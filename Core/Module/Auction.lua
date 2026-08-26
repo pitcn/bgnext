@@ -1357,7 +1357,8 @@ BG.Init(function()
             local itemType = f.itemFrame.itemTypeText
             itemType:SetText((itemType:GetText() or "") .. (hasGZ and " " or "") .. BG.STC_g1(L["<心愿>"]))
             hasHope = true
-            BG.PlaySound("hope")
+            local _, itemLink = GetItemInfo(itemID)
+            BG.BGNext.WishlistReminder.notify("auction", itemID, BG.FB1, tostring(f), itemLink)
         end
         local isFold
         if hasGZ or hasHope then

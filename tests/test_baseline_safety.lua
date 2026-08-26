@@ -10,6 +10,7 @@ return function(test)
     local main = readAll("Core/BiaoGe.lua")
     local database = readAll("Core/DB/DB.lua")
     local auction = readAll("Core/Module/Auction.lua")
+    local wishlistReminder = readAll("Core/BGNext/WishlistReminder.lua")
     local helpers = readAll("Core/function2.lua")
     local trade = readAll("Core/Module/Trade.lua")
     local clear = readAll("Core/Module/ClearBiaoGe.lua")
@@ -22,7 +23,10 @@ return function(test)
     test.eq(sendMail:find("MailHistoryMainFrame", 1, true), nil, "send-mail legacy history shortcut is absent")
     test.eq(database:find("BiaoGe.Hope", 1, true), nil, "legacy wishlist data is not initialized or migrated")
     test.eq(auction:find("BG.HopeFrame", 1, true), nil, "auction does not scan the removed legacy wishlist UI")
-    test.eq(auction:find('BG.PlaySound("hope")', 1, true) ~= nil, true, "auction wishlist reminder includes local sound")
+    test.eq(auction:find('WishlistReminder.notify("auction"', 1, true) ~= nil, true,
+        "auction delegates to local wishlist reminder")
+    test.eq(wishlistReminder:find('BG.PlaySound("hope")', 1, true) ~= nil, true,
+        "wishlist reminder includes local sound")
     for path, content in pairs({
         ["Core/BiaoGe.lua"] = main,
         ["Core/DB/DB.lua"] = database,
