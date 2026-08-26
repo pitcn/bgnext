@@ -6,7 +6,9 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 | --- | --- | --- | --- | --- | --- | --- |
 | `schemaVersion` | Plugin constant | Safe migrations | Local until BGNext data is cleared | None | Clear all BGNext data | Low |
 | `settings` | User choices | Module preferences | Local until changed or cleared | None | Settings/reset | Low |
-| `wishlist` | User-entered item choices for self | Personal reminders | Local until item/list is cleared | None | Add/remove/clear | Low |
+| `wishlist[realmId][player][raidId][difficultyIndex][bossIndex][slotIndex]` | Item IDs explicitly selected by the current player for their own logged-in character | Reproduce the original boss-and-slot wishlist and local reminders | Local until the user removes a slot, clears the raid, or clears BGNext data | Current player UI only | Edit slot/right-click remove/clear/import | Medium |
+| `wishlistUnplaced[realmId][player][raidId][itemId]` | Items from the temporary BGNext flat wishlist that cannot be mapped reliably to one boss | Preserve user-entered test data without guessing a boss | Local until manually cleared or successfully placed | Current player UI only | Review and clear locally | Medium |
+| Manual wishlist import/export text | Raid, difficulty, boss position and item IDs selected by the current player | User-directed backup and restore | Visible edit box only; BGNext does not write it outside SavedVariables or send it | Recipient chosen manually by the user after copying | Explicit click, full preview, cancel available | Medium |
 | `equipmentFilters` | User choices and current-character capabilities | Local display filtering | Local until profile is cleared | None | Edit/reset | Low |
 | `ownCharacters` | Characters observed only while the user is logged into them | Own-character overview | Local until character/module/all data is cleared | None | Delete character/disable/clear | Medium |
 | `currentRaid` | Current raid identity and the user’s current-raid purchases | Personal current-raid shopping summary | One current raid; cleared on new raid, settlement completion, or manual clear | None | Clear current raid | Medium |
@@ -28,3 +30,5 @@ Mail subject, body, unrelated attachments, chat text, account identifiers, devic
 Automatic-bidding state is memory-only. Its auction identity, item identity, current price, increment, cap, next bid, status, and stop reason must not be written to SavedVariables. Reloading the UI destroys the state.
 
 Local addon conflict detection reads only the current client’s addon metadata and enabled/loaded state. It sends no channel messages, writes no SavedVariables and does not inspect other players’ addon versions.
+
+Wishlist import/export never calls `SendChatMessage`, `C_ChatInfo.SendAddonMessage`, clipboard APIs, HTTP, telemetry or file APIs. BGNext only displays or accepts the text after an explicit user action.
