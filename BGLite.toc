@@ -20,6 +20,7 @@ Libs\embeds.xml
 Core\DB\DB.xml
 Core\BGNext\Init.lua
 Core\BGNext\Identity.lua
+Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
