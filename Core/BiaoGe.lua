@@ -138,7 +138,7 @@ BG.Init(function()
         VerText:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
         VerText:SetTextColor(RGB("00BFFF"))
         local identity = BG.BGNext and BG.BGNext.Identity
-        VerText:SetText(identity and (identity.projectName .. " v" .. identity.version) or "BGNext")
+        VerText:SetText(identity and ("v" .. identity.version) or "")
         BG.VerText = VerText
 
         -- 说明书

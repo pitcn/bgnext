@@ -31,4 +31,6 @@ return function(test)
     test.eq(core:find('SLASH_BGNEXT3 = "/bglite"', 1, true) ~= nil, true, "legacy slash registered")
     test.eq(core:find('SLASH_BIAOGE1 = "/biaoge"', 1, true) == nil, true, "old BiaoGe slash removed")
     test.eq(core:find('SLASH_BIAOGE2 = "/gbg"', 1, true) == nil, true, "old gbg slash removed")
+    test.eq(core:find('VerText:SetText(identity and ("v" .. identity.version) or "")', 1, true) ~= nil, true,
+        "version label does not repeat the adjacent BGNext title")
 end
