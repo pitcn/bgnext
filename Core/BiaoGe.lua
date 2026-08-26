@@ -349,60 +349,6 @@ BG.Init(function()
             t:SetText(L["对账"])
         end
     end
-    -- Lite: 恢复交易记录 / 邮件记录面板（原 BGLite 裁剪时整体删除，2026-08-24 按 BiaoGe v2.3.5 恢复，功能保持一致）
-    -- 交易记录
-    BG.TradeHistoryMainFrame = CreateFrame("Frame", "BG.TradeHistoryMainFrame", BG.MainFrame)
-    do
-        local mainFrame = BG.TradeHistoryMainFrame
-        mainFrame:Hide()
-        BG.BackBiaoGe(mainFrame)
-        mainFrame:SetScript("OnShow", function()
-            BG.FrameHide(0)
-            BiaoGe.lastFrame = "TradeHistory"
-            BG.TabButtonsFB:Hide()
-            if BG.NanDuDropDown then
-                BG.NanDuDropDown.DropDown:Hide()
-            end
-        end)
-        mainFrame:SetScript("OnHide", function(self)
-            if not self:IsShown() and BiaoGe.lastFrame == "TradeHistory" then
-                BiaoGe.lastFrame = nil
-            end
-        end)
-
-        local text = mainFrame:CreateFontString()
-        text:SetPoint("BOTTOMLEFT", BG.MainFrame, "BOTTOMLEFT", 35, 45)
-        text:SetFont(BIAOGE_TEXT_FONT, 20, "OUTLINE")
-        text:SetTextColor(RGB(BG.g1))
-        text:SetText(L["交易记录"])
-    end
-
-    -- 邮件记录
-    BG.MailHistoryMainFrame = CreateFrame("Frame", "BG.MailHistoryMainFrame", BG.MainFrame)
-    do
-        local mainFrame = BG.MailHistoryMainFrame
-        mainFrame:Hide()
-        BG.BackBiaoGe(mainFrame)
-        mainFrame:SetScript("OnShow", function()
-            BG.FrameHide(0)
-            BiaoGe.lastFrame = "MailHistory"
-            BG.TabButtonsFB:Hide()
-            if BG.NanDuDropDown then
-                BG.NanDuDropDown.DropDown:Hide()
-            end
-        end)
-        mainFrame:SetScript("OnHide", function(self)
-            if not self:IsShown() and BiaoGe.lastFrame == "MailHistory" then
-                BiaoGe.lastFrame = nil
-            end
-        end)
-
-        local text = mainFrame:CreateFontString()
-        text:SetPoint("BOTTOMLEFT", BG.MainFrame, "BOTTOMLEFT", 35, 45)
-        text:SetFont(BIAOGE_TEXT_FONT, 20, "OUTLINE")
-        text:SetTextColor(RGB(BG.g1))
-        text:SetText(L["邮件记录"])
-    end
     ----------生成各副本UI----------
     do
         for k, FB in pairs(BG.FBtable) do
@@ -921,9 +867,6 @@ BG.Init(function()
 
         BG.FBMainFrameTabNum = 1
         BG.DuiZhangMainFrameTabNum = 4
-        -- Lite: 交易/邮件记录面板 tab 编号（对齐 v2.3.5，避让 1-8 主 tab 编号段）
-        BG.TradeHistoryMainFrameTabNum = 101
-        BG.MailHistoryMainFrameTabNum = 102
 
         local r, g, b = GetClassRGB(nil, "player")
         local onEnterDelay = .6
@@ -1015,20 +958,6 @@ BG.Init(function()
 
         -- 2026-08-24 策划决策：恢复对账底部 tab 入口（原 BGLite 裁剪时隐藏，功能本就完整）
         local bt = BG.Create_TabButton(BG.DuiZhangMainFrameTabNum, L["对账"], BG.DuiZhangMainFrame)
-
-        -- Lite: 恢复交易/邮件记录底部 tab（2026-08-24 按 BiaoGe v2.3.5 恢复，对齐 v2.3.5 :1748-1749）
-        -- 2026-08-25 策划：临时隐藏「交易记录」tab（仅隐藏 UI 入口，功能逻辑不动）
-        local bt = BG.Create_TabButton(BG.TradeHistoryMainFrameTabNum, L["交易记录"], BG.TradeHistoryMainFrame)
-        bt:Hide()
-        -- 从 tabButtons 锚点链移除隐藏项：否则「邮件记录」会锚定到隐藏按钮右侧、与「对账」之间留空；
-        -- 同时使 ClickTabButton(101)/lastFrame 恢复不再能显示该面板，彻底切断 UI 入口。
-        for i = #BG.tabButtons, 1, -1 do
-            if BG.tabButtons[i].num == BG.TradeHistoryMainFrameTabNum then
-                tremove(BG.tabButtons, i)
-                break
-            end
-        end
-        BG.Create_TabButton(BG.MailHistoryMainFrameTabNum, L["邮件记录"], BG.MailHistoryMainFrame)
 
         ----------更新已拥有----------
         do

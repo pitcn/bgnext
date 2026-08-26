@@ -1,0 +1,31 @@
+# BGLite upstream snapshot and BGNext safety baseline
+
+## Recorded upstream
+
+- Product: BGLite
+- Reported upstream version: 2.4.0
+- Snapshot date: 2026-08-26
+- File count: 188
+- Integrity manifest: `BGLite-2.4.0.sha256`
+
+The manifest matches the independently downloaded BGLite 2.4.0 distribution snapshot supplied by the maintainer. It records provenance and byte identity; it does **not** certify that every upstream file or behavior satisfies BGNext policy.
+
+## Safety interpretation
+
+The distributed snapshot loads legacy trade and mail history modules by default and contains restoration notes referring to historical BiaoGe behavior. BGNext therefore treats it as the authorized development upstream, not as an already audited safety baseline.
+
+BGNext establishes its safety baseline through reviewed overrides, automated tests, the override manifest, and the quarantine rules below. Public documentation must preserve this distinction.
+
+## Quarantined upstream files
+
+The following upstream files are retained for provenance review but must not be loaded or packaged in a BGNext Release:
+
+- `Core/Module/TradeHistory.lua`
+- `Core/Module/MailHistory.lua`
+- `Core/Module/History.lua`
+
+They must not be used as implementation templates for BGNext’s scoped settlement modules. The independently implemented `Core/BGNext/CurrentTrade.lua` and `Core/BGNext/CurrentMail.lua` will replace only the allowed current/single-settlement behavior.
+
+## Verification rule
+
+Every changed upstream file must be reviewed individually and listed in `BGNext-overrides.sha256`. A changed hash is evidence of a change, not evidence that the change is safe. Tests and review must establish safety separately.

@@ -41,8 +41,6 @@ Core\Module\AuctionLog.lua
 Core\Module\AuctionWA.lua
 Core\Module\AuctionWAEvent.lua
 Core\Module\Trade.lua
-Core\Module\TradeHistory.lua
-Core\Module\MailHistory.lua
 Core\Module\SendMail.lua
 Core\Module\QuickAccounting.lua
 Core\Module\ItemTooltip.lua

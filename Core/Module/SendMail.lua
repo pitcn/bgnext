@@ -1028,24 +1028,6 @@ local function RoadSendMail()
             bt:SetScript("OnLeave", GameTooltip_Hide)
         end
 
-        -- 邮寄记录
-        do
-            local bt = CreateFrame("Button", nil, mainFrame)
-            bt:SetPoint("LEFT", mainFrame.varButton, "RIGHT", 15, 0)
-            bt:SetNormalFontObject(BG.FontGreen15)
-            bt:SetDisabledFontObject(BG.FontDis15)
-            bt:SetHighlightFontObject(BG.FontWhite15)
-            bt:SetText(L["邮寄记录"])
-            bt:SetSize(bt:GetFontString():GetWidth(), 20)
-            BG.SetTextHighlightTexture(bt)
-            bt:SetScript("OnClick", function(self)
-                BG.PlaySound(1)
-                BG.MainFrame:Show()
-                BG.ClickTabButton(BG.MailHistoryMainFrameTabNum)
-                CloseAllBags()
-            end)
-        end
-
         -- 背景
         do
             local f = CreateFrame("Frame", nil, mainFrame, "InsetFrameTemplate")
