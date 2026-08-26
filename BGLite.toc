@@ -22,6 +22,7 @@ Core\BGNext\DataLifecycle.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
 Core\BGNext\ReleaseInfo.lua
+Core\BGNext\Wishlist.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
