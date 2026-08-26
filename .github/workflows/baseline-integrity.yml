@@ -1,0 +1,26 @@
+name: Baseline integrity
+
+"on":
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-baseline:
+    name: Verify BGLite 2.4.0 baseline
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify baseline files
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/verify-baseline.ps1
