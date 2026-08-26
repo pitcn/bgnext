@@ -442,6 +442,148 @@ if runtimeReady() then
         return frame
     end
 
+    local importPanel, exportPanel
+
+    local function limitsByRaid()
+        local result = {}
+        for _, raidId in ipairs(BG.FBtable or {}) do
+            result[raidId] = limitsFor(raidId)
+        end
+        return result
+    end
+
+    local function createTextPanel(owner, title, importMode)
+        local panel = CreateFrame("Frame", nil, owner, "BackdropTemplate")
+        panel:SetBackdrop({
+            bgFile = "Interface/ChatFrame/ChatFrameBackground",
+            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+            edgeSize = 10,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        })
+        panel:SetBackdropColor(0, 0, 0, 0.8)
+        panel:SetPoint("TOPRIGHT", BG.MainFrame, "TOPRIGHT", -20, -20)
+        panel:SetSize(250, 250)
+        panel:SetFrameLevel(130)
+        panel:EnableMouse(true)
+        panel:Hide()
+
+        local heading = panel:CreateFontString(nil, "OVERLAY")
+        heading:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+        heading:SetPoint("TOP", 0, -8)
+        heading:SetTextColor(1, 1, 1)
+        heading:SetText(title)
+
+        local box = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+        box:SetBackdrop({
+            bgFile = "Interface/ChatFrame/ChatFrameBackground",
+            edgeFile = "Interface/ChatFrame/ChatFrameBackground",
+            edgeSize = 1,
+        })
+        box:SetBackdropColor(0, 0, 0, 0.8)
+        box:SetBackdropBorderColor(1, 1, 1, 0.5)
+        box:SetPoint("TOPLEFT", 8, -28)
+        box:SetSize(234, 180)
+
+        local scroll = CreateFrame("ScrollFrame", nil, box, BG.scrollTemplate)
+        scroll:SetPoint("TOPLEFT", 5, -4)
+        scroll:SetPoint("BOTTOMRIGHT", -27, 4)
+        local edit = CreateFrame("EditBox", nil, scroll)
+        edit:SetWidth(200)
+        edit:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
+        edit:SetMultiLine(true)
+        edit:SetAutoFocus(false)
+        edit:EnableMouse(true)
+        edit:SetTextInsets(5, 5, 5, 10)
+        scroll:SetScrollChild(edit)
+        edit:SetScript("OnEscapePressed", function() panel:Hide() end)
+        panel.edit, panel.scroll = edit, scroll
+
+        local cancel = BG.CreateButton(panel)
+        cancel:SetSize(110, 25)
+        cancel:SetPoint("BOTTOMRIGHT", -8, 10)
+        cancel:SetText(CANCEL or "取消")
+        cancel:SetScript("OnClick", function() panel:Hide() end)
+
+        if importMode then
+            local function acceptImport()
+                local parsed = wishlist.parseImport(edit:GetText(), limitsByRaid())
+                if not parsed.ok then
+                    localMessage("心愿导入失败：" .. tostring(parsed.reason))
+                    return
+                end
+                local root, realmId, player = context()
+                if not wishlist.applyImport(root, realmId, player, parsed) then
+                    localMessage("心愿导入失败：当前角色信息不可用。")
+                    return
+                end
+                for raidId in pairs(parsed.raids) do
+                    local raidFrame = BG["HopeFrame" .. raidId]
+                    if raidFrame and raidFrame:IsShown() then raidFrame:Refresh() end
+                end
+                localMessage(string.format("心愿清单导入成功，一共导入%d件装备。", parsed.itemCount))
+                panel:Hide()
+            end
+            local okay = BG.CreateButton(panel)
+            okay:SetSize(110, 25)
+            okay:SetPoint("BOTTOMLEFT", 8, 10)
+            okay:SetText(OKAY or "确定")
+            okay:SetScript("OnClick", acceptImport)
+            edit:SetScript("OnEnterPressed", acceptImport)
+        end
+        return panel
+    end
+
+    local function showImportPanel()
+        if exportPanel then exportPanel:Hide() end
+        if not importPanel then
+            importPanel = createTextPanel(BG.ButtonImportHope, "导入心愿", true)
+        end
+        importPanel:SetShown(not importPanel:IsShown())
+        if importPanel:IsShown() then
+            importPanel.edit:SetText("")
+            importPanel.edit:SetFocus()
+        end
+    end
+
+    local function showExportPanel()
+        if importPanel then importPanel:Hide() end
+        if not exportPanel then
+            exportPanel = createTextPanel(BG.ButtonExportHope, "导出心愿", false)
+        end
+        exportPanel:SetShown(not exportPanel:IsShown())
+        if exportPanel:IsShown() then
+            local root, realmId, player, raidId = context()
+            local payload = wishlist.exportRaid(root, realmId, player, raidId, limitsFor(raidId))
+            exportPanel.edit:SetText(payload or "心愿清单是空的")
+            exportPanel.edit:HighlightText()
+            exportPanel.edit:SetFocus()
+        end
+    end
+
+    local function confirmClearRaid()
+        local popupName = "BGNEXT_CLEAR_CURRENT_WISHLIST"
+        StaticPopupDialogs[popupName] = StaticPopupDialogs[popupName] or {
+            text = "确定清空心愿？",
+            button1 = YES or "是",
+            button2 = NO or "否",
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            showAlert = true,
+        }
+        StaticPopupDialogs[popupName].OnAccept = function()
+            local root, realmId, player, raidId = context()
+            if wishlist.clearRaid(root, realmId, player, raidId) then
+                local frame = BG["HopeFrame" .. raidId]
+                if frame then frame:Refresh() end
+                local shortName = BG.GetFBinfo and BG.GetFBinfo(raidId, "shortName") or raidId
+                localMessage(string.format("已清空心愿< %s >", tostring(shortName)))
+                if BG.PlaySound then BG.PlaySound(2) end
+            end
+        end
+        StaticPopup_Show(popupName)
+    end
+
     BG.Init(function()
         BG.HopeMainFrame = CreateFrame("Frame", nil, BG.MainFrame)
         BG.HopeMainFrame:SetAllPoints(BG.MainFrame)
@@ -464,6 +606,33 @@ if runtimeReady() then
         end
         BG.HopeMainFrame:SetScript("OnShow", showCurrentRaid)
         BG.Create_TabButton(M.tabNumber, L["心愿清单"] or "心愿清单", BG.HopeMainFrame)
+
+        BG.ButtonImportHope = CreateFrame("Button", nil, BG.HopeMainFrame)
+        BG.ButtonImportHope:SetPoint("TOPRIGHT", BG.MainFrame, "TOPRIGHT", -35, 4)
+        if BG.FontGreen15 then BG.ButtonImportHope:SetNormalFontObject(BG.FontGreen15) end
+        if BG.FontDis15 then BG.ButtonImportHope:SetDisabledFontObject(BG.FontDis15) end
+        if BG.FontWhite15 then BG.ButtonImportHope:SetHighlightFontObject(BG.FontWhite15) end
+        BG.ButtonImportHope:SetText("导入心愿")
+        BG.ButtonImportHope:SetSize(BG.ButtonImportHope:GetFontString():GetWidth(), 30)
+        if BG.SetTextHighlightTexture then BG.SetTextHighlightTexture(BG.ButtonImportHope) end
+        BG.ButtonImportHope:SetScript("OnClick", showImportPanel)
+
+        BG.ButtonExportHope = CreateFrame("Button", nil, BG.HopeMainFrame)
+        BG.ButtonExportHope:SetPoint("RIGHT", BG.ButtonImportHope, "LEFT", -7, 0)
+        if BG.FontGreen15 then BG.ButtonExportHope:SetNormalFontObject(BG.FontGreen15) end
+        if BG.FontDis15 then BG.ButtonExportHope:SetDisabledFontObject(BG.FontDis15) end
+        if BG.FontWhite15 then BG.ButtonExportHope:SetHighlightFontObject(BG.FontWhite15) end
+        BG.ButtonExportHope:SetText("导出心愿")
+        BG.ButtonExportHope:SetSize(BG.ButtonExportHope:GetFontString():GetWidth(), 30)
+        if BG.SetTextHighlightTexture then BG.SetTextHighlightTexture(BG.ButtonExportHope) end
+        BG.ButtonExportHope:SetScript("OnClick", showExportPanel)
+
+        BG.ButtonHopeQingKong = BG.CreateButton(BG.HopeMainFrame)
+        BG.ButtonHopeQingKong:SetSize(120, 25)
+        BG.ButtonHopeQingKong:SetPoint("BOTTOMLEFT", BG.MainFrame, "BOTTOMLEFT", 30, 38)
+        BG.ButtonHopeQingKong:SetText("清空心愿")
+        BG.ButtonHopeQingKong:SetScript("OnClick", confirmClearRaid)
+
         if hooksecurefunc and BG.ClickFBbutton then
             hooksecurefunc(BG, "ClickFBbutton", function()
                 if BG.HopeMainFrame:IsShown() then showCurrentRaid() end

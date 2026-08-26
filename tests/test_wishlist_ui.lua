@@ -42,4 +42,19 @@ return function(test)
     }) do
         test.eq(source:find(forbidden, 1, true), nil, "forbidden simplified or communicating UI absent: " .. forbidden)
     end
+    for _, required in ipairs({
+        "local function showImportPanel",
+        "local function showExportPanel",
+        "local function confirmClearRaid",
+        "wishlist.parseImport",
+        "wishlist.applyImport",
+        "wishlist.exportRaid",
+        "BG.ButtonImportHope",
+        "BG.ButtonExportHope",
+    }) do
+        test.eq(source:find(required, 1, true) ~= nil, true, "original control contract present: " .. required)
+    end
+    for _, forbiddenApi in ipairs({ "C_Clipboard", "CopyToClipboard", "ChatEdit_InsertLink" }) do
+        test.eq(source:find(forbiddenApi, 1, true), nil, "no automatic clipboard or chat export: " .. forbiddenApi)
+    end
 end
