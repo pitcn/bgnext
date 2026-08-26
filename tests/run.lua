@@ -1,6 +1,7 @@
 local T = dofile("tests/testlib.lua")
 local suites = {
     "tests/test_init.lua",
+    "tests/test_data_lifecycle.lua",
 }
 
 for _, path in ipairs(suites) do

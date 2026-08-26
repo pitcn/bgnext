@@ -17,6 +17,7 @@ Templates.xml
 Libs\embeds.xml
 Core\DB\DB.xml
 Core\BGNext\Init.lua
+Core\BGNext\DataLifecycle.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
