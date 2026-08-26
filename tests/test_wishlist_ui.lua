@@ -27,6 +27,8 @@ return function(test)
     test.eq(ui.shortcutAction(true, "RightButton", true), "auction", "master looter alt-right starts auction")
     test.eq(ui.shortcutAction(false, "RightButton", true), nil, "member alt-right has no privileged action")
     test.eq(ui.shortcutAction(false, "LeftButton", false), nil, "no modifier does not set wishlist")
+    test.eq(ui.isLooted(7001, { 7002, 7001 }), true, "recorded current-raid item shows looted marker")
+    test.eq(ui.isLooted(7001, { 7002 }), false, "unrecorded item hides looted marker")
 
     local file = assert(io.open("Core/BGNext/WishlistUI.lua", "rb"))
     local source = file:read("*a")
@@ -58,6 +60,16 @@ return function(test)
     for _, forbiddenApi in ipairs({ "C_Clipboard", "CopyToClipboard", "ChatEdit_InsertLink" }) do
         test.eq(source:find(forbiddenApi, 1, true), nil, "no automatic clipboard or chat export: " .. forbiddenApi)
     end
+    test.eq(source:find("and BG.MainFrame and BG.Create_TabButton", 1, true), nil,
+        "wishlist registration does not require frames before ADDON_LOADED")
+    test.eq(source:find("and BG.BGNext.DB", 1, true), nil,
+        "wishlist registration does not require SavedVariables before ADDON_LOADED")
+    test.eq(source:find("if not BG.MainFrame or not BG.Create_TabButton or not BG.BGNext.DB then return end", 1, true) ~= nil, true,
+        "wishlist callback validates frames and SavedVariables after ADDON_LOADED")
+    test.eq(source:find("BG.AddHText(slot.FB, link, itemId, slot)", 1, true) ~= nil, true,
+        "hard-mode decoration receives the raid identifier")
+    test.eq(source:find("BG.lastfocuszhuangbei2 = nextSlot", 1, true) ~= nil, true,
+        "item picker advances to the next slot like the original workflow")
 
     local mainFile = assert(io.open("Core/BiaoGe.lua", "rb"))
     local mainSource = mainFile:read("*a")

@@ -101,8 +101,16 @@ function M.shortcutAction(isMasterLooter, button, altDown)
     return nil
 end
 
+function M.isLooted(wishItemId, recordedItemIds)
+    if type(wishItemId) ~= "number" then return false end
+    for _, itemId in ipairs(recordedItemIds or {}) do
+        if itemId == wishItemId then return true end
+    end
+    return false
+end
+
 local function runtimeReady()
-    return ns and BG.Init and BG.MainFrame and BG.Create_TabButton and BG.BGNext.Wishlist and BG.BGNext.DB
+    return ns and BG.Init and BG.BGNext.Wishlist
 end
 
 if runtimeReady() then
@@ -110,6 +118,7 @@ if runtimeReady() then
     local hopeMaxn = ns.HopeMaxn
     local hopeMaxb = ns.HopeMaxb
     local hopeMaxi = ns.HopeMaxi
+    local maxb = ns.Maxb
     local L = ns.L or setmetatable({}, { __index = function(_, key) return key end })
 
     local function context(raidId)
@@ -191,6 +200,24 @@ if runtimeReady() then
         slot._refreshing = nil
     end
 
+    local function recordedRaidItems(raidId)
+        local result = {}
+        local raidFrame = BG.Frame and BG.Frame[raidId]
+        if not raidFrame then return result end
+        for bossIndex = 1, maxb[raidId] or 0 do
+            local boss = raidFrame["boss" .. bossIndex]
+            local slotCount = BG.GetMaxi and BG.GetMaxi(raidId, bossIndex) or 0
+            for slotIndex = 1, slotCount do
+                local cell = boss and boss["zhuangbei" .. slotIndex]
+                local itemId = cell and wishlist.itemIdFromValue(cell:GetText())
+                if itemId then
+                    result[#result + 1] = BG.GetLeiTingItem and BG.GetLeiTingItem(itemId, raidId) or itemId
+                end
+            end
+        end
+        return result
+    end
+
     local function updateSlotAppearance(slot)
         local text = slot:GetText()
         local itemId = wishlist.itemIdFromValue(text)
@@ -209,7 +236,13 @@ if runtimeReady() then
             if BG.IsHave then BG.IsHave(slot) end
         end
         if BG.UpdateFilter then BG.UpdateFilter(slot) end
-        if BG.Update_IsLooted then BG.Update_IsLooted(slot) end
+        if slot.looted then
+            local canonicalItemId = itemId
+            if canonicalItemId and BG.GetLeiTingItem then
+                canonicalItemId = BG.GetLeiTingItem(canonicalItemId, slot.FB)
+            end
+            slot.looted:SetShown(M.isLooted(canonicalItemId, recordedRaidItems(slot.FB)))
+        end
     end
 
     local function persistSlot(slot)
@@ -321,6 +354,11 @@ if runtimeReady() then
             BG.lastfocuszhuangbei = self
             BG.lastfocus = self
             if BG.SetListzhuangbei then BG.SetListzhuangbei(self) end
+            local boss = BG.HopeFrame[self.FB]
+                and BG.HopeFrame[self.FB]["nandu" .. self.hopenandu]
+                and BG.HopeFrame[self.FB]["nandu" .. self.hopenandu]["boss" .. self.bossnum]
+            local nextSlot = boss and boss["zhuangbei" .. (self.i + 1)] or nil
+            BG.lastfocuszhuangbei2 = nextSlot
         end)
         slot:SetScript("OnEditFocusLost", function(self)
             self:ClearHighlightText()
@@ -585,6 +623,7 @@ if runtimeReady() then
     end
 
     BG.Init(function()
+        if not BG.MainFrame or not BG.Create_TabButton or not BG.BGNext.DB then return end
         BG.HopeMainFrame = CreateFrame("Frame", nil, BG.MainFrame)
         BG.HopeMainFrame:SetAllPoints(BG.MainFrame)
         BG.HopeMainFrame:Hide()
