@@ -1,0 +1,264 @@
+if BG.IsBlackListPlayer then return end
+local AddonName, ns = ...
+
+local L = ns.L
+
+local GetClassRGB = ns.GetClassRGB
+local AddTexture = ns.AddTexture
+local GetItemID = ns.GetItemID
+
+local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
+local GetLootMethod = GetLootMethod or C_PartyInfo.GetLootMethod
+
+local Maxb = ns.Maxb
+
+local player = BG.playerName
+
+local r, g, b = GetClassRGB(nil, "player")
+
+BG.Init2(function()
+    local itemFucs = {}
+    local unitFucs = {}
+    -- 单位
+    do
+        -- 鼠标提示玩家的欠款和罚款
+        do
+            local fk = {}
+            local qk = {}
+            local function Get()
+                if not IsInRaid(1) then return end
+                local FB = BG.FB1
+                fk = {}
+                qk = {}
+                BG.PairFBItem(function(item, buyer, money, b, i)
+                    local name = buyer:GetText()
+                    if name ~= '' then
+                        fk[name] = fk[name] or 0
+                        qk[name] = qk[name] or 0
+                        if b == Maxb[FB] then
+                            fk[name] = fk[name] + (tonumber(money:GetText()) or 0)
+                        end
+                        qk[name] = qk[name] + (tonumber(BiaoGe[FB]["boss" .. b]["qiankuan" .. i]) or 0)
+                    end
+                end)
+            end
+            C_Timer.NewTicker(2, Get)
+
+            local function AddUnitInfo(self, unit, name)
+                if BiaoGe.options["mouseFK"] ~= 1 then return end
+                if not IsInRaid(1) then return end
+                local fkMoney = fk[name] or 0
+                local qkMoney = qk[name] or 0
+                if fkMoney ~= 0 then
+                    self:AddLine(L["罚款："] .. BG.STC_w1(BG.FormatNumber(fkMoney, 2)), 1, .82, 0)
+                end
+                if qkMoney ~= 0 then
+                    self:AddLine(L["欠款："] .. BG.STC_w1(BG.FormatNumber(qkMoney, 2)), 1, .82, 0)
+                end
+                if fkMoney ~= 0 or qkMoney ~= 0 then
+                    self:Show()
+                end
+            end
+            tinsert(unitFucs, AddUnitInfo)
+        end
+
+        -- 星团长
+        if BG.MeetingHornRegimentData then
+            local function AddUnitInfo(self, unit, name)
+                if BiaoGe.options["MeetingHorn_starRaidLeader"] ~= 1 then return end
+                local currentLevel = BG.MeetingHornRegimentData[name]
+                if not currentLevel then return end
+                currentLevel = currentLevel.level
+                -- local currentLevel = 5 -- test
+                local nextText = _G["GameTooltipTextLeft1"]
+                local str = nextText:GetText() or ''
+                nextText:SetFormattedText('%s|T%s%s|t', str, BG.MeetingHornStarTexture(currentLevel), BG.MeetingHornGetCoords("tooltip"))
+                self:Show()
+            end
+            tinsert(unitFucs, AddUnitInfo)
+        end
+    end
+
+    -- 物品
+    do
+        -- MOP在正义奖章和一袋岩石碎片里显示正义点数数量
+        if BG.IsMOP then
+            local itemIDs = {
+                [247796] = 395,
+                [256883] = 395,
+                [248329] = 3350,
+                [266272] = 3414,
+            }
+
+            local function AddInfo(self, itemID, link, name)
+                if BiaoGe.options["showCurrencyCount"] ~= 1 then return end
+                local currency = itemIDs[itemID]
+                if currency then
+                    local info = C_CurrencyInfo.GetCurrencyInfo(currency)
+                    local name = info.name
+                    local count = info.quantity
+                    local maxCount = info.maxQuantity
+                    local tex = info.iconFileID
+                    local quality = info.quality
+                    local r, g, b = GetItemQualityColor(quality)
+                    self:AddLine(" ")
+                    self:AddLine("< BGLite >", 0, .75, 1)
+                    if not info.useTotalEarnedForMaxQty then
+                        self:AddDoubleLine(AddTexture(tex) .. name, BG.FormatNumber(count) .. "/" .. BG.FormatNumber(maxCount), r, g, b, 1, 1, 1)
+                    else
+                        local totalEarned = info.totalEarned
+                        self:AddDoubleLine(AddTexture(tex) .. name,
+                            format(L["%s(总上限:%s/%s)"], count, BG.FormatNumber(totalEarned), BG.FormatNumber(maxCount)), r, g, b, 1, 1, 1)
+                    end
+                    self:Show()
+                    return
+                end
+            end
+            tinsert(itemFucs, AddInfo)
+        end
+
+        -- 背包提示已拍未交易
+        local function SetBagItem(self, b, i)
+            if not BG.ImMLorLeader() then return end
+            local info = C_Container.GetContainerItemInfo(b, i)
+            if not info then return end
+            local FB = BG.FB1
+            if type(BiaoGe[FB].auctionLog) ~= "table" then return end
+            local notBound
+            if not info.isBound then
+                notBound = true
+            else
+                for i = 1, self:NumLines() do
+                    local tx = _G["GameTooltipTextLeft" .. i]:GetText()
+                    if tx then
+                        local time = tx:match(BIND_TRADE_TIME_REMAINING:gsub("%%s", "(.+)"))
+                        if time then
+                            notBound = true
+                            break
+                        end
+                    end
+                    i = i + 1
+                end
+            end
+            if notBound then
+                local trade = {}
+                local notrade = {}
+                for _, v in pairs(BiaoGe[FB].auctionLog) do
+                    if v.type == 1 and BG.IsSameItem(info.hyperlink, v.zhuangbei) then
+                        tinsert(v.trade and trade or notrade, v)
+                    end
+                end
+                if next(trade) or next(notrade) then
+                    self:AddLine(" ")
+                    for _, v in ipairs(trade) do
+                        local text = BG.FormatNumber(v.jine, 2) .. "(|c" .. select(4, GetClassColor(v.class)) .. v.maijia .. "|r)"
+                        self:AddDoubleLine(L["已拍已交易"], text, 0, 1, 0)
+                    end
+                    for _, v in ipairs(notrade) do
+                        local text = BG.FormatNumber(v.jine, 2) .. "(|c" .. select(4, GetClassColor(v.class)) .. v.maijia .. "|r)"
+                        self:AddDoubleLine(L["已拍未交易"], text, 1, 0, 0)
+                    end
+                    self:Show()
+                end
+            end
+        end
+        hooksecurefunc(GameTooltip, "SetBagItem", SetBagItem)
+
+        -- 表格/背包高亮对应物品
+        do
+            local i = 1
+            while _G["ChatFrame" .. i] do
+                _G["ChatFrame" .. i]:HookScript("OnHyperlinkEnter", function(self, link, text)
+                    BG.Show_AllHighlight(link, "chat")
+                end)
+                _G["ChatFrame" .. i]:HookScript("OnHyperlinkLeave", BG.Hide_AllHighlight)
+                i = i + 1
+            end
+
+            if IsAddOnLoaded("Bagnon") then
+                BG.After(1, function()
+                    local i = 1
+                    while _G["BagnonContainerItem" .. i] do
+                        local bag = _G["BagnonContainerItem" .. i]
+                        if BG.IsRetail then
+                            bag:HookScript("OnLeave", GameTooltip_Hide)
+                        else
+                            bag:HookScript("OnLeave", ContainerFrameItemButton_OnLeave)
+                        end
+                        i = i + 1
+                    end
+                end)
+            end
+
+            local link
+            local dalayFrame = CreateFrame("Frame")
+            dalayFrame.t = 0
+            dalayFrame:Hide()
+            local function OnUpdate(self, t)
+                self.t = self.t + t
+                if self.t >= .1 then
+                    self:Hide()
+                    if link then
+                        BG.Show_AllHighlight(link, "bag")
+                    end
+                end
+            end
+            local function OnHide()
+                dalayFrame:Hide()
+                BG.Hide_AllHighlight()
+            end
+            dalayFrame:SetScript('OnUpdate', OnUpdate)
+
+            local function OnEnter(self, button)
+                local b = self:GetParent():GetID()
+                local i = self:GetID()
+                link = C_Container.GetContainerItemLink(b, i)
+                dalayFrame.t = 0
+                dalayFrame:Show()
+            end
+            hooksecurefunc("ContainerFrameItemButton_OnEnter", OnEnter)
+            if BG.IsRetail then
+                hooksecurefunc("GameTooltip_Hide", OnHide)
+            else
+                hooksecurefunc("ContainerFrameItemButton_OnLeave", OnHide)
+            end
+        end
+    end
+
+    -- 执行
+    do
+        local function UnitGo(self)
+            if InCombatLockdown() then return end
+            if BG.InBoss() then return end
+            local _, unit = self:GetUnit()
+            if BG.IsSecret(unit) then return end
+            if not unit or not UnitIsPlayer(unit) then return end
+            local name = BG.GN(unit)
+            for _, fuc in ipairs(unitFucs) do
+                fuc(self, unit, name)
+            end
+        end
+        if BG.IsRetail then
+            TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, UnitGo)
+        else
+            GameTooltip:HookScript("OnTooltipSetUnit", UnitGo)
+        end
+
+        local function ItemGo(self)
+            if self ~= GameTooltip  then return end
+            local name, link = self:GetItem()
+            if not link then return end
+            local itemID = GetItemID(link)
+            if not itemID then return end
+            itemID = BG.GetLeiTingItem(itemID)
+            for _, fuc in ipairs(itemFucs) do
+                fuc(self, itemID, link, name)
+            end
+        end
+        if BG.IsRetail then
+            TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, ItemGo)
+        else
+            GameTooltip:HookScript("OnTooltipSetItem", ItemGo)
+        end
+    end
+end)

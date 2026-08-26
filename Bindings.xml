@@ -1,0 +1,14 @@
+<Bindings>
+    <!--
+        WoW 会自动从插件根目录加载本文件，不需要（也不应该）在 TOC 里声明。
+        动作名 BIAOGE 与以下两处必须严格一致，否则设置面板的绑定控件读不到键、键也不会生效：
+          Core/DB/Init2.lua   BINDING_HEADER_BIAOGE / BINDING_NAME_BIAOGE  —— 提供分类名与显示名
+          Core/Options.lua    O.CreateBindKey(..., "BIAOGE", L["表格快捷键"]) —— 面板内的绑定控件
+        原版 BiaoGe 另有一个 name="RoleOverview" 的绑定，本插件不声明：
+        角色总览在本插件里不存在（BG.RoleOverviewUI 是空实现），而 BG.SetFBCD 已被改写为
+        「切换主表格面板」，若声明该绑定只会重复开主面板却标着「角色总览」，属误导。
+    -->
+    <Binding name="BIAOGE" Category="BINDING_HEADER_BIAOGE">
+        if BG and BG.MainFrame then BG.MainFrame:SetShown(not BG.MainFrame:IsVisible()) end
+    </Binding>
+</Bindings>

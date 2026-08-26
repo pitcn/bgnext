@@ -1,0 +1,49 @@
+## Interface: 11508, 11509, 20506, 30405, 38002, 40402, 50503, 50504, 50505, 120005, 120007, 120100
+## Title: <BGLite> |cff00BFFFBGLite纯净版|r
+## Notes: /bglite or /gbg
+## IconTexture: Interface\AddOns\BGLite\Media\icon\icon.tga
+## Author: CQZS (Lite)
+## LoadOnDemand: 0
+## SavedVariables: BiaoGe
+## Version: 2.4.0
+
+Locales\zhCN.lua
+Locales\zhTW.lua
+Locales\enUS.lua
+
+Templates.xml
+Libs\embeds.xml
+Core\DB\DB.xml
+Core\function1.lua
+Core\function2.lua
+Core\FBUI\FBUI.xml
+
+Core\Module\Receive.lua
+Core\Module\DuiZhang.lua
+
+Core\TongBao\ZhangDan.lua
+Core\TongBao\LiuPai.lua
+Core\TongBao\XiaoFei.lua
+Core\TongBao\QianKuan.lua
+Core\TongBao\Channel.lua
+
+Core\BiaoGe.lua
+
+Core\Module\ClearBiaoGe.lua
+Core\Module\Loot.lua
+Core\Module\AuctionMSG.lua
+Core\Module\Auction.lua
+Core\Module\AuctionLog.lua
+Core\Module\AuctionWA.lua
+Core\Module\AuctionWAEvent.lua
+Core\Module\Trade.lua
+Core\Module\TradeHistory.lua
+Core\Module\MailHistory.lua
+Core\Module\SendMail.lua
+Core\Module\QuickAccounting.lua
+Core\Module\ItemTooltip.lua
+Core\Module\ItemLib.lua
+Core\Module\hooks.lua
+
+Core\Module\minimap.lua
+Core\Options.lua
