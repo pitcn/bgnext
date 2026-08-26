@@ -1138,7 +1138,7 @@ BG.Init(function()
             local item, link, quality, level, _, _, _, _, _, Texture, _, typeID = GetItemInfo(link)
             if not link then return end
             if IsAltKeyDown() then
-                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button)
+                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
                 if action == "auction" then
                     BG.StartAuction(link, nil, nil, nil, button == "RightButton")
                 elseif action == "wishlist" and BG.ToggleCurrentWish then

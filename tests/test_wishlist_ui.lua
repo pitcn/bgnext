@@ -57,4 +57,10 @@ return function(test)
     for _, forbiddenApi in ipairs({ "C_Clipboard", "CopyToClipboard", "ChatEdit_InsertLink" }) do
         test.eq(source:find(forbiddenApi, 1, true), nil, "no automatic clipboard or chat export: " .. forbiddenApi)
     end
+
+    local mainFile = assert(io.open("Core/BiaoGe.lua", "rb"))
+    local mainSource = mainFile:read("*a")
+    mainFile:close()
+    test.eq(mainSource:find("shortcutAction(BG.IsML, button, true)", 1, true) ~= nil, true,
+        "alt-click call site passes the explicit modifier state")
 end
