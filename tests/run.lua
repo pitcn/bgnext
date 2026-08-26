@@ -10,6 +10,8 @@ local suites = {
     "tests/test_wishlist.lua",
     "tests/test_wishlist_ui.lua",
     "tests/test_wishlist_reminder.lua",
+    "tests/test_equipment_filter_profiles.lua",
+    "tests/test_equipment_filter.lua",
 }
 
 for _, path in ipairs(suites) do
