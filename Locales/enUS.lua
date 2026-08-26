@@ -1314,6 +1314,7 @@ do
     L["|cffFFFFFF左键：|r打开表格"] = "|cffFFFFFFLeft: |r to open table"
     L["|cffFFFFFF右键：|r打开设置"] = "|cffFFFFFFRight:|rOpen Settings"
     L["BGLite版本"] = "BGLite version"
+    L["兼容插件版本"] = "Compatible addon versions"
     L["插件：%s"] = "AddOn: %s"
     L["拍卖WA版本"] = "Auction WA version"
     L["需全团安装拍卖WA，没安装的人将会看不到拍卖窗口"] = "Auction WA needs to be installed by the whole group, if you don't install it, you won't be able to see the auction window."

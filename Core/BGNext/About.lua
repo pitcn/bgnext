@@ -108,6 +108,8 @@ if BG.Init then
             button:SetText(label)
             if previous then
                 button:SetPoint("RIGHT", previous, "LEFT", -4, 0)
+            elseif BG.ButtonExportHope then
+                button:SetPoint("RIGHT", BG.ButtonExportHope, "LEFT", -12, 0)
             else
                 button:SetPoint("TOPRIGHT", BG.MainFrame, "TOPRIGHT", -31, -2)
             end

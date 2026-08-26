@@ -1329,6 +1329,7 @@ do
     L["|cffFFFFFF左键：|r打开表格"] = true
     L["|cffFFFFFF右键：|r打开设置"] = true
     L["BGLite版本"] = true
+    L["兼容插件版本"] = true
     L["插件：%s"] = true
     L["拍卖WA版本"] = true
     L["需全团安装拍卖WA，没安装的人将会看不到拍卖窗口"] = true

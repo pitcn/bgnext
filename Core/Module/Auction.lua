@@ -123,7 +123,7 @@ BG.Init(function()
     local function Addon_OnEnter(self, _, tooltip)
         if not self then return end
         if tooltip then
-            self.title = L["BGLite版本"] .. "(" .. RAID .. ")"
+            self.title = L["兼容插件版本"] .. "(" .. RAID .. ")"
             self.table = BG.raidBiaoGeVersion
             tooltip:SetOwner(self, "ANCHOR_NONE", 0, 0)
             tooltip:ClearLines()
@@ -1072,7 +1072,7 @@ BG.Init(function()
             guild:SetSize(1, 20)
             guild:SetPoint("BOTTOMLEFT", 10, 2)
             guild:Hide()
-            guild.title = L["BGLite版本"] .. "(" .. GUILD .. ")"
+            guild.title = L["兼容插件版本"] .. "(" .. GUILD .. ")"
             guild.title2 = GUILD .. L["插件：%s"]
             guild.table = BG.guildBiaoGeVersion
             guild.isGuild = true
@@ -1091,7 +1091,7 @@ BG.Init(function()
             addon:SetSize(1, 20)
             addon:SetPoint("LEFT", BG.ButtonGuildVer, "RIGHT", 0, 0)
             addon:Hide()
-            addon.title = L["BGLite版本"] .. "(" .. RAID .. ")"
+            addon.title = L["兼容插件版本"] .. "(" .. RAID .. ")"
             addon.title2 = L["插件：%s"]
             addon.table = BG.raidBiaoGeVersion
             addon.isAddon = true
