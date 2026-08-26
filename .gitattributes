@@ -1,0 +1,9 @@
+# Preserve the official BGLite baseline byte-for-byte on every platform.
+/BGLite.toc -text
+/Bindings.xml -text
+/Templates.xml -text
+/addon_version.txt -text
+/Core/** -text
+/Libs/** -text
+/Locales/** -text
+/Media/** -text
