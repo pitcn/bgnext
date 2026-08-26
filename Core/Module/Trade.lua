@@ -82,7 +82,7 @@ BG.Init(function()
 
         function BG.CancelGuanZhuAndHopeInTrade(itemID)
             local name, link = GetItemInfo(itemID)
-            local haveguanzhu, havehope
+            local haveguanzhu
             for _, FB in pairs(BG.FBtable) do
                 for b = 1, Maxb[FB] do
                     for i = 1, BG.GetMaxi(FB, b) do
@@ -99,29 +99,10 @@ BG.Init(function()
                         end
                     end
                 end
-                for n = 1, HopeMaxn[FB] do
-                    for b = 1, HopeMaxb[FB] do
-                        for i = 1, HopeMaxi do
-                            local bt = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                            if bt then
-                                local _itemID = GetItemID(bt:GetText())
-                                if _itemID == itemID then
-                                    bt:SetText("")
-                                    BiaoGe.Hope[RealmId][player][FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i] = nil
-                                    havehope = true
-                                end
-                            end
-                        end
-                    end
-                end
             end
 
-            if haveguanzhu and havehope then
-                BG.SendSystemMessage(format(L["已自动取消%s的关注和心愿。"], name))
-            elseif haveguanzhu then
+            if haveguanzhu then
                 BG.SendSystemMessage(format(L["已自动取消%s的关注。"], name))
-            elseif havehope then
-                BG.SendSystemMessage(format(L["已自动取消%s的心愿。"], name))
             end
         end
 

@@ -399,16 +399,6 @@ do
                 end
             end
         end
-        for n = 1, HopeMaxn[FB] do -- 心愿清单
-            for b = 1, HopeMaxb[FB] do
-                for i = 1, HopeMaxi do
-                    local bt = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                    if bt then
-                        BG.UpdateFilter(bt)
-                    end
-                end
-            end
-        end
         if BG.ZhuangbeiList then
             local i = 1
             while BG.ZhuangbeiList["button" .. i] do

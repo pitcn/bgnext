@@ -7,15 +7,33 @@ local function validText(value)
     return type(value) == "string" and value:find("%S") ~= nil
 end
 
+local function validContextKey(value)
+    return validText(value) or type(value) == "number"
+end
+
 local function validItemId(itemId)
     return type(itemId) == "number" and itemId > 0 and itemId == math.floor(itemId)
+end
+
+function M.itemIdFromValue(value)
+    if validItemId(value) then
+        return value
+    end
+    if type(value) ~= "string" then
+        return nil
+    end
+    local itemId = tonumber(value:match("^%s*(%d+)%s*$") or value:match("item:(%d+)"))
+    if validItemId(itemId) then
+        return itemId
+    end
+    return nil
 end
 
 local function getRaid(root, realmId, player, raidId, create)
     if type(root) ~= "table" or type(root.wishlist) ~= "table" then
         return nil
     end
-    if not validText(realmId) or not validText(player) or (type(raidId) ~= "string" and type(raidId) ~= "number") then
+    if not validContextKey(realmId) or not validText(player) or not validContextKey(raidId) then
         return nil
     end
     local realm = root.wishlist[realmId]
@@ -71,6 +89,17 @@ end
 function M.contains(root, realmId, player, raidId, itemId)
     local raid = getRaid(root, realmId, player, raidId, false)
     return raid ~= nil and raid[itemId] == true
+end
+
+function M.toggle(root, realmId, player, raidId, itemId)
+    if M.contains(root, realmId, player, raidId, itemId) then
+        M.remove(root, realmId, player, raidId, itemId)
+        return false
+    end
+    if M.add(root, realmId, player, raidId, itemId) then
+        return true
+    end
+    return nil
 end
 
 function M.list(root, realmId, player, raidId)

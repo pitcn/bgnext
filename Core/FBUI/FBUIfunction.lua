@@ -466,13 +466,12 @@ function BG.FBZhuangBeiUI(FB, t, b, bb, i, ii, scrollFrame)
                 if BG.lastfocus then
                     BG.lastfocus:ClearFocus()
                 end
-                if BG.IsML then -- 开始拍卖
+                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button)
+                if action == "auction" then
                     local link = self:GetText()
                     BG.StartAuction(link, self, nil, nil, button == "RightButton")
-                else -- 关注装备
-                    if button ~= "RightButton" then
-                        BG.SetGuanZhu(bt, 1)
-                    end
+                elseif action == "wishlist" and BG.ToggleCurrentWish then
+                    BG.ToggleCurrentWish(self:GetText())
                 end
             end
             return

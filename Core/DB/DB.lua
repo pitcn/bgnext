@@ -751,32 +751,6 @@ do
             end
         end
 
-        -- 心愿UI
-        BG.HopeFrame = {}
-        for _, FB in ipairs(BG.FBtable) do
-            BG.HopeFrame[FB] = {}
-            for n = 1, HopeMaxn[FB] do
-                BG.HopeFrame[FB]["nandu" .. n] = {}
-                for b = 1, 22 do
-                    BG.HopeFrame[FB]["nandu" .. n]["boss" .. b] = {}
-                end
-            end
-        end
-
-        -- 心愿底色
-        BG.HopeFrameDs = {}
-        for index, value in ipairs(BG.FBtable) do
-            for t = 1, 3, 1 do
-                BG.HopeFrameDs[value .. t] = {}
-                for n = 1, 4 do
-                    BG.HopeFrameDs[value .. t]["nandu" .. n] = {}
-                    for b = 1, 22 do
-                        BG.HopeFrameDs[value .. t]["nandu" .. n]["boss" .. b] = {}
-                    end
-                end
-            end
-        end
-
         -- 接收UI
         BG.ReceiveFrame = {}
         for index, value in ipairs(BG.FBtable) do
@@ -1192,38 +1166,8 @@ BG.Init(function()
         BiaoGeA.filterClassNum = nil
     end
 
-    -- 心愿清单
-    if not BiaoGe.Hope then
-        BiaoGe.Hope = {}
-    end
-
-    if not BiaoGe.Hope[realmID] then
-        BiaoGe.Hope[realmID] = {}
-    end
-    if not BiaoGe.Hope[realmID][player] then
-        BiaoGe.Hope[realmID][player] = {}
-    end
-    for index, FB in ipairs(BG.FBtable) do
-        if not BiaoGe.Hope[realmID][player][FB] then
-            BiaoGe.Hope[realmID][player][FB] = {}
-        end
-        for n = 1, 4 do
-            if not BiaoGe.Hope[realmID][player][FB]["nandu" .. n] then
-                BiaoGe.Hope[realmID][player][FB]["nandu" .. n] = {}
-                for b = 1, 22 do
-                    if not BiaoGe.Hope[realmID][player][FB]["nandu" .. n]["boss" .. b] then
-                        BiaoGe.Hope[realmID][player][FB]["nandu" .. n]["boss" .. b] = {}
-                    end
-                end
-            end
-        end
-    end
-    if BiaoGeA and BiaoGeA.Hope then
-        for k, v in pairs(BiaoGeA.Hope) do
-            BiaoGe.Hope[realmID][player][k] = v
-        end
-        BiaoGeA.Hope = nil
-    end
+    -- BGNext 心愿清单只使用 BiaoGe.BGNext.wishlist。
+    -- 不初始化、读取或迁移历史 BiaoGe/BiaoGeA 心愿数据。
 
     -- 记录服务器名称
     do

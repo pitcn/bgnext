@@ -972,17 +972,6 @@ BG.Init(function()
                             end
                         end
                     end
-                elseif BG.HopeMainFrame and BG.HopeMainFrame:IsVisible() then
-                    for n = 1, HopeMaxn[FB] do
-                        for b = 1, Maxb[FB] do
-                            for i = 1, BG.GetMaxi(FB, b) do
-                                local bt = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                                if bt then
-                                    BG.IsHave(bt)
-                                end
-                            end
-                        end
-                    end
                 elseif BG.DuiZhangMainFrame and BG.DuiZhangMainFrame:IsVisible() then
                     for b = 1, Maxb[FB] do
                         for i = 1, BG.GetMaxi(FB, b) do
@@ -1118,35 +1107,6 @@ BG.Init(function()
                 end
             end
 
-            if BG.HopeMainFrame and BG.HopeMainFrame:IsVisible() then
-                local yes
-                for _, FB in pairs(BG.FBtable) do
-                    for n = 1, HopeMaxn[FB] do
-                        for b = 1, HopeMaxb[FB] do
-                            for i = 1, HopeMaxi do
-                                if BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i] then
-                                    local itemID = GetItemID(BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]:GetText())
-                                    if itemID then
-                                        local name, link, quality, level, _, _, _, _, _, Texture, _, typeID = GetItemInfo(itemID)
-                                        yes = string.find(itemIDs, tostring(itemID))
-                                        if yes then
-                                            BG.HopeFrameDs[FB .. 3]["nandu" .. n]["boss" .. b]["ds" .. i]:Show()
-                                            BG.OnUpdateTime(function(self, elapsed)
-                                                self.timeElapsed = self.timeElapsed + elapsed
-                                                if BiaoGe.options[name1] ~= 1 or self.timeElapsed >= BiaoGe.options[name2] then
-                                                    BG.HopeFrameDs[FB .. 3]["nandu" .. n]["boss" .. b]["ds" .. i]:Hide()
-                                                    self:SetScript("OnUpdate", nil)
-                                                    self:Hide()
-                                                end
-                                            end)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
         end)
     end
     ----------点击聊天/背包添加装备----------
@@ -1177,12 +1137,11 @@ BG.Init(function()
             local item, link, quality, level, _, _, _, _, _, Texture, _, typeID = GetItemInfo(link)
             if not link then return end
             if IsAltKeyDown() then
-                if BG.IsML then -- 开始拍卖
+                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button)
+                if action == "auction" then
                     BG.StartAuction(link, nil, nil, nil, button == "RightButton")
-                else            -- 关注装备
-                    if button ~= "RightButton" then
-                        BG.AddGuanZhu(link)
-                    end
+                elseif action == "wishlist" and BG.ToggleCurrentWish then
+                    BG.ToggleCurrentWish(link)
                 end
             elseif IsShiftKeyDown() then
                 Insert(link)

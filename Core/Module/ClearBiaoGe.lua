@@ -120,19 +120,6 @@ function BG.ClearBiaoGeUI()
             }
             BG.UpdateButtonClearBiaoGeMoney()
             return num
-        elseif _type == "hope" then
-            for n = 1, HopeMaxn[FB] do
-                for b = 1, Maxb[FB] - 1 do
-                    for i = 1, HopeMaxi do
-                        if BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i] then
-                            BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]:SetText("")
-                            BiaoGe.Hope[realmID][player][FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i] = nil
-                        end
-                    end
-                end
-            end
-            BG.UpdateItemLib_LeftHope_HideAll()
-            BG.UpdateItemLib_RightHope_HideAll()
         end
     end
 

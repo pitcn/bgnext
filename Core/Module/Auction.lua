@@ -1351,24 +1351,13 @@ BG.Init(function()
             end
             if hasGZ then break end
         end
-        -- 心愿
-        for _, FB in ipairs(BG.GetAllFB()) do
-            for n = 1, HopeMaxn[FB] do
-                for b = 1, HopeMaxb[FB] do
-                    for i = 1, HopeMaxi do
-                        local zb = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                        if zb and itemID == GetItemID(zb:GetText()) then
-                            local itemType = f.itemFrame.itemTypeText
-                            itemType:SetText((itemType:GetText() or "") .. (hasGZ and " " or "") .. BG.STC_g1(L["<心愿>"]))
-                            hasHope = true
-                            break
-                        end
-                    end
-                    if hasHope then break end
-                end
-                if hasHope then break end
-            end
-            if hasHope then break end
+        -- BGNext 心愿仅检查当前角色、当前选择副本的本地清单。
+        -- 不再扫描已移除的旧心愿界面，也不读取其他角色或历史数据。
+        if BG.IsHope and BG.IsHope(itemID, BG.FB1) then
+            local itemType = f.itemFrame.itemTypeText
+            itemType:SetText((itemType:GetText() or "") .. (hasGZ and " " or "") .. BG.STC_g1(L["<心愿>"]))
+            hasHope = true
+            BG.PlaySound("hope")
         end
         local isFold
         if hasGZ or hasHope then
