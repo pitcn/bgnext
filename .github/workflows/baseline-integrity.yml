@@ -1,6 +1,7 @@
 name: Baseline integrity
 
 "on":
+  workflow_dispatch:
   push:
     branches:
       - main
