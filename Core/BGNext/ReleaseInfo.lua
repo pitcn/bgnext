@@ -1,8 +1,14 @@
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
+local identity = assert(BG.BGNext.Identity, "BGNext Identity must load before ReleaseInfo")
+
 local info = {
-    projectName = "BGNext",
+    projectName = identity.projectName,
+    version = identity.version,
+    upstreamName = identity.upstreamName,
+    upstreamVersion = identity.upstreamVersion,
+    protocolVersion = identity.protocolVersion,
     author = "国服社区共创",
     official = false,
     summary = "基于 BGLite 上游维护的独立、非官方社区共创项目。",

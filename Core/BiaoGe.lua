@@ -137,7 +137,8 @@ BG.Init(function()
         VerText:SetPoint("BOTTOMLEFT", TitleText, "BOTTOMRIGHT", 0, 0)
         VerText:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
         VerText:SetTextColor(RGB("00BFFF"))
-        VerText:SetText(BG.ver)
+        local identity = BG.BGNext and BG.BGNext.Identity
+        VerText:SetText(identity and (identity.projectName .. " v" .. identity.version) or "BGNext")
         BG.VerText = VerText
 
         -- 说明书
@@ -1894,15 +1895,14 @@ end
 
 -- 插件命令
 BG.Init2(function()
-    SlashCmdList["BIAOGE"] = function()
-        if not BG.MainFrame then
-            return
+    SlashCmdList["BGNEXT"] = function()
+        if BG.MainFrame then
+            BG.MainFrame:SetShown(not BG.MainFrame:IsVisible())
         end
-        BG.MainFrame:SetShown(not BG.MainFrame:IsVisible())
     end
-    SLASH_BIAOGE1 = "/biaoge"
-    SLASH_BIAOGE2 = "/gbg"
-    SLASH_BIAOGE3 = "/bglite"
+    SLASH_BGNEXT1 = "/bgn"
+    SLASH_BGNEXT2 = "/bgnext"
+    SLASH_BGNEXT3 = "/bglite"
 
     -- 解锁位置
     SlashCmdList["BIAOGEMOVE"] = function()

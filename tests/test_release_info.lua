@@ -1,5 +1,6 @@
 return function(test)
     BG = { BGNext = {} }
+    dofile("Core/BGNext/Identity.lua")
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
