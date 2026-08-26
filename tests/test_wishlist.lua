@@ -33,4 +33,34 @@ return function(test)
     test.eq(wish.itemIdFromValue("item:6002:0:0:0"), 6002, "item string parsed")
     test.eq(wish.itemIdFromValue("|cff0070dd|Hitem:6003::::::::|h[Test]|h|r"), 6003, "item link parsed")
     test.eq(wish.itemIdFromValue("not an item"), nil, "unrelated text rejected")
+
+    local function resolver(itemId)
+        if itemId == 6001 or itemId == 6002 or itemId == 6003 then
+            return { difficultyIndex = 1, bossIndex = 2 }
+        end
+        return nil
+    end
+
+    local placed = wish.placeItem(root, "realm", "A", "ICC", limits, 6001, resolver)
+    test.eq(placed.ok, true, "normal boss drop placed")
+    test.eq(placed.slotIndex, 1, "first free original-order slot used")
+    wish.setSlot(root, "realm", "A", "ICC", limits, 1, 2, 2, 6002)
+    local full = wish.placeItem(root, "realm", "A", "ICC", limits, 6003, resolver)
+    test.eq(full.ok, false, "full boss does not place")
+    test.eq(full.reason, "boss-full", "full boss rejected")
+    test.eq(wish.placeItem(root, "realm", "A", "ICC", limits, 6999, resolver).reason, "unknown-drop",
+        "unknown drop rejected")
+
+    local legacy = {
+        wishlist = { realm = { A = { ICC = { [6001] = true, [6999] = true } } } },
+        wishlistUnplaced = {},
+    }
+    local result = wish.migrateFlatRaid(legacy, "realm", "A", "ICC", limits, resolver)
+    test.eq(result.placed, 1, "known legacy item placed")
+    test.eq(result.quarantined, 1, "unknown legacy item quarantined")
+    test.eq(legacy.wishlistUnplaced.realm.A.ICC[6999], true, "unknown item preserved")
+    local repeated = wish.migrateFlatRaid(legacy, "realm", "A", "ICC", limits, resolver)
+    test.eq(repeated.changed, false, "slot data is not migrated twice")
+    test.eq(repeated.placed, 0, "second migration places nothing")
+    test.eq(repeated.quarantined, 0, "second migration quarantines nothing")
 end

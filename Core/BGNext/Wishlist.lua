@@ -152,6 +152,100 @@ function M.clearRaid(root, realmId, player, raidId)
     return true
 end
 
+function M.placeItem(root, realmId, player, raidId, limits, itemId, resolver)
+    if not validItemId(itemId) or type(resolver) ~= "function" then
+        return { ok = false, reason = "unknown-drop" }
+    end
+    local location = resolver(itemId, raidId)
+    if type(location) ~= "table"
+        or not validLimits(limits, location.difficultyIndex, location.bossIndex, 1)
+    then
+        return { ok = false, reason = "unknown-drop" }
+    end
+    for slotIndex = 1, limits.slots do
+        if M.getSlot(root, realmId, player, raidId, location.difficultyIndex, location.bossIndex, slotIndex) == nil then
+            M.setSlot(root, realmId, player, raidId, limits, location.difficultyIndex, location.bossIndex, slotIndex, itemId)
+            return {
+                ok = true,
+                difficultyIndex = location.difficultyIndex,
+                bossIndex = location.bossIndex,
+                slotIndex = slotIndex,
+            }
+        end
+    end
+    return { ok = false, reason = "boss-full" }
+end
+
+local function getUnplacedRaid(root, realmId, player, raidId, create)
+    if type(root) ~= "table" or not validContextKey(realmId) or not validText(player) or not validContextKey(raidId) then
+        return nil
+    end
+    if type(root.wishlistUnplaced) ~= "table" then
+        if not create then return nil end
+        root.wishlistUnplaced = {}
+    end
+    local realm = root.wishlistUnplaced[realmId]
+    if not realm and create then
+        realm = {}
+        root.wishlistUnplaced[realmId] = realm
+    end
+    local character = realm and realm[player]
+    if not character and create then
+        character = {}
+        realm[player] = character
+    end
+    local raid = character and character[raidId]
+    if not raid and create then
+        raid = {}
+        character[raidId] = raid
+    end
+    return raid
+end
+
+function M.migrateFlatRaid(root, realmId, player, raidId, limits, resolver)
+    local raid = getRaid(root, realmId, player, raidId, false)
+    local itemIds = {}
+    if raid then
+        for key, value in pairs(raid) do
+            if validItemId(key) and value == true then
+                itemIds[#itemIds + 1] = key
+            end
+        end
+    end
+    if #itemIds == 0 then
+        return { changed = false, placed = 0, quarantined = 0 }
+    end
+    table.sort(itemIds)
+
+    local temporaryRoot = { wishlist = {} }
+    local placed, quarantined = 0, 0
+    local unplacedItems = {}
+    for _, itemId in ipairs(itemIds) do
+        local result = M.placeItem(temporaryRoot, realmId, player, raidId, limits, itemId, resolver)
+        if result.ok then
+            placed = placed + 1
+        else
+            quarantined = quarantined + 1
+            unplacedItems[itemId] = true
+        end
+    end
+
+    for key in pairs(raid) do
+        raid[key] = nil
+    end
+    local migratedRaid = getRaid(temporaryRoot, realmId, player, raidId, false) or {}
+    for difficultyIndex, bosses in pairs(migratedRaid) do
+        raid[difficultyIndex] = bosses
+    end
+    if next(unplacedItems) then
+        local unplacedRaid = getUnplacedRaid(root, realmId, player, raidId, true)
+        for itemId in pairs(unplacedItems) do
+            unplacedRaid[itemId] = true
+        end
+    end
+    return { changed = true, placed = placed, quarantined = quarantined }
+end
+
 function M.add(root, realmId, player, raidId, itemId)
     if not validItemId(itemId) then
         return false
