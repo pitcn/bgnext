@@ -2,7 +2,8 @@
 ## Title: <BGNext> |cff00BFFFBGNext|r
 ## Notes: /bglite or /gbg
 ## IconTexture: Interface\AddOns\BGLite\Media\icon\icon.tga
-## Author: CQZS (Lite)
+## Author: 国服社区共创
+## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.0
 ## LoadOnDemand: 0
@@ -20,6 +21,7 @@ Core\BGNext\Init.lua
 Core\BGNext\DataLifecycle.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
+Core\BGNext\ReleaseInfo.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
@@ -34,6 +36,7 @@ Core\TongBao\QianKuan.lua
 Core\TongBao\Channel.lua
 
 Core\BiaoGe.lua
+Core\BGNext\About.lua
 
 Core\Module\ClearBiaoGe.lua
 Core\Module\Loot.lua
