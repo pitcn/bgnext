@@ -63,4 +63,33 @@ return function(test)
     test.eq(repeated.changed, false, "slot data is not migrated twice")
     test.eq(repeated.placed, 0, "second migration places nothing")
     test.eq(repeated.quarantined, 0, "second migration quarantines nothing")
+
+    local codecRoot = { wishlist = {} }
+    wish.setSlot(codecRoot, "realm", "A", "ICC", limits, 1, 2, 1, 7001)
+    wish.setSlot(codecRoot, "realm", "A", "ICC", limits, 1, 2, 2, 7002)
+    test.eq(wish.exportRaid(codecRoot, "realm", "A", "ICC", limits), "ICC:n1b2-7001-7002",
+        "stable original text format")
+    test.eq(wish.exportRaid({ wishlist = {} }, "realm", "A", "ICC", limits), nil, "empty raid has no payload")
+
+    local imported = wish.parseImport("ICC:n1b2-7001-7002,n2b1-7100", { ICC = limits })
+    test.eq(imported.ok, true, "valid import parsed")
+    test.eq(imported.itemCount, 3, "valid import counts items")
+    test.eq(imported.raids.ICC[1][2][1], 7001, "first imported slot")
+    test.eq(imported.raids.ICC[2][1][1], 7100, "second difficulty imported")
+    test.eq(wish.parseImport("ICC:n9b2-7001", { ICC = limits }).reason, "out-of-range",
+        "out-of-range import rejected")
+    test.eq(wish.parseImport("ICC:n1b2-doSomething()", { ICC = limits }).reason, "invalid-item",
+        "non-numeric payload rejected")
+    test.eq(wish.parseImport(string.rep("1", 32769), { ICC = limits }).reason, "too-large",
+        "oversized import rejected")
+
+    wish.setSlot(codecRoot, "realm", "A", "TOC", limits, 1, 1, 1, 7200)
+    local beforeInvalid = wish.getSlot(codecRoot, "realm", "A", "ICC", 1, 2, 1)
+    test.eq(wish.applyImport(codecRoot, "realm", "A", wish.parseImport("bad", { ICC = limits })), false,
+        "invalid import is not applied")
+    test.eq(wish.getSlot(codecRoot, "realm", "A", "ICC", 1, 2, 1), beforeInvalid,
+        "invalid import preserves existing raid")
+    test.eq(wish.applyImport(codecRoot, "realm", "A", imported), true, "valid import applied")
+    test.eq(wish.getSlot(codecRoot, "realm", "A", "ICC", 2, 1, 1), 7100, "valid import replaces raid")
+    test.eq(wish.getSlot(codecRoot, "realm", "A", "TOC", 1, 1, 1), 7200, "valid import preserves other raid")
 end
