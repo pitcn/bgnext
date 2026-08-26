@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用帮助与讨论
+    url: https://github.com/pitcn/biaoge-next/discussions
+    about: 安装、使用和一般交流请优先使用 Discussions。
+  - name: 私密安全报告
+    url: https://github.com/pitcn/biaoge-next/security/advisories/new
+    about: 可被利用或涉及敏感数据的问题请勿公开提交。

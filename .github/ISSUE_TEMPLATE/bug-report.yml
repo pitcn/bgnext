@@ -1,0 +1,90 @@
+name: 错误报告
+description: 报告可以稳定复现的插件错误或兼容性问题
+title: "[Bug] "
+labels:
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告问题。请先删除截图、日志和路径中的角色名、战网信息、聊天内容及其他敏感数据。安全或隐私漏洞请使用私密安全报告，不要填写本表单。
+  - type: input
+    id: addon-version
+    attributes:
+      label: 插件版本
+      description: 填写 Release 版本或提交 SHA。
+      placeholder: 例如 2.4.0-baseline 或 9e0b119
+    validations:
+      required: true
+  - type: dropdown
+    id: game-flavor
+    attributes:
+      label: 游戏客户端
+      options:
+        - 时光服 / Titan
+        - 经典旧世 / 永久 60
+        - 熊猫人之谜经典版
+        - 巫妖王之怒经典版
+        - 灾变经典版
+        - 正式服
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: game-version
+    attributes:
+      label: 游戏版本
+      description: 可在登录界面或游戏内版本信息中查看。
+      placeholder: 例如 5.5.4
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 从登录或重载界面开始，列出可以重复触发问题的最短步骤。
+      placeholder: |
+        1. 进入……
+        2. 点击……
+        3. 观察到……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: errors
+    attributes:
+      label: 错误信息或脱敏截图
+      description: 只粘贴与问题相关的内容；没有错误文本时填写“无”。
+    validations:
+      required: true
+  - type: textarea
+    id: addon-isolation
+    attributes:
+      label: 其他插件排查
+      description: 说明是否在仅启用 BGLite/BiaoGe Next 时复现，以及哪些插件可能相关。
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: 提交确认
+      options:
+        - label: 我使用的是从本仓库或受认可发布平台获得的版本。
+          required: true
+        - label: 我已搜索现有 Issue，没有发现相同问题。
+          required: true
+        - label: 我已从文本、截图和路径中删除不必要的个人或玩家信息。
+          required: true
+        - label: 这不是需要私密披露的安全或隐私漏洞。
+          required: true
