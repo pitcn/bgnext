@@ -238,10 +238,17 @@ Expose only pure helpers on the module table and test them:
 
 ```lua
 test.eq(ui.tabNumber, 3, "wishlist uses original third tab")
-test.eq(ui.nextCell(1, 1, 1, "RIGHT", 2, 3, 2).slotIndex, 2, "right moves one slot")
-test.eq(ui.nextCell(1, 1, 2, "RIGHT", 2, 3, 2).bossIndex, 2, "right wraps to next boss")
-test.eq(ui.nextCell(1, 3, 2, "DOWN", 2, 3, 2).difficultyIndex, 2, "down wraps to next difficulty")
-test.eq(ui.nextCell(2, 3, 2, "TAB", 2, 3, 2).difficultyIndex, 1, "tab wraps whole grid")
+test.eq(ui.nextCell(1, 1, 1, "RIGHT", 4, 3, 2, false).slotIndex, 2, "right moves one slot")
+test.eq(ui.nextCell(1, 1, 2, "RIGHT", 4, 3, 2, false).difficultyIndex, 2,
+    "right edge moves to paired difficulty")
+test.eq(ui.nextCell(3, 3, 1, "DOWN", 4, 3, 2, false).difficultyIndex, 1,
+    "down edge returns from lower-left difficulty")
+test.eq(ui.nextCell(1, 2, 1, "DOWN", 4, 3, 2, true).difficultyIndex, 3,
+    "modified vertical arrow changes difficulty row")
+test.eq(ui.nextCell(1, 2, 1, "RIGHT", 4, 3, 2, true).difficultyIndex, 2,
+    "modified horizontal arrow changes difficulty column")
+test.eq(ui.nextCell(1, 3, 2, "TAB", 4, 3, 2, false).difficultyIndex, 3,
+    "tab follows original difficulty order after the last boss")
 test.eq(ui.shortcutAction(false, "LeftButton", true), "wishlist", "alt-left sets wish")
 test.eq(ui.shortcutAction(true, "RightButton", true), "auction", "alt-right keeps auction")
 test.eq(ui.shortcutAction(false, "LeftButton", false), nil, "no modifier does not set wish")
@@ -267,7 +274,7 @@ Implement these exact handlers:
 - Cursor item on mouse-up: validate and place in that slot.
 - Shift click on a filled slot: insert its link into chat through existing `BG.InsertLink` only after the user gesture.
 - Ctrl click/hover: use existing dress-up/item-library behavior when supported.
-- Tab and arrow keys: call the tested `nextCell` and focus the returned existing slot.
+- Tab and arrow keys: call the tested `nextCell` and focus the returned existing slot. Preserve the original difficulty mapping exactly: horizontal edge movement pairs `1↔2` and `3↔4`; vertical edge movement pairs `1↔3` and `2↔4` on four-difficulty raids; modified horizontal arrows switch difficulty columns and modified vertical arrows switch difficulty rows. Two- and one-difficulty raids use the original fallback mappings rather than generic row-major wrapping.
 - Enter: clear focus and hide the item picker.
 - Focus gained: select text, record `BG.lastfocuszhuangbei`, open the existing boss-drop picker.
 - Focus lost: clear selection and focus marker.
