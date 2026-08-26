@@ -36,7 +36,7 @@ do
     BG.scrollStep = 80
     BG.borderAlpha = .5
     BG.ver = "v" .. GetAddOnMetadata(AddonName, "Version")
-    BG.BG = "|cff00BFFF<BGLite>|r "
+    BG.BG = "|cff00BFFF<BGNext>|r "
     BG.rareIcon = "|A:nameplates-icon-elite-silver:0:0|a"
     BG.iconTexCoord = { .07, .93, .07, .93 }
     BG.zaxiang = {} -- 杂项如果太多，则需要换列

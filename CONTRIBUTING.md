@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你参与 BiaoGe Next。项目欢迎代码、测试、错误复现、翻译、文档、视觉设计、安全研究和合规建议。
+感谢你参与 BGNext。项目欢迎代码、测试、错误复现、翻译、文档、视觉设计、安全研究和合规建议。
 
 参与贡献即表示你同意遵守 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)、[SECURITY.md](SECURITY.md)、[PRIVACY.md](PRIVACY.md)和[合规边界](docs/COMPLIANCE.md)。
 
@@ -82,7 +82,7 @@ pwsh -NoProfile -File tools/verify-baseline.ps1
 
 只能提交本人原创、已获明确授权或符合原许可证要求的内容。涉及第三方代码、UI、图片、字体、声音或文案时，Pull Request 必须列出来源、作者、许可证或授权依据。
 
-提交贡献即表示你确认拥有必要权利，并允许项目为审查、维护、构建和发布 BiaoGe Next 使用该贡献。详情见 [COPYRIGHT.md](COPYRIGHT.md)。
+提交贡献即表示你确认拥有必要权利，并允许项目为审查、维护、构建和发布 BGNext 使用该贡献。详情见 [COPYRIGHT.md](COPYRIGHT.md)。
 
 ## 审查与合并
 

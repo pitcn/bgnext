@@ -38,7 +38,7 @@ function BG.OpenOption()
     Settings.OpenToCategory(BG.optionsID)
 end
 
-BG.optionsName = "BGLite-金团表格纯净版"
+BG.optionsName = "BGNext"
 BG.Init(function()
     local main = CreateFrame("Frame", nil, UIParent)
     do
@@ -47,7 +47,7 @@ BG.Init(function()
         BG.AddOption(main)
         local t = main:CreateFontString()
         t:SetFont(BIAOGE_TEXT_FONT, 16, "OUTLINE")
-t:SetText("|cff" .. "00BFFF" .. "BGLite-金团表格纯净版" .. "|r")
+t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
         t:SetPoint("TOPLEFT", main, 15, 0)
         local top = t
         local t = main:CreateFontString()
@@ -80,7 +80,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGLite-金团表格纯净版" .. "|r")
         bt:SetScript("OnClick", function(self)
             if not StaticPopupDialogs["BiaoGe_ResetOptions"] then
                 StaticPopupDialogs["BiaoGe_ResetOptions"] = {
-                    text = "重置BGLite插件中你的所有配置文件。",
+                    text = "重置BGNext插件中你的所有配置文件。",
                     button1 = L["是"],
                     button2 = L["否"],
                     OnAccept = function()
@@ -101,7 +101,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGLite-金团表格纯净版" .. "|r")
             GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 0)
             GameTooltip:ClearLines()
             GameTooltip:AddLine(self:GetText(), 1, 1, 1, true)
-            GameTooltip:AddLine("重置BGLite插件中你的所有配置文件。", 1, 0.82, 0, true)
+            GameTooltip:AddLine("重置BGNext插件中你的所有配置文件。", 1, 0.82, 0, true)
             GameTooltip:Show()
         end)
         bt:SetScript("OnLeave", function(self)

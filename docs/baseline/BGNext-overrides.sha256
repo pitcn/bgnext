@@ -1,0 +1,11 @@
+# Explicit BGNext changes to upstream BGLite 2.4.0 files.
+# Format: SHA-256, two spaces, repository-relative path.
+c5144cbee99c04251a3b8d4ac8a8fe14f5bc7aa91ffde731a62d78b60dc73ed3  BGLite.toc
+a4ab23cc83887958dcde70bb88e4042f6ea566c9860bd00e7f1701002686190a  Core/function1.lua
+647912af8d2fed24d5079a27615936e08ceef899d81bcd64b623a6a3c9bfafef  Core/Options.lua
+2debf70033af31b691b3a9f3680b4316e30def5c5a6ae3afbc4c37052dd43c35  Core/BiaoGe.lua
+9220b2eb251098d67aea739108cde3f1b9c9d65991f5675901b063b96f374e8c  Core/DB/DB.lua
+2cf74f3fa32c1434e2e45508aaffe9050fc6b28b10c02ff1119460d6624cc366  Core/DB/Init2.lua
+6f32b7574191e2f65f0616a74bb932fef6434f98200ae7e05597b84487787023  Core/Module/hooks.lua
+eb53cbd95dc5e311f1f807a7af4ec52d08596c1c5b2c973547b9dab3807fcca4  Core/Module/minimap.lua
+5925158910c68aef5a637b0e920deee56676a158a448af9fce74fe3c4aa7b8a8  Core/Module/TradeHistory.lua

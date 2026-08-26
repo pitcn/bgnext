@@ -10,11 +10,11 @@
 
 ## 错误报告
 
-可以稳定复现的错误，请使用[错误报告表单](https://github.com/pitcn/biaoge-next/issues/new?template=bug-report.yml)。提供游戏版本、插件版本、复现步骤、预期结果和实际结果，并先尝试排除其他插件冲突。
+可以稳定复现的错误，请使用[错误报告表单](https://github.com/pitcn/bgnext/issues/new?template=bug-report.yml)。提供游戏版本、插件版本、复现步骤、预期结果和实际结果，并先尝试排除其他插件冲突。
 
 ## 功能建议
 
-请使用[功能建议表单](https://github.com/pitcn/biaoge-next/issues/new?template=feature-request.yml)。涉及数据、通信、自动化或第三方素材时，必须完整填写相应栏目。
+请使用[功能建议表单](https://github.com/pitcn/bgnext/issues/new?template=feature-request.yml)。涉及数据、通信、自动化或第三方素材时，必须完整填写相应栏目。
 
 ## 安全与隐私问题
 

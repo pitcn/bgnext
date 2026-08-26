@@ -1,4 +1,4 @@
-# BiaoGe Next
+# BGNext
 
 基于 **BGLite 纯净版**的安全、透明、可持续社区共创维护项目。
 
@@ -8,19 +8,19 @@
 
 ## 项目缘起
 
-BiaoGe Next 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活动」的响应。我们希望在 BGLite 纯净版的基础上，通过公开审查和社区协作，逐步提供稳定、实用、易用的团队协作功能。
+BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活动」的响应。我们希望在 BGLite 纯净版的基础上，通过公开审查和社区协作，逐步提供稳定、实用、易用的团队协作功能。
 
 本项目是独立、非官方的社区项目，不代表网易、暴雪或 BGLite 原作者的官方立场。活动名称只用于说明项目缘起，不构成合作、认证、推荐或商业背书。
 
 ## 当前状态
 
 - 上游基线：BGLite 2.4.0
-- 基线提交：[`9e0b119`](https://github.com/pitcn/biaoge-next/commit/9e0b119c66a644cce0083b5ffe4e59c6c946d0f1)
+- 基线提交：[`9e0b119`](https://github.com/pitcn/bgnext/commit/9e0b119c66a644cce0083b5ffe4e59c6c946d0f1)
 - 原版文件：188 个
-- 基线完整性：由 [SHA-256 清单](docs/baseline/BGLite-2.4.0.sha256)和自动检查共同保护
-- 当前阶段：仓库与社区治理建设；尚未增加 BiaoGe Next 自有运行功能
+- 基线完整性：由 [SHA-256 清单](docs/baseline/BGLite-2.4.0.sha256)、[明确覆盖清单](docs/baseline/BGNext-overrides.sha256)和自动检查共同保护
+- 当前阶段：已完成 BGNext 品牌元数据改名；尚未增加自有运行功能
 
-仓库内的 BGLite 2.4.0 运行文件与项目启动时取得的官方纯净版逐文件一致。治理文档、Issue 模板和自动检查不属于 WoW 插件运行文件。
+仓库以 BGLite 2.4.0 官方纯净版为上游基线。除覆盖清单明确记录的插件显示名称和界面品牌文字外，其余上游运行文件保持逐文件一致；覆盖内容不改变功能、存档或通信协议。
 
 ## 项目目的
 
@@ -52,16 +52,16 @@ BiaoGe Next 发起于对网易 DD 公开举办的「BGLite 增强版开发激励
 1. 下载仓库代码。
 2. 将包含 `BGLite.toc` 的目录命名为 `BGLite`。
 3. 复制到对应游戏客户端的 `Interface/AddOns/` 目录。
-4. 完全退出并重新启动游戏，在插件列表中确认 BGLite 已启用。
+4. 完全退出并重新启动游戏，在插件列表中确认 BGNext 已启用。
 
 请勿把未经审核的开发分支作为正式版本分发。
 
 ## 欢迎共创
 
-BiaoGe Next 由社区共同维护。我们欢迎插件作者、玩家、测试者、翻译者、设计师、文档贡献者和合规审查者参与。
+BGNext 由社区共同维护。我们欢迎插件作者、玩家、测试者、翻译者、设计师、文档贡献者和合规审查者参与。
 
-- 发现问题：提交[错误报告](https://github.com/pitcn/biaoge-next/issues/new?template=bug-report.yml)
-- 提议功能：提交[功能建议](https://github.com/pitcn/biaoge-next/issues/new?template=feature-request.yml)
+- 发现问题：提交[错误报告](https://github.com/pitcn/bgnext/issues/new?template=bug-report.yml)
+- 提议功能：提交[功能建议](https://github.com/pitcn/bgnext/issues/new?template=feature-request.yml)
 - 贡献实现：阅读[贡献指南](CONTRIBUTING.md)并提交 Pull Request
 - 获取帮助：阅读[支持说明](SUPPORT.md)
 - 报告安全问题：遵循[安全政策](SECURITY.md)，不要公开利用细节或敏感数据
@@ -70,7 +70,7 @@ BiaoGe Next 由社区共同维护。我们欢迎插件作者、玩家、测试�
 
 ## 慈善承诺
 
-与 BiaoGe Next 相关的全部活动奖金、赞助及其他项目收入均用于慈善捐赠，不作为维护者或贡献者的个人收益。
+与 BGNext 相关的全部活动奖金、赞助及其他项目收入均用于慈善捐赠，不作为维护者或贡献者的个人收益。
 
 依法必须缴纳或代扣代缴的税费会单独记录；扣除依法必须承担的税费后，剩余资金全部捐赠给具备合法资质、信息可核验的慈善组织。项目将公开脱敏后的收入、税费、受赠机构和捐赠凭证。详见[慈善与财务透明政策](docs/CHARITY.md)。
 
@@ -89,6 +89,6 @@ BiaoGe Next 由社区共同维护。我们欢迎插件作者、玩家、测试�
 
 ## 版权与免责声明
 
-BGLite、《魔兽世界》及仓库内既有代码、商标、图片、声音和第三方库的相关权利归各自权利人所有。本仓库不会把上游内容声明为 BiaoGe Next 原创，也不会在未取得充分权利的情况下擅自授予统一开源许可证。详情见[版权与权利说明](COPYRIGHT.md)。
+BGLite、《魔兽世界》及仓库内既有代码、商标、图片、声音和第三方库的相关权利归各自权利人所有。本仓库不会把上游内容声明为 BGNext 原创，也不会在未取得充分权利的情况下擅自授予统一开源许可证。详情见[版权与权利说明](COPYRIGHT.md)。
 
 使用插件前请自行备份必要数据。项目按现状提供，不对游戏更新、平台规则变化或第三方环境造成的兼容性问题作无条件保证。

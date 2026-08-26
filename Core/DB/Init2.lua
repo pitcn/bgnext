@@ -25,7 +25,7 @@ for i = 11, 15 do
 end
 
 -- 游戏按键设置
-BINDING_HEADER_BIAOGE     = "BGLite"
+BINDING_HEADER_BIAOGE     = "BGNext"
 BINDING_NAME_BIAOGE       = L["打开/关闭表格"]
 BINDING_NAME_RoleOverview = L["打开/关闭角色总览"]
 

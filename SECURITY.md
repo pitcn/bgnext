@@ -6,7 +6,7 @@
 
 ## 私密报告安全问题
 
-请优先使用 GitHub 的 [Private Vulnerability Reporting](https://github.com/pitcn/biaoge-next/security/advisories/new) 提交安全报告。
+请优先使用 GitHub 的 [Private Vulnerability Reporting](https://github.com/pitcn/bgnext/security/advisories/new) 提交安全报告。
 
 安全报告建议包含：
 

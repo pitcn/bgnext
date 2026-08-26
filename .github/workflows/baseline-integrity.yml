@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   verify-baseline:
-    name: Verify BGLite 2.4.0 baseline
+    name: Verify BGLite baseline and BGNext overrides
     runs-on: windows-latest
     timeout-minutes: 10
     steps:

@@ -1,8 +1,10 @@
 ## Interface: 11508, 11509, 20506, 30405, 38002, 40402, 50503, 50504, 50505, 120005, 120007, 120100
-## Title: <BGLite> |cff00BFFFBGLite纯净版|r
+## Title: <BGNext> |cff00BFFFBGNext|r
 ## Notes: /bglite or /gbg
 ## IconTexture: Interface\AddOns\BGLite\Media\icon\icon.tga
 ## Author: CQZS (Lite)
+## X-Project: BGNext
+## X-Upstream: BGLite 2.4.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.0

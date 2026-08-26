@@ -1,8 +1,8 @@
-# BiaoGe Next Repository Professionalization Implementation Plan
+# BGNext Repository Professionalization Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** 在不修改 188 个 BGLite 2.4.0 运行文件的前提下，为 BiaoGe Next 建立完整、可信、可审计的社区维护文档与 GitHub 协作流程。
+**Goal:** 在不修改 188 个 BGLite 2.4.0 运行文件的前提下，为 BGNext 建立完整、可信、可审计的社区维护文档与 GitHub 协作流程。
 
 **Architecture:** 将项目入口、社区治理、安全隐私、合规边界、慈善透明和贡献者认可拆分为职责单一的 Markdown 文件；用固定 SHA-256 清单和 PowerShell 校验脚本保护官方基线；用 GitHub Issue、PR 模板和 CI 将规则落实到每次贡献。
 

@@ -87,7 +87,7 @@ local function RoadTrade()
         local target
         local success
         -- Lite: 密语前缀品牌化（原版 "BiaoGe: " 玩家可见，外显品牌约束要求改）
-        local logo = "BGLite: "
+        local logo = "BGNext: "
         local f = CreateFrame("Frame")
         f:RegisterEvent("TRADE_ACCEPT_UPDATE")
         f:RegisterEvent("UI_INFO_MESSAGE")

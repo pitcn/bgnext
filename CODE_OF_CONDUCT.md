@@ -1,6 +1,6 @@
 # 社区行为准则
 
-BiaoGe Next 希望建立一个尊重、可靠、可审查的插件维护社区。本准则适用于仓库、Issue、Pull Request、Discussion 及以项目名义开展的其他协作空间。
+BGNext 希望建立一个尊重、可靠、可审查的插件维护社区。本准则适用于仓库、Issue、Pull Request、Discussion 及以项目名义开展的其他协作空间。
 
 ## 我们鼓励
 

@@ -131,7 +131,7 @@ BG.Init(function()
         -- TitleText:SetPoint("TOP", -40, -4);
         TitleText:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
         TitleText:SetTextColor(RGB("00BFFF"))
-        TitleText:SetText("BGLite-biaoge纯净版")
+        TitleText:SetText("BGNext")
         BG.Title = TitleText
         local VerText = BG.MainFrame:CreateFontString()
         VerText:SetPoint("BOTTOMLEFT", TitleText, "BOTTOMRIGHT", 0, 0)
@@ -166,7 +166,7 @@ BG.Init(function()
             end
         end
         -- 说明书正文统一由 Locales/ 三语 instructionsText 驱动（原硬编码块覆盖 Locale 版，已移除）；此处仅对非 zhCN/zhTW/enUS 客户端留兜底，避免 tooltip nil
-        ns.instructionsText = ns.instructionsText or { "|cff00BFFF< BGLite 说明书>|r", " " }
+        ns.instructionsText = ns.instructionsText or { "|cff00BFFF< BGNext 说明书>|r", " " }
         f:SetScript("OnEnter", function(self)
             self.OnEnter = true
             GameTooltip:SetOwner(self, "ANCHOR_NONE")
@@ -217,7 +217,7 @@ BG.Init(function()
                 local f = BG.CreateMainFrame()
                 f:SetSize(450, 100)
                 f:SetFrameStrata("HIGH")
-                f.titleText:SetText("BGLite-biaoge纯净版")
+                f.titleText:SetText("BGNext")
                 f.texts = {}
                 BG.updateFrame = f
                 local w = 15
