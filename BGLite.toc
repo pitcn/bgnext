@@ -27,6 +27,8 @@ Core\BGNext\CurrentMail.lua
 Core\BGNext\ReleaseInfo.lua
 Core\BGNext\Wishlist.lua
 Core\BGNext\WishlistReminder.lua
+Core\BGNext\EquipmentFilterProfiles.lua
+Core\BGNext\EquipmentFilter.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
