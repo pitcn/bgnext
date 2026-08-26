@@ -15,6 +15,23 @@ local function validItemId(itemId)
     return type(itemId) == "number" and itemId > 0 and itemId == math.floor(itemId)
 end
 
+local function validPositiveIndex(value)
+    return type(value) == "number" and value > 0 and value == math.floor(value)
+end
+
+local function validLimits(limits, difficultyIndex, bossIndex, slotIndex)
+    return type(limits) == "table"
+        and validPositiveIndex(limits.difficulties)
+        and validPositiveIndex(limits.bosses)
+        and validPositiveIndex(limits.slots)
+        and validPositiveIndex(difficultyIndex)
+        and validPositiveIndex(bossIndex)
+        and validPositiveIndex(slotIndex)
+        and difficultyIndex <= limits.difficulties
+        and bossIndex <= limits.bosses
+        and slotIndex <= limits.slots
+end
+
 function M.itemIdFromValue(value)
     if validItemId(value) then
         return value
@@ -54,6 +71,87 @@ local function getRaid(root, realmId, player, raidId, create)
     return raid
 end
 
+local function getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
+    local raid = getRaid(root, realmId, player, raidId, false)
+    return raid and raid[difficultyIndex] and raid[difficultyIndex][bossIndex] or nil
+end
+
+function M.setSlot(root, realmId, player, raidId, limits, difficultyIndex, bossIndex, slotIndex, itemId)
+    if not validItemId(itemId) or not validLimits(limits, difficultyIndex, bossIndex, slotIndex) then
+        return false
+    end
+    local raid = getRaid(root, realmId, player, raidId, true)
+    if not raid then
+        return false
+    end
+    raid[difficultyIndex] = raid[difficultyIndex] or {}
+    raid[difficultyIndex][bossIndex] = raid[difficultyIndex][bossIndex] or {}
+    raid[difficultyIndex][bossIndex][slotIndex] = itemId
+    return true
+end
+
+function M.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+    local slots = getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
+    return slots and slots[slotIndex] or nil
+end
+
+function M.clearSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+    local slots = getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
+    if not slots or slots[slotIndex] == nil then
+        return false
+    end
+    slots[slotIndex] = nil
+    return true
+end
+
+function M.findItem(root, realmId, player, raidId, itemId)
+    local result = {}
+    if not validItemId(itemId) then
+        return result
+    end
+    local raid = getRaid(root, realmId, player, raidId, false)
+    if raid then
+        for difficultyIndex, bosses in pairs(raid) do
+            if validPositiveIndex(difficultyIndex) and type(bosses) == "table" then
+                for bossIndex, slots in pairs(bosses) do
+                    if validPositiveIndex(bossIndex) and type(slots) == "table" then
+                        for slotIndex, storedItemId in pairs(slots) do
+                            if validPositiveIndex(slotIndex) and storedItemId == itemId then
+                                result[#result + 1] = {
+                                    difficultyIndex = difficultyIndex,
+                                    bossIndex = bossIndex,
+                                    slotIndex = slotIndex,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    table.sort(result, function(left, right)
+        if left.difficultyIndex ~= right.difficultyIndex then
+            return left.difficultyIndex < right.difficultyIndex
+        end
+        if left.bossIndex ~= right.bossIndex then
+            return left.bossIndex < right.bossIndex
+        end
+        return left.slotIndex < right.slotIndex
+    end)
+    return result
+end
+
+function M.clearRaid(root, realmId, player, raidId)
+    local raid = getRaid(root, realmId, player, raidId, false)
+    if not raid or not next(raid) then
+        return false
+    end
+    for key in pairs(raid) do
+        raid[key] = nil
+    end
+    return true
+end
+
 function M.add(root, realmId, player, raidId, itemId)
     if not validItemId(itemId) then
         return false
@@ -88,7 +186,7 @@ end
 
 function M.contains(root, realmId, player, raidId, itemId)
     local raid = getRaid(root, realmId, player, raidId, false)
-    return raid ~= nil and raid[itemId] == true
+    return (raid ~= nil and raid[itemId] == true) or #M.findItem(root, realmId, player, raidId, itemId) > 0
 end
 
 function M.toggle(root, realmId, player, raidId, itemId)
