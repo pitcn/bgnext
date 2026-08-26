@@ -9,14 +9,16 @@ local c1 = ns.c1
 
 do --英语说明书
     ns.instructionsText = {
-        "|cff00BFFF<BGLite Pure Edition Guide>|r",
-        "This edition has been security-cleaned and streamlined by the World of Warcraft China operations team. It retains only essential auction features; no new feature modules will be added, and maintenance is limited to security and stability.",
-        "Features and content unrelated to core auctions, together with all non-compliant and risky code, have been removed to provide a safer, cleaner, and lighter addon experience.",
-        "BGLite Pure Edition is a basic transitional option. Developers are encouraged to build safe and stable enhancements on this edition, giving players richer and more capable choices.",
-        "World of Warcraft China Operations Team",
+        "|cff00BFFF<BGNext Guide>|r",
+        "BGNext v0.1.0 is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
+        "Core auctions continue to use BGLite's existing public protocol. Players using BGNext and BGLite may participate in the same basic auction; consult the release notes for the actual compatibility test status.",
+        "Personal wishlists, own-character information, and personal helper data stay local and are not sent to the raid or outside the game. Current-raid trade and mail reconciliation keeps only the most recent raid for at most seven days and never stores mail bodies.",
+        "If another BiaoGe/BGLite-family addon is enabled on this client, BGNext warns the player but never disables it without confirmation.",
+        "Code, testing, translation, design, and security-review contributions are welcome through Issues and Pull Requests. Contributors are recorded in the credits and relevant release notes.",
+        "This project is not endorsed by upstream authors, the game operator, or any platform.",
         " ",
         "|cff00BFFFCommands:|r",
-        "|cffFFFFFF-Open: |r/BGLite or /gbg, or bind a key in the game settings.",
+        "|cffFFFFFF-Open: |r/bgn or /bgnext, or bind a key in the game settings. The legacy /bglite command remains available.",
         "|cffFFFFFF-Quick action: |rRight-click an input box to clear its contents.",
         "|cffFFFFFF-Automatic auction: |rALT+click an item in the table, bags, or chat to open the auction panel.",
         "|cffFFFFFF-Auction countdown: |rRight-click an item in chat to start the automatic countdown. (When you are the group Leader or item distributor)",
