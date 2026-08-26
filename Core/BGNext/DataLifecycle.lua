@@ -44,6 +44,19 @@ function M.beginSettlement(root, raidId, now)
     return current
 end
 
+function M.beginRaid(root, raidId, now)
+    local currentRaid = root.currentRaid
+    if currentRaid.raidId ~= raidId then
+        root.currentRaid = {
+            raidId = raidId,
+            startedAt = now,
+            purchases = {},
+        }
+    end
+    local settlement = M.beginSettlement(root, raidId, now)
+    return root.currentRaid, settlement
+end
+
 function M.purgeExpired(root, now)
     local expiresAt = root.currentSettlement.expiresAt
     if expiresAt and now >= expiresAt then

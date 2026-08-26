@@ -19,4 +19,12 @@ return function(test)
     test.eq(life.purgeExpired(root, 300 + 7 * 86400 - 1), false, "before expiry")
     test.eq(life.purgeExpired(root, 300 + 7 * 86400), true, "at expiry")
     test.eq(#root.currentSettlement.trades, 0, "expired trades cleared")
+
+    life.beginRaid(root, "raid-c", 1000)
+    root.currentRaid.purchases[1] = { itemId = 10 }
+    life.beginRaid(root, "raid-c", 1100)
+    test.eq(#root.currentRaid.purchases, 1, "same raid shopping preserved")
+    life.beginRaid(root, "raid-d", 1200)
+    test.eq(#root.currentRaid.purchases, 0, "new raid shopping cleared")
+    test.eq(root.currentSettlement.raidId, "raid-d", "new raid settlement selected")
 end
