@@ -15,6 +15,7 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 | `currentSettlement.startedAt` / `expiresAt` | Local/server time | Enforce retention | Cleared with settlement | None | Manual clear | Low |
 | `currentSettlement.trades` | Current-settlement trade events | Reconciliation | One settlement, maximum seven days | None | Manual clear | Medium |
 | `currentSettlement.mails` | Current-settlement mail events | Reconciliation | One settlement, maximum seven days | None | Manual clear | Medium |
+| Local addon conflict inventory | Addon folder name, enabled/loaded state, `X-Project`, `X-Upstream` | Prevent simultaneous local loading of known conflicting addons | Memory only; discarded after the login check | Current player UI only | Explicit confirmation before disabling; cancel leaves addon state unchanged | Low |
 
 ## Allowed settlement record fields
 
@@ -25,3 +26,5 @@ Mail subject, body, unrelated attachments, chat text, account identifiers, devic
 ## Runtime-only data
 
 Automatic-bidding state is memory-only. Its auction identity, item identity, current price, increment, cap, next bid, status, and stop reason must not be written to SavedVariables. Reloading the UI destroys the state.
+
+Local addon conflict detection reads only the current client’s addon metadata and enabled/loaded state. It sends no channel messages, writes no SavedVariables and does not inspect other players’ addon versions.
