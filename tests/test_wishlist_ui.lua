@@ -49,6 +49,7 @@ return function(test)
         "wishlist.parseImport",
         "wishlist.applyImport",
         "wishlist.exportRaid",
+        "wishlist.migrateFlatRaid",
         "BG.ButtonImportHope",
         "BG.ButtonExportHope",
     }) do

@@ -589,8 +589,15 @@ if runtimeReady() then
         BG.HopeMainFrame:SetAllPoints(BG.MainFrame)
         BG.HopeMainFrame:Hide()
         BG.HopeFrame = {}
+        local quarantined = 0
         for _, raidId in ipairs(BG.FBtable or {}) do
+            local migration = wishlist.migrateFlatRaid(BG.BGNext.DB, BG.realmID, BG.playerName,
+                raidId, limitsFor(raidId), resolveDrop)
+            quarantined = quarantined + migration.quarantined
             BG["HopeFrame" .. raidId] = createRaidGrid(raidId, BG.HopeMainFrame)
+        end
+        if quarantined > 0 then
+            localMessage(string.format("有%d件旧测试版心愿无法可靠匹配首领，已保留但未自动放入心愿格。", quarantined))
         end
 
         local function showCurrentRaid()
