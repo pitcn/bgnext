@@ -1,23 +1,45 @@
 return function(test)
     BG = { BGNext = {} }
-    local wish = dofile("Core/BGNext/Wishlist.lua")
+    dofile("Core/BGNext/Wishlist.lua")
     local ui = dofile("Core/BGNext/WishlistUI.lua")
-    local root = { wishlist = {} }
 
-    wish.add(root, 123, "A", "ICC", 8001)
-    test.eq(ui.isWish(root, 123, "A", "ICC", "item:8001"), true, "current character item link reminds")
-    test.eq(ui.isWish(root, 123, "B", "ICC", "item:8001"), false, "other character wish stays private")
-    test.eq(ui.isWish(root, 123, "A", "TOC", "item:8001"), false, "other raid wish does not remind")
-    test.eq(ui.isWish(root, 123, "A", "ICC", "invalid"), false, "invalid item never reminds")
+    test.eq(ui.tabNumber, 3, "wishlist uses original third tab")
+    test.eq(ui.nextCell(1, 1, 1, "RIGHT", 4, 3, 2, false).slotIndex, 2, "right moves one slot")
+    test.eq(ui.nextCell(1, 1, 2, "RIGHT", 4, 3, 2, false).difficultyIndex, 2,
+        "right edge moves to paired difficulty")
+    test.eq(ui.nextCell(2, 1, 1, "LEFT", 4, 3, 2, false).difficultyIndex, 1,
+        "left edge moves to paired difficulty")
+    test.eq(ui.nextCell(3, 3, 1, "DOWN", 4, 3, 2, false).difficultyIndex, 1,
+        "down edge returns from lower-left difficulty")
+    test.eq(ui.nextCell(4, 1, 1, "UP", 4, 3, 2, false).difficultyIndex, 2,
+        "up edge returns from lower-right difficulty")
+    test.eq(ui.nextCell(1, 2, 1, "DOWN", 4, 3, 2, true).difficultyIndex, 3,
+        "modified vertical arrow changes difficulty row")
+    test.eq(ui.nextCell(1, 2, 1, "RIGHT", 4, 3, 2, true).difficultyIndex, 2,
+        "modified horizontal arrow changes difficulty column")
+    test.eq(ui.nextCell(1, 3, 2, "TAB", 4, 3, 2, false).difficultyIndex, 3,
+        "tab follows original difficulty order after last boss")
+    test.eq(ui.nextCell(4, 3, 2, "TAB", 4, 3, 2, false), nil,
+        "tab stops after original final difficulty")
 
-    local enabled, itemId = ui.toggleWish(root, 123, "A", "ICC", "item:8002")
-    test.eq(enabled, true, "shortcut adds a missing current wish")
-    test.eq(itemId, 8002, "shortcut reports the affected item")
-    test.eq(ui.toggleWish(root, 123, "A", "ICC", "item:8002"), false, "shortcut removes an existing current wish")
-    test.eq(ui.toggleWish(root, 123, "A", "ICC", "invalid"), nil, "shortcut rejects invalid item text")
+    test.eq(ui.shortcutAction(false, "LeftButton", true), "wishlist", "member alt-left sets wishlist")
+    test.eq(ui.shortcutAction(true, "LeftButton", true), "wishlist", "master looter alt-left sets wishlist")
+    test.eq(ui.shortcutAction(true, "RightButton", true), "auction", "master looter alt-right starts auction")
+    test.eq(ui.shortcutAction(false, "RightButton", true), nil, "member alt-right has no privileged action")
+    test.eq(ui.shortcutAction(false, "LeftButton", false), nil, "no modifier does not set wishlist")
 
-    test.eq(ui.shortcutAction(false, "LeftButton"), "wishlist", "member alt-left toggles wishlist")
-    test.eq(ui.shortcutAction(true, "LeftButton"), "wishlist", "master looter alt-left toggles wishlist")
-    test.eq(ui.shortcutAction(true, "RightButton"), "auction", "master looter alt-right starts auction")
-    test.eq(ui.shortcutAction(false, "RightButton"), nil, "member alt-right has no privileged action")
+    local file = assert(io.open("Core/BGNext/WishlistUI.lua", "rb"))
+    local source = file:read("*a")
+    file:close()
+    for _, forbidden in ipairs({
+        "个人心愿清单",
+        "输入物品 ID",
+        "已记录 %d 件装备",
+        "SendChatMessage",
+        "SendAddonMessage",
+        "通报心愿",
+        "查询心愿竞争",
+    }) do
+        test.eq(source:find(forbidden, 1, true), nil, "forbidden simplified or communicating UI absent: " .. forbidden)
+    end
 end

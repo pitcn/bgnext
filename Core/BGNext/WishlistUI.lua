@@ -1,286 +1,511 @@
+local _, ns = ...
+
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
-local M = {}
+local M = { tabNumber = 3 }
 
-function M.isWish(root, realmId, player, raidId, value)
-    local wishlist = BG.BGNext.Wishlist
-    if not wishlist then
-        return false
-    end
-    local itemId = wishlist.itemIdFromValue(value)
-    return itemId ~= nil and wishlist.contains(root, realmId, player, raidId, itemId)
+local function pairedHorizontal(difficultyIndex, difficultyCount)
+    if difficultyCount <= 1 then return 1 end
+    local target = difficultyIndex % 2 == 1 and difficultyIndex + 1 or difficultyIndex - 1
+    return target <= difficultyCount and target or difficultyIndex
 end
 
-function M.toggleWish(root, realmId, player, raidId, value)
-    local wishlist = BG.BGNext.Wishlist
-    if not wishlist then
-        return nil
+local function verticalEdge(difficultyIndex, difficultyCount, key)
+    if difficultyCount > 2 then
+        return difficultyIndex <= 2 and difficultyIndex + 2 or difficultyIndex - 2
     end
-    local itemId = wishlist.itemIdFromValue(value)
-    if not itemId then
-        return nil
-    end
-    return wishlist.toggle(root, realmId, player, raidId, itemId), itemId
+    if key == "DOWN" and difficultyIndex == 2 then return 1 end
+    return difficultyIndex
 end
 
-function M.shortcutAction(isMasterLooter, button)
-    if button == "LeftButton" then
-        return "wishlist"
+local function tabDifficulty(difficultyIndex, difficultyCount)
+    local target
+    if difficultyIndex == 1 then
+        target = difficultyCount > 2 and 3 or 2
+    elseif difficultyIndex == 3 then
+        target = 2
+    elseif difficultyIndex == 2 then
+        target = 4
     end
-    if isMasterLooter and button == "RightButton" then
-        return "auction"
+    return target and target <= difficultyCount and target or nil
+end
+
+function M.nextCell(difficultyIndex, bossIndex, slotIndex, key, difficultyCount, bossCount, slotCount, modified)
+    if modified then
+        local target
+        if (key == "UP" or key == "DOWN") and difficultyCount > 2 then
+            target = difficultyIndex <= 2 and difficultyIndex + 2 or difficultyIndex - 2
+        elseif key == "LEFT" or key == "RIGHT" then
+            target = pairedHorizontal(difficultyIndex, difficultyCount)
+        end
+        if target and target ~= difficultyIndex then
+            return { difficultyIndex = target, bossIndex = bossIndex, slotIndex = slotIndex }
+        end
+        return nil
+    end
+
+    if key == "TAB" then
+        if slotIndex < slotCount then
+            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex, slotIndex = slotIndex + 1 }
+        end
+        if bossIndex < bossCount then
+            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex + 1, slotIndex = 1 }
+        end
+        local target = tabDifficulty(difficultyIndex, difficultyCount)
+        return target and { difficultyIndex = target, bossIndex = 1, slotIndex = 1 } or nil
+    elseif key == "LEFT" then
+        if slotIndex > 1 then
+            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex, slotIndex = slotIndex - 1 }
+        end
+        return {
+            difficultyIndex = pairedHorizontal(difficultyIndex, difficultyCount),
+            bossIndex = bossIndex,
+            slotIndex = slotCount,
+        }
+    elseif key == "RIGHT" then
+        if slotIndex < slotCount then
+            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex, slotIndex = slotIndex + 1 }
+        end
+        return {
+            difficultyIndex = pairedHorizontal(difficultyIndex, difficultyCount),
+            bossIndex = bossIndex,
+            slotIndex = 1,
+        }
+    elseif key == "UP" then
+        if bossIndex > 1 then
+            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex - 1, slotIndex = slotIndex }
+        end
+        return {
+            difficultyIndex = verticalEdge(difficultyIndex, difficultyCount, key),
+            bossIndex = bossCount,
+            slotIndex = slotIndex,
+        }
+    elseif key == "DOWN" then
+        if bossIndex < bossCount then
+            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex + 1, slotIndex = slotIndex }
+        end
+        return {
+            difficultyIndex = verticalEdge(difficultyIndex, difficultyCount, key),
+            bossIndex = 1,
+            slotIndex = slotIndex,
+        }
     end
     return nil
 end
 
-local function currentContext()
-    return BG.BGNext.DB, BG.realmID, BG.playerName, BG.FB1
+function M.shortcutAction(isMasterLooter, button, altDown)
+    if not altDown then return nil end
+    if button == "LeftButton" then return "wishlist" end
+    if isMasterLooter and button == "RightButton" then return "auction" end
+    return nil
 end
 
-local function sendLocalMessage(message)
-    if BG.SendSystemMessage then
-        BG.SendSystemMessage(message)
-    else
-        print((BG.BG or "<BGNext> ") .. message)
-    end
+local function runtimeReady()
+    return ns and BG.Init and BG.MainFrame and BG.Create_TabButton and BG.BGNext.Wishlist and BG.BGNext.DB
 end
 
-local function createWishlistFrame()
-    local frame = CreateFrame("Frame", nil, BG.MainFrame)
-    frame:SetAllPoints(BG.MainFrame)
-    frame:Hide()
+if runtimeReady() then
+    local wishlist = BG.BGNext.Wishlist
+    local hopeMaxn = ns.HopeMaxn
+    local hopeMaxb = ns.HopeMaxb
+    local hopeMaxi = ns.HopeMaxi
+    local L = ns.L or setmetatable({}, { __index = function(_, key) return key end })
 
-    local title = frame:CreateFontString(nil, "OVERLAY")
-    title:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -58)
-    title:SetFont(BIAOGE_TEXT_FONT, 18, "OUTLINE")
-    title:SetTextColor(1, 0.82, 0)
-    title:SetText("个人心愿清单")
-
-    local privacy = frame:CreateFontString(nil, "OVERLAY")
-    privacy:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    privacy:SetFont(BIAOGE_TEXT_FONT, 13, "")
-    privacy:SetTextColor(0.55, 0.85, 1)
-    privacy:SetText("仅保存在本地，仅当前角色可见，不会发送给团队或其他玩家。")
-
-    local raidText = frame:CreateFontString(nil, "OVERLAY")
-    raidText:SetPoint("TOPLEFT", privacy, "BOTTOMLEFT", 0, -14)
-    raidText:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
-    raidText:SetTextColor(0.92, 0.92, 0.92)
-
-    local input = CreateFrame("EditBox", nil, frame, BG.editTemplate or "InputBoxTemplate")
-    input:SetPoint("TOPLEFT", raidText, "BOTTOMLEFT", 0, -10)
-    input:SetSize(285, 24)
-    input:SetAutoFocus(false)
-    input:SetTextInsets(8, 8, 0, 0)
-    input:SetMaxLetters(255)
-
-    local placeholder = input:CreateFontString(nil, "ARTWORK")
-    placeholder:SetPoint("LEFT", input, "LEFT", 8, 0)
-    placeholder:SetFont(BIAOGE_TEXT_FONT, 13, "")
-    placeholder:SetTextColor(0.5, 0.5, 0.5)
-    placeholder:SetText("输入物品 ID，或 Shift+点击物品链接")
-    input:SetScript("OnTextChanged", function(self)
-        placeholder:SetShown(self:GetText() == "")
-    end)
-
-    local addButton = BG.CreateButton(frame)
-    addButton:SetPoint("LEFT", input, "RIGHT", 8, 0)
-    addButton:SetSize(72, 24)
-    addButton:SetText("添加")
-
-    local clearButton = BG.CreateButton(frame)
-    clearButton:SetPoint("LEFT", addButton, "RIGHT", 8, 0)
-    clearButton:SetSize(100, 24)
-    clearButton:SetText("清空本副本")
-
-    local countText = frame:CreateFontString(nil, "OVERLAY")
-    countText:SetPoint("TOPLEFT", input, "BOTTOMLEFT", 0, -14)
-    countText:SetFont(BIAOGE_TEXT_FONT, 13, "")
-    countText:SetTextColor(0.75, 0.75, 0.75)
-
-    local scroll = CreateFrame("ScrollFrame", nil, frame, BG.scrollTemplate or "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", countText, "BOTTOMLEFT", 0, -8)
-    scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -48, 42)
-
-    local content = CreateFrame("Frame", nil, scroll)
-    content:SetSize(470, 1)
-    scroll:SetScrollChild(content)
-
-    local rows = {}
-    local function removeItem(itemId)
-        local root, realmId, player, raidId = currentContext()
-        if BG.BGNext.Wishlist.remove(root, realmId, player, raidId, itemId) then
-            sendLocalMessage("已从当前副本的个人心愿清单移除。")
-            frame:Refresh()
-        end
+    local function context(raidId)
+        return BG.BGNext.DB, BG.realmID, BG.playerName, raidId or BG.FB1
     end
 
-    local function createRow(index)
-        local row = CreateFrame("Button", nil, content)
-        row:SetSize(470, 24)
-        if index == 1 then
-            row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
-        else
-            row:SetPoint("TOPLEFT", rows[index - 1], "BOTTOMLEFT", 0, -3)
-        end
-        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-
-        local background = row:CreateTexture(nil, "BACKGROUND")
-        background:SetAllPoints()
-        background:SetColorTexture(0.08, 0.08, 0.08, index % 2 == 0 and 0.7 or 0.45)
-
-        local label = row:CreateFontString(nil, "OVERLAY")
-        label:SetPoint("LEFT", row, "LEFT", 8, 0)
-        label:SetPoint("RIGHT", row, "RIGHT", -90, 0)
-        label:SetJustifyH("LEFT")
-        label:SetFont(BIAOGE_TEXT_FONT, 14, "")
-
-        local hint = row:CreateFontString(nil, "OVERLAY")
-        hint:SetPoint("RIGHT", row, "RIGHT", -8, 0)
-        hint:SetFont(BIAOGE_TEXT_FONT, 12, "")
-        hint:SetTextColor(0.65, 0.65, 0.65)
-        hint:SetText("右键移除")
-
-        row:SetScript("OnClick", function(self, button)
-            if button == "RightButton" and self.itemId then
-                removeItem(self.itemId)
-            elseif self.itemLink and IsShiftKeyDown() and BG.InsertLink then
-                BG.InsertLink(self.itemLink)
-            end
-        end)
-        row:SetScript("OnEnter", function(self)
-            if not self.itemId then return end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetItemByID(self.itemId)
-            GameTooltip:AddLine("右键：从个人心愿清单移除", 0.5, 1, 0.5, true)
-            GameTooltip:Show()
-        end)
-        row:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-
-        row.label = label
-        row.hint = hint
-        row:Hide()
-        rows[index] = row
-        return row
+    local function limitsFor(raidId)
+        return {
+            difficulties = hopeMaxn[raidId] or 0,
+            bosses = hopeMaxb[raidId] or 0,
+            slots = hopeMaxi or 0,
+        }
     end
 
-    function frame:Refresh()
-        local root, realmId, player, raidId = currentContext()
-        local items = BG.BGNext.Wishlist.list(root, realmId, player, raidId)
-        raidText:SetText("当前副本：" .. tostring(raidId or "未识别"))
-        countText:SetText(string.format("已记录 %d 件装备", #items))
+    local function sameItem(left, right)
+        if BG.IsSame then return BG.IsSame(left, right) end
+        return tonumber(left) == tonumber(right)
+    end
 
-        for index, itemId in ipairs(items) do
-            local row = rows[index] or createRow(index)
-            row.itemId = itemId
-            row.itemLink = nil
-            local itemName, itemLink = GetItemInfo(itemId)
-            row.itemLink = itemLink
-            row.label:SetText(itemLink or itemName or ("物品 ID：" .. itemId))
-            row:Show()
-            if BG.OnItemLoad then
-                BG.OnItemLoad(itemId):ContinueOnItemLoad(function()
-                    if row.itemId ~= itemId then return end
-                    local loadedName, loadedLink = GetItemInfo(itemId)
-                    row.itemLink = loadedLink
-                    row.label:SetText(loadedLink or loadedName or ("物品 ID：" .. itemId))
-                end)
+    local function resolveDrop(itemId, raidId)
+        local difficulties = BG.difficultyTable and BG.difficultyTable[raidId]
+        local raidLoot = BG.Loot and BG.Loot[raidId]
+        if not difficulties or not raidLoot then return nil end
+        for difficultyIndex, difficultyName in ipairs(difficulties) do
+            local difficultyLoot = raidLoot[difficultyName]
+            if difficultyLoot then
+                for bossIndex = 1, hopeMaxb[raidId] or 0 do
+                    for _, droppedItemId in ipairs(difficultyLoot["boss" .. bossIndex] or {}) do
+                        if sameItem(itemId, droppedItemId) then
+                            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex }
+                        end
+                    end
+                end
             end
         end
-        for index = #items + 1, #rows do
-            rows[index].itemId = nil
-            rows[index].itemLink = nil
-            rows[index]:Hide()
-        end
-        content:SetHeight(math.max(1, #items * 27))
-    end
-
-    local function addInput()
-        local itemId = BG.BGNext.Wishlist.itemIdFromValue(input:GetText())
-        if not itemId then
-            sendLocalMessage("无法识别该物品，请输入物品 ID 或粘贴物品链接。")
-            return
-        end
-        local root, realmId, player, raidId = currentContext()
-        if BG.BGNext.Wishlist.add(root, realmId, player, raidId, itemId) then
-            input:SetText("")
-            input:ClearFocus()
-            sendLocalMessage("已加入当前副本的个人心愿清单。")
-            frame:Refresh()
-        else
-            sendLocalMessage("该物品已在清单中，或当前角色/副本信息不可用。")
-        end
-    end
-
-    addButton:SetScript("OnClick", addInput)
-    input:SetScript("OnEnterPressed", addInput)
-    input:SetScript("OnEscapePressed", function(self)
-        self:ClearFocus()
-    end)
-
-    local popupName = "BGNEXT_CLEAR_CURRENT_WISHLIST"
-    StaticPopupDialogs[popupName] = StaticPopupDialogs[popupName] or {
-        text = "确认清空当前角色在当前副本的全部心愿装备？",
-        button1 = YES,
-        button2 = NO,
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        preferredIndex = 3,
-    }
-    clearButton:SetScript("OnClick", function()
-        StaticPopupDialogs[popupName].OnAccept = function()
-            local root, realmId, player, raidId = currentContext()
-            if BG.BGNext.Wishlist.clear(root, realmId, player, raidId) then
-                sendLocalMessage("已清空当前副本的个人心愿清单。")
-                frame:Refresh()
-            end
-        end
-        StaticPopup_Show(popupName)
-    end)
-
-    frame:SetScript("OnShow", function(self)
-        self:Refresh()
-    end)
-    return frame
-end
-
-BG.IsHope = function(itemId, raidId)
-    local root, realmId, player, currentRaidId = currentContext()
-    return M.isWish(root, realmId, player, raidId or currentRaidId, itemId)
-end
-
-BG.ToggleCurrentWish = function(value)
-    local root, realmId, player, raidId = currentContext()
-    local enabled = M.toggleWish(root, realmId, player, raidId, value)
-    if enabled == nil then
-        sendLocalMessage("无法识别该物品，心愿清单未改变。")
         return nil
     end
-    sendLocalMessage(enabled and "已加入当前副本的个人心愿清单。" or "已从当前副本的个人心愿清单移除。")
-    if BG.WishlistMainFrame and BG.WishlistMainFrame:IsShown() then
-        BG.WishlistMainFrame:Refresh()
-    end
-    return enabled
-end
 
-if BG.Init then
-    BG.Init(function()
-        if not BG.MainFrame or not BG.Create_TabButton or not BG.BGNext.Wishlist or not BG.BGNext.DB then
-            return
+    local function localMessage(message)
+        if BG.SendSystemMessage then BG.SendSystemMessage(message) else print("<BGNext> " .. message) end
+    end
+
+    local function difficultyLabel(raidId, difficultyIndex)
+        if BG.IsWLKFB and BG.IsWLKFB(raidId) then
+            return ({
+                "< |cffFFFFFF10人|r|cff00BFFF普通|r >",
+                "< |cffFFFFFF25人|r|cff00BFFF普通|r >",
+                "< |cffFFFFFF10人|r|cffFF0000英雄|r >",
+                "< |cffFFFFFF25人|r|cffFF0000英雄|r >",
+            })[difficultyIndex]
+        elseif BG.IsRetail then
+            return ({ "< |cff00BFFF普通|r >", "< |cffFF0000英雄|r >", "< |cffa335ee史诗|r >" })[difficultyIndex]
         end
-        BG.WishlistMainFrameTabNum = 2
-        BG.WishlistMainFrame = createWishlistFrame()
-        BG.Create_TabButton(BG.WishlistMainFrameTabNum, "心愿清单", BG.WishlistMainFrame, 105)
+        return ({ "< |cff00BFFF普通|r >", "< |cffFF0000英雄|r >" })[difficultyIndex]
+            or tostring(BG.difficultyTable[raidId][difficultyIndex])
+    end
+
+    local function setSlotText(slot, itemId)
+        slot._refreshing = true
+        if itemId then
+            local _, link = GetItemInfo(itemId)
+            slot:SetText(link or tostring(itemId))
+            if BG.OnItemLoad then
+                BG.OnItemLoad(itemId):ContinueOnItemLoad(function()
+                    if slot.itemId ~= itemId then return end
+                    local _, loadedLink = GetItemInfo(itemId)
+                    if loadedLink then
+                        slot._refreshing = true
+                        slot:SetText(loadedLink)
+                        slot:SetCursorPosition(0)
+                        slot._refreshing = nil
+                    end
+                end)
+            end
+        else
+            slot:SetText("")
+        end
+        slot:SetCursorPosition(0)
+        slot._refreshing = nil
+    end
+
+    local function updateSlotAppearance(slot)
+        local text = slot:GetText()
+        local itemId = wishlist.itemIdFromValue(text)
+        slot.itemId = itemId
+        if itemId then
+            local _, link, _, level, _, _, _, _, _, texture, _, typeId, _, bindType = GetItemInfo(itemId)
+            slot.icon:SetTexture(texture)
+            if BG.AddHText and link then BG.AddHText(slot.FB, link, itemId, slot) end
+            if BG.BindOnEquip then BG.BindOnEquip(slot, bindType) end
+            if BG.LevelText then BG.LevelText(slot, level, typeId) end
+            if BG.IsHave then BG.IsHave(slot) end
+        else
+            slot.icon:SetTexture(nil)
+            if BG.BindOnEquip then BG.BindOnEquip(slot) end
+            if BG.LevelText then BG.LevelText(slot) end
+            if BG.IsHave then BG.IsHave(slot) end
+        end
+        if BG.UpdateFilter then BG.UpdateFilter(slot) end
+        if BG.Update_IsLooted then BG.Update_IsLooted(slot) end
+    end
+
+    local function persistSlot(slot)
+        if slot._refreshing then return true end
+        local itemId = wishlist.itemIdFromValue(slot:GetText())
+        local root, realmId, player, raidId = context(slot.FB)
+        if not itemId then
+            if slot:GetText() == "" then
+                wishlist.clearSlot(root, realmId, player, raidId, slot.hopenandu, slot.bossnum, slot.i)
+                slot.itemId = nil
+                updateSlotAppearance(slot)
+                return true
+            end
+            return false
+        end
+        local location = resolveDrop(itemId, raidId)
+        if not location or location.difficultyIndex ~= slot.hopenandu or location.bossIndex ~= slot.bossnum then
+            return false
+        end
+        wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId), slot.hopenandu, slot.bossnum, slot.i, itemId)
+        slot.itemId = itemId
+        updateSlotAppearance(slot)
+        return true
+    end
+
+    local function focusCell(raidId, cell)
+        local target = cell and BG.HopeFrame[raidId]
+            and BG.HopeFrame[raidId]["nandu" .. cell.difficultyIndex]
+            and BG.HopeFrame[raidId]["nandu" .. cell.difficultyIndex]["boss" .. cell.bossIndex]
+            and BG.HopeFrame[raidId]["nandu" .. cell.difficultyIndex]["boss" .. cell.bossIndex]["zhuangbei" .. cell.slotIndex]
+        if target then target:SetFocus() end
+    end
+
+    local function createSlot(parent, raidId, difficultyIndex, bossIndex, slotIndex, anchor, xOffset)
+        local slot = CreateFrame("EditBox", nil, parent, BG.editTemplate)
+        slot:SetSize(115, 20)
+        slot:SetFrameLevel(110)
+        slot:SetPoint("TOPLEFT", anchor, slotIndex == 1 and "BOTTOMLEFT" or "TOPLEFT", xOffset or 0, slotIndex == 1 and -1 or 0)
+        slot:SetAutoFocus(false)
+        if BG.SetEditStickyFocus then BG.SetEditStickyFocus(slot) end
+        slot.FB, slot.hopenandu, slot.bossnum, slot.i = raidId, difficultyIndex, bossIndex, slotIndex
+        slot.icon = slot:CreateTexture(nil, "ARTWORK")
+        slot.icon:SetPoint("LEFT", -22, 0)
+        slot.icon:SetSize(16, 16)
+        if BG.LootedText then BG.LootedText(slot) end
+
+        slot.hover = slot:CreateTexture(nil, "BACKGROUND")
+        slot.hover:SetPoint("TOPLEFT", -4, -2)
+        slot.hover:SetPoint("BOTTOMRIGHT", -1, 0)
+        slot.hover:SetColorTexture(1, 1, 1, 0.1)
+        slot.hover:Hide()
+        slot.focus = slot:CreateTexture(nil, "BACKGROUND")
+        slot.focus:SetAllPoints(slot.hover)
+        slot.focus:SetColorTexture(1, 1, 1, 0.1)
+        slot.focus:Hide()
+
+        slot:SetScript("OnTextChanged", function(self)
+            if not self._refreshing then persistSlot(self) end
+        end)
+        slot:SetScript("OnMouseDown", function(self, button)
+            if button == "RightButton" and not IsAltKeyDown() then
+                self._refreshing = true
+                self:SetText("")
+                self._refreshing = nil
+                local root, realmId, player = context(self.FB)
+                wishlist.clearSlot(root, realmId, player, self.FB, self.hopenandu, self.bossnum, self.i)
+                updateSlotAppearance(self)
+                self:ClearFocus()
+            elseif IsShiftKeyDown() and self:GetText() ~= "" and BG.InsertLink then
+                BG.InsertLink(self:GetText())
+                self:ClearFocus()
+            elseif IsControlKeyDown() and self:GetText() ~= "" and BG.GoToItemLib then
+                BG.GoToItemLib(self)
+            end
+        end)
+        slot:SetScript("OnMouseUp", function(self)
+            local infoType, _, itemLink = GetCursorInfo()
+            if infoType == "item" and itemLink then
+                local oldItemId = self.itemId
+                self._refreshing = true
+                self:SetText(itemLink)
+                self._refreshing = nil
+                if not persistSlot(self) then
+                    self.itemId = oldItemId
+                    setSlotText(self, oldItemId)
+                    localMessage("只能设置该难度下对应首领正常掉落的装备为心愿。")
+                end
+                self:ClearFocus()
+                ClearCursor()
+            end
+        end)
+        slot:SetScript("OnEnter", function(self)
+            self.hover:Show()
+            if self.itemId then
+                GameTooltip:SetOwner(self, BG.ButtonIsInRight and BG.ButtonIsInRight(self) and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
+                GameTooltip:SetItemByID(self.itemId)
+                GameTooltip:AddLine("右键取消心愿装备", 0.5, 1, 0.5, true)
+                GameTooltip:Show()
+            end
+        end)
+        slot:SetScript("OnLeave", function(self)
+            self.hover:Hide()
+            GameTooltip:Hide()
+            SetCursor(nil)
+        end)
+        slot:SetScript("OnEditFocusGained", function(self)
+            self:HighlightText()
+            self.focus:Show()
+            BG.lastfocuszhuangbei = self
+            BG.lastfocus = self
+            if BG.SetListzhuangbei then BG.SetListzhuangbei(self) end
+        end)
+        slot:SetScript("OnEditFocusLost", function(self)
+            self:ClearHighlightText()
+            self.focus:Hide()
+            if self:GetText() ~= "" and not persistSlot(self) then
+                setSlotText(self, self.itemId)
+                localMessage("该装备不属于此难度下的当前首领，心愿未改变。")
+            end
+        end)
+        slot:SetScript("OnTabPressed", function(self)
+            focusCell(self.FB, M.nextCell(self.hopenandu, self.bossnum, self.i, "TAB",
+                hopeMaxn[self.FB], hopeMaxb[self.FB], hopeMaxi, false))
+        end)
+        slot:SetScript("OnKeyDown", function(self, key)
+            if key == "UP" or key == "DOWN" or key == "LEFT" or key == "RIGHT" then
+                focusCell(self.FB, M.nextCell(self.hopenandu, self.bossnum, self.i, key,
+                    hopeMaxn[self.FB], hopeMaxb[self.FB], hopeMaxi, IsModifierKeyDown()))
+            end
+        end)
+        slot:SetScript("OnEnterPressed", function(self)
+            self:ClearFocus()
+            if BG.FrameZhuangbeiList then BG.FrameZhuangbeiList:Hide() end
+        end)
+        slot:SetScript("OnEscapePressed", function(self)
+            self:ClearFocus()
+            if BG.FrameZhuangbeiList then BG.FrameZhuangbeiList:Hide() end
+        end)
+        return slot
+    end
+
+    local function createRaidGrid(raidId, parent)
+        local frame = CreateFrame("Frame", nil, parent)
+        frame:SetAllPoints(parent)
+        frame:Hide()
+        BG.HopeFrame[raidId] = {}
+        local previousBottomFirst, previousHeaderLast
+
+        for difficultyIndex = 1, hopeMaxn[raidId] do
+            local difficulty = frame:CreateFontString(nil, "OVERLAY")
+            if difficultyIndex == 1 then
+                difficulty:SetPoint("TOPLEFT", BG.MainFrame, "TOPLEFT", 10, -60)
+            elseif difficultyIndex == 2 or difficultyIndex == 4 then
+                difficulty:SetPoint("TOPRIGHT", previousBottomFirst, "TOPLEFT", -20, -30)
+            else
+                difficulty:SetPoint("TOPLEFT", previousHeaderLast, "TOPRIGHT", 20, 0)
+            end
+            difficulty:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+            difficulty:SetTextColor(1, 0.82, 0)
+            difficulty:SetSize(100, 20)
+            difficulty:SetJustifyH("RIGHT")
+            difficulty:SetText(difficultyLabel(raidId, difficultyIndex))
+
+            local headers, priorHeader = {}, difficulty
+            for slotIndex = 1, hopeMaxi do
+                local header = frame:CreateFontString(nil, "OVERLAY")
+                header:SetPoint("TOPLEFT", priorHeader, "TOPRIGHT", slotIndex == 1 and 20 or 26, 0)
+                header:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+                header:SetTextColor(1, 0.82, 0)
+                header:SetSize(115, 20)
+                header:SetJustifyH("LEFT")
+                header:SetText("心愿" .. slotIndex)
+                headers[slotIndex], priorHeader = header, header
+            end
+            previousHeaderLast = headers[#headers]
+
+            BG.HopeFrame[raidId]["nandu" .. difficultyIndex] = {}
+            local priorFirstSlot
+            for bossIndex = 1, hopeMaxb[raidId] do
+                local boss = {}
+                BG.HopeFrame[raidId]["nandu" .. difficultyIndex]["boss" .. bossIndex] = boss
+                local rowAnchor = bossIndex == 1 and headers[1] or priorFirstSlot
+                for slotIndex = 1, hopeMaxi do
+                    local anchor = slotIndex == 1 and rowAnchor or boss["zhuangbei1"]
+                    local xOffset = slotIndex == 1 and 0 or (115 + 26) * (slotIndex - 1)
+                    local slot = createSlot(frame, raidId, difficultyIndex, bossIndex, slotIndex, anchor, xOffset)
+                    boss["zhuangbei" .. slotIndex] = slot
+                end
+                priorFirstSlot = boss.zhuangbei1
+                local bossLabel = frame:CreateFontString(nil, "OVERLAY")
+                bossLabel:SetPoint("TOPRIGHT", boss.zhuangbei1, "TOPLEFT", -26, -3)
+                bossLabel:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
+                local bossInfo = BG.Boss[raidId] and BG.Boss[raidId]["boss" .. bossIndex]
+                local color = bossInfo and bossInfo.color or "FFFFFF"
+                if ns.RGB then bossLabel:SetTextColor(ns.RGB(color)) else bossLabel:SetTextColor(1, 1, 1) end
+                bossLabel:SetSize(100, 20)
+                bossLabel:SetJustifyH("RIGHT")
+                bossLabel:SetText(bossInfo and bossInfo.name2 or ("Boss " .. bossIndex))
+                boss.name = bossLabel
+            end
+            previousBottomFirst = priorFirstSlot
+        end
+
+        function frame:Refresh()
+            local root, realmId, player = context(raidId)
+            for difficultyIndex = 1, hopeMaxn[raidId] do
+                for bossIndex = 1, hopeMaxb[raidId] do
+                    local writeIndex = 1
+                    for slotIndex = 1, hopeMaxi do
+                        local itemId = wishlist.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+                        if itemId then
+                            if writeIndex ~= slotIndex then
+                                wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId),
+                                    difficultyIndex, bossIndex, writeIndex, itemId)
+                                wishlist.clearSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+                            end
+                            writeIndex = writeIndex + 1
+                        end
+                    end
+                    for slotIndex = 1, hopeMaxi do
+                        local slot = BG.HopeFrame[raidId]["nandu" .. difficultyIndex]["boss" .. bossIndex]["zhuangbei" .. slotIndex]
+                        local itemId = wishlist.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+                        slot.itemId = itemId
+                        setSlotText(slot, itemId)
+                        updateSlotAppearance(slot)
+                    end
+                end
+            end
+        end
+        return frame
+    end
+
+    BG.Init(function()
+        BG.HopeMainFrame = CreateFrame("Frame", nil, BG.MainFrame)
+        BG.HopeMainFrame:SetAllPoints(BG.MainFrame)
+        BG.HopeMainFrame:Hide()
+        BG.HopeFrame = {}
+        for _, raidId in ipairs(BG.FBtable or {}) do
+            BG["HopeFrame" .. raidId] = createRaidGrid(raidId, BG.HopeMainFrame)
+        end
+
+        local function showCurrentRaid()
+            for _, raidId in ipairs(BG.FBtable or {}) do
+                local frame = BG["HopeFrame" .. raidId]
+                if raidId == BG.FB1 then
+                    frame:Show()
+                    frame:Refresh()
+                else
+                    frame:Hide()
+                end
+            end
+        end
+        BG.HopeMainFrame:SetScript("OnShow", showCurrentRaid)
+        BG.Create_TabButton(M.tabNumber, L["心愿清单"] or "心愿清单", BG.HopeMainFrame)
         if hooksecurefunc and BG.ClickFBbutton then
             hooksecurefunc(BG, "ClickFBbutton", function()
-                if BG.WishlistMainFrame:IsShown() then
-                    BG.WishlistMainFrame:Refresh()
-                end
+                if BG.HopeMainFrame:IsShown() then showCurrentRaid() end
             end)
+        end
+
+        BG.IsHope = function(value, raidId)
+            local itemId = wishlist.itemIdFromValue(value)
+            if not itemId then return false end
+            local root, realmId, player, currentRaidId = context(raidId)
+            return wishlist.contains(root, realmId, player, currentRaidId, itemId)
+        end
+
+        BG.SetHope = function(value, raidId)
+            local itemId = wishlist.itemIdFromValue(value)
+            local root, realmId, player, currentRaidId = context(raidId)
+            local result = wishlist.placeItem(root, realmId, player, currentRaidId, limitsFor(currentRaidId), itemId, resolveDrop)
+            if result.ok then
+                local frame = BG["HopeFrame" .. currentRaidId]
+                if frame and frame:IsShown() then frame:Refresh() end
+                return true
+            end
+            localMessage(result.reason == "boss-full" and "该首领的心愿格子已满。" or "只能设置团本首领正常掉落的装备为心愿。")
+            return false
+        end
+
+        BG.DeleteHope = function(value, raidId)
+            local itemId = wishlist.itemIdFromValue(value)
+            if not itemId then return false end
+            local root, realmId, player, currentRaidId = context(raidId)
+            local matches = wishlist.findItem(root, realmId, player, currentRaidId, itemId)
+            for _, match in ipairs(matches) do
+                wishlist.clearSlot(root, realmId, player, currentRaidId,
+                    match.difficultyIndex, match.bossIndex, match.slotIndex)
+            end
+            local frame = BG["HopeFrame" .. currentRaidId]
+            if frame and frame:IsShown() then frame:Refresh() end
+            return #matches > 0
+        end
+
+        BG.ToggleCurrentWish = function(value)
+            return BG.SetHope(value, BG.FB1)
         end
     end)
 end
