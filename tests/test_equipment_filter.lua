@@ -54,4 +54,14 @@ return function(test)
     otherDefaults.profiles.MAGE.name = "other"
     test.eq(state.profiles.MAGE.name, "法师", "character state is not aliased")
     test.eq(defaults[1].name, "法师", "source defaults are not mutated")
+
+    local file = assert(io.open("Core/function2.lua", "rb"))
+    local source = file:read("*a")
+    file:close()
+    test.eq(source:find("BG.BGNext.GetActiveEquipmentFilterProfile", 1, true) ~= nil, true,
+        "BGLite filter engine reads the BGNext active profile accessor")
+    test.eq(source:find("BiaoGe.FilterClassItemDB", 1, true), nil,
+        "BGLite filter engine does not write or read the legacy profile database")
+    test.eq(source:find("C_ChatInfo.SendAddonMessage", 1, true), nil,
+        "local equipment filtering adds no addon communication")
 end
