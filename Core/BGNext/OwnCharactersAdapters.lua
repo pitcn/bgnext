@@ -55,6 +55,19 @@ local CURRENCY_IDS = {
     retail = {},
 }
 
+-- Stable BGNext column key -> numeric item ID, per family. Like CURRENCY_IDS,
+-- only a verified in-game ID belongs here; an unlisted key resolves to nil and
+-- its column stays hidden.
+local ITEM_IDS = {
+    vanilla = {},
+    tbc = {},
+    wrath = {},
+    titan = {},
+    cata = {},
+    mop = {},
+    retail = {},
+}
+
 local function clone(value, seen)
     if type(value) ~= "table" then return value end
     seen = seen or {}
@@ -102,6 +115,296 @@ function M.safeCall(fn, ...)
     return result
 end
 
+-- Calls an optional Blizzard API and returns ok plus every result, or ok=false
+-- when the API is absent or throws. Several item/lockout/profession APIs return
+-- tuples rather than a single value, so this is kept separate from safeCall().
+local function callAll(fn, ...)
+    if type(fn) ~= "function" then return false end
+    return pcall(fn, ...)
+end
+
+--------------------------------------------------------------------------
+-- Current-character readers
+--
+-- Each reader reads only the logged-in player (or the player's own currencies
+-- and saved instances) and returns plain string/number/boolean/table data. A
+-- missing or protected API, or a wrong-typed value, degrades to nil rather than
+-- throwing or fabricating a value. None of these readers accepts a unit token,
+-- a player name, or any parameter that could address another player.
+--------------------------------------------------------------------------
+
+function M.readPlayerName(api)
+    local name = M.safeCall(api and api.UnitName, "player")
+    if type(name) ~= "string" or name == "" then return nil end
+    return name
+end
+
+function M.readRealmId(api)
+    local id = M.safeCall(api and api.GetRealmID)
+    if type(id) ~= "number" then return nil end
+    return id
+end
+
+function M.readRealmName(api)
+    local name = M.safeCall(api and api.GetRealmName)
+    if type(name) ~= "string" or name == "" then return nil end
+    return name:gsub(" ", ""):gsub("%-", "")
+end
+
+function M.readFaction(api)
+    local faction = M.safeCall(api and api.UnitFactionGroup, "player")
+    if type(faction) ~= "string" or faction == "" then return nil end
+    return faction
+end
+
+function M.readClass(api)
+    local fn = api and api.UnitClass
+    if type(fn) ~= "function" then return nil end
+    local ok, classFile = pcall(function() return select(2, fn("player")) end)
+    if not ok or type(classFile) ~= "string" or classFile == "" then return nil end
+    return classFile
+end
+
+function M.readLevel(api)
+    local level = M.safeCall(api and api.UnitLevel, "player")
+    if type(level) ~= "number" then return nil end
+    return level
+end
+
+function M.readItemLevel(api)
+    local fn = api and api.GetAverageItemLevel
+    if type(fn) ~= "function" then return nil end
+    local ok, overall, equipped = pcall(fn)
+    if not ok then return nil end
+    local value = type(equipped) == "number" and equipped
+        or (type(overall) == "number" and overall or nil)
+    return value
+end
+
+function M.readMoney(api)
+    local money = M.safeCall(api and api.GetMoney)
+    if type(money) ~= "number" then return nil end
+    return money
+end
+
+function M.readNow(api)
+    local clock = (api and api.time) or time
+    local now = M.safeCall(clock)
+    if type(now) ~= "number" then return nil end
+    return now
+end
+
+-- Reads the currently equipped items into a slot-keyed table. Each entry is
+-- only the plain data the whitelist allows; nothing else reaches storage.
+function M.readEquipment(api)
+    local getLink = api and api.GetInventoryItemLink
+    if type(getLink) ~= "function" then return nil end
+    local getInstant = api and api.GetItemInfoInstant
+    local getInfo = api and api.GetItemInfo
+    local getIcon = api and api.GetItemIcon
+
+    local slots = {}
+    for slot = 1, 19 do
+        local link = M.safeCall(getLink, "player", slot)
+        if type(link) == "string" and link ~= "" then
+            local itemId
+            if type(getInstant) == "function" then
+                local id = M.safeCall(getInstant, link)
+                if type(id) == "number" then itemId = id end
+            end
+
+            local itemLevel, quality, icon
+            if type(getInfo) == "function" then
+                local ok, name, itemLink, itemQuality, itemLvl, _, _, _, _, _, itemTexture =
+                    pcall(getInfo, link)
+                if ok then
+                    quality = type(itemQuality) == "number" and itemQuality or nil
+                    itemLevel = type(itemLvl) == "number" and itemLvl or nil
+                    if type(itemTexture) == "number" then
+                        icon = itemTexture
+                    elseif type(itemTexture) == "string" and itemTexture ~= "" then
+                        icon = itemTexture
+                    end
+                end
+            end
+
+            if not icon and itemId and type(getIcon) == "function" then
+                local iconPath = M.safeCall(getIcon, itemId)
+                if type(iconPath) == "number" or (type(iconPath) == "string" and iconPath ~= "") then
+                    icon = iconPath
+                end
+            end
+
+            if itemId or itemLevel or quality or icon then
+                slots[slot] = {
+                    itemId = itemId,
+                    itemLevel = itemLevel,
+                    quality = quality,
+                    icon = icon,
+                    count = 1,
+                    link = link,
+                }
+            end
+        end
+    end
+    if next(slots) == nil then return nil end
+    return slots
+end
+
+-- Reads the saved-instance lockouts for the raids this family renders. Only
+-- columns whose zoneId matches a saved instance produce a state; a lockout with
+-- no reset time still records progress/completion but not a countdown.
+function M.readRaidStates(api, raidColumns)
+    local getNum = api and api.GetNumSavedInstances
+    local getInfo = api and api.GetSavedInstanceInfo
+    if type(getNum) ~= "function" or type(getInfo) ~= "function" then return nil end
+
+    local count = M.safeCall(getNum)
+    if type(count) ~= "number" or count <= 0 then return nil end
+
+    local byInstance = {}
+    for _, column in ipairs(raidColumns or {}) do
+        local source = type(column) == "table" and column.source or nil
+        local instanceIds = type(source) == "table" and source.instanceIds or nil
+        if type(column) == "table" and type(column.id) == "string" and type(instanceIds) == "table" then
+            for _, instanceId in ipairs(instanceIds) do
+                if type(instanceId) == "number" then
+                    byInstance[instanceId] = { columnId = column.id, totalParts = #instanceIds }
+                end
+            end
+        end
+    end
+
+    local now = (api and api.time) or time
+    local nowValue = M.safeCall(now)
+
+    local states = {}
+    local seenInstances = {}
+    for index = 1, count do
+        local ok, name, lockoutId, reset, difficulty, locked, extended, mostSig, isRaid,
+            maxPlayers, difficultyName, numEncounters, encounterProgress, _, instanceId = callAll(getInfo, index)
+        local mapping = byInstance[instanceId]
+        if ok and locked == true and isRaid == true and mapping and not seenInstances[instanceId] then
+            seenInstances[instanceId] = true
+            local state = states[mapping.columnId] or {
+                progress = 0,
+                total = 0,
+                completedParts = 0,
+                totalParts = mapping.totalParts,
+            }
+            if type(difficulty) == "number" then state.difficulty = difficulty end
+            if type(numEncounters) == "number" and type(encounterProgress) == "number" then
+                state.total = state.total + numEncounters
+                state.progress = state.progress + encounterProgress
+                if numEncounters > 0 and encounterProgress >= numEncounters then
+                    state.completedParts = state.completedParts + 1
+                end
+            end
+            if type(reset) == "number" and reset >= 0 and type(nowValue) == "number" then
+                local resetsAt = nowValue + reset
+                if state.resetsAt == nil or resetsAt < state.resetsAt then state.resetsAt = resetsAt end
+            end
+            states[mapping.columnId] = state
+        end
+    end
+    for _, state in pairs(states) do
+        if state.totalParts > 0 and state.completedParts == state.totalParts then
+            state.completed = true
+        end
+    end
+    if next(states) == nil then return nil end
+    return states
+end
+
+-- Reads the two primary professions into an index-keyed table (position 1 and
+-- 2 only; secondary skills are intentionally not part of this overview).
+function M.readProfessions(api)
+    local getProfs = api and api.GetProfessions
+    local getInfo = api and api.GetProfessionInfo
+    if type(getProfs) ~= "function" or type(getInfo) ~= "function" then return nil end
+
+    local _, prof1, prof2 = callAll(getProfs)
+    local result = {}
+    for position, index in ipairs({ prof1, prof2 }) do
+        if type(index) == "number" then
+            local ok, name, texture, rank, maxRank = callAll(getInfo, index)
+            if ok and type(name) == "string" and name ~= "" then
+                result[position] = {
+                    name = name,
+                    skill = type(rank) == "number" and rank or nil,
+                    maxSkill = type(maxRank) == "number" and maxRank or nil,
+                    icon = (type(texture) == "number" or (type(texture) == "string" and texture ~= ""))
+                        and texture or nil,
+                }
+            end
+        end
+    end
+    if next(result) == nil then return nil end
+    return result
+end
+
+-- Reads the player's own currencies and item-count tokens. Honor is always
+-- attempted; a currency or item token is read only when this family has a
+-- verified ID for it, so an unverified column produces nothing.
+function M.readResources(api, family)
+    local result = { currencies = {}, items = {} }
+
+    local getHonor = api and api.UnitHonor
+    if type(getHonor) == "function" then
+        local honor = M.safeCall(getHonor, "player")
+        if type(honor) == "number" then result.currencies.honor = honor end
+    end
+
+    local ids = CURRENCY_IDS[family]
+    local getCurrency = api and api.GetCurrencyInfo
+    if ids and type(getCurrency) == "function" then
+        for key, id in pairs(ids) do
+            if type(id) == "number" then
+                local ok, name, amount = callAll(getCurrency, id)
+                if ok and type(amount) == "number" then
+                    result.currencies[key] = amount
+                end
+            end
+        end
+    end
+
+    local itemIds = ITEM_IDS[family]
+    local getCount = api and api.GetItemCount
+    if itemIds and type(getCount) == "function" then
+        for key, itemId in pairs(itemIds) do
+            if type(itemId) == "number" then
+                local count = M.safeCall(getCount, itemId, true)
+                if type(count) == "number" then
+                    result.items[key] = count
+                end
+            end
+        end
+    end
+
+    if next(result.currencies) == nil and next(result.items) == nil then return nil end
+    return result
+end
+
+-- Builds the environment the collector consumes. Every entry is a zero-argument
+-- reader so the collector can treat missing APIs and protected values uniformly.
+function M.readers(family, api, raidColumns)
+    return {
+        playerName = function() return M.readPlayerName(api) end,
+        realmId = function() return M.readRealmId(api) end,
+        realmName = function() return M.readRealmName(api) end,
+        faction = function() return M.readFaction(api) end,
+        class = function() return M.readClass(api) end,
+        level = function() return M.readLevel(api) end,
+        itemLevel = function() return M.readItemLevel(api) end,
+        money = function() return M.readMoney(api) end,
+        now = function() return M.readNow(api) end,
+        equipment = function() return M.readEquipment(api) end,
+        raidStates = function() return M.readRaidStates(api, raidColumns) end,
+        professions = function() return M.readProfessions(api) end,
+        resources = function() return M.readResources(api, family) end,
+    }
+end
+
 function M.currencyId(family, columnId)
     local ids = CURRENCY_IDS[family]
     if not ids or type(columnId) ~= "string" then return nil end
@@ -112,6 +415,37 @@ end
 -- it. Unverified columns must be hidden rather than rendered with a guess.
 function M.isVerifiedColumn(family, columnId)
     return M.currencyId(family, columnId) ~= nil
+end
+
+-- Reports whether the current client exposes every API needed to populate one
+-- declared column. Catalog presence alone is never treated as runtime support.
+function M.canReadColumn(family, api, column)
+    if not M.isFamily(family) or type(api) ~= "table" or type(column) ~= "table" then return false end
+    local source = column.source or {}
+    if source.kind == "raid" then
+        return source.readable == true and type(source.instanceIds) == "table" and #source.instanceIds > 0
+            and type(api.GetNumSavedInstances) == "function"
+            and type(api.GetSavedInstanceInfo) == "function"
+    end
+    if source.kind == "money" then return type(api.GetMoney) == "function" end
+    if source.kind == "equipment" then
+        return type(api.GetInventoryItemLink) == "function"
+            and (type(api.GetItemInfoInstant) == "function"
+                or type(api.GetItemInfo) == "function" or type(api.GetItemIcon) == "function")
+    end
+    if source.kind == "profession" then
+        return type(api.GetProfessions) == "function" and type(api.GetProfessionInfo) == "function"
+    end
+    if source.kind == "currency" then
+        local key = source.key or column.id
+        if key == "honor" then return type(api.UnitHonor) == "function" end
+        local currencyId = CURRENCY_IDS[family] and CURRENCY_IDS[family][key]
+        if type(currencyId) == "number" then return type(api.GetCurrencyInfo) == "function" end
+        local itemId = ITEM_IDS[family] and ITEM_IDS[family][key]
+        if type(itemId) == "number" then return type(api.GetItemCount) == "function" end
+        return false
+    end
+    return false
 end
 
 BG.BGNext.OwnCharactersAdapters = M

@@ -11,6 +11,9 @@
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
+local AddonName, ns = ...
+local L = ns and ns.L or setmetatable({}, { __index = function(_, key) return tostring(key) end })
+
 local M = {}
 
 -- Geometry constants. These are the calibration surface for in-game screenshot
@@ -139,7 +142,16 @@ local function raidCell(column, snapshot, now)
     local states = type(snapshot.raidStates) == "table" and snapshot.raidStates or nil
     local state = states and states[column.id] or nil
     if type(state) ~= "table" then return cell end
+    if type(state.resetsAt) == "number" then cell.resetsAt = state.resetsAt end
     if type(state.resetsAt) == "number" and type(now) == "number" and now >= state.resetsAt then
+        return cell
+    end
+    if type(state.totalParts) == "number" and state.totalParts > 1
+        and type(state.completedParts) == "number" and state.completedParts < state.totalParts then
+        cell.state = "progress"
+        cell.progress = state.completedParts
+        cell.total = state.totalParts
+        cell.text = string.format("%d/%d", state.completedParts, state.totalParts)
         return cell
     end
     if type(state.progress) == "number" and type(state.total) == "number" and state.total > 0
@@ -160,6 +172,44 @@ local function raidCell(column, snapshot, now)
         return cell
     end
     return cell
+end
+
+-- Renders the remaining time until a raid reset as a short, human-readable
+-- string. Past or missing timestamps yield nil so the caller can fall back to
+-- the static hint instead of showing a nonsense countdown.
+function M.formatCountdown(now, resetsAt)
+    if type(now) ~= "number" or type(resetsAt) ~= "number" then return nil end
+    local remaining = resetsAt - now
+    if remaining <= 0 then return nil end
+    local days = math.floor(remaining / 86400)
+    local hours = math.floor((remaining % 86400) / 3600)
+    local minutes = math.floor((remaining % 3600) / 60)
+    if days > 0 then
+        return string.format("%d天%d小时", days, hours)
+    end
+    if hours > 0 then
+        return string.format("%d小时%d分", hours, minutes)
+    end
+    if minutes > 0 then
+        return string.format("%d分", minutes)
+    end
+    return L["不足1分钟"]
+end
+
+-- The nearest future reset across the laid-out rows. Weekly locks all reset at
+-- the same maintenance, so a single countdown is meaningful; expired states
+-- are ignored rather than shown as a negative countdown.
+function M.nearestReset(rows, now)
+    local nearest
+    for _, row in ipairs(rows or {}) do
+        for _, cell in ipairs(row.cells or {}) do
+            local resetsAt = cell.resetsAt
+            if type(resetsAt) == "number" and (type(now) ~= "number" or now < resetsAt) then
+                if nearest == nil or resetsAt < nearest then nearest = resetsAt end
+            end
+        end
+    end
+    return nearest
 end
 
 local function equipmentCell(column, snapshot)
@@ -368,6 +418,7 @@ function M.project(input)
     end
 
     local count = #entries
+    local resetCountdown = M.formatCountdown(now, M.nearestReset(raidRows, now))
     -- Both sections share one window, so the window is as wide as the wider
     -- section. Each section also reports its own width so the renderer can
     -- lay out its header and separators without re-deriving them.
@@ -389,6 +440,7 @@ function M.project(input)
         raid = {
             title = M.titles.raid,
             hint = M.hints.raid,
+            resetCountdown = resetCountdown,
             nameHeader = string.format("角色(%d) 装等", count),
             characterCount = count,
             columns = raidColumns,

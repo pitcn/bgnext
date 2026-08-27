@@ -61,10 +61,6 @@ function M.collect(env)
     if not player or player == "" then return nil end
 
     local realmId = read(env, "realmId", "number")
-    if realmId == nil then
-        realmId = read(env, "realmId", "string")
-        if realmId == "" then realmId = nil end
-    end
     if realmId == nil then return nil end
 
     local snapshot = {

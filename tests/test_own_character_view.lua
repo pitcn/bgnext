@@ -73,6 +73,39 @@ return function(test)
     test.eq(byId.NAXXtitan.text, "", "expired raid has no text")
     test.eq(byId.TOCtitan.state, "empty", "unvisited raid renders blank")
 
+    local groupedMissing = View.project(input({
+        snapshots = { snapshot({
+            raidStates = {
+                SSCtitan = {
+                    progress = 6, total = 6, completedParts = 1, totalParts = 2,
+                    resetsAt = 9000,
+                },
+            },
+        }) },
+    }))
+    local groupedCell
+    for _, cell in ipairs(groupedMissing.raid.rows[1].cells) do
+        if cell.columnId == "SSCtitan" then groupedCell = cell break end
+    end
+    test.eq(groupedCell.state, "progress", "one completed instance cannot complete a grouped raid")
+    test.eq(groupedCell.text, "1/2", "a grouped raid shows completed instances when one lock is missing")
+
+    -- Real reset countdown, surfaced as a section-level hint.
+    test.eq(View.formatCountdown(1000, 1000 + 2 * 86400 + 3 * 3600), "2天3小时", "countdown spans days and hours")
+    test.eq(View.formatCountdown(1000, 1000 + 3 * 3600 + 20 * 60), "3小时20分", "countdown spans hours and minutes")
+    test.eq(View.formatCountdown(1000, 1000 + 5 * 60), "5分", "countdown under an hour shows minutes")
+    test.eq(View.formatCountdown(1000, 1000 + 30), "不足1分钟", "countdown under a minute is clamped")
+    test.eq(View.formatCountdown(1000, 1000), nil, "a reset at now has no countdown")
+    test.eq(View.formatCountdown(2000, 1000), nil, "a past reset has no countdown")
+    test.eq(View.formatCountdown(nil, 1000), nil, "a missing now has no countdown")
+    test.eq(View.formatCountdown(1000, nil), nil, "a missing reset has no countdown")
+
+    test.eq(View.nearestReset(states.raid.rows, 1000), 9000, "nearest reset picks the closest future reset")
+    test.eq(View.nearestReset({}, 1000), nil, "no rows means no reset")
+    test.eq(states.raid.resetCountdown ~= nil, true, "the raid section carries a countdown")
+    test.eq(type(states.raid.resetCountdown), "string", "the countdown is a string")
+    test.eq(View.project(input()).raid.resetCountdown, nil, "no raid states means no countdown")
+
     -- Expiry is a render-time decision; the caller's snapshot is untouched.
     local sourceSnapshot = snapshot({ raidStates = { NAXXtitan = { completed = true, resetsAt = 500 } } })
     View.project(input({ snapshots = { sourceSnapshot } }))
@@ -299,22 +332,54 @@ return function(test)
     -- The settings page lists only columns this client can actually read, so a
     -- field with no verified reader is never offered as a checkbox and never
     -- rendered with a guessed value.
-    local availability = Settings.availableColumns("titan", titanCatalog)
+    local readableApi = {
+        GetNumSavedInstances = function() return 0 end,
+        GetSavedInstanceInfo = function() end,
+        GetMoney = function() return 0 end,
+        GetInventoryItemLink = function() end,
+        GetItemInfoInstant = function() end,
+        GetProfessions = function() end,
+        GetProfessionInfo = function() end,
+        UnitHonor = function() return 0 end,
+    }
+    local availability = Settings.availableColumns("titan", titanCatalog, readableApi)
     test.eq(type(availability), "function", "availability is a predicate")
     test.eq(availability("raid", "MCtitan"), true, "raid lock state is readable")
+    test.eq(availability("raid", "Worldtitan"), false, "world-boss state without a reader is hidden")
     test.eq(availability("resource", "money"), true, "gold is readable on every client")
     test.eq(availability("resource", "equipment"), true, "equipment is readable on every client")
     test.eq(availability("resource", "prof1"), true, "professions are readable on titan")
     test.eq(availability("resource", "titanShard"), false, "an unverified currency is not offered")
     test.eq(availability("resource", "nope"), false, "unknown columns are unavailable")
+    local unavailable = Settings.availableColumns("titan", titanCatalog, {})
+    test.eq(unavailable("raid", "MCtitan"), false, "missing saved-instance APIs hide raid columns")
+    test.eq(unavailable("resource", "money"), false, "missing money API hides gold")
+    test.eq(unavailable("resource", "equipment"), false, "missing inventory APIs hide equipment")
+    test.eq(unavailable("resource", "prof1"), false, "missing profession APIs hide professions")
+    test.eq(unavailable("resource", "honor"), false, "missing honor API hides honor")
 
     -- That same predicate drives the projection, so an unverified column can
     -- never reach the table.
     local guarded = View.project(input({
         snapshots = { snapshot({ currencies = { titanShard = 7 } }) },
-        available = Settings.availableColumns("titan", titanCatalog),
+        available = Settings.availableColumns("titan", titanCatalog, readableApi),
     }))
     for _, column in ipairs(guarded.resource.columns) do
         test.eq(column.id ~= "titanShard", true, "unverified column stays out of the table")
+    end
+
+    -- Destructive clears expose distinct confirmation text naming the scope.
+    test.eq(type(Settings.clearDialogText), "function", "clear confirmation text is exposed")
+    test.eq(Settings.clearDialogText("family") ~= Settings.clearDialogText("all"), true,
+        "family and all clears warn differently")
+    test.eq(string.find(Settings.clearDialogText("family"), "当前版本", 1, true) ~= nil, true,
+        "family clear names the current version")
+
+    -- The settings page wires the clear and disable controls to the runtime.
+    local settingsSource = io.open("Core/BGNext/RoleOverviewSettings.lua", "r")
+    local ssrc = settingsSource:read("*a")
+    settingsSource:close()
+    for _, required in ipairs({ "setEnabled", "isEnabled", "clearFamily", "clearAll", "confirmClear" }) do
+        test.eq(string.find(ssrc, required, 1, true) ~= nil, true, "settings page wires " .. required)
     end
 end

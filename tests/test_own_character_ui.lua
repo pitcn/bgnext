@@ -105,6 +105,22 @@ return function(test)
     test.eq(type(hunter.r) == "number" and type(hunter.g) == "number" and type(hunter.b) == "number", true,
         "class colour has rgb components")
 
+    -- Item tooltips prefer the collected link and fall back to the item id.
+    local byLink = UI.tooltipTarget({ itemId = 123, link = "|cffffffff|Hitem:123|h|r" })
+    test.eq(type(byLink), "table", "tooltipTarget resolves a link")
+    test.eq(byLink.kind, "link", "a collected link is preferred")
+    test.eq(byLink.value, "|cffffffff|Hitem:123|h|r", "the link is the tooltip source")
+    local byId = UI.tooltipTarget({ itemId = 123 })
+    test.eq(byId.kind, "item", "item id is the fallback")
+    test.eq(byId.value, 123, "the item id is the tooltip source")
+    test.eq(UI.tooltipTarget({}), nil, "no item means no tooltip")
+    test.eq(UI.tooltipTarget(nil), nil, "a missing item means no tooltip")
+    test.eq(UI.tooltipTarget({ itemId = 0 }), nil, "a zero item id means no tooltip")
+
+    -- The raid section lays out the reset countdown; the resource section does not.
+    test.eq(layout.sections[1].countdown ~= nil, true, "raid section lays out the reset countdown")
+    test.eq(layout.sections[2].countdown, nil, "resource section has no countdown")
+
     -- Empty data renders a compact message, never an empty equipment wall.
     local emptyProjection = View.project({
         family = "titan", catalog = Catalog.forFamily("titan"), snapshots = {},
@@ -154,8 +170,18 @@ return function(test)
         test.eq(string.find(source, forbidden, 1, true), nil, "renderer never traverses " .. forbidden)
     end
 
+    -- Rows expose a right-click delete surface; the entry wires the handler.
+    test.eq(type(UI.SetRowHandler), "function", "a per-row handler setter is exposed")
+    test.eq(string.find(source, "RightButton", 1, true) ~= nil, true, "rows register right-click")
+    test.eq(string.find(source, "SetRowHandler", 1, true) ~= nil, true, "the renderer exposes SetRowHandler")
+
     -- No per-character card or vertical equipment wall may exist.
     for _, forbidden in ipairs({ "CreateCard", "cardLayout", "CreateCharacterCard", "columnPerCharacter" }) do
         test.eq(string.find(source, forbidden, 1, true), nil, "renderer has no " .. forbidden .. " helper")
+    end
+
+    -- Equipment icons use Blizzard's official tooltip, not a hand-built one.
+    for _, required in ipairs({ "GameTooltip", "SetHyperlink", "SetItemByID" }) do
+        test.eq(string.find(source, required, 1, true) ~= nil, true, "renderer uses " .. required)
     end
 end

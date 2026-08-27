@@ -13,6 +13,14 @@ return function(test)
         itemLevel = 230.75,
         updatedAt = 1000,
         money = 50000,
+        equipment = {
+            [1] = { itemId = 1001, icon = 134400 },
+            [2] = { itemId = 1002, icon = "Interface\\Icons\\INV_Test" },
+            [3] = { itemId = 1003, icon = { unsafe = true } },
+        },
+        professions = {
+            [1] = { name = "工程", icon = 136243 },
+        },
         raidStates = { SWtitan = { completed = true, resetsAt = 2000 } },
         unknownField = "must not persist",
     })
@@ -20,6 +28,10 @@ return function(test)
     test.eq(saved.player, "Piti", "stores current character")
     test.eq(saved.realmName, "时光II", "stores normalized realm name")
     test.eq(saved.unknownField, nil, "drops non-whitelisted fields")
+    test.eq(saved.equipment[1].icon, 134400, "numeric Blizzard texture file IDs are preserved")
+    test.eq(saved.equipment[2].icon, "Interface\\Icons\\INV_Test", "string Blizzard texture paths are preserved")
+    test.eq(saved.equipment[3].icon, nil, "non-serializable texture values are rejected")
+    test.eq(saved.professions[1].icon, 136243, "numeric profession texture IDs are preserved")
     test.eq(M.get(root, "titan", 123, "Piti").itemLevel, 230.75, "reads snapshot")
     M.expireRaidStates(root, 2001)
     test.eq(next(M.get(root, "titan", 123, "Piti").raidStates), nil, "expires weekly state")
@@ -123,4 +135,21 @@ return function(test)
     test.eq(#M.list(fresh, "titan"), 0, "unknown family lists nothing")
     test.eq(M.get(fresh, "titan", 1, "Nobody"), nil, "unknown character reads nil")
     test.eq(M.delete(fresh, "titan", 1, "Nobody"), false, "deleting an unknown character is safe")
+
+    -- Only explicit string/number/boolean types are stored. The whitelist must
+    -- never accept "any": a wrong-typed scalar, frame, function or userdata is
+    -- dropped instead of reaching SavedVariables.
+    local typeRoot = {}
+    test.eq(M.upsert(typeRoot, "titan", { realmId = "123", player = "Piti" }), nil,
+        "a string realm id is rejected (realmId must be a number)")
+
+    local typed = M.upsert(typeRoot, "titan", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        equipment = { [1] = { itemId = 1, icon = {} } },
+        raidStates = { MCtitan = { difficulty = "normal", resetsAt = 9000 } },
+        professions = { { name = "锻造", icon = function() end } },
+    })
+    test.eq(typed.equipment[1].icon, nil, "non-string equipment icon is dropped")
+    test.eq(typed.raidStates.MCtitan.difficulty, nil, "non-number difficulty is dropped")
+    test.eq(typed.professions[1].icon, nil, "non-string profession icon is dropped")
 end

@@ -28,6 +28,12 @@ return function(test)
     test.eq(Entry.intent(nil, {}), nil, "a missing action does nothing")
     test.eq(Entry.intent("hover", nil), "preview", "a missing state is safe")
 
+    -- Controls read settings, refresh, close left-to-right (close far right).
+    local order = Entry.controlOrder()
+    test.eq(order[1], "settings", "settings control comes first")
+    test.eq(order[2], "refresh", "refresh control comes second")
+    test.eq(order[3], "close", "close control comes last")
+
     -- Both documented commands are recognised, with and without arguments.
     test.eq(Entry.parseCommand("role"), "role", "/bgn role is recognised")
     test.eq(Entry.parseCommand("  role  "), "role", "surrounding spaces are ignored")
@@ -36,6 +42,25 @@ return function(test)
     test.eq(Entry.parseCommand(""), nil, "an empty command is not the role command")
     test.eq(Entry.parseCommand(nil), nil, "a missing command is safe")
     test.eq(Entry.parseCommand("something-else"), nil, "unrelated arguments are ignored")
+
+    -- dispatchSlash decides whether the command was the role overview and, when
+    -- it was, hands off to the entry's own toggle instead of the main frame.
+    local toggles = 0
+    local mockEntry = { togglePinned = function() toggles = toggles + 1 end }
+    test.eq(Entry.dispatchSlash("role", mockEntry), true, "/bgn role is dispatched")
+    test.eq(toggles, 1, "dispatchSlash toggles the pinned window")
+    test.eq(Entry.dispatchSlash("  role  ", mockEntry), true, "surrounding spaces are ignored")
+    test.eq(Entry.dispatchSlash("角色总览", mockEntry), true, "the localized command is dispatched")
+    test.eq(toggles, 3, "three role commands toggle three times")
+    test.eq(Entry.dispatchSlash("something", mockEntry), false, "an unrelated argument is not dispatched")
+    test.eq(Entry.dispatchSlash("", mockEntry), false, "an empty command is not dispatched")
+    test.eq(Entry.dispatchSlash(nil, mockEntry), false, "a missing command is not dispatched")
+
+    test.eq(Entry.canOpen({ isEnabled = function() return true end }), true,
+        "an enabled runtime allows the overview to open")
+    test.eq(Entry.canOpen({ isEnabled = function() return false end }), false,
+        "a disabled runtime blocks entry hover and slash opening")
+    test.eq(toggles, 3, "non-role commands never toggle")
 
     -- Default is the current realm; holding Shift widens to all local realms.
     test.eq(Entry.showAllRealms({}), false, "default shows the current realm only")
@@ -73,6 +98,50 @@ return function(test)
     test.eq(Entry.applyDelete(root, { family = "titan", realmId = 456 }, true), false, "a request without a name deletes nothing")
     test.eq(Model.get(root, "titan", 456, "Piti") ~= nil, true, "malformed requests left the data alone")
 
+    -- The delete confirmation names the exact character and realm.
+    local dialog = Entry.deleteDialogText({ player = "Piti", realmId = 123 }, { realmName = "时光II" })
+    test.eq(type(dialog), "string", "delete confirmation produces text")
+    test.eq(string.find(dialog, "Piti", 1, true) ~= nil, true, "delete confirmation names the character")
+    test.eq(string.find(dialog, "时光II", 1, true) ~= nil, true, "delete confirmation names the realm")
+    test.eq(string.find(dialog, "%", 1, true), nil, "delete confirmation has no format placeholder")
+
+    -- Without a realm name it falls back to the realm id, still naming the row.
+    local dialog2 = Entry.deleteDialogText({ player = "Piti", realmId = 123 }, nil)
+    test.eq(string.find(dialog2, "123", 1, true) ~= nil, true, "delete confirmation falls back to the realm id")
+    test.eq(Entry.deleteDialogText(nil, nil), "", "a missing request produces empty text")
+
+    -- Window anchors save only serializable values, never the relative frame.
+    local anchor = Entry.sanitizePoint("TOPLEFT", { name = "not-serializable" }, "BOTTOMRIGHT", 12.5, -7)
+    test.eq(type(anchor), "table", "sanitizePoint keeps a valid anchor")
+    test.eq(anchor.point, "TOPLEFT", "sanitizePoint keeps the point")
+    test.eq(anchor.relativePoint, "BOTTOMRIGHT", "sanitizePoint keeps the relative point")
+    test.eq(anchor.x, 12.5, "sanitizePoint keeps x")
+    test.eq(anchor.y, -7, "sanitizePoint keeps y")
+    test.eq(anchor.relativeTo, nil, "sanitizePoint drops the frame reference")
+    test.eq(Entry.sanitizePoint(nil, nil, "CENTER", 0, 0), nil, "a missing point is rejected")
+    test.eq(Entry.sanitizePoint("CENTER", nil, nil, 0, 0), nil, "a missing relative point is rejected")
+    test.eq(Entry.sanitizePoint("CENTER", nil, "CENTER", "0", 0), nil, "a non-numeric x is rejected")
+    test.eq(Entry.sanitizePoint("NOT_ANCHOR", nil, "CENTER", 0, 0), nil, "an invalid point is rejected")
+    test.eq(Entry.sanitizePoint("CENTER", nil, "NOT_ANCHOR", 0, 0), nil, "an invalid relative point is rejected")
+
+    -- Restore accepts only a valid, visible position.
+    local restored = Entry.restorePoint({ point = "TOPLEFT", relativePoint = "BOTTOMRIGHT", x = 5, y = 5 })
+    test.eq(type(restored), "table", "restorePoint accepts a valid anchor")
+    test.eq(restored.x, 5, "restorePoint keeps x")
+    test.eq(Entry.restorePoint(nil), nil, "restorePoint rejects a missing anchor")
+    test.eq(Entry.restorePoint({ point = "TOPLEFT", relativePoint = "CENTER" }), nil, "restorePoint rejects missing coordinates")
+    test.eq(Entry.restorePoint({ point = "TOPLEFT", relativePoint = "CENTER", x = "5", y = 5 }), nil,
+        "restorePoint rejects non-numeric coordinates")
+    test.eq(Entry.restorePoint({ point = "TOPLEFT", relativePoint = "CENTER", x = 999999999, y = 5 }), nil,
+        "restorePoint rejects off-screen coordinates")
+    local viewport = { width = 1920, height = 1080, windowWidth = 600, windowHeight = 300 }
+    test.eq(Entry.restorePoint({ point = "CENTER", relativePoint = "CENTER", x = 600, y = 300 }, viewport) ~= nil,
+        true, "restorePoint accepts a visible centered window")
+    test.eq(Entry.restorePoint({ point = "CENTER", relativePoint = "CENTER", x = 800, y = 300 }, viewport), nil,
+        "restorePoint rejects a moderately off-screen x coordinate")
+    test.eq(Entry.restorePoint({ point = "CENTER", relativePoint = "CENTER", x = 600, y = 500 }, viewport), nil,
+        "restorePoint rejects a moderately off-screen y coordinate")
+
     -- Refresh re-reads the current character only; it never scans others.
     test.eq(type(Entry.refreshPlan), "function", "a refresh plan is exposed")
     local plan = Entry.refreshPlan()
@@ -90,4 +159,8 @@ return function(test)
     }) do
         test.eq(string.find(source, forbidden, 1, true), nil, "entry never uses " .. forbidden)
     end
+
+    -- The settings control jumps straight to the 角色总览 settings page.
+    test.eq(string.find(source, "ButtonOptions_roleOverview", 1, true) ~= nil, true,
+        "settings control opens the role overview page")
 end

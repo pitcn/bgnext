@@ -112,9 +112,9 @@ end
 -- Returns a predicate saying whether this client can actually read a column.
 -- Both the settings page and the projection use it, so a field with no
 -- verified reader is neither offered as a checkbox nor rendered with a guess.
-function M.availableColumns(family, catalog)
+function M.availableColumns(family, catalog, api)
     local adapters = BG.BGNext.OwnCharactersAdapters
-    local capabilities = adapters and adapters.capabilities(family) or nil
+    api = api or _G
 
     local index = {}
     for section, sectionKey in pairs(SECTIONS) do
@@ -130,24 +130,7 @@ function M.availableColumns(family, catalog)
         local column = index[section] and index[section][columnId] or nil
         if not column then return false end
 
-        local source = column.source or {}
-        if source.kind == "raid" or source.kind == "money" or source.kind == "equipment" then
-            -- Raid lock state, GetMoney() and the equipped items are readable
-            -- on every client family BGLite declares.
-            return true
-        end
-        if source.kind == "profession" then
-            return capabilities ~= nil and capabilities.hasProfessionApi == true
-        end
-        if source.kind == "currency" then
-            local key = source.key or column.id
-            if key == "honor" then
-                return capabilities ~= nil and capabilities.hasHonorApi == true
-            end
-            -- Every other currency needs a confirmed ID for this client.
-            return adapters ~= nil and adapters.isVerifiedColumn(family, key) == true
-        end
-        return false
+        return adapters ~= nil and adapters.canReadColumn(family, api, column) == true
     end
 end
 
@@ -167,6 +150,41 @@ local PANEL_SECTIONS = {
     { section = "raid", key = "raidColumns", title = "团本完成列" },
     { section = "resource", key = "resourceColumns", title = "货币与资源列" },
 }
+
+-- The confirmation text for a destructive clear, naming the exact scope so a
+-- user never wipes another client's records by surprise.
+function M.clearDialogText(kind)
+    if kind == "family" then
+        return L["确认清空当前版本的角色数据？此操作不可撤销。"]
+    end
+    return L["确认清空全部版本的角色数据？此操作不可撤销。"]
+end
+
+-- Shows the confirmation dialog and, on accept, runs the matching clear on the
+-- runtime. The runtime's clear functions are already tested; this is only the
+-- in-game confirmation wrapper.
+function M.confirmClear(kind, family)
+    if type(StaticPopupDialogs) ~= "table" or type(StaticPopup_Show) ~= "function" then return end
+    local dialogName = kind == "family" and "BGNextRoleOverviewClearFamily" or "BGNextRoleOverviewClearAll"
+    StaticPopupDialogs[dialogName] = {
+        text = M.clearDialogText(kind),
+        button1 = L["清空"],
+        button2 = L["取消"],
+        OnAccept = function()
+            local runtime = BG.BGNext and BG.BGNext.OwnCharactersRuntime
+            if not runtime then return end
+            if kind == "family" then
+                if type(runtime.clearFamily) == "function" then runtime.clearFamily(nil, family) end
+            else
+                if type(runtime.clearAll) == "function" then runtime.clearAll(nil) end
+            end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+    StaticPopup_Show(dialogName)
+end
 
 -- Builds the "角色总览" settings page. The available columns differ per client
 -- family, so the page is generated from the catalog rather than hard-coded.
@@ -241,6 +259,50 @@ function M.BuildPanel(parent)
                 parent:Show()
             end
         end)
+
+        y = y - 20
+
+        -- Disabling the module stops collection and refresh; no data is
+        -- deleted, and re-checking restores collection.
+        local runtime = BG.BGNext and BG.BGNext.OwnCharactersRuntime
+        local enabledCheck = CreateFrame("CheckButton", nil, parent, "ChatConfigCheckButtonTemplate")
+        enabledCheck:SetSize(30, 30)
+        enabledCheck:SetPoint("TOPLEFT", parent, 20, y)
+        enabledCheck.Text:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+        enabledCheck.Text:SetText(L["启用角色总览"])
+        enabledCheck.Text:SetWordWrap(false)
+        enabledCheck.Text:SetWidth(160)
+        enabledCheck:SetHitRectInsets(0, -enabledCheck.Text:GetWidth(), 0, 0)
+        local function updateEnabled()
+            if runtime and type(runtime.isEnabled) == "function" then
+                enabledCheck:SetChecked(runtime.isEnabled())
+            end
+        end
+        updateEnabled()
+        enabledCheck:SetScript("OnClick", function(self)
+            if runtime and type(runtime.setEnabled) == "function" then
+                runtime.setEnabled(nil, self:GetChecked() and true or false)
+                refresh()
+            end
+        end)
+        enabledCheck:SetScript("OnShow", updateEnabled)
+        y = y - 40
+
+        -- Clear this client's character data only, then every client's, each
+        -- behind its own confirmation dialog.
+        local clearFamily = BG.CreateButton(parent)
+        clearFamily:SetSize(200, 25)
+        clearFamily:SetPoint("TOPLEFT", parent, 20, y)
+        clearFamily:SetText(L["清空当前版本角色数据"])
+        clearFamily:SetScript("OnClick", function() M.confirmClear("family", family) end)
+        y = y - 30
+
+        local clearAll = BG.CreateButton(parent)
+        clearAll:SetSize(200, 25)
+        clearAll:SetPoint("TOPLEFT", parent, 20, y)
+        clearAll:SetText(L["清空全部角色数据"])
+        clearAll:SetScript("OnClick", function() M.confirmClear("all", nil) end)
+        y = y - 30
 
         parent:SetSize(400, math.abs(y) + 60)
     end)

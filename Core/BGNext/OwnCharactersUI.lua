@@ -69,6 +69,20 @@ function M.classColor(classToken)
     return { r = FALLBACK_CLASS_COLOR.r, g = FALLBACK_CLASS_COLOR.g, b = FALLBACK_CLASS_COLOR.b }
 end
 
+-- Picks the source for Blizzard's official item tooltip. A collected item link
+-- is preferred (it preserves the exact item), otherwise the item id. Returning
+-- nil means there is nothing safe to show.
+function M.tooltipTarget(item)
+    if type(item) ~= "table" then return nil end
+    if type(item.link) == "string" and item.link ~= "" then
+        return { kind = "link", value = item.link }
+    end
+    if type(item.itemId) == "number" and item.itemId > 0 then
+        return { kind = "item", value = item.itemId }
+    end
+    return nil
+end
+
 local function columnWidth(column)
     if column.width == "dynamic-items" then
         local slots = column.slots or 0
@@ -86,6 +100,7 @@ local function layoutSection(source, key, top)
         key = key,
         title = source.title,
         hint = source.hint,
+        countdown = source.resetCountdown,
         nameHeader = source.nameHeader,
         titleY = top,
         headerY = top - metrics.sectionTitleHeight,
@@ -165,12 +180,19 @@ end
 
 local frame
 local provider
-local pool = { rows = {}, texts = {}, textures = {} }
+local rowHandler
+local pool = { rows = {}, texts = {}, textures = {}, buttons = {}, itemButtons = {} }
 
 -- The entry module supplies the projection. Keeping it a callback is what
 -- lets this file stay free of storage access.
 function M.SetProvider(fn)
     provider = type(fn) == "function" and fn or nil
+end
+
+-- The entry module supplies the per-row right-click handler (section, row).
+-- Stored as a callback so this renderer never learns how deletion works.
+function M.SetRowHandler(fn)
+    rowHandler = type(fn) == "function" and fn or nil
 end
 
 function M.GetFrame()
@@ -198,9 +220,62 @@ local function acquireTexture(parent, index)
     return item
 end
 
+local function acquireRowButton(parent, index)
+    local item = pool.buttons[index]
+    if not item then
+        item = CreateFrame("Button", nil, parent)
+        item:RegisterForClicks("RightButtonUp")
+        item:SetScript("OnMouseDown", function(self, mouseButton)
+            if mouseButton == "RightButton" and rowHandler then
+                rowHandler(self.__section, self.__row)
+            end
+        end)
+        pool.buttons[index] = item
+    end
+    item:Show()
+    return item
+end
+
+-- Shows Blizzard's own tooltip for an item, never a hand-written summary. The
+-- link is used when the collector captured one; otherwise the item id.
+local function showItemTooltip(self)
+    local target = M.tooltipTarget(self.__item)
+    if not target or type(GameTooltip) ~= "table" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    if target.kind == "link" then
+        GameTooltip:SetHyperlink(target.value)
+    else
+        GameTooltip:SetItemByID(target.value)
+    end
+    GameTooltip:Show()
+end
+
+local function hideItemTooltip()
+    if type(GameTooltip) == "table" then GameTooltip:Hide() end
+end
+
+local function acquireItemButton(parent, index)
+    local item = pool.itemButtons[index]
+    if not item then
+        item = CreateFrame("Button", nil, parent)
+        item:SetScript("OnEnter", showItemTooltip)
+        item:SetScript("OnLeave", hideItemTooltip)
+        item:SetScript("OnMouseDown", function(self, mouseButton)
+            if mouseButton == "RightButton" and rowHandler then
+                rowHandler(self.__section, self.__row)
+            end
+        end)
+        pool.itemButtons[index] = item
+    end
+    item:Show()
+    return item
+end
+
 local function resetPool()
     for _, item in ipairs(pool.texts) do item:Hide() end
     for _, item in ipairs(pool.textures) do item:Hide() end
+    for _, item in ipairs(pool.buttons) do item:Hide() end
+    for _, item in ipairs(pool.itemButtons) do item:Hide() end
 end
 
 local function cellText(cell, column)
@@ -219,7 +294,7 @@ function M.Draw(layout)
 
     frame:SetSize(layout.width, layout.height)
 
-    local textIndex, textureIndex = 0, 0
+    local textIndex, textureIndex, buttonIndex, itemButtonIndex = 0, 0, 0, 0
     local function nextText()
         textIndex = textIndex + 1
         return acquireText(frame, textIndex)
@@ -227,6 +302,14 @@ function M.Draw(layout)
     local function nextTexture()
         textureIndex = textureIndex + 1
         return acquireTexture(frame, textureIndex)
+    end
+    local function nextButton()
+        buttonIndex = buttonIndex + 1
+        return acquireRowButton(frame, buttonIndex)
+    end
+    local function nextItemButton()
+        itemButtonIndex = itemButtonIndex + 1
+        return acquireItemButton(frame, itemButtonIndex)
     end
 
     if layout.isEmpty then
@@ -246,7 +329,9 @@ function M.Draw(layout)
         local hint = nextText()
         hint:SetPoint("LEFT", title, "RIGHT", 8, 0)
         hint:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
-        hint:SetText(L[section.hint])
+        local hintText = L[section.hint]
+        if section.countdown then hintText = hintText .. " " .. section.countdown end
+        hint:SetText(hintText)
 
         local nameHeader = nextText()
         nameHeader:SetPoint("TOPLEFT", frame, M.metrics.padding, section.headerY)
@@ -274,6 +359,17 @@ function M.Draw(layout)
             stripe:SetPoint("TOPLEFT", frame, M.metrics.padding, row.y)
             stripe:SetSize(layout.width - M.metrics.padding * 2, M.metrics.rowHeight)
 
+            -- Invisible full-row hit area. Textures and font strings do not
+            -- capture the mouse, so this button receives every click over the
+            -- row and forwards only right-clicks to the entry's handler.
+            if rowHandler then
+                local hit = nextButton()
+                hit:SetPoint("TOPLEFT", frame, M.metrics.padding, row.y)
+                hit:SetSize(layout.width - M.metrics.padding * 2, M.metrics.rowHeight)
+                hit.__section = section.key
+                hit.__row = row
+            end
+
             local name = nextText()
             name:SetPoint("TOPLEFT", frame, M.metrics.padding, row.y)
             local classColor = M.classColor(row.class)
@@ -292,12 +388,15 @@ function M.Draw(layout)
                         check:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, row.y)
                     elseif cell.state == "items" then
                         for slot, item in ipairs(cell.items) do
-                            local icon = nextTexture()
-                            icon:SetTexture(item.icon or (type(GetItemIcon) == "function" and GetItemIcon(item.itemId)))
+                            local icon = nextItemButton()
+                            icon:SetNormalTexture(item.icon or (type(GetItemIcon) == "function" and GetItemIcon(item.itemId)))
                             icon:SetSize(M.metrics.iconSize, M.metrics.iconSize)
                             icon:SetPoint("TOPLEFT", frame,
                                 M.metrics.padding + column.x + (slot - 1) * (M.metrics.iconSize + M.metrics.iconGap),
                                 row.y)
+                            icon.__item = item
+                            icon.__section = section.key
+                            icon.__row = row
                             if item.itemLevel then
                                 local overlay = nextText()
                                 overlay:SetPoint("BOTTOMRIGHT", icon, 1, -1)

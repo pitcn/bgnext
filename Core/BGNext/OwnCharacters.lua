@@ -15,7 +15,7 @@ local M = {}
 -- collector or a corrupted save happens to carry is dropped on write.
 local SNAPSHOT_FIELDS = {
     player = "string",
-    realmId = "any",
+    realmId = "number",
     realmName = "string",
     faction = "string",
     class = "string",
@@ -30,19 +30,22 @@ local SNAPSHOT_FIELDS = {
     professions = "table",
 }
 
+local TEXTURE_TYPES = { string = true, number = true }
+
 local EQUIPMENT_FIELDS = {
     itemId = "number", itemLevel = "number", quality = "number",
-    icon = "any", count = "number", link = "string",
+    icon = TEXTURE_TYPES, count = "number", link = "string",
 }
 
 local RAID_STATE_FIELDS = {
     completed = "boolean", progress = "number", total = "number",
-    difficulty = "any", resetsAt = "number",
+    completedParts = "number", totalParts = "number",
+    difficulty = "number", resetsAt = "number",
 }
 
 local PROFESSION_FIELDS = {
     name = "string", skill = "number", maxSkill = "number",
-    icon = "any", cooldownEndsAt = "number",
+    icon = TEXTURE_TYPES, cooldownEndsAt = "number",
 }
 
 local function isKey(value)
@@ -50,7 +53,8 @@ local function isKey(value)
 end
 
 local function accepts(expected, value)
-    return expected == "any" or type(value) == expected
+    if type(expected) == "table" then return expected[type(value)] == true end
+    return type(value) == expected
 end
 
 -- Copies only whitelisted fields of a nested record; unknown keys are dropped.

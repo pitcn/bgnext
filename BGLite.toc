@@ -37,6 +37,7 @@ Core\BGNext\OwnCharactersView.lua
 Core\BGNext\RoleOverviewSettings.lua
 Core\BGNext\OwnCharactersUI.lua
 Core\BGNext\RoleOverviewEntry.lua
+Core\BGNext\OwnCharactersRuntime.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml

@@ -18,18 +18,27 @@ BG.BGNext = BG.BGNext or {}
 
 local M = {}
 
-local function raid(id, zoneId, title, variant)
+local function raid(id, zoneId, title, variant, instanceIds)
+    local ids = instanceIds
+    if type(ids) ~= "table" then
+        ids = type(zoneId) == "number" and { zoneId } or {}
+    end
     return {
         id = id,
         section = "raid",
         title = title,
-        zoneId = zoneId,
+        zoneId = #ids == 1 and zoneId or nil,
         variant = variant,
         kind = "status",
         width = "narrow",
         defaultVisible = true,
         total = false,
-        source = { kind = "raid", key = id },
+        source = {
+            kind = "raid",
+            key = id,
+            instanceIds = ids,
+            readable = #ids > 0,
+        },
     }
 end
 
@@ -103,12 +112,12 @@ local CATALOG = {
     },
     titan = {
         raidColumns = {
-            raid("MCtitan", 409, "熔火之心"),
-            raid("SSCtitan", 548, "毒蛇风暴"),
-            raid("NAXXtitan", 533, "纳克萨玛斯"),
-            raid("TOCtitan", 309, "P4双本"),
-            raid("SWtitan", 568, "P5双本"),
-            raid("ULDtitan", 603, "奥杜尔"),
+            raid("MCtitan", 409, "熔火之心", nil, { 409 }),
+            raid("SSCtitan", 548, "毒蛇风暴", nil, { 548, 550 }),
+            raid("NAXXtitan", 533, "纳克萨玛斯", nil, { 533, 615, 616 }),
+            raid("TOCtitan", 309, "P4双本", nil, { 309, 649 }),
+            raid("SWtitan", 568, "P5双本", nil, { 568, 580 }),
+            raid("ULDtitan", 603, "奥杜尔", nil, { 603 }),
             raid("Worldtitan", nil, "世界Boss"),
         },
         resourceColumns = commonResources({

@@ -366,10 +366,13 @@ BG.Init(function()
             lastbt = BG.QianKuanUI(lastbt)
             BG.NotifyChannelUI(lastbt)
 
-            -- BGNext: 角色总览右下角入口、悬停预览、固定窗口与 /bgn role、/bgnext role。
+            -- BGNext: 角色总览右下角入口、悬停预览与固定窗口。
             if BG.BGNext and BG.BGNext.RoleOverviewEntry then
                 BG.BGNext.RoleOverviewEntry.installEntry(BG.MainFrame)
-                BG.BGNext.RoleOverviewEntry.installSlash()
+            end
+            -- BGNext: 采集当前角色 -> 写入 -> 过期清理 -> 刷新 的运行时引导。
+            if BG.BGNext and BG.BGNext.OwnCharactersRuntime then
+                BG.BGNext.OwnCharactersRuntime.install()
             end
         end)
 
@@ -1901,7 +1904,14 @@ end
 
 -- 插件命令
 BG.Init2(function()
-    SlashCmdList["BGNEXT"] = function()
+    SlashCmdList["BGNEXT"] = function(message)
+        -- BGNext: "/bgn role" / "/bgnext role" opens the own-character overview
+        -- instead of toggling the main table. Every other argument keeps the
+        -- original main-table toggle.
+        local entry = BG.BGNext and BG.BGNext.RoleOverviewEntry
+        if entry and entry.dispatchSlash and entry.dispatchSlash(message, entry) then
+            return
+        end
         if BG.MainFrame then
             BG.MainFrame:SetShown(not BG.MainFrame:IsVisible())
         end
