@@ -50,6 +50,7 @@ end
 local function setProfileButton(button, profile, selected)
     button.profileId = profile.id
     button.icon:SetTexture(profile.icon or 134400)
+    button.icon:SetDesaturated(not selected)
     button.selected:SetShown(selected)
     button:Show()
 end
@@ -62,16 +63,18 @@ local function createProfileButton(parent, index, onClick)
     else
         button:SetPoint("LEFT", parent.buttons[index - 1], "RIGHT", 10, 0)
     end
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(40, 40)
-    icon:SetPoint("CENTER")
-    button.icon = icon
-    local selected = button:CreateTexture(nil, "OVERLAY")
-    selected:SetTexture("Interface/Buttons/CheckButtonHilight")
-    selected:SetBlendMode("ADD")
-    selected:SetAllPoints()
+    local selected = button:CreateTexture(nil, "BACKGROUND")
+    selected:SetSize(40, 40)
+    selected:SetPoint("CENTER")
+    selected:SetTexture("Interface/ChatFrame/UI-ChatIcon-BlinkHilight")
     button.selected = selected
-    button:SetHighlightTexture("Interface/Buttons/ButtonHilight-Square", "ADD")
+    local icon = button:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints()
+    button.icon = icon
+    local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetSize(23, 23)
+    highlight:SetPoint("CENTER")
+    highlight:SetColorTexture(1, 1, 1, .2)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:SetScript("OnClick", onClick)
     button:SetScript("OnEnter", function(self)

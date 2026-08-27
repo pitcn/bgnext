@@ -20,6 +20,17 @@ return function(test)
     test.eq(source:find("moveProfile", 1, true) ~= nil, true, "profile reorder action retained")
     test.eq(source:find("deleteProfile", 1, true) ~= nil, true, "profile delete action retained")
     test.eq(source:find("IconButtons", 1, true) ~= nil, true, "profile icon chooser retained")
+    local profileButtonStart = assert(source:find("local function createProfileButton", 1, true))
+    local profileButtonEnd = assert(source:find("local function updateProfileRows", profileButtonStart, true))
+    local profileButtonSource = source:sub(profileButtonStart, profileButtonEnd - 1)
+    test.eq(profileButtonSource:find('icon:SetAllPoints()', 1, true) ~= nil, true,
+        "shortcut profile icon uses the original 25x25 button bounds")
+    test.eq(profileButtonSource:find('selected:SetSize(40, 40)', 1, true) ~= nil, true,
+        "shortcut selection glow retains the original 40x40 size")
+    test.eq(profileButtonSource:find('Interface/ChatFrame/UI-ChatIcon-BlinkHilight', 1, true) ~= nil, true,
+        "shortcut selection glow retains the original texture")
+    test.eq(source:find('button.icon:SetDesaturated(not selected)', 1, true) ~= nil, true,
+        "inactive shortcut icons retain the original desaturated state")
     test.eq(source:find("#current.order * 35 - 10", 1, true), nil,
         "shortcut container preserves trailing spacing before settings")
     test.eq(source:find("main:SetSize(560, 700)", 1, true) ~= nil, true,
