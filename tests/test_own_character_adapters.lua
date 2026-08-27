@@ -1,0 +1,138 @@
+return function(test)
+    BG = { BGNext = {} }
+    local Adapters = dofile("Core/BGNext/OwnCharactersAdapters.lua")
+    local Catalog = dofile("Core/BGNext/OwnCharactersCatalog.lua")
+
+    -- Client-family detection from the flags BGLite already sets in Core/DB/Init.lua.
+    test.eq(Adapters.familyFromFlags({ IsTitan = true }), "titan", "detects titan")
+    test.eq(Adapters.familyFromFlags({ IsMOP = true }), "mop", "detects mop")
+    test.eq(Adapters.familyFromFlags({ IsRetail = true }), "retail", "detects retail")
+    test.eq(Adapters.familyFromFlags({ IsCTM = true }), "cata", "detects cata")
+    test.eq(Adapters.familyFromFlags({ IsTBC = true }), "tbc", "detects tbc")
+    test.eq(Adapters.familyFromFlags({ IsVanilla = true }), "vanilla", "detects vanilla")
+    test.eq(Adapters.familyFromFlags({ IsWLK = true, IsWLK_80 = true }), "wrath", "detects wrath")
+
+    -- BGLite sets IsWLK for the anniversary client too; titan must win.
+    test.eq(Adapters.familyFromFlags({ IsWLK = true, IsTitan = true }), "titan", "titan outranks wrath")
+    test.eq(Adapters.familyFromFlags({ IsVanilla = true, IsVanilla_Sod = true }), "vanilla", "sod maps to vanilla")
+    test.eq(Adapters.familyFromFlags({}), nil, "unknown client has no family")
+    test.eq(Adapters.familyFromFlags(nil), nil, "missing flags are safe")
+
+    -- Missing or failing APIs degrade to nil instead of throwing.
+    test.eq(Adapters.safeCall(nil), nil, "missing API is safe")
+    test.eq(Adapters.safeCall("not a function"), nil, "non-function is safe")
+    test.eq(Adapters.safeCall(function() error("protected") end), nil, "throwing API is safe")
+    test.eq(Adapters.safeCall(function(a, b) return a + b end, 2, 3), 5, "forwards arguments")
+    test.eq(Adapters.safeCall(function() return nil end), nil, "nil result is preserved")
+
+    -- Every declared family is covered.
+    local families = Adapters.families
+    test.eq(#families, 7, "seven client families are declared")
+    local expectedFamilies = {
+        vanilla = true, tbc = true, wrath = true, titan = true,
+        cata = true, mop = true, retail = true,
+    }
+    for _, family in ipairs(families) do
+        test.eq(expectedFamilies[family], true, family .. " is an expected family")
+    end
+
+    local titan = Catalog.forFamily("titan")
+    test.eq(type(titan.raidColumns), "table", "titan raid columns exist")
+    test.eq(type(titan.resourceColumns), "table", "titan resource columns exist")
+    test.eq(Catalog.defaultVisible("titan", "raid", "MCtitan"), true, "default is explicit")
+
+    -- Descriptor shape is enforced for every column of every family.
+    local validKind = {
+        status = true, progress = true, number = true,
+        money = true, items = true, profession = true,
+    }
+    local validWidth = {
+        narrow = true, normal = true, wide = true, ["dynamic-items"] = true,
+    }
+    for _, family in ipairs(families) do
+        local catalog = Catalog.forFamily(family)
+        test.eq(type(catalog), "table", family .. " has a catalog")
+        test.eq(#catalog.raidColumns > 0, true, family .. " declares raid columns")
+        test.eq(#catalog.resourceColumns > 0, true, family .. " declares resource columns")
+
+        local seen = {}
+        for _, section in ipairs({ "raidColumns", "resourceColumns" }) do
+            local expectedSection = section == "raidColumns" and "raid" or "resource"
+            for _, column in ipairs(catalog[section]) do
+                local label = family .. "/" .. tostring(column.id)
+                test.eq(type(column.id), "string", label .. " has a string id")
+                test.eq(column.id ~= "", true, label .. " id is not empty")
+                test.eq(seen[column.id], nil, label .. " id is unique in its family")
+                seen[column.id] = true
+                test.eq(column.section, expectedSection, label .. " declares its section")
+                test.eq(type(column.title), "string", label .. " has a title")
+                test.eq(column.title ~= "", true, label .. " title is not empty")
+                test.eq(validKind[column.kind], true, label .. " has a valid kind")
+                test.eq(validWidth[column.width], true, label .. " has a valid width")
+                test.eq(type(column.defaultVisible), "boolean", label .. " has explicit default visibility")
+                test.eq(type(column.total), "boolean", label .. " states whether it totals")
+            end
+        end
+
+        -- Only numeric-ish columns may claim a total; status columns never do.
+        for _, column in ipairs(catalog.resourceColumns) do
+            if column.kind == "status" or column.kind == "items" or column.kind == "profession" then
+                test.eq(column.total, false, family .. "/" .. column.id .. " does not fake a total")
+            end
+        end
+        for _, column in ipairs(catalog.raidColumns) do
+            test.eq(column.total, false, family .. "/" .. column.id .. " raid column has no total")
+        end
+
+        -- Gold is the one resource every supported client exposes via GetMoney().
+        test.eq(Catalog.column(family, "resource", "money") ~= nil, true, family .. " exposes gold")
+        test.eq(Catalog.column(family, "resource", "money").kind, "money", family .. " gold is money-kind")
+    end
+
+    -- Deterministic order across calls.
+    local firstOrder, secondOrder = {}, {}
+    for i, column in ipairs(Catalog.forFamily("titan").raidColumns) do firstOrder[i] = column.id end
+    for i, column in ipairs(Catalog.forFamily("titan").raidColumns) do secondOrder[i] = column.id end
+    test.eq(#firstOrder, #secondOrder, "raid column count is stable")
+    for i = 1, #firstOrder do
+        test.eq(firstOrder[i], secondOrder[i], "raid column order is stable at " .. i)
+    end
+
+    -- Callers cannot corrupt the shared catalog.
+    local mutable = Catalog.forFamily("titan")
+    mutable.raidColumns[1].title = "mutated"
+    mutable.raidColumns[1] = nil
+    test.eq(Catalog.forFamily("titan").raidColumns[1].id, firstOrder[1], "catalog is defensively copied")
+    test.eq(Catalog.forFamily("titan").raidColumns[1].title ~= "mutated", true, "titles are defensively copied")
+
+    -- Families expose only their own instances.
+    test.eq(Catalog.column("titan", "raid", "MCtitan") ~= nil, true, "titan has MCtitan")
+    test.eq(Catalog.column("mop", "raid", "MCtitan"), nil, "mop does not carry titan raids")
+    test.eq(Catalog.column("mop", "raid", "MSV") ~= nil, true, "mop has MSV")
+    test.eq(Catalog.column("titan", "raid", "MSV"), nil, "titan does not carry mop raids")
+    test.eq(Catalog.column("retail", "raid", "VS") ~= nil, true, "retail has VS")
+    test.eq(Catalog.column("vanilla", "raid", "MC") ~= nil, true, "vanilla has MC")
+    test.eq(Catalog.column("titan", "raid", "MC"), nil, "titan uses suffixed raid keys")
+
+    -- The user-facing hideable resource column from the acceptance criteria.
+    test.eq(Catalog.column("titan", "resource", "titanShard") ~= nil, true, "titan declares the shard column")
+
+    -- Unknown lookups stay safe.
+    test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")
+    test.eq(Catalog.forFamily(nil), nil, "missing family is safe")
+    test.eq(Catalog.column("titan", "raid", "nope"), nil, "unknown column is nil")
+    test.eq(Catalog.column("titan", "nope", "MCtitan"), nil, "unknown section is nil")
+    test.eq(Catalog.defaultVisible("nope", "raid", "MCtitan"), false, "unknown family defaults to hidden")
+    test.eq(Catalog.defaultVisible("titan", "raid", "nope"), false, "unknown column defaults to hidden")
+
+    -- Capabilities are declared per family and never invented at render time.
+    local caps = Adapters.capabilities("titan")
+    test.eq(type(caps), "table", "titan declares capabilities")
+    test.eq(type(caps.hasCurrencyApi), "boolean", "currency capability is explicit")
+    test.eq(Adapters.capabilities("nope"), nil, "unknown family has no capabilities")
+
+    -- Currency IDs are only declared where they are verified; unverified keys
+    -- must resolve to nil so the column is hidden instead of showing fake data.
+    test.eq(Adapters.currencyId("titan", "unverified-key"), nil, "unverified currency has no ID")
+    test.eq(Adapters.isVerifiedColumn("titan", "titanShard"), false, "shard ID is not verified yet")
+end
