@@ -1703,6 +1703,21 @@ do
     L["不能即时生效的设置在重载后生效。"] = true
     L["表格"] = true
     L["角色总览"] = true
+    -- BGNext: 角色总览（自有角色总览）
+    L["团本完成列"] = true
+    L["货币与资源列"] = true
+    L["恢复当前版本默认列"] = true
+    L["专业1"] = true
+    L["专业2"] = true
+    L["泰坦碎片"] = true
+    L["徽章"] = true
+    L["勇气点数"] = true
+    L["< 角色团本完成总览 >"] = true
+    L["< 角色货币总览 >"] = true
+    L["距离下次重置"] = true
+    L["中键或 Ctrl+左键固定，按住 Shift 显示全部服务器"] = true
+    L["合计"] = true
+    L["尚无本地角色记录，登录角色后自动记录。"] = true
     L["|cffffffff< UI缩放 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的大小"] = true
     L["|cffffffff< UI透明度 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的透明度"] = true
     L["UI透明度"] = true

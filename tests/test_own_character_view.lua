@@ -243,4 +243,78 @@ return function(test)
         snapshots = { snapshot(), "not a table", { player = "NoRealm" }, snapshot({ raidStates = "broken" }) },
     }))
     test.eq(#malformed.raid.rows, 2, "malformed snapshots are skipped, valid ones survive")
+
+    -- Column visibility is stored per client family.
+    local Settings = dofile("Core/BGNext/RoleOverviewSettings.lua")
+    local root = {}
+    local titanCatalog = Catalog.forFamily("titan")
+    local mopCatalog = Catalog.forFamily("mop")
+
+    Settings.ensure(root, "titan", titanCatalog)
+    test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "defaults come from the catalog")
+
+    Settings.setVisible(root, "titan", "raid", "MCtitan", false)
+    test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), false, "hiding is remembered")
+    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), true, "titan settings do not affect mop")
+
+    Settings.setVisible(root, "mop", "raid", "MSV", false)
+    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false, "mop hiding is remembered")
+    test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), false, "mop settings do not affect titan")
+
+    Settings.setVisible(root, "titan", "raid", "MCtitan", true)
+    test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "re-checking restores the column")
+
+    Settings.setVisible(root, "titan", "raid", "MCtitan", false)
+    Settings.setVisible(root, "titan", "resource", "titanShard", false)
+    Settings.resetFamily(root, "titan")
+    test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "reset restores catalog defaults")
+    test.eq(Settings.isVisible(root, "titan", "resource", "titanShard", titanCatalog), true, "reset restores every section")
+    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false, "reset touches only the chosen family")
+
+    -- Settings feed the projection, and hiding never deletes snapshot data.
+    Settings.setVisible(root, "titan", "resource", "titanShard", false)
+    local settingsSnapshot = snapshot({ currencies = { titanShard = 3 } })
+    local projected = View.project(input({
+        snapshots = { settingsSnapshot },
+        visibility = Settings.visibilityFor(root, "titan"),
+    }))
+    for _, column in ipairs(projected.resource.columns) do
+        test.eq(column.id ~= "titanShard", true, "settings hide the column in the projection")
+    end
+    test.eq(settingsSnapshot.currencies.titanShard, 3, "settings never delete snapshot values")
+    test.eq(projected.resource.width < wide.resource.width, true, "settings-driven hiding shrinks the section")
+
+    -- Unknown lookups stay safe and default to the catalog, never to a guess.
+    test.eq(Settings.isVisible(root, "titan", "raid", "nope", titanCatalog), false, "unknown column is not visible")
+    test.eq(Settings.isVisible(root, "titan", "nope", "MCtitan", titanCatalog), false, "unknown section is not visible")
+    test.eq(type(Settings.visibilityFor(root, "nope")), "table", "unknown family yields an empty override set")
+    test.eq(Settings.visibilityFor(nil, "titan") ~= nil, true, "missing root is safe")
+    Settings.setVisible(root, nil, "raid", "MCtitan", false)
+    test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "a missing family writes nothing")
+
+    -- Only booleans are stored, so a corrupted save cannot smuggle in data.
+    Settings.setVisible(root, "titan", "raid", "MCtitan", "yes")
+    test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "non-boolean visibility is ignored")
+
+    -- The settings page lists only columns this client can actually read, so a
+    -- field with no verified reader is never offered as a checkbox and never
+    -- rendered with a guessed value.
+    local availability = Settings.availableColumns("titan", titanCatalog)
+    test.eq(type(availability), "function", "availability is a predicate")
+    test.eq(availability("raid", "MCtitan"), true, "raid lock state is readable")
+    test.eq(availability("resource", "money"), true, "gold is readable on every client")
+    test.eq(availability("resource", "equipment"), true, "equipment is readable on every client")
+    test.eq(availability("resource", "prof1"), true, "professions are readable on titan")
+    test.eq(availability("resource", "titanShard"), false, "an unverified currency is not offered")
+    test.eq(availability("resource", "nope"), false, "unknown columns are unavailable")
+
+    -- That same predicate drives the projection, so an unverified column can
+    -- never reach the table.
+    local guarded = View.project(input({
+        snapshots = { snapshot({ currencies = { titanShard = 7 } }) },
+        available = Settings.availableColumns("titan", titanCatalog),
+    }))
+    for _, column in ipairs(guarded.resource.columns) do
+        test.eq(column.id ~= "titanShard", true, "unverified column stays out of the table")
+    end
 end

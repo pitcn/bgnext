@@ -181,6 +181,14 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
 
         biaoge = BG.OptionsCreateTab("Options_biaoge", L["表格"])
         autoAuction = BG.OptionsCreateTab("Options_autoAuction", L["自动拍卖"])
+        -- BGNext: 角色总览的列显示设置页。
+        -- 每个客户端版本族可用的列不同（团本、货币、专业各不一样），所以这里只创建页签，
+        -- 页面内容由 Core/BGNext/RoleOverviewSettings.lua 按当前版本的列目录动态生成。
+        -- 该文件里原本就已声明 roleOverview 局部变量，此处只是把它接上。
+        roleOverview = BG.OptionsCreateTab("Options_roleOverview", L["角色总览"])
+        if BG.BGNext and BG.BGNext.RoleOverviewSettings then
+            BG.BGNext.RoleOverviewSettings.BuildPanel(roleOverview)
+        end
         -- Lite: 恢复「其他功能」页（2026-08-24 按 BiaoGe v2.3.5 还原，仅保留有模块支撑的配置项）
         others = BG.OptionsCreateTab("Options_others", L["其他功能"])
 
