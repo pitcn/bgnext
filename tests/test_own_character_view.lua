@@ -256,6 +256,36 @@ return function(test)
         end
     end
 
+    -- Item identity reaches the renderer, and content-derived widths prevent
+    -- item strips and adjacent large numeric values from colliding.
+    local measured = View.project(input({
+        snapshots = { snapshot({
+            equipment = {
+                [13] = {
+                    itemId = 1001,
+                    link = "|Hitem:1001::::::::|h[Test Trinket]|h",
+                    icon = 11,
+                },
+                [14] = { itemId = 1002, icon = 12 },
+            },
+            currencies = { titanEmber = 18421, titanShard = 542 },
+        }) },
+    }))
+    local measuredColumns = {}
+    for _, column in ipairs(measured.resource.columns) do measuredColumns[column.id] = column end
+    local measuredCells = {}
+    for _, cell in ipairs(measured.resource.rows[1].cells) do measuredCells[cell.columnId] = cell end
+    test.eq(measuredCells.trinkets.items[1].link, "|Hitem:1001::::::::|h[Test Trinket]|h",
+        "item link reaches the renderer")
+    test.eq(measuredCells.trinkets.items[2].itemId, 1002, "item id remains a tooltip fallback")
+    test.eq(measuredColumns.trinkets.width >= View.metrics.iconSize * 2 + View.metrics.iconGap, true,
+        "two item icons fit without overflow")
+    test.eq(measuredColumns.titanEmber.width >= View.measureNumber("18421"), true,
+        "currency width fits its longest value")
+    test.eq(measuredColumns.titanShard.x
+        - (measuredColumns.titanEmber.x + measuredColumns.titanEmber.width)
+        >= View.metrics.columnGap, true, "adjacent numeric columns retain a gap")
+
     -- Unavailable columns never reach the projection, so nothing is faked.
     local unavailable = View.project(input({
         available = function(section, columnId) return not (section == "resource" and columnId == "titanShard") end,

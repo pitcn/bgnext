@@ -25,6 +25,7 @@ M.metrics = {
     totalsRowHeight = 20,
     iconSize = 19,
     iconGap = 1,
+    columnGap = 8,
     nameColumnWidth = 120,
     sectionGap = 10,
     padding = 8,
@@ -120,19 +121,58 @@ local function visibleColumns(columns, section, visibility, available)
 end
 
 local function columnWidth(column)
+    if type(column.width) == "number" then return column.width end
     if column.width == "dynamic-items" then
         local slots = column.slots or EQUIPMENT_SLOTS
-        return slots * (M.metrics.iconSize + M.metrics.iconGap)
+        return slots * M.metrics.iconSize
+            + math.max(0, slots - 1) * M.metrics.iconGap + 8
     end
     return M.metrics.columnWidths[column.width] or M.metrics.columnWidths.normal
 end
 
 local function sectionWidth(columns)
     local width = M.metrics.nameColumnWidth
-    for _, column in ipairs(columns) do
+    for index, column in ipairs(columns) do
+        if index > 1 then width = width + M.metrics.columnGap end
         width = width + columnWidth(column)
     end
     return width + M.metrics.padding * 2
+end
+
+function M.measureNumber(value)
+    return math.max(24, #tostring(value or "") * 8 + 8)
+end
+
+local function totalText(column, totals)
+    local total = totals and totals[column.id]
+    if type(total) ~= "number" then return "" end
+    if column.kind == "money" then return tostring(math.floor(total / 10000)) end
+    return tostring(total)
+end
+
+local function measureColumns(columns, rows, totals)
+    local x = M.metrics.nameColumnWidth
+    for index, column in ipairs(columns) do
+        local widthClass = column.width
+        local width
+        if widthClass == "dynamic-items" then
+            width = columnWidth(column)
+        elseif column.kind == "number" or column.kind == "money" then
+            width = M.metrics.columnWidths.narrow
+            for _, row in ipairs(rows or {}) do
+                local cell = row.cells and row.cells[index]
+                width = math.max(width, M.measureNumber(cell and cell.text or ""))
+            end
+            width = math.max(width, M.measureNumber(totalText(column, totals)))
+        else
+            width = columnWidth(column)
+        end
+        if index > 1 then x = x + M.metrics.columnGap end
+        column.widthClass = widthClass
+        column.width = width
+        column.x = x
+        x = x + width
+    end
 end
 
 -- A weekly raid state is meaningful only until its official reset. Past that
@@ -467,6 +507,10 @@ function M.project(input)
             column.slots = type(configured) == "table" and #configured or 1
         end
     end
+
+
+    measureColumns(raidColumns, raidRows, nil)
+    measureColumns(resourceColumns, resourceRows, totals)
 
     local count = #entries
     local resetCountdown = M.formatCountdown(now, M.nearestReset(raidRows, now))
