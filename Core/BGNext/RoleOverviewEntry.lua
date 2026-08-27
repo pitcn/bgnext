@@ -82,6 +82,25 @@ function M.entryPresentation(classFile)
     }
 end
 
+function M.windowPresentation(mode)
+    if mode == "preview" then
+        return {
+            strata = "FULLSCREEN_DIALOG",
+            point = "BOTTOMRIGHT",
+            relativePoint = "TOPRIGHT",
+            x = 0,
+            y = 0,
+        }
+    end
+    return {
+        strata = "HIGH",
+        point = "CENTER",
+        relativePoint = "CENTER",
+        x = 0,
+        y = 0,
+    }
+end
+
 -- A delete request is always keyed by family, realm and name together so a
 -- same-name character on another realm can never be removed by mistake.
 function M.deleteRequest(row, family)
@@ -179,6 +198,36 @@ local state = { pinned = pinned }
 local window
 local entryButton
 
+local function placeWindow(mode)
+    if not window then return end
+    local presentation = M.windowPresentation(mode)
+    window:SetFrameStrata(presentation.strata)
+    if window.SetFrameLevel then window:SetFrameLevel(100) end
+    if window.SetToplevel then window:SetToplevel(true) end
+    window:ClearAllPoints()
+
+    if mode == "preview" and entryButton then
+        window:SetPoint(presentation.point, entryButton, presentation.relativePoint,
+            presentation.x, presentation.y)
+        return
+    end
+
+    local root = BG.BGNext.DB
+    local saved = root and type(root.settings) == "table" and root.settings.roleOverviewPoint
+    local anchor = M.restorePoint(saved, {
+        width = UIParent:GetWidth(),
+        height = UIParent:GetHeight(),
+        windowWidth = window:GetWidth(),
+        windowHeight = window:GetHeight(),
+    })
+    if anchor then
+        local ok = pcall(window.SetPoint, window, anchor.point, UIParent, anchor.relativePoint, anchor.x, anchor.y)
+        if ok then return end
+    end
+    window:SetPoint(presentation.point, UIParent, presentation.relativePoint,
+        presentation.x, presentation.y)
+end
+
 function M.canOpen(runtime)
     runtime = runtime or BG.BGNext.OwnCharactersRuntime
     if runtime and type(runtime.isEnabled) == "function" then
@@ -245,21 +294,7 @@ local function ensureWindow()
     -- Restore the saved anchor when it is still valid; otherwise reset to a
     -- sensible default so a corrupt or off-screen position never strands the
     -- window where the user cannot reach it.
-    window:ClearAllPoints()
-    local root = BG.BGNext.DB
-    local saved = root and type(root.settings) == "table" and root.settings.roleOverviewPoint
-    local anchor = M.restorePoint(saved, {
-        width = UIParent:GetWidth(),
-        height = UIParent:GetHeight(),
-        windowWidth = window:GetWidth(),
-        windowHeight = window:GetHeight(),
-    })
-    if anchor then
-        local ok = pcall(window.SetPoint, window, anchor.point, UIParent, anchor.relativePoint, anchor.x, anchor.y)
-        if not ok then window:SetPoint("CENTER", UIParent, "CENTER", 0, 0) end
-    else
-        window:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    end
+    placeWindow("pinned")
 
     local ui = BG.BGNext.OwnCharactersUI
     if ui then
@@ -319,6 +354,7 @@ function M.setPinned(value)
     state.pinned = pinned
     if pinned and not window then ensureWindow() end
     if window then
+        if pinned then placeWindow("pinned") end
         window:SetShown(pinned)
         if pinned and BG.BGNext.OwnCharactersUI and BG.BGNext.OwnCharactersUI.Refresh then
             BG.BGNext.OwnCharactersUI.Refresh()
@@ -344,6 +380,7 @@ function M.showPreview()
     if not M.canOpen() then return end
     ensureWindow()
     if not pinned then
+        placeWindow("preview")
         window:SetShown(true)
         local runtime = BG.BGNext.OwnCharactersRuntime
         if runtime and type(runtime.setVisible) == "function" then runtime.setVisible(nil, true) end

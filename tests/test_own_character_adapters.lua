@@ -125,6 +125,20 @@ return function(test)
     test.eq(Catalog.defaultVisible("titan", "resource", "equipmentDetails"), false, "full equipment is details-only")
     test.eq(Catalog.column("titan", "resource", "equipment"), nil, "the old all-equipment main column is gone")
 
+    local shortTitles = {
+        SWtitan = "SW", ZAtitan = "ZAM", TOCtitan = "TOC", ZUGtitan = "ZG",
+        NAXXtitan = "NAXX", MCtitan = "MC", VOAtitan = "宝库",
+    }
+    for id, title in pairs(shortTitles) do
+        test.eq(Catalog.column("titan", "raid", id).title, title, id .. " uses the compact requested heading")
+    end
+    test.eq(Catalog.column("titan", "resource", "legendaryItems").title, "已有", "legendary heading is compact")
+    test.eq(Catalog.column("titan", "resource", "upgradeItems").title, "升级", "upgrade heading is compact")
+    test.eq(Catalog.column("titan", "resource", "titanEmber").title, "余烬", "ember heading is compact")
+    test.eq(Catalog.column("titan", "resource", "titanShard").title, "碎片", "shard heading is compact")
+    test.eq(Catalog.column("titan", "resource", "stoneKeeper").title, "岩石", "Stone Keeper heading is compact")
+    test.eq(Catalog.column("titan", "resource", "honor").title, "荣誉", "honor heading is compact")
+
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")
     test.eq(Catalog.forFamily(nil), nil, "missing family is safe")

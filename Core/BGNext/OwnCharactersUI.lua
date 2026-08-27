@@ -90,6 +90,28 @@ function M.rowLabel(section, row)
     return display
 end
 
+local function liveCurrencyInfo(currencyId)
+    if type(C_CurrencyInfo) == "table" and type(C_CurrencyInfo.GetCurrencyInfo) == "function" then
+        return C_CurrencyInfo.GetCurrencyInfo(currencyId)
+    end
+end
+
+function M.columnHeader(column, currencyInfo)
+    if type(column) ~= "table" then return "" end
+    local rawLabel = type(column.title) == "string" and column.title or ""
+    local label = L[rawLabel]
+    local source = type(column.source) == "table" and column.source or nil
+    if not source or source.kind ~= "currency" or source.showHeaderIcon ~= true
+        or type(source.currencyId) ~= "number" then
+        return label
+    end
+    local resolver = type(currencyInfo) == "function" and currencyInfo or liveCurrencyInfo
+    local ok, info = pcall(resolver, source.currencyId)
+    local icon = ok and type(info) == "table" and info.iconFileID or nil
+    if type(icon) ~= "number" and type(icon) ~= "string" then return label end
+    return label .. "|T" .. tostring(icon) .. ":14:14|t"
+end
+
 -- Picks the source for Blizzard's official item tooltip. A collected item link
 -- is preferred (it preserves the exact item), otherwise the item id. Returning
 -- nil means there is nothing safe to show.
@@ -137,6 +159,7 @@ local function layoutSection(source, key, top)
             id = column.id,
             title = column.title,
             color = column.color,
+            source = column.source,
             zoneId = column.zoneId,
             kind = column.kind,
             slots = column.slots,
@@ -368,12 +391,7 @@ function M.Draw(layout)
             header:SetWidth(column.width)
             local headerColor = M.hexColor(column.color)
             header:SetTextColor(headerColor.r, headerColor.g, headerColor.b)
-            local label = column.title
-            if column.zoneId and type(GetRealZoneText) == "function" then
-                local zoneName = GetRealZoneText(column.zoneId)
-                if type(zoneName) == "string" and zoneName ~= "" then label = zoneName end
-            end
-            header:SetText(L[label or ""])
+            header:SetText(M.columnHeader(column))
         end
 
         for _, row in ipairs(section.rows) do

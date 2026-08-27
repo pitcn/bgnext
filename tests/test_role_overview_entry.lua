@@ -79,6 +79,18 @@ return function(test)
     test.eq(string.find(presentation.text, "角色总览", 1, true) ~= nil, true,
         "entry includes the original label")
 
+    -- Hover previews attach to the entry and must render above the main addon.
+    local preview = Entry.windowPresentation("preview")
+    test.eq(preview.strata, "FULLSCREEN_DIALOG", "hover preview renders above the main addon")
+    test.eq(preview.point, "BOTTOMRIGHT", "hover preview uses its bottom-right corner")
+    test.eq(preview.relativePoint, "TOPRIGHT", "hover preview opens above the entry")
+    test.eq(preview.x, 0, "hover preview has no horizontal gap")
+    test.eq(preview.y, 0, "hover preview has no vertical gap")
+
+    local fixed = Entry.windowPresentation("pinned")
+    test.eq(fixed.strata, "HIGH", "pinned window keeps the original high strata")
+    test.eq(fixed.point, "CENTER", "an unsaved pinned window defaults to the screen center")
+
     -- Deletion is keyed by family, realm and name together.
     local root = {}
     Model.upsert(root, "titan", {

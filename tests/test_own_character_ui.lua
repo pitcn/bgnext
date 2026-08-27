@@ -126,6 +126,21 @@ return function(test)
     test.eq(cyan.g > 0.7, true, "hex color parses green")
     test.eq(cyan.b, 1, "hex color parses blue")
 
+    -- Catalog titles are authoritative: raid IDs never expand back to long
+    -- localized zone names, while selected currencies add their game icon.
+    test.eq(UI.columnHeader({ title = "SW", zoneId = 580 }), "SW",
+        "compact raid title is not replaced by GetRealZoneText")
+    local currencyHeader = UI.columnHeader({
+        title = "余烬",
+        source = { kind = "currency", currencyId = 3403, showHeaderIcon = true },
+    }, function(id)
+        test.eq(id, 3403, "currency header resolves the declared currency id")
+        return { iconFileID = 123456 }
+    end)
+    test.eq(currencyHeader, "余烬|T123456:14:14|t", "currency heading includes its game icon")
+    test.eq(UI.columnHeader({ title = "荣誉", source = { kind = "currency", currencyId = 1901 } },
+        function() return { iconFileID = 999 } end), "荣誉", "icons remain opt-in per heading")
+
     -- The raid section lays out the reset countdown; the resource section does not.
     test.eq(layout.sections[1].countdown ~= nil, true, "raid section lays out the reset countdown")
     test.eq(layout.sections[2].countdown, nil, "resource section has no countdown")
@@ -188,6 +203,8 @@ return function(test)
     for _, forbidden in ipairs({ "CreateCard", "cardLayout", "CreateCharacterCard", "columnPerCharacter" }) do
         test.eq(string.find(source, forbidden, 1, true), nil, "renderer has no " .. forbidden .. " helper")
     end
+    test.eq(string.find(source, "GetRealZoneText", 1, true), nil,
+        "renderer never expands compact raid headings back to full zone names")
 
     -- Equipment icons use Blizzard's official tooltip, not a hand-built one.
     for _, required in ipairs({ "GameTooltip", "SetHyperlink", "SetItemByID" }) do
