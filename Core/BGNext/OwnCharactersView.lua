@@ -460,13 +460,15 @@ function M.project(input)
     local catalog = input.catalog
     if type(catalog) ~= "table" then return nil end
 
-    if catalog.status ~= "tested-in-game" then
+    if catalog.status ~= "tested-in-game"
+        and catalog.status ~= "pending-in-game-verification" then
         local width = 360
         local count = 0
         local raidHeight = M.metrics.sectionTitleHeight + M.metrics.headerHeight
         local resourceHeight = M.metrics.sectionTitleHeight + M.metrics.headerHeight + M.metrics.totalsRowHeight
         return {
             family = input.family,
+            verificationStatus = catalog.status or "unverified",
             unsupported = true,
             isEmpty = true,
             characterCount = count,
@@ -556,6 +558,7 @@ function M.project(input)
 
     return {
         family = family,
+        verificationStatus = catalog.status,
         isEmpty = count == 0,
         characterCount = count,
         showAllRealms = input.showAllRealms == true,

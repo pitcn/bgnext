@@ -14,7 +14,8 @@ return function(test)
 
     -- BGLite sets IsWLK for the anniversary client too; titan must win.
     test.eq(Adapters.familyFromFlags({ IsWLK = true, IsTitan = true }), "titan", "titan outranks wrath")
-    test.eq(Adapters.familyFromFlags({ IsVanilla = true, IsVanilla_Sod = true }), "vanilla", "sod maps to vanilla")
+    test.eq(Adapters.familyFromFlags({ IsVanilla = true, IsVanilla_Sod = true }), nil,
+        "season of discovery is excluded from role overview")
     test.eq(Adapters.familyFromFlags({}), nil, "unknown client has no family")
     test.eq(Adapters.familyFromFlags(nil), nil, "missing flags are safe")
 
@@ -41,11 +42,56 @@ return function(test)
     test.eq(type(titan.resourceColumns), "table", "titan resource columns exist")
     test.eq(Catalog.defaultVisible("titan", "raid", "MCtitan"), true, "default is explicit")
     test.eq(Catalog.status("titan"), "tested-in-game", "titan is the release-ready catalog")
-    for _, family in ipairs({ "vanilla", "tbc", "wrath", "cata", "mop", "retail" }) do
+    for _, family in ipairs({ "wrath", "cata" }) do
         test.eq(Catalog.status(family), "unverified", family .. " remains unverified")
         local catalog = Catalog.forFamily(family)
         test.eq(#catalog.raidColumns, 0, family .. " exposes no unreliable raid placeholders")
         test.eq(#catalog.resourceColumns, 0, family .. " exposes no unreliable resource placeholders")
+    end
+
+    for _, family in ipairs({ "vanilla", "tbc", "mop", "retail" }) do
+        test.eq(Catalog.status(family), "pending-in-game-verification",
+            family .. " is explicitly pending real-client validation")
+        local catalog = Catalog.forFamily(family)
+        test.eq(#catalog.raidColumns > 0, true, family .. " declares verified BGLite instance IDs")
+        test.eq(#catalog.resourceColumns > 0, true, family .. " declares only confirmed summary columns")
+        test.eq(Catalog.column(family, "resource", "mainProfession") ~= nil, true,
+            family .. " exposes the profession summary")
+        test.eq(Catalog.column(family, "resource", "weapons") ~= nil, true,
+            family .. " exposes equipped weapons")
+        test.eq(Catalog.column(family, "resource", "trinkets") ~= nil, true,
+            family .. " exposes equipped trinkets")
+        test.eq(Catalog.column(family, "resource", "money") ~= nil, true,
+            family .. " exposes local money")
+        test.eq(Catalog.defaultVisible(family, "resource", "equipmentDetails"), false,
+            family .. " keeps full equipment behind the details option")
+        test.eq(Catalog.column(family, "resource", "upgradeItems"), nil,
+            family .. " never inherits Titan upgrade items")
+        test.eq(Catalog.column(family, "resource", "titanEmber"), nil,
+            family .. " never inherits Titan currencies")
+    end
+
+    local expectedRaidInstances = {
+        vanilla = { 409, 249, 469, 309, 509, 531, 533 },
+        tbc = { 532, 565, 544, 548, 550, 534, 564, 568, 580 },
+        mop = { 1008, 1009, 996, 1098, 1136 },
+        retail = { 3004, 2912, 2939, 2913, 1592 },
+    }
+    for family, expected in pairs(expectedRaidInstances) do
+        local catalog = Catalog.forFamily(family)
+        test.eq(#catalog.raidColumns, #expected, family .. " has one column per confirmed instance")
+        for index, instanceId in ipairs(expected) do
+            local column = catalog.raidColumns[index]
+            test.eq(#column.source.instanceIds, 1, family .. "/" .. column.id .. " is never grouped")
+            test.eq(column.source.instanceIds[1], instanceId,
+                family .. " instance order remains deterministic at " .. index)
+        end
+    end
+    test.eq(Catalog.defaultVisible("retail", "raid", "VA"), true,
+        "the BGLite current-season Retail raid is visible")
+    for _, id in ipairs({ "VS", "DR", "MQD", "Micosis" }) do
+        test.eq(Catalog.defaultVisible("retail", "raid", id), false,
+            "the Retail previous-season column " .. id .. " is hidden by default")
     end
 
     local seenTitanInstances = {}
@@ -66,9 +112,10 @@ return function(test)
     for _, family in ipairs(families) do
         local catalog = Catalog.forFamily(family)
         test.eq(type(catalog), "table", family .. " has a catalog")
-        if family == "titan" then
-            test.eq(#catalog.raidColumns > 0, true, "titan declares raid columns")
-            test.eq(#catalog.resourceColumns > 0, true, "titan declares resource columns")
+        if family == "titan" or family == "vanilla" or family == "tbc"
+            or family == "mop" or family == "retail" then
+            test.eq(#catalog.raidColumns > 0, true, family .. " declares raid columns")
+            test.eq(#catalog.resourceColumns > 0, true, family .. " declares resource columns")
         end
 
         local seen = {}
@@ -125,10 +172,12 @@ return function(test)
     -- Families expose only their own instances.
     test.eq(Catalog.column("titan", "raid", "MCtitan") ~= nil, true, "titan has MCtitan")
     test.eq(Catalog.column("mop", "raid", "MCtitan"), nil, "mop does not carry titan raids")
-    test.eq(Catalog.column("mop", "raid", "MSV"), nil, "unverified mop exposes no synthetic P1 group")
+    test.eq(Catalog.column("mop", "raid", "MSV") ~= nil, true, "mop exposes Mogu'shan independently")
+    test.eq(Catalog.column("mop", "raid", "HOF") ~= nil, true, "mop exposes Heart of Fear independently")
+    test.eq(Catalog.column("mop", "raid", "TES") ~= nil, true, "mop exposes Terrace independently")
     test.eq(Catalog.column("titan", "raid", "MSV"), nil, "titan does not carry mop raids")
-    test.eq(Catalog.column("retail", "raid", "VS"), nil, "unverified retail exposes no synthetic P1 group")
-    test.eq(Catalog.column("vanilla", "raid", "MC"), nil, "unverified vanilla exposes no placeholder raid")
+    test.eq(Catalog.column("retail", "raid", "VS") ~= nil, true, "retail keeps the BGLite P1 raid hidden")
+    test.eq(Catalog.column("vanilla", "raid", "MC") ~= nil, true, "vanilla exposes Molten Core")
     test.eq(Catalog.column("titan", "raid", "MC"), nil, "titan uses suffixed raid keys")
 
     -- Titan follows the original visible resource summary. Full equipment is

@@ -327,8 +327,8 @@ return function(test)
     test.eq(View.project({}), nil, "input without a catalog is safe")
 
     local unsupported = View.project({
-        family = "mop",
-        catalog = Catalog.forFamily("mop"),
+        family = "wrath",
+        catalog = Catalog.forFamily("wrath"),
         snapshots = { snapshot() },
         currentRealmId = 123,
         now = 1000,
@@ -336,6 +336,19 @@ return function(test)
     })
     test.eq(unsupported.unsupported, true, "unverified client projects an explicit unsupported state")
     test.eq(unsupported.characterCount, 0, "unverified client does not render misleading character rows")
+
+    local pending = View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot() },
+        currentRealmId = 123,
+        now = 1000,
+        visibility = {},
+    })
+    test.eq(pending.unsupported, nil, "pending clients remain renderable for real-client validation")
+    test.eq(pending.verificationStatus, "pending-in-game-verification",
+        "the projection preserves the client validation status")
+    test.eq(pending.characterCount, 1, "a pending client renders only its local test snapshot")
 
     local malformed = View.project(input({
         snapshots = { snapshot(), "not a table", { player = "NoRealm" }, snapshot({ raidStates = "broken" }) },
@@ -354,8 +367,8 @@ return function(test)
 
     Settings.setVisible(root, "titan", "raid", "MCtitan", false)
     test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), false, "hiding is remembered")
-    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false,
-        "unverified mop has no visible placeholder column")
+    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), true,
+        "mop uses its explicit independent-instance default")
 
     Settings.setVisible(root, "mop", "raid", "MSV", false)
     test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false, "mop hiding is remembered")
@@ -370,7 +383,7 @@ return function(test)
     test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "reset restores catalog defaults")
     test.eq(Settings.isVisible(root, "titan", "resource", "titanShard", titanCatalog), true, "reset restores every section")
     test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false,
-        "reset does not invent an unverified mop column")
+        "resetting Titan does not change the Mogu'shan preference")
 
     -- Settings feed the projection, and hiding never deletes snapshot data.
     Settings.setVisible(root, "titan", "resource", "titanShard", false)

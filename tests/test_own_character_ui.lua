@@ -199,7 +199,7 @@ return function(test)
     -- Empty data renders a compact message, never an empty equipment wall.
     local emptyProjection = View.project({
         family = "titan", catalog = Catalog.forFamily("titan"), snapshots = {},
-        currentRealmId = 123, now = 1000, visibility = {},
+        currentRealmId = 123, showAllRealms = true, now = 1000, visibility = {},
     })
     local emptyLayout = UI.layout(emptyProjection)
     test.eq(emptyLayout.isEmpty, true, "empty layout is flagged")
@@ -208,13 +208,24 @@ return function(test)
     test.eq(#emptyLayout.sections[1].rows, 0, "empty layout draws no character rows")
 
     local unsupportedLayout = UI.layout(View.project({
-        family = "mop",
-        catalog = Catalog.forFamily("mop"),
+        family = "wrath",
+        catalog = Catalog.forFamily("wrath"),
         snapshots = { snapshot() },
         currentRealmId = 123, now = 1000, visibility = {},
     }))
     test.eq(unsupportedLayout.emptyText, "该版本角色总览适配中。",
         "unverified clients show a truthful adaptation message")
+
+    local pendingLayout = UI.layout(View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot() },
+        currentRealmId = 123, showAllRealms = true, now = 1000, visibility = {},
+    }))
+    test.eq(pendingLayout.emptyText ~= "该版本角色总览适配中。", true,
+        "pending clients do not render an unsupported placeholder")
+    test.eq(pendingLayout.characterCount, 1,
+        "pending clients render the local snapshot for real-client validation")
 
     -- Hiding a column immediately reflows the layout.
     local hidden = View.project({

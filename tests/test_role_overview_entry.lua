@@ -60,6 +60,14 @@ return function(test)
         "an enabled runtime allows the overview to open")
     test.eq(Entry.canOpen({ isEnabled = function() return false end }), false,
         "a disabled runtime blocks entry hover and slash opening")
+    test.eq(Entry.canOpen({
+        isEnabled = function() return true end,
+        isAvailable = function() return false end,
+    }), false, "an excluded client never exposes the role overview entry")
+    test.eq(Entry.canOpen({
+        isEnabled = function() return true end,
+        isAvailable = function() return true end,
+    }), true, "a pending validation client may expose the entry")
     test.eq(toggles, 3, "non-role commands never toggle")
 
     -- Default is the current realm; holding Shift widens to all local realms.

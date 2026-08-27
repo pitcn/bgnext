@@ -50,6 +50,15 @@ return function(test)
         return deps, root, spy, uiCalls, apiCalls
     end
 
+    test.eq(Runtime.isAvailable({ family = "titan", catalog = Catalog.forFamily("titan") }), true,
+        "tested-in-game clients expose the overview")
+    test.eq(Runtime.isAvailable({ family = "mop", catalog = Catalog.forFamily("mop") }), true,
+        "pending clients expose the overview for real-client validation")
+    test.eq(Runtime.isAvailable({ family = nil, catalog = nil }), false,
+        "excluded clients such as Season of Discovery expose no overview")
+    test.eq(Runtime.isAvailable({ family = "wrath", catalog = Catalog.forFamily("wrath") }), false,
+        "unverified empty families expose no overview")
+
     -- The full chain runs on collectAndStore and writes a snapshot.
     local deps, root, spy, uiCalls, apiCalls = build()
     local snapshot = Runtime.collectAndStore(deps)

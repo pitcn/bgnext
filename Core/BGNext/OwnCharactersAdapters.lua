@@ -121,6 +121,9 @@ M.clone = clone
 
 function M.familyFromFlags(flags)
     if type(flags) ~= "table" then return nil end
+    -- Season of Discovery intentionally has no own-character overview. Check
+    -- this before IsVanilla because BGLite sets both flags on that client.
+    if flags.IsVanilla_Sod then return nil end
     for _, entry in ipairs(FAMILY_ORDER) do
         if flags[entry.flag] then return entry.family end
     end
@@ -423,14 +426,30 @@ function M.readProfessions(api)
     return readSkillLineProfessions(api)
 end
 
--- Reads the player's own currencies and item-count tokens. Honor is always
--- attempted; a currency or item token is read only when this family has a
--- verified ID for it, so an unverified column produces nothing.
-function M.readResources(api, family)
+local function resourceWhitelist(columns)
+    local keys, prefixes = {}, {}
+    for _, column in ipairs(columns or {}) do
+        local source = type(column) == "table" and column.source or nil
+        if type(source) == "table" then
+            if source.kind == "currency" then
+                keys[source.key or column.id] = true
+            elseif source.kind == "tracked-items" and type(source.prefix) == "string" then
+                prefixes[source.prefix] = true
+            end
+        end
+    end
+    return keys, prefixes
+end
+
+-- Reads only resources that the current family's explicit catalog declares.
+-- A readable API alone is not permission to collect a value: absent and
+-- pending columns stay absent from the snapshot as well as the UI.
+function M.readResources(api, family, resourceColumns)
     local result = { currencies = {}, items = {} }
+    local allowedKeys, allowedPrefixes = resourceWhitelist(resourceColumns)
 
     local getHonor = api and api.UnitHonor
-    if type(getHonor) == "function" then
+    if allowedKeys.honor and type(getHonor) == "function" then
         local honor = M.safeCall(getHonor, "player")
         if type(honor) == "number" then result.currencies.honor = honor end
     end
@@ -442,7 +461,7 @@ function M.readResources(api, family)
     end
     if ids and type(getCurrency) == "function" then
         for key, id in pairs(ids) do
-            if type(id) == "number" then
+            if allowedKeys[key] and type(id) == "number" then
                 local ok, first, amount = callAll(getCurrency, id)
                 if ok and type(first) == "table" then amount = first.quantity end
                 if ok and type(amount) == "number" then
@@ -456,7 +475,7 @@ function M.readResources(api, family)
     local getCount = api and api.GetItemCount
     if itemIds and type(getCount) == "function" then
         for key, itemId in pairs(itemIds) do
-            if type(itemId) == "number" then
+            if allowedKeys[key] and type(itemId) == "number" then
                 local count = M.safeCall(getCount, itemId, true)
                 if type(count) == "number" then
                     result.items[key] = count
@@ -465,7 +484,7 @@ function M.readResources(api, family)
         end
     end
 
-    if family == "titan" and type(getCount) == "function" then
+    if family == "titan" and allowedPrefixes["legendary:"] and type(getCount) == "function" then
         for _, group in ipairs(TITAN_LEGENDARY_GROUPS) do
             for _, itemId in ipairs(group) do
                 local count = M.safeCall(getCount, itemId, true)
@@ -475,6 +494,8 @@ function M.readResources(api, family)
                 end
             end
         end
+    end
+    if family == "titan" and allowedPrefixes["upgrade:"] and type(getCount) == "function" then
         for _, itemId in ipairs(TITAN_UPGRADE_ITEMS) do
             local count = M.safeCall(getCount, itemId, true)
             if type(count) == "number" and count > 0 then
@@ -489,7 +510,7 @@ end
 
 -- Builds the environment the collector consumes. Every entry is a zero-argument
 -- reader so the collector can treat missing APIs and protected values uniformly.
-function M.readers(family, api, raidColumns)
+function M.readers(family, api, raidColumns, resourceColumns)
     return {
         playerName = function() return M.readPlayerName(api) end,
         realmId = function() return M.readRealmId(api) end,
@@ -503,7 +524,7 @@ function M.readers(family, api, raidColumns)
         equipment = function() return M.readEquipment(api) end,
         raidStates = function() return M.readRaidStates(api, raidColumns) end,
         professions = function() return M.readProfessions(api) end,
-        resources = function() return M.readResources(api, family) end,
+        resources = function() return M.readResources(api, family, resourceColumns) end,
     }
 end
 

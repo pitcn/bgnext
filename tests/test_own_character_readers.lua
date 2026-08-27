@@ -158,7 +158,7 @@ return function(test)
             if id == 265340 then return 2 end
             return 0
         end,
-    }), titanRaidColumns).resources()
+    }), titanRaidColumns, Catalog.forFamily("titan").resourceColumns).resources()
     test.eq(resources.currencies.honor, 90, "Titan honor uses currency 1901")
     test.eq(resources.currencies.titanEmber, 12, "Titan ember uses currency 3403")
     test.eq(resources.currencies.titanShard, 34, "Titan shard uses currency 3406")
@@ -166,6 +166,13 @@ return function(test)
     test.eq(resources.currencies.arena, 78, "Titan arena points use currency 1900")
     test.eq(resources.items["legendary:255103"], 1, "owned legendary items are tracked by item id")
     test.eq(resources.items["upgrade:265340"], 2, "legendary upgrade items are tracked by item id")
+
+    local vanillaCatalog = Catalog.forFamily("vanilla")
+    local vanillaResources = Adapters.readers("vanilla", api({
+        UnitHonor = function() return 999 end,
+    }), vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources()
+    test.eq(vanillaResources, nil,
+        "a family does not collect honor or currencies absent from its explicit resource whitelist")
 
     -- Missing, non-function or throwing APIs degrade to nil, never an error.
     local degraded = Adapters.readers("titan", api({

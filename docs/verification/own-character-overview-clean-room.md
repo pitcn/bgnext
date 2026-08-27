@@ -9,14 +9,15 @@ A catalog entry only means BGNext can build a column list for that family. It do
 | Family | Detection | Column coverage | Raid-status API | Currency APIs | Status |
 | --- | --- | --- | --- | --- | --- |
 | Anniversary / Titan | `IsTitan` | Raids + equipment + money + professions + Titan-shard/emblem columns defined | Code-covered | Titan-shard/emblem IDs code-covered | **Code-covered, awaiting in-game validation** (first full validation target) |
-| Vanilla | `IsVanilla` | Raids + equipment + money + professions | Code-covered | None verified | Code-covered / simulated / unverified |
-| The Burning Crusade | `IsTBC` | Raids + equipment + money + professions | Code-covered | None verified | Code-covered / simulated / unverified |
-| Wrath of the Lich King | `IsWLK` | Raids + equipment + money + professions + emblem | Code-covered | Emblem ID code-covered | Code-covered / simulated / unverified |
-| Cataclysm | `IsCTM` | Raids + equipment + money + professions + valor | Code-covered | Valor ID code-covered | Code-covered / simulated / unverified |
-| Mists of Pandaria | `IsMOP` | Raids + equipment + money + professions + valor | Code-covered | Valor ID code-covered | Code-covered / simulated / unverified |
-| Retail | `IsRetail` | Raids + equipment + money + professions | Code-covered | None verified | Code-covered / simulated / unverified |
+| Vanilla 60 | `IsVanilla` + not `IsVanilla_Sod` | Seven independent raids + equipment + money + professions | Code-covered | None declared | Code-covered / automatically tested / pending in-game verification |
+| Season of Discovery | `IsVanilla_Sod` | No catalog or entry | Not loaded | None | Explicitly unsupported |
+| The Burning Crusade | `IsTBC` | Nine independent raids + equipment + money + professions | Code-covered | None declared | Code-covered / automatically tested / pending in-game verification |
+| Wrath of the Lich King | `IsWLK` | No release catalog in this scope | Not claimed | None declared | Unverified |
+| Cataclysm | `IsCTM` | No release catalog in this scope | Not claimed | None declared | Unverified |
+| Mists of Pandaria | `IsMOP` | Five independent raids + equipment + money + professions | Code-covered | None declared; world bosses pending | Code-covered / automatically tested / pending in-game verification |
+| Retail | `IsRetail` | Current BGLite raid instances + equipment + money + professions | Code-covered | None declared | Code-covered / automatically tested / pending in-game verification |
 
-No family is marked "supported". The Anniversary/Titan client is the first in-game validation target; every other family remains explicitly unverified until a real client confirms detection, raid status, and each currency column that BGNext declares visible.
+No newly added family is marked "supported". Vanilla 60, TBC, Mists and Retail are testable but remain pending until their respective real clients confirm detection, independent raid states, local summaries and safe degradation. Wrath and Cataclysm remain empty and unverified; Season of Discovery is explicitly excluded.
 
 ## Automated evidence
 

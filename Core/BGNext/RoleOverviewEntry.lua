@@ -259,7 +259,11 @@ end
 function M.canOpen(runtime)
     runtime = runtime or BG.BGNext.OwnCharactersRuntime
     if runtime and type(runtime.isEnabled) == "function" then
-        return runtime.isEnabled() == true
+        if runtime.isEnabled() ~= true then return false end
+        if type(runtime.isAvailable) == "function" then
+            return runtime.isAvailable() == true
+        end
+        return true
     end
     return true
 end
@@ -488,6 +492,7 @@ end
 function M.installEntry(mainFrame)
     if type(mainFrame) ~= "table" then return end
     if type(CreateFrame) ~= "function" then return end
+    if not M.canOpen() then return end
 
     if entryButton then return entryButton end
     local classFile

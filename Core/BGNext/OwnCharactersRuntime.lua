@@ -49,6 +49,20 @@ function M.deps()
     return liveDeps
 end
 
+-- Availability is separate from the user's enable switch. A client is
+-- available only when it has an explicit testable catalog; excluded clients
+-- (notably Season of Discovery) and empty unverified families never expose an
+-- entry or collect a placeholder snapshot.
+function M.isAvailable(deps)
+    deps = deps or M.deps()
+    if type(deps) ~= "table" or type(deps.family) ~= "string" then return false end
+    local catalog = deps.catalog
+    if type(catalog) ~= "table" then return false end
+    local status = catalog.status
+    if status ~= "tested-in-game" and status ~= "pending-in-game-verification" then return false end
+    return #(catalog.raidColumns or {}) > 0 or #(catalog.resourceColumns or {}) > 0
+end
+
 -- The module-disable switch lives under root.settings.roleOverviewEnabled. A
 -- missing value means enabled (backward-compatible default).
 function M.isEnabled(deps)
@@ -66,7 +80,7 @@ function M.setEnabled(deps, value)
     root.settings.roleOverviewEnabled = value and true or false
     local entry = deps.entry or BG.BGNext.RoleOverviewEntry
     if entry and type(entry.setAvailable) == "function" then
-        entry.setAvailable(value and true or false)
+        entry.setAvailable(value == true and M.isAvailable(deps))
     end
     if value then
         M.collectAndStore(deps)
@@ -116,7 +130,7 @@ end
 -- module is disabled or the client cannot identify the logged-in character.
 function M.collectAndStore(deps)
     deps = deps or M.deps()
-    if not M.isEnabled(deps) then return nil end
+    if not M.isEnabled(deps) or not M.isAvailable(deps) then return nil end
 
     local adapters = deps.adapters
     local collector = deps.collector
@@ -132,7 +146,7 @@ function M.collectAndStore(deps)
     local now = (type(deps.now) == "function" and deps.now) or defaultNow
     local stamp = now()
 
-    local env = adapters.readers(family, api, catalog.raidColumns)
+    local env = adapters.readers(family, api, catalog.raidColumns, catalog.resourceColumns)
     env.now = function() return stamp end
 
     local snapshot = collector.collect(env)
@@ -180,6 +194,11 @@ end
 local installed = false
 function M.install(deps)
     deps = deps or M.deps()
+    if not M.isAvailable(deps) then
+        local entry = deps and (deps.entry or BG.BGNext.RoleOverviewEntry)
+        if entry and type(entry.setAvailable) == "function" then entry.setAvailable(false) end
+        return nil
+    end
     if installed then return deps.frame end
     installed = true
 
