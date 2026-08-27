@@ -7,15 +7,19 @@ return function(test)
 
     local titanById = {}
     for _, column in ipairs(titanRaidColumns) do titanById[column.id] = column end
-    test.eq(#titanById.SSCtitan.source.instanceIds, 2, "Titan P2 groups SSC and TK")
-    test.eq(titanById.SSCtitan.zoneId, nil, "a grouped raid keeps its combined catalog title")
+    test.eq(#titanById.SSCtitan.source.instanceIds, 1, "Titan SSC is an independent lockout")
+    test.eq(titanById.SSCtitan.zoneId, 548, "Titan SSC keeps its own Blizzard instance id")
     test.eq(titanById.MCtitan.zoneId, 409, "a single raid may use Blizzard's localized zone title")
-    test.eq(titanById.SSCtitan.source.instanceIds[1], 548, "Titan P2 starts with SSC")
-    test.eq(titanById.SSCtitan.source.instanceIds[2], 550, "Titan P2 also includes TK")
-    test.eq(#titanById.NAXXtitan.source.instanceIds, 3, "Titan P3 groups Naxx, OS and EOE")
-    test.eq(#titanById.TOCtitan.source.instanceIds, 2, "Titan P4 groups both raids")
-    test.eq(#titanById.SWtitan.source.instanceIds, 2, "Titan P5 groups both raids")
-    test.eq(titanById.Worldtitan.source.readable, false, "unreadable world-boss status is explicit")
+    test.eq(titanById.SSCtitan.source.instanceIds[1], 548, "Titan SSC maps only instance 548")
+    test.eq(titanById.TKtitan.source.instanceIds[1], 550, "Titan TK maps only instance 550")
+    test.eq(titanById.NAXXtitan.source.instanceIds[1], 533, "Titan Naxx maps only instance 533")
+    test.eq(titanById.OStitan.source.instanceIds[1], 615, "Titan OS maps only instance 615")
+    test.eq(titanById.EOEtitan.source.instanceIds[1], 616, "Titan EOE maps only instance 616")
+    test.eq(titanById.TOCtitan.source.instanceIds[1], 649, "Titan TOC maps only instance 649")
+    test.eq(titanById.ZUGtitan.source.instanceIds[1], 309, "Titan ZG maps only instance 309")
+    test.eq(titanById.SWtitan.source.instanceIds[1], 580, "Titan Sunwell maps only instance 580")
+    test.eq(titanById.ZAtitan.source.instanceIds[1], 568, "Titan ZA maps only instance 568")
+    test.eq(titanById.Worldtitan, nil, "synthetic combined world-boss column is absent")
 
     local function api(overrides)
         local base = {
@@ -94,13 +98,14 @@ return function(test)
     test.eq(raidStates.MCtitan.total, 10, "raid total encounters are read")
     test.eq(raidStates.MCtitan.progress, 10, "raid progress is read")
     test.eq(raidStates.MCtitan.resetsAt, 8600, "raid reset time is now plus remaining lockout")
-    test.eq(raidStates.SSCtitan.progress, 8, "a grouped raid sums encounter progress")
-    test.eq(raidStates.SSCtitan.total, 10, "a grouped raid sums encounter totals")
-    test.eq(raidStates.SSCtitan.completedParts, 1, "a grouped raid counts completed instances")
-    test.eq(raidStates.SSCtitan.totalParts, 2, "a grouped raid knows every configured instance")
-    test.eq(raidStates.SSCtitan.completed, nil, "a grouped raid is incomplete until every instance is complete")
-    test.eq(raidStates.SSCtitan.resetsAt, 10400, "a grouped raid keeps the nearest reset")
-    test.eq(raidStates.SSCtitan.completed, nil, "a partial lockout is not marked complete")
+    test.eq(raidStates.SSCtitan.progress, 6, "SSC progress stays on the SSC column")
+    test.eq(raidStates.SSCtitan.total, 6, "SSC total stays on the SSC column")
+    test.eq(raidStates.SSCtitan.completed, true, "a complete SSC lockout is complete")
+    test.eq(raidStates.SSCtitan.resetsAt, 12200, "SSC keeps its own reset")
+    test.eq(raidStates.TKtitan.progress, 2, "TK progress stays on the TK column")
+    test.eq(raidStates.TKtitan.total, 4, "TK total stays on the TK column")
+    test.eq(raidStates.TKtitan.completed, nil, "a partial TK lockout is not complete")
+    test.eq(raidStates.TKtitan.resetsAt, 10400, "TK keeps its own reset")
 
     -- Professions read the two primary skill lines into index-keyed entries.
     local profApi = api({
@@ -122,12 +127,27 @@ return function(test)
     }), titanRaidColumns).professions()
     test.eq(numericProfessions[1].icon, 136241, "numeric profession texture file IDs are retained")
 
-    -- Resources read the current character's honor; unverified currency and item
-    -- tokens stay empty so their columns remain hidden.
-    local resources = Adapters.readers("titan", api(), titanRaidColumns).resources()
-    test.eq(resources.currencies.honor, 15, "honor is read for the current character")
-    test.eq(resources.currencies.titanShard, nil, "an unverified currency id yields no value")
-    test.eq(resources.currencies.emblem, nil, "an unverified emblem yields no value")
+    -- Titan resources use the verified game IDs and table-returning currency API.
+    local resources = Adapters.readers("titan", api({
+        C_CurrencyInfo = {
+            GetCurrencyInfo = function(id)
+                local amounts = { [3403] = 12, [3406] = 34, [161] = 56, [1900] = 78, [1901] = 90 }
+                return { quantity = amounts[id] or 0 }
+            end,
+        },
+        GetItemCount = function(id)
+            if id == 255103 then return 1 end
+            if id == 265340 then return 2 end
+            return 0
+        end,
+    }), titanRaidColumns).resources()
+    test.eq(resources.currencies.honor, 90, "Titan honor uses currency 1901")
+    test.eq(resources.currencies.titanEmber, 12, "Titan ember uses currency 3403")
+    test.eq(resources.currencies.titanShard, 34, "Titan shard uses currency 3406")
+    test.eq(resources.currencies.stoneKeeper, 56, "Stone Keeper shards use currency 161")
+    test.eq(resources.currencies.arena, 78, "Titan arena points use currency 1900")
+    test.eq(resources.items["legendary:255103"], 1, "owned legendary items are tracked by item id")
+    test.eq(resources.items["upgrade:265340"], 2, "legendary upgrade items are tracked by item id")
 
     -- Missing, non-function or throwing APIs degrade to nil, never an error.
     local degraded = Adapters.readers("titan", api({

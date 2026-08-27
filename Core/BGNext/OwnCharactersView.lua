@@ -28,7 +28,7 @@ M.metrics = {
     nameColumnWidth = 120,
     sectionGap = 10,
     padding = 8,
-    columnWidths = { narrow = 44, normal = 64, wide = 90 },
+    columnWidths = { narrow = 44, normal = 64, wide = 110 },
 }
 
 M.titles = {
@@ -37,8 +37,8 @@ M.titles = {
 }
 
 M.hints = {
-    raid = "距离下次重置",
-    resource = "中键或 Ctrl+左键固定，按住 Shift 显示全部服务器",
+    raid = "（团本重置时间：",
+    resource = "（鼠标中键固定显示，长按SHIFT显示全服务器角色）",
 }
 
 local EQUIPMENT_SLOTS = 19
@@ -216,9 +216,14 @@ local function equipmentCell(column, snapshot)
     local cell = { columnId = column.id, state = "empty", items = {} }
     local equipment = type(snapshot.equipment) == "table" and snapshot.equipment or nil
     if not equipment then return cell end
+    local allowed
+    if type(column.source) == "table" and type(column.source.slots) == "table" then
+        allowed = {}
+        for _, slot in ipairs(column.source.slots) do allowed[slot] = true end
+    end
     local slots = {}
     for slot in pairs(equipment) do
-        if type(slot) == "number" then slots[#slots + 1] = slot end
+        if type(slot) == "number" and (not allowed or allowed[slot]) then slots[#slots + 1] = slot end
     end
     table.sort(slots)
     for _, slot in ipairs(slots) do
@@ -239,10 +244,32 @@ local function equipmentCell(column, snapshot)
     return cell
 end
 
+local function trackedItemsCell(column, snapshot)
+    local cell = { columnId = column.id, state = "empty", items = {} }
+    local items = type(snapshot.items) == "table" and snapshot.items or nil
+    local prefix = type(column.source) == "table" and column.source.prefix or nil
+    if not items or type(prefix) ~= "string" then return cell end
+    for key, count in pairs(items) do
+        if type(key) == "string" and type(count) == "number" and count > 0
+            and key:sub(1, #prefix) == prefix then
+            local itemId = tonumber(key:sub(#prefix + 1))
+            if itemId then
+                cell.items[#cell.items + 1] = { itemId = itemId, count = count }
+            end
+        end
+    end
+    table.sort(cell.items, function(a, b) return a.itemId < b.itemId end)
+    if #cell.items > 0 then cell.state = "items" end
+    return cell
+end
+
 local function resourceCell(column, snapshot)
     local source = column.source or {}
     if source.kind == "equipment" then
         return equipmentCell(column, snapshot)
+    end
+    if source.kind == "tracked-items" then
+        return trackedItemsCell(column, snapshot)
     end
 
     local cell = { columnId = column.id, state = "empty", text = "" }
@@ -287,6 +314,27 @@ local function resourceCell(column, snapshot)
                     and string.format("%s %d", entry.name, entry.skill)
                     or entry.name
             end
+        end
+        return cell
+    end
+
+    if source.kind == "profession-summary" then
+        local professions = type(snapshot.professions) == "table" and snapshot.professions or nil
+        local entries = {}
+        for index = 1, 2 do
+            local entry = professions and professions[index] or nil
+            if type(entry) == "table" and isNonEmptyString(entry.name) then
+                entries[#entries + 1] = {
+                    name = entry.name,
+                    skill = entry.skill,
+                    maxSkill = entry.maxSkill,
+                    icon = entry.icon,
+                }
+            end
+        end
+        if #entries > 0 then
+            cell.state = "professions"
+            cell.entries = entries
         end
         return cell
     end
@@ -410,11 +458,14 @@ function M.project(input)
         resourceRows[#resourceRows + 1] = resourceRow
     end
 
-    -- An icon column is only as wide as the icons it actually draws. With no
-    -- equipment data at all it keeps a full-set reservation so its header and
-    -- the columns after it stay where the user expects.
+    -- An icon column is only as wide as the icons it actually draws. Empty
+    -- weapon/trinket columns reserve their configured slots; other summaries
+    -- reserve one icon so the compact original table does not become a wall.
     for _, column in pairs(iconColumns) do
-        if (column.slots or 0) <= 0 then column.slots = EQUIPMENT_SLOTS end
+        if (column.slots or 0) <= 0 then
+            local configured = type(column.source) == "table" and column.source.slots or nil
+            column.slots = type(configured) == "table" and #configured or 1
+        end
     end
 
     local count = #entries
@@ -441,7 +492,7 @@ function M.project(input)
             title = M.titles.raid,
             hint = M.hints.raid,
             resetCountdown = resetCountdown,
-            nameHeader = string.format("角色(%d) 装等", count),
+            nameHeader = string.format("%d个角色（装等）", count),
             characterCount = count,
             columns = raidColumns,
             rows = raidRows,
@@ -450,7 +501,7 @@ function M.project(input)
         resource = {
             title = M.titles.resource,
             hint = M.hints.resource,
-            nameHeader = string.format("角色(%d) 等级", count),
+            nameHeader = string.format("%d个角色（等级）", count),
             characterCount = count,
             columns = resourceColumns,
             rows = resourceRows,

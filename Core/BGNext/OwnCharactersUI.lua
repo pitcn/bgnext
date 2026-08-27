@@ -31,7 +31,7 @@ M.metrics = View and View.metrics or {
     nameColumnWidth = 120,
     sectionGap = 10,
     padding = 8,
-    columnWidths = { narrow = 44, normal = 64, wide = 90 },
+    columnWidths = { narrow = 44, normal = 64, wide = 110 },
 }
 
 M.colors = {
@@ -67,6 +67,27 @@ function M.classColor(classToken)
         return { r = color.r, g = color.g, b = color.b }
     end
     return { r = FALLBACK_CLASS_COLOR.r, g = FALLBACK_CLASS_COLOR.g, b = FALLBACK_CLASS_COLOR.b }
+end
+
+function M.hexColor(value)
+    if type(value) ~= "string" or not value:match("^%x%x%x%x%x%x$") then
+        return { r = M.colors.text.r, g = M.colors.text.g, b = M.colors.text.b }
+    end
+    return {
+        r = tonumber(value:sub(1, 2), 16) / 255,
+        g = tonumber(value:sub(3, 4), 16) / 255,
+        b = tonumber(value:sub(5, 6), 16) / 255,
+    }
+end
+
+function M.rowLabel(section, row)
+    if type(row) ~= "table" then return "" end
+    local display = type(row.display) == "string" and row.display or ""
+    local trailing = section == "raid" and row.itemLevel or row.level
+    if type(trailing) == "number" then
+        return string.format("%s (%d)", display, math.floor(trailing))
+    end
+    return display
 end
 
 -- Picks the source for Blizzard's official item tooltip. A collected item link
@@ -115,6 +136,7 @@ local function layoutSection(source, key, top)
         section.columns[#section.columns + 1] = {
             id = column.id,
             title = column.title,
+            color = column.color,
             zoneId = column.zoneId,
             kind = column.kind,
             slots = column.slots,
@@ -330,7 +352,9 @@ function M.Draw(layout)
         hint:SetPoint("LEFT", title, "RIGHT", 8, 0)
         hint:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
         local hintText = L[section.hint]
-        if section.countdown then hintText = hintText .. " " .. section.countdown end
+        if section.key == "raid" then
+            hintText = section.countdown and (hintText .. section.countdown .. "）") or ""
+        end
         hint:SetText(hintText)
 
         local nameHeader = nextText()
@@ -342,7 +366,8 @@ function M.Draw(layout)
             local header = nextText()
             header:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, section.headerY)
             header:SetWidth(column.width)
-            header:SetTextColor(M.colors.text.r, M.colors.text.g, M.colors.text.b)
+            local headerColor = M.hexColor(column.color)
+            header:SetTextColor(headerColor.r, headerColor.g, headerColor.b)
             local label = column.title
             if column.zoneId and type(GetRealZoneText) == "function" then
                 local zoneName = GetRealZoneText(column.zoneId)
@@ -374,8 +399,7 @@ function M.Draw(layout)
             name:SetPoint("TOPLEFT", frame, M.metrics.padding, row.y)
             local classColor = M.classColor(row.class)
             name:SetTextColor(classColor.r, classColor.g, classColor.b)
-            local trailing = section.key == "raid" and row.itemLevel or row.level
-            name:SetText(trailing and (row.display .. " " .. tostring(math.floor(trailing))) or row.display)
+            name:SetText(M.rowLabel(section.key, row))
 
             for index, column in ipairs(section.columns) do
                 local cell = row.cells[index]
@@ -397,11 +421,25 @@ function M.Draw(layout)
                             icon.__item = item
                             icon.__section = section.key
                             icon.__row = row
-                            if item.itemLevel then
+                            if item.itemLevel or (type(item.count) == "number" and item.count > 1) then
                                 local overlay = nextText()
                                 overlay:SetPoint("BOTTOMRIGHT", icon, 1, -1)
-                                overlay:SetText(tostring(math.floor(item.itemLevel)))
+                                overlay:SetText(tostring(math.floor(item.itemLevel or item.count)))
                             end
+                        end
+                    elseif cell.state == "professions" then
+                        local offset = 0
+                        for _, profession in ipairs(cell.entries or {}) do
+                            local skill = nextText()
+                            skill:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x + offset, row.y)
+                            skill:SetWidth(28)
+                            skill:SetText(tostring(math.floor(profession.skill or 0)))
+                            offset = offset + 28
+                            local icon = nextTexture()
+                            icon:SetTexture(profession.icon)
+                            icon:SetSize(M.metrics.iconSize, M.metrics.iconSize)
+                            icon:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x + offset, row.y)
+                            offset = offset + M.metrics.iconSize + M.metrics.iconGap
                         end
                     else
                         local text = cellText(cell, column)

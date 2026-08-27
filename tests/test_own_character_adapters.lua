@@ -114,8 +114,16 @@ return function(test)
     test.eq(Catalog.column("vanilla", "raid", "MC") ~= nil, true, "vanilla has MC")
     test.eq(Catalog.column("titan", "raid", "MC"), nil, "titan uses suffixed raid keys")
 
-    -- The user-facing hideable resource column from the acceptance criteria.
+    -- Titan follows the original visible resource summary. Full equipment is
+    -- available only as an explicitly hidden details column.
     test.eq(Catalog.column("titan", "resource", "titanShard") ~= nil, true, "titan declares the shard column")
+    test.eq(Catalog.defaultVisible("titan", "resource", "mainProfession"), true, "main professions show by default")
+    test.eq(Catalog.defaultVisible("titan", "resource", "weapons"), true, "weapons show by default")
+    test.eq(Catalog.defaultVisible("titan", "resource", "trinkets"), true, "trinkets show by default")
+    test.eq(Catalog.defaultVisible("titan", "resource", "legendaryItems"), true, "owned legendaries show by default")
+    test.eq(Catalog.defaultVisible("titan", "resource", "upgradeItems"), true, "upgrade items show by default")
+    test.eq(Catalog.defaultVisible("titan", "resource", "equipmentDetails"), false, "full equipment is details-only")
+    test.eq(Catalog.column("titan", "resource", "equipment"), nil, "the old all-equipment main column is gone")
 
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")
@@ -131,8 +139,15 @@ return function(test)
     test.eq(type(caps.hasCurrencyApi), "boolean", "currency capability is explicit")
     test.eq(Adapters.capabilities("nope"), nil, "unknown family has no capabilities")
 
-    -- Currency IDs are only declared where they are verified; unverified keys
-    -- must resolve to nil so the column is hidden instead of showing fake data.
+    -- Verified Titan currency IDs match the game data used by the original UI.
     test.eq(Adapters.currencyId("titan", "unverified-key"), nil, "unverified currency has no ID")
-    test.eq(Adapters.isVerifiedColumn("titan", "titanShard"), false, "shard ID is not verified yet")
+    test.eq(Adapters.currencyId("titan", "titanEmber"), 3403, "Titan ember ID is verified")
+    test.eq(Adapters.currencyId("titan", "titanShard"), 3406, "Titan shard ID is verified")
+    test.eq(Adapters.currencyId("titan", "stoneKeeper"), 161, "Stone Keeper shard ID is verified")
+    test.eq(Adapters.currencyId("titan", "honor"), 1901, "Titan honor ID is verified")
+    test.eq(Adapters.isVerifiedColumn("titan", "titanShard"), true, "shard column is now readable")
+    test.eq(Adapters.canReadColumn("titan", {
+        C_CurrencyInfo = { GetCurrencyInfo = function() return { quantity = 0 } end },
+    }, Catalog.column("titan", "resource", "honor")), true,
+        "Titan honor can use the currency API without UnitHonor")
 end

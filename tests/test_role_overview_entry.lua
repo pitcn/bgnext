@@ -67,6 +67,18 @@ return function(test)
     test.eq(Entry.showAllRealms({ shift = true }), true, "shift shows every local realm")
     test.eq(Entry.showAllRealms(nil), false, "a missing state defaults to current realm")
 
+    -- The main-frame entry follows the original bottom-right presentation.
+    local presentation = Entry.entryPresentation("HUNTER")
+    test.eq(presentation.point, "BOTTOMRIGHT", "entry anchors from the bottom-right")
+    test.eq(presentation.relativePoint, "BOTTOMRIGHT", "entry uses the main frame bottom-right")
+    test.eq(presentation.x, -20, "entry keeps the original right inset")
+    test.eq(presentation.y, 1, "entry sits on the original bottom bar")
+    test.eq(presentation.height, 25, "entry matches the bottom-bar height")
+    test.eq(string.find(presentation.text, "GarrMission_ClassIcon-hunter", 1, true) ~= nil, true,
+        "entry includes the current class icon")
+    test.eq(string.find(presentation.text, "角色总览", 1, true) ~= nil, true,
+        "entry includes the original label")
+
     -- Deletion is keyed by family, realm and name together.
     local root = {}
     Model.upsert(root, "titan", {

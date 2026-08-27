@@ -49,7 +49,16 @@ local CURRENCY_IDS = {
     vanilla = {},
     tbc = {},
     wrath = {},
-    titan = {},
+    titan = {
+        titanEmber = 3403,
+        titanShard = 3406,
+        jewelcraftingToken = 61,
+        cookingToken = 81,
+        championSeal = 241,
+        stoneKeeper = 161,
+        arena = 1900,
+        honor = 1901,
+    },
     cata = {},
     mop = {},
     retail = {},
@@ -66,6 +75,34 @@ local ITEM_IDS = {
     cata = {},
     mop = {},
     retail = {},
+}
+
+-- Public game item IDs used by the Titan legendary summary. Each inner
+-- legendary group represents upgrade variants of one item family; only the
+-- first owned variant is displayed so upgrades never appear as duplicates.
+local TITAN_LEGENDARY_GROUPS = {
+    { 255103, 260344, 257606, 260346, 264750, 264779, 264759, 264769,
+      264751, 264780, 264760, 264770, 264752, 264781, 264761, 264771,
+      264753, 264782, 264762, 264772, 264754, 264783, 264763, 264773,
+      264755, 264784, 264764, 264774, 264789, 264785, 264765, 264775,
+      264756, 264786, 264766, 264776, 264757, 264787, 264767, 264777,
+      264758, 264788, 264768, 264778 },
+    { 263264, 17203 },
+    { 257605 },
+    { 264749, 264936, 264748, 264935, 264746, 264934, 264933, 264745,
+      264932, 264744, 264931, 264743, 264930, 264742, 264929, 264741,
+      264928, 264731, 264927, 259908, 264926 },
+    { 265522, 265521, 265520, 265519, 265518, 265517, 265516, 265515,
+      265514, 19019, 19018 },
+    { 265570, 265569, 265568, 265567, 265566, 265565, 265564, 265563,
+      22632, 265841 },
+    { 17142, 269677, 269675, 269672, 269679, 269676, 269680, 269674, 272955 },
+    { 34334 },
+}
+
+local TITAN_UPGRADE_ITEMS = {
+    265340, 265524, 267339, 269664, 265335, 265523, 267338, 269667,
+    265526, 267335, 269669, 267340, 269665, 269670,
 }
 
 local function clone(value, seen)
@@ -357,10 +394,14 @@ function M.readResources(api, family)
 
     local ids = CURRENCY_IDS[family]
     local getCurrency = api and api.GetCurrencyInfo
+    if type(getCurrency) ~= "function" and type(api and api.C_CurrencyInfo) == "table" then
+        getCurrency = api.C_CurrencyInfo.GetCurrencyInfo
+    end
     if ids and type(getCurrency) == "function" then
         for key, id in pairs(ids) do
             if type(id) == "number" then
-                local ok, name, amount = callAll(getCurrency, id)
+                local ok, first, amount = callAll(getCurrency, id)
+                if ok and type(first) == "table" then amount = first.quantity end
                 if ok and type(amount) == "number" then
                     result.currencies[key] = amount
                 end
@@ -377,6 +418,24 @@ function M.readResources(api, family)
                 if type(count) == "number" then
                     result.items[key] = count
                 end
+            end
+        end
+    end
+
+    if family == "titan" and type(getCount) == "function" then
+        for _, group in ipairs(TITAN_LEGENDARY_GROUPS) do
+            for _, itemId in ipairs(group) do
+                local count = M.safeCall(getCount, itemId, true)
+                if type(count) == "number" and count > 0 then
+                    result.items["legendary:" .. tostring(itemId)] = count
+                    break
+                end
+            end
+        end
+        for _, itemId in ipairs(TITAN_UPGRADE_ITEMS) do
+            local count = M.safeCall(getCount, itemId, true)
+            if type(count) == "number" and count > 0 then
+                result.items["upgrade:" .. tostring(itemId)] = count
             end
         end
     end
@@ -433,18 +492,22 @@ function M.canReadColumn(family, api, column)
             and (type(api.GetItemInfoInstant) == "function"
                 or type(api.GetItemInfo) == "function" or type(api.GetItemIcon) == "function")
     end
-    if source.kind == "profession" then
+    if source.kind == "profession" or source.kind == "profession-summary" then
         return type(api.GetProfessions) == "function" and type(api.GetProfessionInfo) == "function"
     end
     if source.kind == "currency" then
         local key = source.key or column.id
-        if key == "honor" then return type(api.UnitHonor) == "function" end
         local currencyId = CURRENCY_IDS[family] and CURRENCY_IDS[family][key]
-        if type(currencyId) == "number" then return type(api.GetCurrencyInfo) == "function" end
+        if type(currencyId) == "number" then
+            return type(api.GetCurrencyInfo) == "function"
+                or (type(api.C_CurrencyInfo) == "table" and type(api.C_CurrencyInfo.GetCurrencyInfo) == "function")
+        end
+        if key == "honor" then return type(api.UnitHonor) == "function" end
         local itemId = ITEM_IDS[family] and ITEM_IDS[family][key]
         if type(itemId) == "number" then return type(api.GetItemCount) == "function" end
         return false
     end
+    if source.kind == "tracked-items" then return type(api.GetItemCount) == "function" end
     return false
 end
 

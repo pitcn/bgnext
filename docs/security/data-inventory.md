@@ -32,6 +32,8 @@ Mail subject, body, unrelated attachments, chat text, account identifiers, devic
 
 Snapshots are stored at `BiaoGe.BGNext.ownCharacters[clientFamily][realmId][player]`, keyed by the realm and name of the character the user is logged into, and are overwritten on each re-login (last-seen only, no history array). The allowed fields are `player`, `realmId`, `realmName`, `faction`, `class`, `level`, `itemLevel`, `money`, `updatedAt`, `equipment`, `currencies`, `items`, `raidStates`, and `professions`; every nested table is whitelisted and sanitized on write. Equipment and profession textures accept only a Blizzard string path or numeric file ID. Grouped raid states may additionally store numeric `completedParts` and `totalParts`; raid status is dropped once its weekly `resetsAt` timestamp has passed.
 
+On the Titan client, `currencies` may contain only the locally read values for the explicitly declared currency columns. `items` may additionally contain numeric counts keyed as `legendary:<itemId>` or `upgrade:<itemId>` for the fixed legendary-summary item lists. These values come only from `GetItemCount` for the logged-in character and are used only to reproduce the local “已有橙武” and “升级物品” columns; they are not inventory history and are overwritten with the next character snapshot.
+
 No other-player, cross-account, historical, communication, or migration data is accepted: BGNext never reads or stores another player's identity or information, never keeps a previous-value or profile history, and never persists chat, mail body, account/device identifiers, GUIDs, notes, or cross-raid aggregates for this feature. Currency columns whose reliable in-game API is not yet verified render blank rather than fabricating a value.
 
 ## Runtime-only data

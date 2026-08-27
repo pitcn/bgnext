@@ -70,6 +70,18 @@ function M.showAllRealms(state)
     return state.shift == true
 end
 
+function M.entryPresentation(classFile)
+    local classKey = type(classFile) == "string" and classFile:lower() or "warrior"
+    return {
+        point = "BOTTOMRIGHT",
+        relativePoint = "BOTTOMRIGHT",
+        x = -20,
+        y = 1,
+        height = 25,
+        text = "|A:GarrMission_ClassIcon-" .. classKey .. ":0:0|a" .. L["角色总览"],
+    }
+end
+
 -- A delete request is always keyed by family, realm and name together so a
 -- same-name character on another realm can never be removed by mistake.
 function M.deleteRequest(row, family)
@@ -393,10 +405,23 @@ function M.installEntry(mainFrame)
     if type(mainFrame) ~= "table" then return end
     if type(CreateFrame) ~= "function" then return end
 
-    local button = BG.CreateButton(mainFrame)
-    button:SetSize(60, 25)
-    button:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -350, 38)
-    button:SetText(L["角色总览"])
+    if entryButton then return entryButton end
+    local classFile
+    if type(UnitClass) == "function" then
+        local _, detected = UnitClass("player")
+        classFile = detected
+    end
+    local presentation = M.entryPresentation(classFile)
+    local button = CreateFrame("Button", nil, mainFrame)
+    button:SetSize(20, presentation.height)
+    button:SetPoint(presentation.point, mainFrame, presentation.relativePoint,
+        presentation.x, presentation.y)
+    if BG.FontYellow13 then button:SetNormalFontObject(BG.FontYellow13) end
+    if BG.FontWhite13 then button:SetHighlightFontObject(BG.FontWhite13) end
+    button:SetText(presentation.text)
+    if button.GetFontString and button:GetFontString() then
+        button:SetWidth(button:GetFontString():GetStringWidth())
+    end
     BG.ButtonRoleOverview = button
     entryButton = button
     M.setAvailable(M.canOpen())
@@ -406,6 +431,12 @@ function M.installEntry(mainFrame)
     button:SetScript("OnMouseDown", function(_, mouseButton)
         if mouseButton == "MiddleButton" or (mouseButton == "LeftButton" and IsControlKeyDown()) then
             M.togglePinned()
+        end
+    end)
+    button:SetScript("OnMouseUp", function(_, mouseButton)
+        if mouseButton == "RightButton" then
+            if BG.OpenOption then BG.OpenOption() end
+            if BG.MainFrame and BG.MainFrame.Hide then BG.MainFrame:Hide() end
         end
     end)
 

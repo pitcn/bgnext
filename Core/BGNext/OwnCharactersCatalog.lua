@@ -18,7 +18,7 @@ BG.BGNext = BG.BGNext or {}
 
 local M = {}
 
-local function raid(id, zoneId, title, variant, instanceIds)
+local function raid(id, zoneId, title, variant, instanceIds, defaultVisible, color)
     local ids = instanceIds
     if type(ids) ~= "table" then
         ids = type(zoneId) == "number" and { zoneId } or {}
@@ -27,11 +27,12 @@ local function raid(id, zoneId, title, variant, instanceIds)
         id = id,
         section = "raid",
         title = title,
+        color = color,
         zoneId = #ids == 1 and zoneId or nil,
         variant = variant,
         kind = "status",
         width = "narrow",
-        defaultVisible = true,
+        defaultVisible = defaultVisible ~= false,
         total = false,
         source = {
             kind = "raid",
@@ -42,14 +43,15 @@ local function raid(id, zoneId, title, variant, instanceIds)
     }
 end
 
-local function resource(id, title, kind, width, total, source)
+local function resource(id, title, kind, width, total, source, defaultVisible, color)
     return {
         id = id,
         section = "resource",
         title = title,
+        color = color,
         kind = kind,
         width = width,
-        defaultVisible = true,
+        defaultVisible = defaultVisible ~= false,
         total = total,
         source = source,
     }
@@ -112,18 +114,53 @@ local CATALOG = {
     },
     titan = {
         raidColumns = {
-            raid("MCtitan", 409, "熔火之心", nil, { 409 }),
-            raid("SSCtitan", 548, "毒蛇风暴", nil, { 548, 550 }),
-            raid("NAXXtitan", 533, "纳克萨玛斯", nil, { 533, 615, 616 }),
-            raid("TOCtitan", 309, "P4双本", nil, { 309, 649 }),
-            raid("SWtitan", 568, "P5双本", nil, { 568, 580 }),
-            raid("ULDtitan", 603, "奥杜尔", nil, { 603 }),
-            raid("Worldtitan", nil, "世界Boss"),
+            raid("SWtitan", 580, "太阳井", nil, { 580 }, true, "00BFFF"),
+            raid("ZAtitan", 568, "祖阿曼", nil, { 568 }, true, "00BFFF"),
+            raid("TOCtitan", 649, "十字军", nil, { 649 }, true, "00BFFF"),
+            raid("ZUGtitan", 309, "祖格", nil, { 309 }, true, "00BFFF"),
+            raid("NAXXtitan", 533, "纳克萨玛斯", nil, { 533 }, true, "00BFFF"),
+            raid("OStitan", 615, "黑曜石", nil, { 615 }, false, "00BFFF"),
+            raid("EOEtitan", 616, "永恒", nil, { 616 }, false, "00BFFF"),
+            raid("SSCtitan", 548, "毒蛇", nil, { 548 }, false, "00BFFF"),
+            raid("TKtitan", 550, "风暴", nil, { 550 }, false, "00BFFF"),
+            raid("MCtitan", 409, "熔火", nil, { 409 }, true, "00BFFF"),
+            raid("VOAtitan", 624, "宝库", nil, { 624 }, true, "00BFFF"),
+            raid("Doomwalker", 119, "末日行者", nil, { 119 }, false, "99CCFF"),
+            raid("DoomLordKazzak", 118, "末日领主", nil, { 118 }, false, "99CCFF"),
+            raid("Lanlongtitan", 116, "蓝龙", nil, { 116 }, false, "99CCFF"),
+            raid("Kazaketitan", 117, "卡扎克", nil, { 117 }, false, "99CCFF"),
         },
-        resourceColumns = commonResources({
-            resource("titanShard", "泰坦碎片", "number", "narrow", true, { kind = "currency", key = "titanShard" }),
-            resource("emblem", "徽章", "number", "narrow", true, { kind = "currency", key = "emblem" }),
-        }),
+        resourceColumns = {
+            resource("mainProfession", "主专业", "profession", "wide", false,
+                { kind = "profession-summary" }, true, "ADFF2F"),
+            resource("weapons", "武器", "items", "dynamic-items", false,
+                { kind = "equipment", slots = { 16, 17, 18 } }, true, "C084FC"),
+            resource("trinkets", "饰品", "items", "dynamic-items", false,
+                { kind = "equipment", slots = { 13, 14 } }, true, "C084FC"),
+            resource("legendaryItems", "已有橙武", "items", "dynamic-items", false,
+                { kind = "tracked-items", prefix = "legendary:" }, true, "ff8000"),
+            resource("upgradeItems", "升级物品", "items", "dynamic-items", false,
+                { kind = "tracked-items", prefix = "upgrade:" }, true, "ff8000"),
+            resource("titanEmber", "泰坦余烬", "number", "wide", true,
+                { kind = "currency", key = "titanEmber" }, true, "ff9900"),
+            resource("titanShard", "泰坦碎片", "number", "narrow", true,
+                { kind = "currency", key = "titanShard" }, true, "7B68EE"),
+            resource("jewelcraftingToken", "珠宝日常", "number", "narrow", true,
+                { kind = "currency", key = "jewelcraftingToken" }, false, "FFFFFF"),
+            resource("cookingToken", "烹饪日常", "number", "narrow", true,
+                { kind = "currency", key = "cookingToken" }, false, "FFFFFF"),
+            resource("championSeal", "冠军徽记", "number", "narrow", true,
+                { kind = "currency", key = "championSeal" }, false, "FFFFFF"),
+            resource("stoneKeeper", "岩石守卫碎片", "number", "narrow", true,
+                { kind = "currency", key = "stoneKeeper" }, true, "FFFFFF"),
+            resource("arena", "竞技场点数", "number", "narrow", true,
+                { kind = "currency", key = "arena" }, false, "FFFFFF"),
+            resource("honor", "荣誉点数", "number", "narrow", true,
+                { kind = "currency", key = "honor" }, true, "FFFFFF"),
+            resource("money", "金币", "money", "normal", true, { kind = "money" }, true, "FFD700"),
+            resource("equipmentDetails", "装备详情", "items", "dynamic-items", false,
+                { kind = "equipment" }, false),
+        },
     },
     cata = {
         raidColumns = {

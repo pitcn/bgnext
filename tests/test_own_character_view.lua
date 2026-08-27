@@ -33,6 +33,9 @@ return function(test)
     local view = View.project(input())
     test.eq(view.raid.title, "< 角色团本完成总览 >", "raid section title")
     test.eq(view.resource.title, "< 角色货币总览 >", "resource section title")
+    test.eq(view.raid.hint, "（团本重置时间：", "raid uses the original reset prefix")
+    test.eq(view.resource.hint, "（鼠标中键固定显示，长按SHIFT显示全服务器角色）",
+        "resource uses the original interaction hint")
     test.eq(type(view.raid.hint), "string", "raid hint is a string")
     test.eq(type(view.resource.hint), "string", "resource hint is a string")
     test.eq(type(view.width), "number", "width is computed")
@@ -44,18 +47,45 @@ return function(test)
     test.eq(#view.raid.rows, 1, "one character is one raid row")
     test.eq(#view.resource.rows, 1, "one character is one resource row")
     test.eq(view.raid.rows[1].player, "Piti", "row is keyed by character")
-    test.eq(#view.raid.columns, #Catalog.forFamily("titan").raidColumns, "all raid columns project")
-    test.eq(view.raid.columns[1].id, "MCtitan", "raid columns keep catalog order")
+    test.eq(#view.raid.columns, 7, "only the original default Titan raid columns project")
+    test.eq(view.raid.columns[1].id, "SWtitan", "raid columns keep the original Titan order")
     test.eq(#view.raid.rows[1].cells, #view.raid.columns, "each row has one cell per column")
-    test.eq(view.raid.rows[1].cells[1].columnId, "MCtitan", "cells follow column order")
+    test.eq(view.raid.rows[1].cells[1].columnId, "SWtitan", "cells follow column order")
 
     -- The first column header carries the visible character count.
     test.eq(type(view.raid.nameHeader), "string", "raid name header exists")
     test.eq(view.raid.characterCount, 1, "raid header counts visible characters")
     test.eq(view.resource.characterCount, 1, "resource header counts visible characters")
+    test.eq(view.raid.nameHeader, "1个角色（装等）", "raid name header matches the original")
+    test.eq(view.resource.nameHeader, "1个角色（等级）", "resource name header matches the original")
+    test.eq(view.raid.columns[1].color, "00BFFF", "Titan raid headers keep the original blue")
+    local resourceById = {}
+    for _, column in ipairs(view.resource.columns) do resourceById[column.id] = column end
+    test.eq(resourceById.mainProfession.color, "ADFF2F", "profession header keeps the original green")
+    test.eq(resourceById.weapons.color, "C084FC", "weapon header keeps the original purple")
+    test.eq(resourceById.legendaryItems.color, "ff8000", "legendary header keeps the original orange")
+    test.eq(resourceById.money.color, "FFD700", "gold header keeps the original gold")
+
+    local professionView = View.project(input({
+        snapshots = { snapshot({
+            professions = {
+                [1] = { name = "锻造", skill = 441, icon = 136241 },
+                [2] = { name = "工程", skill = 450, icon = 136243 },
+            },
+        }) },
+    }))
+    local professionCell
+    for _, cell in ipairs(professionView.resource.rows[1].cells) do
+        if cell.columnId == "mainProfession" then professionCell = cell break end
+    end
+    test.eq(professionCell.state, "professions", "main profession is an icon summary")
+    test.eq(#professionCell.entries, 2, "both main professions are retained")
+    test.eq(professionCell.entries[1].skill, 441, "profession summary retains the skill value")
+    test.eq(professionCell.entries[1].icon, 136241, "profession summary retains the icon")
 
     -- Completion, progress and unknown states.
     local states = View.project(input({
+        visibility = { raid = { SSCtitan = true, TKtitan = true } },
         snapshots = { snapshot({
             raidStates = {
                 MCtitan = { completed = true, resetsAt = 9000 },
@@ -73,22 +103,7 @@ return function(test)
     test.eq(byId.NAXXtitan.text, "", "expired raid has no text")
     test.eq(byId.TOCtitan.state, "empty", "unvisited raid renders blank")
 
-    local groupedMissing = View.project(input({
-        snapshots = { snapshot({
-            raidStates = {
-                SSCtitan = {
-                    progress = 6, total = 6, completedParts = 1, totalParts = 2,
-                    resetsAt = 9000,
-                },
-            },
-        }) },
-    }))
-    local groupedCell
-    for _, cell in ipairs(groupedMissing.raid.rows[1].cells) do
-        if cell.columnId == "SSCtitan" then groupedCell = cell break end
-    end
-    test.eq(groupedCell.state, "progress", "one completed instance cannot complete a grouped raid")
-    test.eq(groupedCell.text, "1/2", "a grouped raid shows completed instances when one lock is missing")
+    test.eq(byId.TKtitan.state, "empty", "TK remains independent from SSC")
 
     -- Real reset countdown, surfaced as a section-level hint.
     test.eq(View.formatCountdown(1000, 1000 + 2 * 86400 + 3 * 3600), "2天3小时", "countdown spans days and hours")
@@ -210,25 +225,32 @@ return function(test)
     View.project(input({ snapshots = { keptSnapshot }, visibility = { resource = { titanShard = false } } }))
     test.eq(keptSnapshot.currencies.titanShard, 12, "hiding a column keeps the underlying snapshot")
 
-    -- The equipment column is sized by how many icons it actually has to draw.
+    -- The main table limits equipment to the original weapon/trinket summaries.
+    -- Full equipment remains an explicitly enabled details column.
     local function equipped(count)
         local slots = {}
         for slot = 1, count do slots[slot] = { itemId = 1000 + slot, itemLevel = 200 } end
         return slots
     end
-    local fewItems = View.project(input({ snapshots = { snapshot({ equipment = equipped(3) }) } }))
-    local manyItems = View.project(input({ snapshots = { snapshot({ equipment = equipped(10) }) } }))
+    local fewItems = View.project(input({
+        snapshots = { snapshot({ equipment = equipped(3) }) },
+        visibility = { resource = { equipmentDetails = true } },
+    }))
+    local manyItems = View.project(input({
+        snapshots = { snapshot({ equipment = equipped(10) }) },
+        visibility = { resource = { equipmentDetails = true } },
+    }))
     test.eq(manyItems.resource.width > fewItems.resource.width, true, "more equipment icons widen the column")
     local function equipmentColumn(projection)
         for _, column in ipairs(projection.resource.columns) do
-            if column.id == "equipment" then return column end
+            if column.id == "equipmentDetails" then return column end
         end
     end
     test.eq(equipmentColumn(fewItems).slots, 3, "column reserves one slot per drawn icon")
     test.eq(equipmentColumn(manyItems).slots, 10, "column grows with the icon count")
     local firstRowItems = manyItems.resource.rows[1].cells
     for _, cell in ipairs(firstRowItems) do
-        if cell.columnId == "equipment" then
+        if cell.columnId == "equipmentDetails" then
             test.eq(#cell.items, 10, "every equipped slot becomes an icon")
             test.eq(cell.items[1].slot, 1, "icons are ordered by slot")
         end
@@ -252,8 +274,8 @@ return function(test)
     test.eq(type(totals.resource.totals), "table", "totals table exists")
     test.eq(totals.resource.totals.money, 30000, "money totals across characters")
     test.eq(totals.resource.totals.honor, 12, "honor totals across characters")
-    test.eq(totals.resource.totals.equipment, nil, "equipment has no fake total")
-    test.eq(totals.resource.totals.prof1, nil, "professions have no fake total")
+    test.eq(totals.resource.totals.equipmentDetails, nil, "equipment details have no fake total")
+    test.eq(totals.resource.totals.mainProfession, nil, "professions have no fake total")
     for _, column in ipairs(totals.resource.columns) do
         if column.total ~= true then
             test.eq(totals.resource.totals[column.id], nil, column.id .. " must not report a total")
@@ -341,32 +363,37 @@ return function(test)
         GetProfessions = function() end,
         GetProfessionInfo = function() end,
         UnitHonor = function() return 0 end,
+        C_CurrencyInfo = { GetCurrencyInfo = function() return { quantity = 0 } end },
+        GetItemCount = function() return 0 end,
     }
     local availability = Settings.availableColumns("titan", titanCatalog, readableApi)
     test.eq(type(availability), "function", "availability is a predicate")
     test.eq(availability("raid", "MCtitan"), true, "raid lock state is readable")
-    test.eq(availability("raid", "Worldtitan"), false, "world-boss state without a reader is hidden")
     test.eq(availability("resource", "money"), true, "gold is readable on every client")
-    test.eq(availability("resource", "equipment"), true, "equipment is readable on every client")
-    test.eq(availability("resource", "prof1"), true, "professions are readable on titan")
-    test.eq(availability("resource", "titanShard"), false, "an unverified currency is not offered")
+    test.eq(availability("resource", "equipmentDetails"), true, "equipment details are readable on every client")
+    test.eq(availability("resource", "weapons"), true, "weapon summary is readable on titan")
+    test.eq(availability("resource", "trinkets"), true, "trinket summary is readable on titan")
+    test.eq(availability("resource", "mainProfession"), true, "professions are readable on titan")
+    test.eq(availability("resource", "titanShard"), true, "verified Titan currency is offered")
+    test.eq(availability("resource", "legendaryItems"), true, "tracked legendary items are offered")
     test.eq(availability("resource", "nope"), false, "unknown columns are unavailable")
     local unavailable = Settings.availableColumns("titan", titanCatalog, {})
     test.eq(unavailable("raid", "MCtitan"), false, "missing saved-instance APIs hide raid columns")
     test.eq(unavailable("resource", "money"), false, "missing money API hides gold")
-    test.eq(unavailable("resource", "equipment"), false, "missing inventory APIs hide equipment")
-    test.eq(unavailable("resource", "prof1"), false, "missing profession APIs hide professions")
+    test.eq(unavailable("resource", "equipmentDetails"), false, "missing inventory APIs hide equipment")
+    test.eq(unavailable("resource", "mainProfession"), false, "missing profession APIs hide professions")
     test.eq(unavailable("resource", "honor"), false, "missing honor API hides honor")
 
-    -- That same predicate drives the projection, so an unverified column can
-    -- never reach the table.
+    -- That same predicate drives projection; verified values reach the table.
     local guarded = View.project(input({
         snapshots = { snapshot({ currencies = { titanShard = 7 } }) },
         available = Settings.availableColumns("titan", titanCatalog, readableApi),
     }))
+    local hasTitanShard = false
     for _, column in ipairs(guarded.resource.columns) do
-        test.eq(column.id ~= "titanShard", true, "unverified column stays out of the table")
+        if column.id == "titanShard" then hasTitanShard = true end
     end
+    test.eq(hasTitanShard, true, "verified Titan shard column reaches the table")
 
     -- Destructive clears expose distinct confirmation text naming the scope.
     test.eq(type(Settings.clearDialogText), "function", "clear confirmation text is exposed")

@@ -117,6 +117,15 @@ return function(test)
     test.eq(UI.tooltipTarget(nil), nil, "a missing item means no tooltip")
     test.eq(UI.tooltipTarget({ itemId = 0 }), nil, "a zero item id means no tooltip")
 
+    test.eq(UI.rowLabel("raid", { display = "Piti", itemLevel = 230.75 }), "Piti (230)",
+        "raid rows use the original parenthesized item level")
+    test.eq(UI.rowLabel("resource", { display = "Piti", level = 80 }), "Piti (80)",
+        "resource rows use the original parenthesized level")
+    local cyan = UI.hexColor("00BFFF")
+    test.eq(cyan.r, 0, "hex color parses red")
+    test.eq(cyan.g > 0.7, true, "hex color parses green")
+    test.eq(cyan.b, 1, "hex color parses blue")
+
     -- The raid section lays out the reset countdown; the resource section does not.
     test.eq(layout.sections[1].countdown ~= nil, true, "raid section lays out the reset countdown")
     test.eq(layout.sections[2].countdown, nil, "resource section has no countdown")
