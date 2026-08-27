@@ -10,7 +10,7 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 | `wishlistUnplaced[realmId][player][raidId][itemId]` | Items from the temporary BGNext flat wishlist that cannot be mapped reliably to one boss | Preserve user-entered test data without guessing a boss | Local until manually cleared or successfully placed | Current player UI only | Review and clear locally | Medium |
 | Manual wishlist import/export text | Raid, difficulty, boss position and item IDs selected by the current player | User-directed backup and restore | Visible edit box only; BGNext does not write it outside SavedVariables or send it | Recipient chosen manually by the user after copying | Explicit click, full preview, cancel available | Medium |
 | `equipmentFilters[realmId][player]` | Filter profiles selected or edited only for the currently logged-in character; defaults are derived from that character's class and client capabilities | Locally weaken unsuitable item rows in the current bill, loot list and auction log | Local until that character's profiles are deleted/reset or all BGNext data is cleared | Current player UI only | Select/disable, create, edit, delete, reorder and reset | Low |
-| `ownCharacters` | Characters observed only while the user is logged into them | Own-character overview | Local until character/module/all data is cleared | None | Delete character/disable/clear | Medium |
+| `ownCharacters[clientFamily][realmId][player]` | Characters observed only while the user is logged into them | Own-character overview | Last-seen snapshot only, overwritten on re-login; raid status expires on weekly reset; cleared per character, per family, or all | Current player UI only | Delete character/clear family/clear all | Medium |
 | `currentRaid` | Current raid identity and the user’s current-raid purchases | Personal current-raid shopping summary | One current raid; cleared on new raid, settlement completion, or manual clear | None | Clear current raid | Medium |
 | `auctionPresets` | User-entered increment and cap | Personal auction presets | Local until preset is removed | Existing BGLite auction flow only after user activation | Remove/reset | Medium |
 | `currentSettlement.raidId` | Current raid context | Enforce one-settlement scope | One settlement, maximum seven days | None | New raid/manual clear/expiry | Medium |
@@ -24,6 +24,12 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 Trade records may contain only `player`, `itemId`, `amount`, `time`, and `status`. Mail records may contain only `player`, `itemId`, `amount`, `time`, `status`, and `direction`. Both are accepted only when their `raidId` matches the active settlement.
 
 Mail subject, body, unrelated attachments, chat text, account identifiers, device identifiers, GUIDs, private notes, and cross-raid aggregates are prohibited.
+
+## Own-character overview data
+
+Snapshots are stored at `BiaoGe.BGNext.ownCharacters[clientFamily][realmId][player]`, keyed by the realm and name of the character the user is logged into, and are overwritten on each re-login (last-seen only, no history array). The allowed fields are `player`, `realmId`, `realmName`, `faction`, `class`, `level`, `itemLevel`, `money`, `updatedAt`, `equipment`, `currencies`, `items`, `raidStates`, and `professions`; every nested table is whitelisted and sanitized on write. Raid status (`raidStates`) is dropped once its weekly `resetsAt` timestamp has passed.
+
+No other-player, cross-account, historical, communication, or migration data is accepted: BGNext never reads or stores another player's identity or information, never keeps a previous-value or profile history, and never persists chat, mail body, account/device identifiers, GUIDs, notes, or cross-raid aggregates for this feature. Currency columns whose reliable in-game API is not yet verified render blank rather than fabricating a value.
 
 ## Runtime-only data
 

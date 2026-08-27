@@ -29,6 +29,14 @@ Core\BGNext\Wishlist.lua
 Core\BGNext\WishlistReminder.lua
 Core\BGNext\EquipmentFilterProfiles.lua
 Core\BGNext\EquipmentFilter.lua
+Core\BGNext\OwnCharacters.lua
+Core\BGNext\OwnCharactersAdapters.lua
+Core\BGNext\OwnCharactersCatalog.lua
+Core\BGNext\OwnCharactersCollector.lua
+Core\BGNext\OwnCharactersView.lua
+Core\BGNext\RoleOverviewSettings.lua
+Core\BGNext\OwnCharactersUI.lua
+Core\BGNext\RoleOverviewEntry.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
