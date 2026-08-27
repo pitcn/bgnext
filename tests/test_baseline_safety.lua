@@ -27,6 +27,8 @@ return function(test)
         "auction delegates to local wishlist reminder")
     test.eq(wishlistReminder:find('BG.PlaySound("hope")', 1, true) ~= nil, true,
         "wishlist reminder includes local sound")
+    test.eq(helpers:find("BG.BGNext.RoleOverviewEntry.togglePinned()", 1, true), nil,
+        "startup RoleOverviewUI never toggles the user-controlled window")
     for path, content in pairs({
         ["Core/BiaoGe.lua"] = main,
         ["Core/DB/DB.lua"] = database,
