@@ -28,6 +28,8 @@ M.metrics = View and View.metrics or {
     totalsRowHeight = 20,
     iconSize = 19,
     iconGap = 1,
+    columnGap = 8,
+    sectionControlWidth = 18,
     nameColumnWidth = 120,
     sectionGap = 10,
     padding = 8,
@@ -48,6 +50,13 @@ M.colors = {
 }
 
 M.controls = { "settings", "refresh", "close" }
+
+function M.headerControls(mode, hideable)
+    return {
+        canHide = mode == "pinned" and hideable == true,
+        canAdd = mode == "pinned",
+    }
+end
 
 M.textures = {
     complete = "Interface\\RaidFrame\\ReadyCheck-Ready",
@@ -157,6 +166,7 @@ local function layoutSection(source, key, top)
         columns = {},
         rows = {},
         width = source.width,
+        addX = source.width - metrics.padding * 2 - metrics.sectionControlWidth + 2,
     }
 
     local x = metrics.nameColumnWidth
@@ -233,7 +243,13 @@ end
 local frame
 local provider
 local rowHandler
-local pool = { rows = {}, texts = {}, textures = {}, buttons = {}, itemButtons = {}, headerButtons = {} }
+local columnHandler
+local settingsHandler
+local renderMode = "pinned"
+local pool = {
+    rows = {}, texts = {}, textures = {}, buttons = {}, itemButtons = {},
+    headerButtons = {}, addButtons = {},
+}
 
 -- The entry module supplies the projection. Keeping it a callback is what
 -- lets this file stay free of storage access.
@@ -245,6 +261,18 @@ end
 -- Stored as a callback so this renderer never learns how deletion works.
 function M.SetRowHandler(fn)
     rowHandler = type(fn) == "function" and fn or nil
+end
+
+function M.SetColumnHandler(fn)
+    columnHandler = type(fn) == "function" and fn or nil
+end
+
+function M.SetSettingsHandler(fn)
+    settingsHandler = type(fn) == "function" and fn or nil
+end
+
+function M.SetMode(mode)
+    renderMode = mode == "preview" and "preview" or "pinned"
 end
 
 function M.GetFrame()
@@ -314,6 +342,12 @@ local function showHeaderTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText(self.__tooltip)
     GameTooltip:Show()
+    if self.__canHide and self.__closeButton then self.__closeButton:Show() end
+end
+
+local function hideHeaderTooltip(self)
+    hideItemTooltip()
+    if self.__closeButton then self.__closeButton:Hide() end
 end
 
 local function acquireHeaderButton(parent, index)
@@ -321,8 +355,36 @@ local function acquireHeaderButton(parent, index)
     if not item then
         item = CreateFrame("Button", nil, parent)
         item:SetScript("OnEnter", showHeaderTooltip)
-        item:SetScript("OnLeave", hideItemTooltip)
+        item:SetScript("OnLeave", hideHeaderTooltip)
+        local close = CreateFrame("Button", nil, item)
+        close:SetSize(14, 14)
+        close:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 2)
+        close:SetNormalFontObject(BG.FontWhite15)
+        close:SetText("×")
+        close:SetScript("OnClick", function()
+            if columnHandler and item.__canHide then
+                columnHandler(item.__section, item.__columnId)
+            end
+        end)
+        close:Hide()
+        item.__closeButton = close
         pool.headerButtons[index] = item
+    end
+    item:Show()
+    return item
+end
+
+
+local function acquireAddButton(parent, index)
+    local item = pool.addButtons[index]
+    if not item then
+        item = CreateFrame("Button", nil, parent)
+        item:SetNormalFontObject(BG.FontWhite15)
+        item:SetText("+")
+        item:SetScript("OnClick", function(self)
+            if settingsHandler then settingsHandler(self.__section) end
+        end)
+        pool.addButtons[index] = item
     end
     item:Show()
     return item
@@ -351,6 +413,7 @@ local function resetPool()
     for _, item in ipairs(pool.buttons) do item:Hide() end
     for _, item in ipairs(pool.itemButtons) do item:Hide() end
     for _, item in ipairs(pool.headerButtons) do item:Hide() end
+    for _, item in ipairs(pool.addButtons) do item:Hide() end
 end
 
 local function cellText(cell, column)
@@ -369,7 +432,7 @@ function M.Draw(layout)
 
     frame:SetSize(layout.width, layout.height)
 
-    local textIndex, textureIndex, buttonIndex, itemButtonIndex, headerButtonIndex = 0, 0, 0, 0, 0
+    local textIndex, textureIndex, buttonIndex, itemButtonIndex, headerButtonIndex, addButtonIndex = 0, 0, 0, 0, 0, 0
     local function nextText()
         textIndex = textIndex + 1
         return acquireText(frame, textIndex)
@@ -389,6 +452,10 @@ function M.Draw(layout)
     local function nextHeaderButton()
         headerButtonIndex = headerButtonIndex + 1
         return acquireHeaderButton(frame, headerButtonIndex)
+    end
+    local function nextAddButton()
+        addButtonIndex = addButtonIndex + 1
+        return acquireAddButton(frame, addButtonIndex)
     end
 
     if layout.isEmpty then
@@ -419,6 +486,14 @@ function M.Draw(layout)
         nameHeader:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
         nameHeader:SetText(section.nameHeader)
 
+        local sectionControls = M.headerControls(renderMode, true)
+        if sectionControls.canAdd then
+            local add = nextAddButton()
+            add:SetPoint("TOPLEFT", frame, M.metrics.padding + section.addX, section.headerY)
+            add:SetSize(M.metrics.sectionControlWidth - 2, M.metrics.headerHeight)
+            add.__section = section.key
+        end
+
         for _, column in ipairs(section.columns) do
             local descriptor = M.columnHeader(column)
             local header = nextText()
@@ -432,6 +507,10 @@ function M.Draw(layout)
             hit:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, section.headerY)
             hit:SetSize(column.width, M.metrics.headerHeight)
             hit.__tooltip = descriptor.tooltip
+            hit.__section = section.key
+            hit.__columnId = column.id
+            hit.__canHide = M.headerControls(renderMode, true).canHide
+            if hit.__closeButton then hit.__closeButton:Hide() end
         end
 
         for _, row in ipairs(section.rows) do

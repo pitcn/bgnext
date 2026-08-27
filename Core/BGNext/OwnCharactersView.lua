@@ -26,6 +26,7 @@ M.metrics = {
     iconSize = 19,
     iconGap = 1,
     columnGap = 8,
+    sectionControlWidth = 18,
     nameColumnWidth = 120,
     sectionGap = 10,
     padding = 8,
@@ -136,7 +137,7 @@ local function sectionWidth(columns)
         if index > 1 then width = width + M.metrics.columnGap end
         width = width + columnWidth(column)
     end
-    return width + M.metrics.padding * 2
+    return width + M.metrics.sectionControlWidth + M.metrics.padding * 2
 end
 
 function M.measureNumber(value)

@@ -100,6 +100,18 @@ function M.setVisible(deps, visible)
     end
 end
 
+function M.setColumnVisible(deps, section, columnId, visible)
+    deps = deps or M.deps()
+    local settings = deps.settings or BG.BGNext.RoleOverviewSettings
+    if not settings or type(settings.setVisible) ~= "function" then return false end
+    if type(deps.root) ~= "table" or type(deps.family) ~= "string" then return false end
+    if section ~= "raid" and section ~= "resource" then return false end
+    if type(columnId) ~= "string" or columnId == "" then return false end
+    settings.setVisible(deps.root, deps.family, section, columnId, visible == true)
+    if deps.ui and type(deps.ui.Refresh) == "function" then deps.ui.Refresh() end
+    return true
+end
+
 -- The one safe collection path. Returns the stored snapshot, or nil when the
 -- module is disabled or the client cannot identify the logged-in character.
 function M.collectAndStore(deps)

@@ -4,6 +4,7 @@ return function(test)
     dofile("Core/BGNext/OwnCharactersCatalog.lua")
     dofile("Core/BGNext/OwnCharactersCollector.lua")
     local Model = dofile("Core/BGNext/OwnCharacters.lua")
+    local Settings = dofile("Core/BGNext/RoleOverviewSettings.lua")
     local Runtime = dofile("Core/BGNext/OwnCharactersRuntime.lua")
 
     local Adapters = BG.BGNext.OwnCharactersAdapters
@@ -42,6 +43,7 @@ return function(test)
             adapters = Adapters,
             collector = Collector,
             model = model,
+            settings = Settings,
             now = function() return 5000 end,
             ui = { Refresh = function() uiCalls.refresh = uiCalls.refresh + 1 end },
         }
@@ -126,4 +128,15 @@ return function(test)
     Runtime.setVisible(d5, false)
     test.eq(cancelled, true, "hiding the overview cancels the ticker")
     test.eq(d5._visibleTicker, nil, "no ticker remains after hiding")
+
+    -- Header controls alter only this client's visibility preferences; the
+    -- collected own-character snapshot remains the same stored value.
+    local d6, root6 = build()
+    Runtime.collectAndStore(d6)
+    local storedCharacter = Model.get(root6, "titan", 123, "Piti")
+    Runtime.setColumnVisible(d6, "resource", "titanShard", false)
+    test.eq(Settings.isVisible(root6, "titan", "resource", "titanShard", d6.catalog), false,
+        "header hide persists the current-family preference")
+    test.eq(Model.get(root6, "titan", 123, "Piti"), storedCharacter,
+        "hiding a column does not replace the character snapshot")
 end

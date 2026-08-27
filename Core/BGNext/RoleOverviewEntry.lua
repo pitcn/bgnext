@@ -200,6 +200,8 @@ local entryButton
 
 local function placeWindow(mode)
     if not window then return end
+    local ui = BG.BGNext.OwnCharactersUI
+    if ui and type(ui.SetMode) == "function" then ui.SetMode(mode) end
     local presentation = M.windowPresentation(mode)
     window:SetFrameStrata(presentation.strata)
     if window.SetFrameLevel then window:SetFrameLevel(100) end
@@ -301,6 +303,16 @@ local function ensureWindow()
         ui.SetFrame(window)
         ui.SetProvider(provider)
         ui.SetRowHandler(M.onRowRightClick)
+        ui.SetColumnHandler(function(section, columnId)
+            local runtime = BG.BGNext.OwnCharactersRuntime
+            if runtime and type(runtime.setColumnVisible) == "function" then
+                runtime.setColumnVisible(nil, section, columnId, false)
+            end
+        end)
+        ui.SetSettingsHandler(function(section)
+            local settings = BG.BGNext.RoleOverviewSettings
+            if settings and type(settings.Open) == "function" then settings.Open(section) end
+        end)
     end
 
     -- Listed in the left-to-right order from M.controlOrder, then placed

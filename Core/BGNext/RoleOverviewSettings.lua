@@ -186,6 +186,16 @@ function M.confirmClear(kind, family)
     StaticPopup_Show(dialogName)
 end
 
+function M.Open(section)
+    M.requestedSection = section == "resource" and "resource" or "raid"
+    if type(BG.OpenOption) == "function" then BG.OpenOption() end
+    if BG.ButtonOptions_roleOverview and type(BG.ButtonOptions_roleOverview.Click) == "function" then
+        BG.ButtonOptions_roleOverview:Click()
+        return true
+    end
+    return false
+end
+
 -- Builds the "角色总览" settings page. The available columns differ per client
 -- family, so the page is generated from the catalog rather than hard-coded.
 -- Runs only inside the game; the pure helpers above stay testable without it.

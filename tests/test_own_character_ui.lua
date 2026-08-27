@@ -150,6 +150,18 @@ return function(test)
     test.eq(fallbackHeader.text, "余烬", "missing currency data falls back to the catalog title")
     test.eq(fallbackHeader.tooltip, "余烬", "missing currency data has a safe tooltip")
 
+    test.eq(UI.headerControls("pinned", true).canHide, true, "pinned headers can hide columns")
+    test.eq(UI.headerControls("preview", true).canHide, false, "preview headers cannot hide columns")
+    test.eq(UI.headerControls("pinned", false).canHide, false, "required headers cannot be hidden")
+    test.eq(UI.headerControls("pinned", true).canAdd, true, "pinned sections expose settings")
+    test.eq(type(UI.SetMode), "function", "entry can declare preview or pinned rendering")
+    test.eq(type(UI.SetColumnHandler), "function", "entry can inject the column visibility handler")
+    test.eq(type(UI.SetSettingsHandler), "function", "entry can inject the section settings handler")
+    local resourceLayout = layout.sections[2]
+    local lastResourceColumn = resourceLayout.columns[#resourceLayout.columns]
+    test.eq(lastResourceColumn.x + lastResourceColumn.width <= resourceLayout.addX, true,
+        "the section add control never overlaps the last column")
+
     -- The raid section lays out the reset countdown; the resource section does not.
     test.eq(layout.sections[1].countdown ~= nil, true, "raid section lays out the reset countdown")
     test.eq(layout.sections[2].countdown, nil, "resource section has no countdown")

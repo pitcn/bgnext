@@ -331,6 +331,7 @@ return function(test)
 
     -- Column visibility is stored per client family.
     local Settings = dofile("Core/BGNext/RoleOverviewSettings.lua")
+    test.eq(type(Settings.Open), "function", "role overview settings expose a section-aware opener")
     local root = {}
     local titanCatalog = Catalog.forFamily("titan")
     local mopCatalog = Catalog.forFamily("mop")
