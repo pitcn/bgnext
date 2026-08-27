@@ -42,6 +42,25 @@ Before a Release, also verify the data inventory, third-party provenance, packag
 
 Stop implementation and report the blocker when provenance is unclear, authorization scope is undocumented, a privacy boundary would be crossed, a required test cannot run, the baseline check fails, or the requested behavior conflicts with these rules. Do not work around a stop condition by renaming a feature, hiding code, changing hashes, or weakening documentation.
 
+## Local completion handoff
+
+After completing a task, and before telling the user it is complete, write one Markdown handoff into the shared repository-local inbox. This is mandatory even when the code was committed and pushed.
+
+Resolve the inbox from the common Git directory so every linked worktree writes to the same place:
+
+```powershell
+$commonGitDir = git rev-parse --path-format=absolute --git-common-dir
+$repositoryHome = Split-Path -Parent $commonGitDir
+$handoffInbox = Join-Path $repositoryHome ".local\handoffs\inbox"
+New-Item -ItemType Directory -Force -Path $handoffInbox | Out-Null
+```
+
+Name the file `yyyyMMdd-HHmmss--<sanitized-branch>--<short-task>.md`. The local `.local/` directory is never committed or pushed.
+
+The handoff must state: repository and worktree paths; branch and exact HEAD; base/range and commits; objective and actual result; changed files; exact verification commands with observed results; security, privacy, provenance, baseline, and compatibility evidence; game-install and SavedVariables status; known limitations and unverified claims; and the precise checks Codex should perform. Use `ready_for_codex_review`, `needs_game_validation`, or `blocked` as the status. Do not describe simulated or unrun checks as passing.
+
+When the user later says only “做好了”, Codex should read the newest file in `.local/handoffs/inbox`, independently verify its referenced worktree and HEAD, and write the review result to `.local/handoffs/reviews` using the same basename plus `.codex-review.md`.
+
 ## Agent skills
 
 ### Issue tracker

@@ -27,6 +27,19 @@ This file intentionally mirrors the mandatory rules in `AGENTS.md`. Claude and C
 - Run `pwsh -NoProfile -File tools/run-lua-tests.ps1`, `pwsh -NoProfile -File tools/verify-baseline.ps1`, and `git diff --check` before every runtime commit and Release.
 - Stop and report unclear provenance, undocumented authorization, privacy conflicts, unavailable required tests, or failed verification. Never bypass a stop condition through renaming, hidden code, hash changes, or weaker documentation.
 
+## Mandatory local completion handoff
+
+Before reporting completion, write a Markdown handoff to the shared, gitignored inbox derived from the common Git directory:
+
+```powershell
+$commonGitDir = git rev-parse --path-format=absolute --git-common-dir
+$repositoryHome = Split-Path -Parent $commonGitDir
+$handoffInbox = Join-Path $repositoryHome ".local\handoffs\inbox"
+New-Item -ItemType Directory -Force -Path $handoffInbox | Out-Null
+```
+
+Use filename `yyyyMMdd-HHmmss--<sanitized-branch>--<short-task>.md` and status `ready_for_codex_review`, `needs_game_validation`, or `blocked`. Include exact repository/worktree path, branch, HEAD, base and commit range, changed files, verification commands and observed output, security/privacy/provenance/baseline/compatibility evidence, game-install and SavedVariables state, limitations, and requested Codex review checks. Never commit or push `.local/`, and never claim an unrun or simulated check passed. This handoff is required even after a successful push so the user can say only “做好了” and Codex can locate and review the latest result.
+
 ## Agent skills
 
 - GitHub Issues is the issue and PRD tracker; see `docs/agents/issue-tracker.md`.
