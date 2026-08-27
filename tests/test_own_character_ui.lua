@@ -128,18 +128,27 @@ return function(test)
 
     -- Catalog titles are authoritative: raid IDs never expand back to long
     -- localized zone names, while selected currencies add their game icon.
-    test.eq(UI.columnHeader({ title = "SW", zoneId = 580 }), "SW",
+    test.eq(UI.columnHeader({ title = "SW", zoneId = 580 }).text, "SW",
         "compact raid title is not replaced by GetRealZoneText")
     local currencyHeader = UI.columnHeader({
         title = "余烬",
         source = { kind = "currency", currencyId = 3403, showHeaderIcon = true },
     }, function(id)
         test.eq(id, 3403, "currency header resolves the declared currency id")
-        return { iconFileID = 123456 }
+        return { name = "泰坦余烬", iconFileID = 123456 }
     end)
-    test.eq(currencyHeader, "余烬|T123456:14:14|t", "currency heading includes its game icon")
-    test.eq(UI.columnHeader({ title = "荣誉", source = { kind = "currency", currencyId = 1901 } },
-        function() return { iconFileID = 999 } end), "荣誉", "icons remain opt-in per heading")
+    test.eq(currencyHeader.text, "|T123456:14:14|t", "currency heading is icon-only")
+    test.eq(currencyHeader.tooltip, "泰坦余烬", "currency tooltip uses its official full name")
+    local plainHeader = UI.columnHeader({
+        title = "荣誉", source = { kind = "currency", currencyId = 1901 },
+    }, function() return { name = "荣誉点数", iconFileID = 999 } end)
+    test.eq(plainHeader.text, "荣誉", "icons remain opt-in per heading")
+    test.eq(plainHeader.tooltip, "荣誉", "plain heading retains its catalog tooltip")
+    local fallbackHeader = UI.columnHeader({
+        title = "余烬", source = { kind = "currency", currencyId = 3403, showHeaderIcon = true },
+    }, function() return nil end)
+    test.eq(fallbackHeader.text, "余烬", "missing currency data falls back to the catalog title")
+    test.eq(fallbackHeader.tooltip, "余烬", "missing currency data has a safe tooltip")
 
     -- The raid section lays out the reset countdown; the resource section does not.
     test.eq(layout.sections[1].countdown ~= nil, true, "raid section lays out the reset countdown")
@@ -207,7 +216,9 @@ return function(test)
         "renderer never expands compact raid headings back to full zone names")
 
     -- Equipment icons use Blizzard's official tooltip, not a hand-built one.
-    for _, required in ipairs({ "GameTooltip", "SetHyperlink", "SetItemByID" }) do
+    for _, required in ipairs({
+        "GameTooltip", "SetHyperlink", "SetItemByID", "RequestLoadItemDataByID", "SetText",
+    }) do
         test.eq(string.find(source, required, 1, true) ~= nil, true, "renderer uses " .. required)
     end
 end

@@ -97,19 +97,25 @@ local function liveCurrencyInfo(currencyId)
 end
 
 function M.columnHeader(column, currencyInfo)
-    if type(column) ~= "table" then return "" end
+    if type(column) ~= "table" then return { text = "", tooltip = "" } end
     local rawLabel = type(column.title) == "string" and column.title or ""
     local label = L[rawLabel]
+    local descriptor = { text = label, tooltip = label }
     local source = type(column.source) == "table" and column.source or nil
     if not source or source.kind ~= "currency" or source.showHeaderIcon ~= true
         or type(source.currencyId) ~= "number" then
-        return label
+        return descriptor
     end
     local resolver = type(currencyInfo) == "function" and currencyInfo or liveCurrencyInfo
     local ok, info = pcall(resolver, source.currencyId)
     local icon = ok and type(info) == "table" and info.iconFileID or nil
-    if type(icon) ~= "number" and type(icon) ~= "string" then return label end
-    return label .. "|T" .. tostring(icon) .. ":14:14|t"
+    if type(info) == "table" and type(info.name) == "string" and info.name ~= "" then
+        descriptor.tooltip = info.name
+    end
+    if type(icon) ~= "number" and type(icon) ~= "string" then return descriptor end
+    descriptor.text = "|T" .. tostring(icon) .. ":14:14|t"
+    descriptor.iconFileID = icon
+    return descriptor
 end
 
 -- Picks the source for Blizzard's official item tooltip. A collected item link
@@ -127,6 +133,7 @@ function M.tooltipTarget(item)
 end
 
 local function columnWidth(column)
+    if type(column.width) == "number" then return column.width end
     if column.width == "dynamic-items" then
         local slots = column.slots or 0
         if slots <= 0 then slots = 1 end
@@ -164,10 +171,10 @@ local function layoutSection(source, key, top)
             kind = column.kind,
             slots = column.slots,
             total = column.total,
-            x = x,
+            x = type(column.x) == "number" and column.x or x,
             width = width,
         }
-        x = x + width
+        x = (type(column.x) == "number" and column.x or x) + width + (metrics.columnGap or 0)
     end
 
     local rowTop = section.headerY - metrics.headerHeight
@@ -226,7 +233,7 @@ end
 local frame
 local provider
 local rowHandler
-local pool = { rows = {}, texts = {}, textures = {}, buttons = {}, itemButtons = {} }
+local pool = { rows = {}, texts = {}, textures = {}, buttons = {}, itemButtons = {}, headerButtons = {} }
 
 -- The entry module supplies the projection. Keeping it a callback is what
 -- lets this file stay free of storage access.
@@ -290,6 +297,9 @@ local function showItemTooltip(self)
     if target.kind == "link" then
         GameTooltip:SetHyperlink(target.value)
     else
+        if type(C_Item) == "table" and type(C_Item.RequestLoadItemDataByID) == "function" then
+            C_Item.RequestLoadItemDataByID(target.value)
+        end
         GameTooltip:SetItemByID(target.value)
     end
     GameTooltip:Show()
@@ -297,6 +307,25 @@ end
 
 local function hideItemTooltip()
     if type(GameTooltip) == "table" then GameTooltip:Hide() end
+end
+
+local function showHeaderTooltip(self)
+    if type(self.__tooltip) ~= "string" or self.__tooltip == "" or type(GameTooltip) ~= "table" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(self.__tooltip)
+    GameTooltip:Show()
+end
+
+local function acquireHeaderButton(parent, index)
+    local item = pool.headerButtons[index]
+    if not item then
+        item = CreateFrame("Button", nil, parent)
+        item:SetScript("OnEnter", showHeaderTooltip)
+        item:SetScript("OnLeave", hideItemTooltip)
+        pool.headerButtons[index] = item
+    end
+    item:Show()
+    return item
 end
 
 local function acquireItemButton(parent, index)
@@ -321,6 +350,7 @@ local function resetPool()
     for _, item in ipairs(pool.textures) do item:Hide() end
     for _, item in ipairs(pool.buttons) do item:Hide() end
     for _, item in ipairs(pool.itemButtons) do item:Hide() end
+    for _, item in ipairs(pool.headerButtons) do item:Hide() end
 end
 
 local function cellText(cell, column)
@@ -339,7 +369,7 @@ function M.Draw(layout)
 
     frame:SetSize(layout.width, layout.height)
 
-    local textIndex, textureIndex, buttonIndex, itemButtonIndex = 0, 0, 0, 0
+    local textIndex, textureIndex, buttonIndex, itemButtonIndex, headerButtonIndex = 0, 0, 0, 0, 0
     local function nextText()
         textIndex = textIndex + 1
         return acquireText(frame, textIndex)
@@ -355,6 +385,10 @@ function M.Draw(layout)
     local function nextItemButton()
         itemButtonIndex = itemButtonIndex + 1
         return acquireItemButton(frame, itemButtonIndex)
+    end
+    local function nextHeaderButton()
+        headerButtonIndex = headerButtonIndex + 1
+        return acquireHeaderButton(frame, headerButtonIndex)
     end
 
     if layout.isEmpty then
@@ -386,12 +420,18 @@ function M.Draw(layout)
         nameHeader:SetText(section.nameHeader)
 
         for _, column in ipairs(section.columns) do
+            local descriptor = M.columnHeader(column)
             local header = nextText()
             header:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, section.headerY)
             header:SetWidth(column.width)
             local headerColor = M.hexColor(column.color)
             header:SetTextColor(headerColor.r, headerColor.g, headerColor.b)
-            header:SetText(M.columnHeader(column))
+            header:SetText(descriptor.text)
+
+            local hit = nextHeaderButton()
+            hit:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, section.headerY)
+            hit:SetSize(column.width, M.metrics.headerHeight)
+            hit.__tooltip = descriptor.tooltip
         end
 
         for _, row in ipairs(section.rows) do
