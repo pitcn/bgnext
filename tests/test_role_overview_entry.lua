@@ -95,6 +95,14 @@ return function(test)
     local newWindow = { Hide = function() hidden = true end }
     test.eq(Entry.prepareNewWindow(newWindow), true, "a newly created role window is initialized")
     test.eq(hidden, true, "a newly created role window starts hidden until explicit interaction")
+    test.eq(Entry.previewShouldRemain(false, true, true), true,
+        "an intentional hover keeps an unpinned preview visible")
+    test.eq(Entry.previewShouldRemain(false, false, true), false,
+        "a hidden parent cannot leave a preview visible")
+    test.eq(Entry.previewShouldRemain(false, true, false), false,
+        "a preview closes when the cursor is no longer over the entry")
+    test.eq(Entry.previewShouldRemain(true, false, false), true,
+        "a deliberately pinned window is independent of hover state")
 
     -- Deletion is keyed by family, realm and name together.
     local root = {}
@@ -192,4 +200,8 @@ return function(test)
     -- The settings control jumps straight to the 角色总览 settings page.
     test.eq(string.find(source, "ButtonOptions_roleOverview", 1, true) ~= nil, true,
         "settings control opens the role overview page")
+    test.eq(string.find(source, 'HookScript("OnHide"', 1, true) ~= nil, true,
+        "hiding the main addon closes any transient preview")
+    test.eq(string.find(source, 'IsMouseOver', 1, true) ~= nil, true,
+        "transient previews verify that the entry is still hovered")
 end

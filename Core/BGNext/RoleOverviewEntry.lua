@@ -107,6 +107,11 @@ function M.prepareNewWindow(target)
     return true
 end
 
+function M.previewShouldRemain(isPinned, entryVisible, entryHovered)
+    if isPinned == true then return true end
+    return entryVisible == true and entryHovered == true
+end
+
 -- A delete request is always keyed by family, realm and name together so a
 -- same-name character on another realm can never be removed by mistake.
 function M.deleteRequest(row, family)
@@ -367,6 +372,7 @@ function M.setPinned(value)
     state.pinned = pinned
     if pinned and not window then ensureWindow() end
     if window then
+        window:SetScript("OnUpdate", nil)
         if pinned then placeWindow("pinned") end
         window:SetShown(pinned)
         if pinned and BG.BGNext.OwnCharactersUI and BG.BGNext.OwnCharactersUI.Refresh then
@@ -391,6 +397,9 @@ end
 
 function M.showPreview()
     if not M.canOpen() then return end
+    local entryVisible = entryButton and (type(entryButton.IsVisible) ~= "function" or entryButton:IsVisible())
+    local entryHovered = entryButton and (type(entryButton.IsMouseOver) ~= "function" or entryButton:IsMouseOver())
+    if not M.previewShouldRemain(pinned, entryVisible == true, entryHovered == true) then return end
     ensureWindow()
     if not pinned then
         placeWindow("preview")
@@ -400,6 +409,19 @@ function M.showPreview()
         if BG.BGNext.OwnCharactersUI and BG.BGNext.OwnCharactersUI.Refresh then
             BG.BGNext.OwnCharactersUI.Refresh()
         end
+        local elapsed = 0
+        window:SetScript("OnUpdate", function(_, delta)
+            elapsed = elapsed + (type(delta) == "number" and delta or 0)
+            if elapsed < 0.1 then return end
+            elapsed = 0
+            local visible = entryButton
+                and (type(entryButton.IsVisible) ~= "function" or entryButton:IsVisible())
+            local hovered = entryButton
+                and (type(entryButton.IsMouseOver) ~= "function" or entryButton:IsMouseOver())
+            if not M.previewShouldRemain(pinned, visible == true, hovered == true) then
+                M.hidePreview()
+            end
+        end)
     end
 end
 
@@ -411,7 +433,10 @@ end
 
 function M.hidePreview()
     if not pinned then
-        if window then window:Hide() end
+        if window then
+            window:SetScript("OnUpdate", nil)
+            window:Hide()
+        end
         local runtime = BG.BGNext.OwnCharactersRuntime
         if runtime and type(runtime.setVisible) == "function" then runtime.setVisible(nil, false) end
     end
@@ -475,6 +500,10 @@ function M.installEntry(mainFrame)
     BG.ButtonRoleOverview = button
     entryButton = button
     M.setAvailable(M.canOpen())
+
+    if type(mainFrame.HookScript) == "function" then
+        mainFrame:HookScript("OnHide", function() M.hidePreview() end)
+    end
 
     button:SetScript("OnEnter", M.showPreview)
     button:SetScript("OnLeave", M.hidePreview)
