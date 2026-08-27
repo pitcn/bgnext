@@ -16,6 +16,10 @@ return function(test)
     for _, forbidden in ipairs({ "SendChatMessage", "C_ChatInfo.SendAddonMessage", "BiaoGe.FilterClassItemDB" }) do
         test.eq(source:find(forbidden, 1, true), nil, "UI excludes " .. forbidden)
     end
+    test.eq(source:find("LibBG:EasyMenu", 1, true) ~= nil, true, "right-click profile menu retained")
+    test.eq(source:find("moveProfile", 1, true) ~= nil, true, "profile reorder action retained")
+    test.eq(source:find("deleteProfile", 1, true) ~= nil, true, "profile delete action retained")
+    test.eq(source:find("IconButtons", 1, true) ~= nil, true, "profile icon chooser retained")
 
     local toc = assert(io.open("BGLite.toc", "rb"))
     local tocSource = toc:read("*a")

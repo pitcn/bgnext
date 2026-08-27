@@ -1,5 +1,6 @@
 local AddonName, ns = ...
 local L = ns.L
+local LibBG = ns.LibBG
 
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}
@@ -9,6 +10,7 @@ local shortcutButtons = {}
 local chooserButtons = {}
 local ruleButtons = {}
 local sectionTitles = {}
+local openProfileMenu
 
 local sectionOrder = {
     { key = "weapon", title = "武器类型过滤" },
@@ -98,7 +100,7 @@ local function updateProfileRows()
             if not shortcut then
                 shortcut = createProfileButton(BG.EquipmentFilterShortcutFrame, index, function(self, mouseButton)
                     if mouseButton == "RightButton" then
-                        BG.EquipmentFilterEditProfile(self.profileId)
+                        openProfileMenu(self)
                     else
                         BG.BGNext.EquipmentFilter.selectProfile(state(), self.profileId)
                         updateProfileRows()
@@ -112,7 +114,7 @@ local function updateProfileRows()
             if not chooser then
                 chooser = createProfileButton(BG.FilterClassItemMainFrame.ProfileRow, index, function(self, mouseButton)
                     if mouseButton == "RightButton" then
-                        BG.EquipmentFilterEditProfile(self.profileId)
+                        openProfileMenu(self)
                     else
                         BG.BGNext.EquipmentFilter.selectProfile(state(), self.profileId)
                         updateProfileRows()
@@ -206,12 +208,49 @@ local function showEdit(profileId)
     frame.profileId = profileId
     frame.Title:SetText(profile and (L["正在修改方案："] .. profile.name) or L["新建过滤方案"])
     frame.NameEdit:SetText(profile and profile.name or "")
-    frame.Icon:SetTexture(profile and profile.icon or 134400)
+    frame.selectedIcon = profile and profile.icon or 134400
+    frame.Icon:SetTexture(frame.selectedIcon)
+    for _, button in ipairs(frame.IconButtons or {}) do
+        button.Selected:SetShown(button.iconPath == frame.selectedIcon)
+    end
     frame:Show()
 end
 
 function BG.EquipmentFilterEditProfile(profileId)
     showEdit(profileId)
+end
+
+openProfileMenu = function(button)
+    local current = state()
+    local profile = current and current.profiles[button.profileId]
+    if not profile then return end
+    local orderMenu = { { isTitle = true, text = L["更改至第几位"], notCheckable = true } }
+    local currentIndex
+    for index, id in ipairs(current.order) do
+        if id == button.profileId then currentIndex = index end
+    end
+    for target = 1, #current.order do
+        orderMenu[#orderMenu + 1] = {
+            text = tostring(target), notCheckable = true,
+            func = function()
+                if currentIndex then BG.BGNext.EquipmentFilter.moveProfile(current, button.profileId, target - currentIndex) end
+                updateProfileRows(); refreshItems()
+            end,
+        }
+    end
+    local menu = {
+        { isTitle = true, text = profile.name, notCheckable = true },
+        { text = L["修改名称/图标"], notCheckable = true, func = function() showEdit(button.profileId) end },
+        { text = L["更改顺序"], notCheckable = true, hasArrow = true, menuList = orderMenu },
+        { isTitle = true, text = "   ", notCheckable = true },
+        { text = L["删除方案"], notCheckable = true, func = function()
+            BG.BGNext.EquipmentFilter.deleteProfile(current, button.profileId)
+            updateProfileRows(); updateRuleButtons(); refreshItems()
+        end },
+        { isTitle = true, text = "   ", notCheckable = true },
+        { text = CANCEL, notCheckable = true, func = function() LibBG:CloseDropDownMenus() end },
+    }
+    LibBG:EasyMenu(menu, BG.dropDown, button, 0, 0, "MENU", 3)
 end
 
 local function createUI()
@@ -291,6 +330,44 @@ local function createUI()
     edit.Icon = edit:CreateTexture(nil, "ARTWORK")
     edit.Icon:SetSize(40, 40)
     edit.Icon:SetPoint("LEFT", edit.NameEdit, "RIGHT", 25, 0)
+    edit.IconButtons = {}
+    local iconChoices = {
+        134400, 132089, 132272, 132333, 132349,
+        132355, 132485, 133733, 134153, 135846,
+        "Interface/Icons/classicon_warrior", "Interface/Icons/classicon_paladin",
+        "Interface/Icons/classicon_hunter", "Interface/Icons/classicon_rogue",
+        "Interface/Icons/classicon_priest", "Interface/Icons/classicon_shaman",
+        "Interface/Icons/classicon_mage", "Interface/Icons/classicon_warlock",
+        "Interface/Icons/classicon_druid", "Interface/Icons/classicon_monk",
+    }
+    local iconLabel = edit:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    iconLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -45)
+    iconLabel:SetText(L["图标："])
+    for index, iconPath in ipairs(iconChoices) do
+        local button = CreateFrame("Button", nil, edit)
+        button:SetSize(30, 30)
+        local column = (index - 1) % 10
+        local row = math.floor((index - 1) / 10)
+        button:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", column * 45, -8 - row * 40)
+        button.iconPath = iconPath
+        local texture = button:CreateTexture(nil, "ARTWORK")
+        texture:SetAllPoints()
+        texture:SetTexture(iconPath)
+        button:SetHighlightTexture("Interface/Buttons/ButtonHilight-Square", "ADD")
+        local selected = button:CreateTexture(nil, "OVERLAY")
+        selected:SetTexture("Interface/Buttons/CheckButtonHilight")
+        selected:SetBlendMode("ADD")
+        selected:SetAllPoints()
+        selected:Hide()
+        button.Selected = selected
+        button:SetScript("OnClick", function(self)
+            edit.selectedIcon = self.iconPath
+            edit.Icon:SetTexture(self.iconPath)
+            for _, other in ipairs(edit.IconButtons) do other.Selected:SetShown(other == self) end
+            play()
+        end)
+        edit.IconButtons[index] = button
+    end
     local confirm = BG.CreateButton(edit)
     confirm:SetSize(120, 25)
     confirm:SetPoint("BOTTOMLEFT", 25, 20)
@@ -298,9 +375,9 @@ local function createUI()
     confirm:SetScript("OnClick", function()
         local current = state()
         if edit.profileId then
-            BG.BGNext.EquipmentFilter.updateProfile(current, edit.profileId, { name = edit.NameEdit:GetText() })
+            BG.BGNext.EquipmentFilter.updateProfile(current, edit.profileId, { name = edit.NameEdit:GetText(), icon = edit.selectedIcon })
         else
-            local _, id = BG.BGNext.EquipmentFilter.createProfile(current, { name = edit.NameEdit:GetText(), icon = 134400, weapon = {}, armor = {}, affix = {}, classRestriction = true, ignoreBattleNetBound = false, tankOnly = false, primaryStat = {} })
+            local _, id = BG.BGNext.EquipmentFilter.createProfile(current, { name = edit.NameEdit:GetText(), icon = edit.selectedIcon or 134400, weapon = {}, armor = {}, affix = {}, classRestriction = true, ignoreBattleNetBound = false, tankOnly = false, primaryStat = {} })
             if id then current.selectedId = id end
         end
         edit:Hide(); updateProfileRows(); updateRuleButtons(); refreshItems(); play()
