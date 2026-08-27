@@ -128,7 +128,7 @@ local function updateProfileRows()
             setProfileButton(chooser, profile, current.selectedId == id)
         end
     end
-    local width = math.max(1, #current.order * 35 - 10)
+    local width = math.max(1, #current.order * 35)
     BG.EquipmentFilterShortcutFrame:SetWidth(width)
     BG.FilterClassItemMainFrame.ProfileRow:SetWidth(width)
 end
@@ -194,7 +194,7 @@ local function updateRuleButtons()
             button.ruleId = rule.id
             button.boolean = section.boolean
             button.Text:SetText(rule.label)
-            button:SetChecked(section.boolean and profile[section.key] or profile[section.key][rule.id])
+            button:SetChecked(BG.BGNext.EquipmentFilter.isRuleSelected(profile, section.key, rule.id, section.boolean))
             button:Show()
         end
         y = y - (math.ceil(#values / 5) * 24) - 8

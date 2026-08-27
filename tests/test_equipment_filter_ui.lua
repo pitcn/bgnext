@@ -20,6 +20,8 @@ return function(test)
     test.eq(source:find("moveProfile", 1, true) ~= nil, true, "profile reorder action retained")
     test.eq(source:find("deleteProfile", 1, true) ~= nil, true, "profile delete action retained")
     test.eq(source:find("IconButtons", 1, true) ~= nil, true, "profile icon chooser retained")
+    test.eq(source:find("#current.order * 35 - 10", 1, true), nil,
+        "shortcut container preserves trailing spacing before settings")
 
     local toc = assert(io.open("BGLite.toc", "rb"))
     local tocSource = toc:read("*a")

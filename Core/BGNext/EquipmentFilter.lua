@@ -88,6 +88,13 @@ function M.getActiveProfile(root, realmId, player)
     return state.selectedId and state.profiles[state.selectedId] or nil
 end
 
+function M.isRuleSelected(profile, sectionKey, ruleId, isBoolean)
+    if type(profile) ~= "table" then return false end
+    if isBoolean then return profile[sectionKey] == true end
+    local rules = profile[sectionKey]
+    return type(rules) == "table" and rules[ruleId] == true or false
+end
+
 function M.selectProfile(state, id)
     if type(state) ~= "table" or type(state.profiles) ~= "table" or not state.profiles[id] then return false end
     if state.selectedId == id then

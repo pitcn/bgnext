@@ -55,6 +55,13 @@ return function(test)
     test.eq(state.profiles.MAGE.name, "法师", "character state is not aliased")
     test.eq(defaults[1].name, "法师", "source defaults are not mutated")
 
+    test.eq(model.isRuleSelected(state.profiles.MAGE, "classRestriction", nil, true), true,
+        "enabled boolean rule is selected")
+    test.eq(model.isRuleSelected(state.profiles.MAGE, "ignoreBattleNetBound", nil, true), false,
+        "disabled boolean rule is read without indexing the boolean")
+    test.eq(model.isRuleSelected(state.profiles.MAGE, "armor", 4, false), true,
+        "table rule selection is read by id")
+
     local file = assert(io.open("Core/function2.lua", "rb"))
     local source = file:read("*a")
     file:close()
