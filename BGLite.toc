@@ -43,6 +43,7 @@ Core\TongBao\QianKuan.lua
 Core\TongBao\Channel.lua
 
 Core\BiaoGe.lua
+Core\BGNext\EquipmentFilterUI.lua
 Core\BGNext\WishlistUI.lua
 Core\BGNext\About.lua
 

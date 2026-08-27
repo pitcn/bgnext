@@ -1,0 +1,341 @@
+local AddonName, ns = ...
+local L = ns.L
+
+BG = BG or {}
+BG.BGNext = BG.BGNext or {}
+
+local M = {}
+local shortcutButtons = {}
+local chooserButtons = {}
+local ruleButtons = {}
+local sectionTitles = {}
+
+local sectionOrder = {
+    { key = "weapon", title = "武器类型过滤" },
+    { key = "armor", title = "护甲类型过滤" },
+    { key = "affix", title = "装备词缀过滤" },
+    { key = "classRestriction", title = "职业限定过滤", boolean = true },
+    { key = "ignoreBattleNetBound", title = "忽略战网绑定", boolean = true },
+    { key = "tankOnly", title = "坦克专属过滤", boolean = true },
+    { key = "primaryStat", title = "主属性" },
+}
+
+local function state()
+    local root = BG.BGNext.DB
+    local realmId = BG.realmID or GetRealmID()
+    local player = BG.playerName
+    local byRealm = root and root.equipmentFilters and root.equipmentFilters[realmId]
+    return byRealm and byRealm[player]
+end
+
+local function activeProfile()
+    local current = state()
+    return current and current.selectedId and current.profiles[current.selectedId], current
+end
+
+local function play()
+    if BG.PlaySound then BG.PlaySound(1) end
+end
+
+local function refreshItems()
+    if BG.UpdateAllFilter then BG.UpdateAllFilter() end
+end
+
+local function hideButtons(buttons)
+    for _, button in ipairs(buttons) do button:Hide() end
+end
+
+local function setProfileButton(button, profile, selected)
+    button.profileId = profile.id
+    button.icon:SetTexture(profile.icon or 134400)
+    button.selected:SetShown(selected)
+    button:Show()
+end
+
+local function createProfileButton(parent, index, onClick)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(25, 25)
+    if index == 1 then
+        button:SetPoint("LEFT", 0, 0)
+    else
+        button:SetPoint("LEFT", parent.buttons[index - 1], "RIGHT", 10, 0)
+    end
+    local icon = button:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(40, 40)
+    icon:SetPoint("CENTER")
+    button.icon = icon
+    local selected = button:CreateTexture(nil, "OVERLAY")
+    selected:SetTexture("Interface/Buttons/CheckButtonHilight")
+    selected:SetBlendMode("ADD")
+    selected:SetAllPoints()
+    button.selected = selected
+    button:SetHighlightTexture("Interface/Buttons/ButtonHilight-Square", "ADD")
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:SetScript("OnClick", onClick)
+    button:SetScript("OnEnter", function(self)
+        local current = state()
+        local profile = current and current.profiles[self.profileId]
+        if not profile then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+        GameTooltip:AddLine(L["使用装备过滤方案："] .. profile.name, 1, .82, 0)
+        GameTooltip:AddLine(L["右键修改方案"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    button:SetScript("OnLeave", GameTooltip_Hide)
+    parent.buttons[index] = button
+    return button
+end
+
+local function updateProfileRows()
+    local current = state()
+    if not current then return end
+    hideButtons(shortcutButtons)
+    hideButtons(chooserButtons)
+    for index, id in ipairs(current.order) do
+        local profile = current.profiles[id]
+        if profile then
+            local shortcut = shortcutButtons[index]
+            if not shortcut then
+                shortcut = createProfileButton(BG.EquipmentFilterShortcutFrame, index, function(self, mouseButton)
+                    if mouseButton == "RightButton" then
+                        BG.EquipmentFilterEditProfile(self.profileId)
+                    else
+                        BG.BGNext.EquipmentFilter.selectProfile(state(), self.profileId)
+                        updateProfileRows()
+                        refreshItems()
+                    end
+                    play()
+                end)
+                shortcutButtons[index] = shortcut
+            end
+            local chooser = chooserButtons[index]
+            if not chooser then
+                chooser = createProfileButton(BG.FilterClassItemMainFrame.ProfileRow, index, function(self, mouseButton)
+                    if mouseButton == "RightButton" then
+                        BG.EquipmentFilterEditProfile(self.profileId)
+                    else
+                        BG.BGNext.EquipmentFilter.selectProfile(state(), self.profileId)
+                        updateProfileRows()
+                        refreshItems()
+                    end
+                    play()
+                end)
+                chooserButtons[index] = chooser
+            end
+            setProfileButton(shortcut, profile, current.selectedId == id)
+            setProfileButton(chooser, profile, current.selectedId == id)
+        end
+    end
+    local width = math.max(1, #current.order * 35 - 10)
+    BG.EquipmentFilterShortcutFrame:SetWidth(width)
+    BG.FilterClassItemMainFrame.ProfileRow:SetWidth(width)
+end
+
+local function sortedRules(values)
+    local result = {}
+    for id, label in pairs(values or {}) do result[#result + 1] = { id = id, label = label } end
+    table.sort(result, function(a, b) return tostring(a.id) < tostring(b.id) end)
+    return result
+end
+
+local function updateRuleButtons()
+    local profile = activeProfile()
+    for _, button in ipairs(ruleButtons) do button:Hide() end
+    if not profile then return end
+    local catalog = BG.BGNext.EquipmentFilterProfiles.getRuleCatalog({ project = WOW_PROJECT_ID })
+    local parent = BG.FilterClassItemMainFrame.RuleFrame
+    local y = -5
+    local used = 0
+    for sectionIndex, section in ipairs(sectionOrder) do
+        local title = sectionTitles[sectionIndex]
+        if not title then
+            title = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            sectionTitles[sectionIndex] = title
+        end
+        title:ClearAllPoints()
+        title:SetPoint("TOPLEFT", 10, y)
+        title:SetText(L[section.title] or section.title)
+        title:SetTextColor(section.key == "tankOnly" and .2 or 0, section.key == "tankOnly" and .65 or 1, 1)
+        y = y - 22
+        local values
+        if section.boolean then
+            values = { { id = section.key, label = L[section.title] or section.title } }
+        else
+            values = sortedRules(catalog[section.key])
+        end
+        for index, rule in ipairs(values) do
+            used = used + 1
+            local button = ruleButtons[used]
+            if not button then
+                button = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+                button:SetSize(24, 24)
+                button.Text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                button.Text:SetPoint("LEFT", button, "RIGHT", 1, 0)
+                button:SetScript("OnClick", function(self)
+                    local selected = activeProfile()
+                    if not selected then return end
+                    if self.boolean then
+                        selected[self.sectionKey] = self:GetChecked() and true or false
+                    else
+                        selected[self.sectionKey][self.ruleId] = self:GetChecked() and true or nil
+                    end
+                    refreshItems()
+                    play()
+                end)
+                ruleButtons[used] = button
+            end
+            local column = (index - 1) % 5
+            local row = math.floor((index - 1) / 5)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", 10 + column * 105, y - row * 24)
+            button.sectionKey = section.key
+            button.ruleId = rule.id
+            button.boolean = section.boolean
+            button.Text:SetText(rule.label)
+            button:SetChecked(section.boolean and profile[section.key] or profile[section.key][rule.id])
+            button:Show()
+        end
+        y = y - (math.ceil(#values / 5) * 24) - 8
+    end
+end
+
+local function showEdit(profileId)
+    local frame = BG.FilterClassItemMainFrame.EditFrame
+    local current = state()
+    local profile = current and current.profiles[profileId]
+    frame.profileId = profileId
+    frame.Title:SetText(profile and (L["正在修改方案："] .. profile.name) or L["新建过滤方案"])
+    frame.NameEdit:SetText(profile and profile.name or "")
+    frame.Icon:SetTexture(profile and profile.icon or 134400)
+    frame:Show()
+end
+
+function BG.EquipmentFilterEditProfile(profileId)
+    showEdit(profileId)
+end
+
+local function createUI()
+    local main = CreateFrame("Frame", nil, BG.MainFrame, "BackdropTemplate")
+    main:SetBackdrop({ bgFile = "Interface/ChatFrame/ChatFrameBackground", edgeFile = "Interface/Tooltips/UI-Tooltip-Border", edgeSize = 16, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    main:SetBackdropColor(0, 0, 0, .9)
+    main:SetSize(560, 400)
+    main:SetPoint("CENTER", BG.MainFrame, "CENTER", 100, 0)
+    main:SetFrameLevel(290)
+    main:EnableMouse(true)
+    main:SetMovable(true)
+    main:SetToplevel(true)
+    main:SetScript("OnMouseDown", function(self) self:StartMoving() end)
+    main:SetScript("OnMouseUp", function(self) self:StopMovingOrSizing() end)
+    main:SetScript("OnShow", function() updateProfileRows(); updateRuleButtons() end)
+    main:Hide()
+    BG.FilterClassItemMainFrame = main
+
+    local title = main:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", 0, -7)
+    title:SetText(L["< 装备过滤 >"])
+
+    local profileRow = CreateFrame("Frame", nil, main)
+    profileRow:SetPoint("TOP", 30, -40)
+    profileRow:SetSize(1, 30)
+    profileRow.buttons = chooserButtons
+    main.ProfileRow = profileRow
+    local chooseText = profileRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    chooseText:SetPoint("RIGHT", profileRow, "LEFT", -10, 0)
+    chooseText:SetText(L["选择方案："])
+
+    local add = BG.CreateButton(main)
+    add:SetSize(25, 25)
+    add:SetPoint("LEFT", profileRow, "RIGHT", 0, 0)
+    add:SetText("+")
+    add:SetScript("OnClick", function() showEdit(nil); play() end)
+
+    local reset = BG.CreateButton(main)
+    reset:SetSize(60, 30)
+    reset:SetPoint("TOPLEFT", 5, -40)
+    reset:SetText(RESET)
+    reset:SetScript("OnClick", function()
+        local _, classToken = UnitClass("player")
+        local defaults = BG.BGNext.EquipmentFilterProfiles.getDefaults({ project = WOW_PROJECT_ID }, classToken)
+        BG.BGNext.EquipmentFilter.resetDefaults(state(), defaults)
+        updateProfileRows(); updateRuleButtons(); refreshItems(); play()
+    end)
+
+    local close = BG.CreateButton(main)
+    close:SetSize(130, 25)
+    close:SetPoint("BOTTOMRIGHT", -10, 15)
+    close:SetText(CLOSE)
+    close:SetScript("OnClick", function() main:Hide(); play() end)
+
+    local rules = CreateFrame("Frame", nil, main)
+    rules:SetPoint("TOPLEFT", 5, -65)
+    rules:SetPoint("BOTTOMRIGHT", -5, 45)
+    main.RuleFrame = rules
+
+    local edit = CreateFrame("Frame", nil, main, "BackdropTemplate")
+    edit:SetBackdrop({ bgFile = "Interface/ChatFrame/ChatFrameBackground", edgeFile = "Interface/Tooltips/UI-Tooltip-Border", edgeSize = 16 })
+    edit:SetBackdropColor(0, 0, 0, .98)
+    edit:SetPoint("TOPLEFT", 10, -80)
+    edit:SetPoint("BOTTOMRIGHT", -10, 45)
+    edit:SetFrameLevel(300)
+    edit:Hide()
+    main.EditFrame = edit
+    edit.Title = edit:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    edit.Title:SetPoint("TOP", 0, -15)
+    local nameLabel = edit:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    nameLabel:SetPoint("TOPLEFT", 25, -45)
+    nameLabel:SetText(L["名称："])
+    edit.NameEdit = CreateFrame("EditBox", nil, edit, "InputBoxTemplate")
+    edit.NameEdit:SetSize(150, 20)
+    edit.NameEdit:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -5)
+    edit.NameEdit:SetAutoFocus(false)
+    edit.Icon = edit:CreateTexture(nil, "ARTWORK")
+    edit.Icon:SetSize(40, 40)
+    edit.Icon:SetPoint("LEFT", edit.NameEdit, "RIGHT", 25, 0)
+    local confirm = BG.CreateButton(edit)
+    confirm:SetSize(120, 25)
+    confirm:SetPoint("BOTTOMLEFT", 25, 20)
+    confirm:SetText(L["确定"])
+    confirm:SetScript("OnClick", function()
+        local current = state()
+        if edit.profileId then
+            BG.BGNext.EquipmentFilter.updateProfile(current, edit.profileId, { name = edit.NameEdit:GetText() })
+        else
+            local _, id = BG.BGNext.EquipmentFilter.createProfile(current, { name = edit.NameEdit:GetText(), icon = 134400, weapon = {}, armor = {}, affix = {}, classRestriction = true, ignoreBattleNetBound = false, tankOnly = false, primaryStat = {} })
+            if id then current.selectedId = id end
+        end
+        edit:Hide(); updateProfileRows(); updateRuleButtons(); refreshItems(); play()
+    end)
+    local back = BG.CreateButton(edit)
+    back:SetSize(120, 25)
+    back:SetPoint("LEFT", confirm, "RIGHT", 15, 0)
+    back:SetText(L["返回"])
+    back:SetScript("OnClick", function() edit:Hide(); play() end)
+
+    local shortcuts = CreateFrame("Frame", nil, BG.FBMainFrame)
+    shortcuts:SetPoint("BOTTOMLEFT", BG.MainFrame, "BOTTOMLEFT", BG.onlyOneHard and 250 or 410, 35)
+    shortcuts:SetSize(1, 30)
+    shortcuts.buttons = shortcutButtons
+    BG.EquipmentFilterShortcutFrame = shortcuts
+    local settings = CreateFrame("Button", nil, shortcuts)
+    settings:SetPoint("LEFT", shortcuts, "RIGHT", 0, 0)
+    settings:SetSize(25, 25)
+    settings:SetNormalTexture("Interface/Buttons/UI-OptionsButton")
+    settings:SetHighlightTexture("Interface/Buttons/UI-OptionsButton")
+    settings:SetScript("OnClick", function() main:SetShown(not main:IsShown()); play() end)
+    settings:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+        GameTooltip:AddLine(L["自定义装备过滤方案"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    settings:SetScript("OnLeave", GameTooltip_Hide)
+    main.SettingsButton = settings
+    updateProfileRows()
+end
+
+BG.FilterClassItemUI = function()
+    if BG.FilterClassItemMainFrame and BG.FilterClassItemMainFrame.GetObjectType then return end
+    createUI()
+end
+
+BG.BGNext.EquipmentFilterUI = M
+return M
