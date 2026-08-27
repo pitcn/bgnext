@@ -98,7 +98,12 @@ do
     function BG.UpdateAllFilter()
     end
 
+    -- BGNext: 原版此函数为空壳。这里把「角色总览」入口接到 BGNext 自己的
+    -- 实现；UI 生命周期仍由 Core/BGNext/RoleOverviewEntry.lua 管理，不引入旧角色代码。
     function BG.RoleOverviewUI()
+        if BG.BGNext and BG.BGNext.RoleOverviewEntry then
+            BG.BGNext.RoleOverviewEntry.togglePinned()
+        end
     end
 
     function BG.FilterClassItemUI()

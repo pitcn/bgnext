@@ -365,6 +365,12 @@ BG.Init(function()
             lastbt = BG.XiaoFeiUI(lastbt)
             lastbt = BG.QianKuanUI(lastbt)
             BG.NotifyChannelUI(lastbt)
+
+            -- BGNext: 角色总览右下角入口、悬停预览、固定窗口与 /bgn role、/bgnext role。
+            if BG.BGNext and BG.BGNext.RoleOverviewEntry then
+                BG.BGNext.RoleOverviewEntry.installEntry(BG.MainFrame)
+                BG.BGNext.RoleOverviewEntry.installSlash()
+            end
         end)
 
         securecall(BG.ReceiveUI)
