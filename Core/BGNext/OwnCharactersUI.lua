@@ -229,7 +229,9 @@ function M.layout(projection)
         width = projection.width,
         height = projection.height,
         isEmpty = projection.isEmpty == true,
-        emptyText = L["尚无本地角色记录，登录角色后自动记录。"],
+        emptyText = projection.unsupported == true
+            and L["该版本角色总览适配中。"]
+            or L["尚无本地角色记录，登录角色后自动记录。"],
         characterCount = projection.characterCount,
         sections = { raid, resource },
     }

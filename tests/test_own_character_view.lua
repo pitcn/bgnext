@@ -324,6 +324,17 @@ return function(test)
     test.eq(View.project(nil), nil, "missing input is safe")
     test.eq(View.project({}), nil, "input without a catalog is safe")
 
+    local unsupported = View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot() },
+        currentRealmId = 123,
+        now = 1000,
+        visibility = {},
+    })
+    test.eq(unsupported.unsupported, true, "unverified client projects an explicit unsupported state")
+    test.eq(unsupported.characterCount, 0, "unverified client does not render misleading character rows")
+
     local malformed = View.project(input({
         snapshots = { snapshot(), "not a table", { player = "NoRealm" }, snapshot({ raidStates = "broken" }) },
     }))

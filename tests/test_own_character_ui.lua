@@ -177,6 +177,15 @@ return function(test)
     test.eq(emptyLayout.emptyText ~= "", true, "empty message is not blank")
     test.eq(#emptyLayout.sections[1].rows, 0, "empty layout draws no character rows")
 
+    local unsupportedLayout = UI.layout(View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot() },
+        currentRealmId = 123, now = 1000, visibility = {},
+    }))
+    test.eq(unsupportedLayout.emptyText, "该版本角色总览适配中。",
+        "unverified clients show a truthful adaptation message")
+
     -- Hiding a column immediately reflows the layout.
     local hidden = View.project({
         family = "titan",

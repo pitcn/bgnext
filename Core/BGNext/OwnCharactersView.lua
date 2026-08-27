@@ -460,6 +460,32 @@ function M.project(input)
     local catalog = input.catalog
     if type(catalog) ~= "table" then return nil end
 
+    if catalog.status ~= "tested-in-game" then
+        local width = 360
+        local count = 0
+        local raidHeight = M.metrics.sectionTitleHeight + M.metrics.headerHeight
+        local resourceHeight = M.metrics.sectionTitleHeight + M.metrics.headerHeight + M.metrics.totalsRowHeight
+        return {
+            family = input.family,
+            unsupported = true,
+            isEmpty = true,
+            characterCount = count,
+            showAllRealms = input.showAllRealms == true,
+            raid = {
+                title = M.titles.raid, hint = M.hints.raid,
+                nameHeader = "0个角色（装等）", characterCount = count,
+                columns = {}, rows = {}, width = width,
+            },
+            resource = {
+                title = M.titles.resource, hint = M.hints.resource,
+                nameHeader = "0个角色（等级）", characterCount = count,
+                columns = {}, rows = {}, totals = {}, width = width,
+            },
+            width = width,
+            height = raidHeight + resourceHeight + M.metrics.sectionGap + M.metrics.padding * 2,
+        }
+    end
+
     local family = input.family
     local now = input.now
     local available = type(input.available) == "function" and input.available or nil
