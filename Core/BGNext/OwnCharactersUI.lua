@@ -53,9 +53,12 @@ M.controls = { "settings", "refresh", "close" }
 
 function M.headerControls(mode, hideable)
     return {
-        canHide = mode == "pinned" and hideable == true,
         canAdd = mode == "pinned",
     }
+end
+
+function M.rowCenterY(rowTop)
+    return rowTop - M.metrics.rowHeight / 2
 end
 
 M.textures = {
@@ -109,7 +112,9 @@ function M.columnHeader(column, currencyInfo)
     if type(column) ~= "table" then return { text = "", tooltip = "" } end
     local rawLabel = type(column.title) == "string" and column.title or ""
     local label = L[rawLabel]
-    local descriptor = { text = label, tooltip = label }
+    local tooltip = type(column.fullTitle) == "string" and column.fullTitle ~= ""
+        and L[column.fullTitle] or label
+    local descriptor = { text = label, tooltip = tooltip }
     local source = type(column.source) == "table" and column.source or nil
     if not source or source.kind ~= "currency" or source.showHeaderIcon ~= true
         or type(source.currencyId) ~= "number" then
@@ -175,6 +180,7 @@ local function layoutSection(source, key, top)
         section.columns[#section.columns + 1] = {
             id = column.id,
             title = column.title,
+            fullTitle = column.fullTitle,
             color = column.color,
             source = column.source,
             zoneId = column.zoneId,
@@ -245,7 +251,6 @@ end
 local frame
 local provider
 local rowHandler
-local columnHandler
 local settingsHandler
 local renderMode = "pinned"
 local pool = {
@@ -265,10 +270,6 @@ function M.SetRowHandler(fn)
     rowHandler = type(fn) == "function" and fn or nil
 end
 
-function M.SetColumnHandler(fn)
-    columnHandler = type(fn) == "function" and fn or nil
-end
-
 function M.SetSettingsHandler(fn)
     settingsHandler = type(fn) == "function" and fn or nil
 end
@@ -285,9 +286,14 @@ local function acquireText(parent, index)
     local item = pool.texts[index]
     if not item then
         item = parent:CreateFontString(nil, "ARTWORK")
-        item:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
         pool.texts[index] = item
     end
+    item:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
+    item:ClearAllPoints()
+    item:SetWordWrap(false)
+    item:SetJustifyH("LEFT")
+    item:SetJustifyV("MIDDLE")
+    item:SetTextColor(M.colors.text.r, M.colors.text.g, M.colors.text.b)
     item:Show()
     return item
 end
@@ -298,6 +304,7 @@ local function acquireTexture(parent, index)
         item = parent:CreateTexture(nil, "ARTWORK")
         pool.textures[index] = item
     end
+    item:ClearAllPoints()
     item:Show()
     return item
 end
@@ -314,42 +321,59 @@ local function acquireRowButton(parent, index)
         end)
         pool.buttons[index] = item
     end
+    item:ClearAllPoints()
+    item:SetFrameLevel(parent:GetFrameLevel() + 1)
     item:Show()
     return item
 end
 
 -- Shows Blizzard's own tooltip for an item, never a hand-written summary. The
 -- link is used when the collector captured one; otherwise the item id.
-local function showItemTooltip(self)
-    local target = M.tooltipTarget(self.__item)
-    if not target or type(GameTooltip) ~= "table" then return end
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+function M.showItemTooltip(tooltip, item, itemApi)
+    local target = M.tooltipTarget(item)
+    if not target or not tooltip then return false end
     if target.kind == "link" then
-        GameTooltip:SetHyperlink(target.value)
+        if type(tooltip.SetHyperlink) ~= "function" then return false end
+        tooltip:SetHyperlink(target.value)
     else
-        if type(C_Item) == "table" and type(C_Item.RequestLoadItemDataByID) == "function" then
-            C_Item.RequestLoadItemDataByID(target.value)
+        local api = itemApi or C_Item
+        if type(api) == "table" and type(api.RequestLoadItemDataByID) == "function" then
+            api.RequestLoadItemDataByID(target.value)
         end
-        GameTooltip:SetItemByID(target.value)
+        if type(tooltip.SetItemByID) == "function" then
+            tooltip:SetItemByID(target.value)
+        elseif type(tooltip.SetHyperlink) == "function" then
+            tooltip:SetHyperlink("item:" .. tostring(target.value))
+        else
+            return false
+        end
     end
-    GameTooltip:Show()
+    return true
+end
+
+local function showItemTooltip(self)
+    if not GameTooltip or type(GameTooltip.SetOwner) ~= "function" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    if M.showItemTooltip(GameTooltip, self.__item, C_Item)
+        and type(GameTooltip.Show) == "function" then
+        GameTooltip:Show()
+    end
 end
 
 local function hideItemTooltip()
-    if type(GameTooltip) == "table" then GameTooltip:Hide() end
+    if GameTooltip and type(GameTooltip.Hide) == "function" then GameTooltip:Hide() end
 end
 
 local function showHeaderTooltip(self)
-    if type(self.__tooltip) ~= "string" or self.__tooltip == "" or type(GameTooltip) ~= "table" then return end
+    if type(self.__tooltip) ~= "string" or self.__tooltip == ""
+        or not GameTooltip or type(GameTooltip.SetOwner) ~= "function" then return end
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText(self.__tooltip)
     GameTooltip:Show()
-    if self.__canHide and self.__closeButton then self.__closeButton:Show() end
 end
 
 local function hideHeaderTooltip(self)
     hideItemTooltip()
-    if self.__closeButton then self.__closeButton:Hide() end
 end
 
 local function acquireHeaderButton(parent, index)
@@ -358,20 +382,10 @@ local function acquireHeaderButton(parent, index)
         item = CreateFrame("Button", nil, parent)
         item:SetScript("OnEnter", showHeaderTooltip)
         item:SetScript("OnLeave", hideHeaderTooltip)
-        local close = CreateFrame("Button", nil, item)
-        close:SetSize(14, 14)
-        close:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 2)
-        close:SetNormalFontObject(BG.FontWhite15)
-        close:SetText("×")
-        close:SetScript("OnClick", function()
-            if columnHandler and item.__canHide then
-                columnHandler(item.__section, item.__columnId)
-            end
-        end)
-        close:Hide()
-        item.__closeButton = close
         pool.headerButtons[index] = item
     end
+    item:ClearAllPoints()
+    item:SetFrameLevel(parent:GetFrameLevel() + 2)
     item:Show()
     return item
 end
@@ -388,6 +402,8 @@ local function acquireAddButton(parent, index)
         end)
         pool.addButtons[index] = item
     end
+    item:ClearAllPoints()
+    item:SetFrameLevel(parent:GetFrameLevel() + 2)
     item:Show()
     return item
 end
@@ -405,6 +421,8 @@ local function acquireItemButton(parent, index)
         end)
         pool.itemButtons[index] = item
     end
+    item:ClearAllPoints()
+    item:SetFrameLevel(parent:GetFrameLevel() + 3)
     item:Show()
     return item
 end
@@ -463,6 +481,7 @@ function M.Draw(layout)
     if layout.isEmpty then
         local message = nextText()
         message:SetPoint("TOPLEFT", frame, M.metrics.padding, layout.sections[1].titleY)
+        message:SetSize(layout.width - M.metrics.padding * 2, M.metrics.sectionTitleHeight)
         message:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
         message:SetText(layout.emptyText)
         return
@@ -473,9 +492,12 @@ function M.Draw(layout)
         title:SetPoint("TOPLEFT", frame, M.metrics.padding, section.titleY)
         title:SetTextColor(M.colors.title.r, M.colors.title.g, M.colors.title.b)
         title:SetText(L[section.title])
+        title:SetSize(title:GetStringWidth(), M.metrics.sectionTitleHeight)
 
         local hint = nextText()
         hint:SetPoint("LEFT", title, "RIGHT", 8, 0)
+        hint:SetSize(math.max(0, layout.width - M.metrics.padding * 2 - title:GetStringWidth() - 8),
+            M.metrics.sectionTitleHeight)
         hint:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
         local hintText = L[section.hint]
         if section.key == "raid" then
@@ -485,6 +507,7 @@ function M.Draw(layout)
 
         local nameHeader = nextText()
         nameHeader:SetPoint("TOPLEFT", frame, M.metrics.padding, section.headerY)
+        nameHeader:SetSize(M.metrics.nameColumnWidth, M.metrics.headerHeight)
         nameHeader:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
         nameHeader:SetText(section.nameHeader)
 
@@ -500,7 +523,8 @@ function M.Draw(layout)
             local descriptor = M.columnHeader(column)
             local header = nextText()
             header:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, section.headerY)
-            header:SetWidth(column.width)
+            header:SetSize(column.width, M.metrics.headerHeight)
+            header:SetJustifyH("CENTER")
             local headerColor = M.hexColor(column.color)
             header:SetTextColor(headerColor.r, headerColor.g, headerColor.b)
             header:SetText(descriptor.text)
@@ -511,8 +535,6 @@ function M.Draw(layout)
             hit.__tooltip = descriptor.tooltip
             hit.__section = section.key
             hit.__columnId = column.id
-            hit.__canHide = M.headerControls(renderMode, true).canHide
-            if hit.__closeButton then hit.__closeButton:Hide() end
         end
 
         for _, row in ipairs(section.rows) do
@@ -535,7 +557,9 @@ function M.Draw(layout)
             end
 
             local name = nextText()
-            name:SetPoint("TOPLEFT", frame, M.metrics.padding, row.y)
+            name:SetPoint("LEFT", frame, "TOPLEFT", M.metrics.padding, M.rowCenterY(row.y))
+            name:SetSize(M.metrics.nameColumnWidth, M.metrics.rowHeight)
+            name:SetWordWrap(false)
             local classColor = M.classColor(row.class)
             name:SetTextColor(classColor.r, classColor.g, classColor.b)
             name:SetText(M.rowLabel(section.key, row))
@@ -548,21 +572,26 @@ function M.Draw(layout)
                         check:SetTexture(M.textures.complete)
                         check:SetVertexColor(M.colors.complete.r, M.colors.complete.g, M.colors.complete.b)
                         check:SetSize(M.metrics.iconSize, M.metrics.iconSize)
-                        check:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, row.y)
+                        check:SetPoint("LEFT", frame, "TOPLEFT", M.metrics.padding + column.x,
+                            M.rowCenterY(row.y))
                     elseif cell.state == "items" then
                         for slot, item in ipairs(cell.items) do
                             local icon = nextItemButton()
                             icon:SetNormalTexture(item.icon or (type(GetItemIcon) == "function" and GetItemIcon(item.itemId)))
                             icon:SetSize(M.metrics.iconSize, M.metrics.iconSize)
-                            icon:SetPoint("TOPLEFT", frame,
+                            icon:SetPoint("LEFT", frame, "TOPLEFT",
                                 M.metrics.padding + column.x + (slot - 1) * (M.metrics.iconSize + M.metrics.iconGap),
-                                row.y)
+                                M.rowCenterY(row.y))
                             icon.__item = item
                             icon.__section = section.key
                             icon.__row = row
                             if item.itemLevel or (type(item.count) == "number" and item.count > 1) then
                                 local overlay = nextText()
-                                overlay:SetPoint("BOTTOMRIGHT", icon, 1, -1)
+                                overlay:SetPoint("TOPLEFT", icon, "TOPLEFT", 0, 0)
+                                overlay:SetSize(M.metrics.iconSize, M.metrics.iconSize)
+                                overlay:SetFont(BIAOGE_TEXT_FONT, 10, "OUTLINE")
+                                overlay:SetJustifyH("RIGHT")
+                                overlay:SetJustifyV("BOTTOM")
                                 overlay:SetText(tostring(math.floor(item.itemLevel or item.count)))
                             end
                         end
@@ -570,22 +599,27 @@ function M.Draw(layout)
                         local offset = 0
                         for _, profession in ipairs(cell.entries or {}) do
                             local skill = nextText()
-                            skill:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x + offset, row.y)
-                            skill:SetWidth(28)
+                            skill:SetPoint("LEFT", frame, "TOPLEFT", M.metrics.padding + column.x + offset,
+                                M.rowCenterY(row.y))
+                            skill:SetSize(28, M.metrics.rowHeight)
+                            skill:SetJustifyH("RIGHT")
                             skill:SetText(tostring(math.floor(profession.skill or 0)))
                             offset = offset + 28
                             local icon = nextTexture()
                             icon:SetTexture(profession.icon)
                             icon:SetSize(M.metrics.iconSize, M.metrics.iconSize)
-                            icon:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x + offset, row.y)
+                            icon:SetPoint("LEFT", frame, "TOPLEFT", M.metrics.padding + column.x + offset,
+                                M.rowCenterY(row.y))
                             offset = offset + M.metrics.iconSize + M.metrics.iconGap
                         end
                     else
                         local text = cellText(cell, column)
                         if text ~= "" then
                             local value = nextText()
-                            value:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, row.y)
-                            value:SetWidth(column.width)
+                            value:SetPoint("CENTER", frame, "TOPLEFT",
+                                M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
+                            value:SetSize(column.width, M.metrics.rowHeight)
+                            value:SetJustifyH("CENTER")
                             value:SetTextColor(M.colors.text.r, M.colors.text.g, M.colors.text.b)
                             value:SetText(text)
                         end
@@ -598,15 +632,19 @@ function M.Draw(layout)
         -- deliberately show nothing rather than a meaningless sum.
         if section.totalsY and section.totals then
             local label = nextText()
-            label:SetPoint("TOPLEFT", frame, M.metrics.padding, section.totalsY)
+            label:SetPoint("LEFT", frame, "TOPLEFT", M.metrics.padding,
+                M.rowCenterY(section.totalsY))
+            label:SetSize(M.metrics.nameColumnWidth, M.metrics.totalsRowHeight)
             label:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
             label:SetText(L["合计"])
             for _, column in ipairs(section.columns) do
                 local total = section.totals[column.id]
                 if type(total) == "number" then
                     local value = nextText()
-                    value:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, section.totalsY)
-                    value:SetWidth(column.width)
+                    value:SetPoint("CENTER", frame, "TOPLEFT",
+                        M.metrics.padding + column.x + column.width / 2, M.rowCenterY(section.totalsY))
+                    value:SetSize(column.width, M.metrics.totalsRowHeight)
+                    value:SetJustifyH("CENTER")
                     value:SetTextColor(M.colors.text.r, M.colors.text.g, M.colors.text.b)
                     value:SetText(column.kind == "money"
                         and tostring(math.floor(total / 10000)) .. "g"

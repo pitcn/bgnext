@@ -303,12 +303,6 @@ local function ensureWindow()
         ui.SetFrame(window)
         ui.SetProvider(provider)
         ui.SetRowHandler(M.onRowRightClick)
-        ui.SetColumnHandler(function(section, columnId)
-            local runtime = BG.BGNext.OwnCharactersRuntime
-            if runtime and type(runtime.setColumnVisible) == "function" then
-                runtime.setColumnVisible(nil, section, columnId, false)
-            end
-        end)
         ui.SetSettingsHandler(function(section)
             local settings = BG.BGNext.RoleOverviewSettings
             if settings and type(settings.Open) == "function" then settings.Open(section) end

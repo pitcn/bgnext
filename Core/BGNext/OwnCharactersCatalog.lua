@@ -18,7 +18,7 @@ BG.BGNext = BG.BGNext or {}
 
 local M = {}
 
-local function raid(id, zoneId, title, variant, instanceIds, defaultVisible, color)
+local function raid(id, zoneId, title, fullTitle, variant, instanceIds, defaultVisible, color)
     local ids = instanceIds
     if type(ids) ~= "table" then
         ids = type(zoneId) == "number" and { zoneId } or {}
@@ -27,6 +27,7 @@ local function raid(id, zoneId, title, variant, instanceIds, defaultVisible, col
         id = id,
         section = "raid",
         title = title,
+        fullTitle = fullTitle,
         color = color,
         zoneId = #ids == 1 and zoneId or nil,
         variant = variant,
@@ -76,21 +77,21 @@ local CATALOG = {
     titan = {
         status = "tested-in-game",
         raidColumns = {
-            raid("SWtitan", 580, "SW", nil, { 580 }, true, "00BFFF"),
-            raid("ZAtitan", 568, "ZAM", nil, { 568 }, true, "00BFFF"),
-            raid("TOCtitan", 649, "TOC", nil, { 649 }, true, "00BFFF"),
-            raid("ZUGtitan", 309, "ZG", nil, { 309 }, true, "00BFFF"),
-            raid("NAXXtitan", 533, "NAXX", nil, { 533 }, true, "00BFFF"),
-            raid("OStitan", 615, "黑曜石", nil, { 615 }, false, "00BFFF"),
-            raid("EOEtitan", 616, "永恒", nil, { 616 }, false, "00BFFF"),
-            raid("SSCtitan", 548, "毒蛇", nil, { 548 }, false, "00BFFF"),
-            raid("TKtitan", 550, "风暴", nil, { 550 }, false, "00BFFF"),
-            raid("MCtitan", 409, "MC", nil, { 409 }, true, "00BFFF"),
-            raid("VOAtitan", 624, "宝库", nil, { 624 }, true, "00BFFF"),
-            raid("Doomwalker", 119, "末日行者", nil, { 119 }, false, "99CCFF"),
-            raid("DoomLordKazzak", 118, "末日领主", nil, { 118 }, false, "99CCFF"),
-            raid("Lanlongtitan", 116, "蓝龙", nil, { 116 }, false, "99CCFF"),
-            raid("Kazaketitan", 117, "卡扎克", nil, { 117 }, false, "99CCFF"),
+            raid("SWtitan", 580, "SW", "太阳之井高地", nil, { 580 }, true, "00BFFF"),
+            raid("ZAtitan", 568, "ZAM", "祖阿曼", nil, { 568 }, true, "00BFFF"),
+            raid("TOCtitan", 649, "TOC", "十字军的试炼", nil, { 649 }, true, "00BFFF"),
+            raid("ZUGtitan", 309, "ZG", "祖尔格拉布", nil, { 309 }, true, "00BFFF"),
+            raid("NAXXtitan", 533, "NAXX", "纳克萨玛斯", nil, { 533 }, true, "00BFFF"),
+            raid("OStitan", 615, "黑曜石", "黑曜石圣殿", nil, { 615 }, false, "00BFFF"),
+            raid("EOEtitan", 616, "永恒", "永恒之眼", nil, { 616 }, false, "00BFFF"),
+            raid("SSCtitan", 548, "毒蛇", "毒蛇神殿", nil, { 548 }, false, "00BFFF"),
+            raid("TKtitan", 550, "风暴", "风暴要塞", nil, { 550 }, false, "00BFFF"),
+            raid("MCtitan", 409, "MC", "熔火之心", nil, { 409 }, true, "00BFFF"),
+            raid("VOAtitan", 624, "宝库", "阿尔卡冯的宝库", nil, { 624 }, true, "00BFFF"),
+            raid("Doomwalker", 119, "末日行者", "末日行者", nil, { 119 }, false, "99CCFF"),
+            raid("DoomLordKazzak", 118, "末日领主", "末日领主卡扎克", nil, { 118 }, false, "99CCFF"),
+            raid("Lanlongtitan", 116, "蓝龙", "艾索雷葛斯", nil, { 116 }, false, "99CCFF"),
+            raid("Kazaketitan", 117, "卡扎克", "卡扎克", nil, { 117 }, false, "99CCFF"),
         },
         resourceColumns = {
             resource("mainProfession", "主专业", "profession", "wide", false,

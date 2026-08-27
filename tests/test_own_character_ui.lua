@@ -56,6 +56,8 @@ return function(test)
     test.eq(raid.rows[2].y < raid.rows[1].y, true, "rows stack downwards")
     test.eq(raid.rows[1].y - raid.rows[2].y, UI.metrics.rowHeight, "rows are one row-height apart")
     test.eq(raid.rows[2].y - raid.rows[3].y, UI.metrics.rowHeight, "row spacing is uniform")
+    test.eq(UI.rowCenterY(raid.rows[1].y), raid.rows[1].y - UI.metrics.rowHeight / 2,
+        "row content is vertically centred inside the stripe")
 
     -- Categories are columns: laid out horizontally in projected order.
     test.eq(#raid.columns, #projection.raid.columns, "every visible column is laid out")
@@ -117,6 +119,24 @@ return function(test)
     test.eq(UI.tooltipTarget(nil), nil, "a missing item means no tooltip")
     test.eq(UI.tooltipTarget({ itemId = 0 }), nil, "a zero item id means no tooltip")
 
+    local tooltipCalls = {}
+    local fakeTooltip = {
+        SetHyperlink = function(_, value) tooltipCalls[#tooltipCalls + 1] = { "link", value } end,
+        SetItemByID = function(_, value) tooltipCalls[#tooltipCalls + 1] = { "id", value } end,
+    }
+    test.eq(UI.showItemTooltip(fakeTooltip, { link = "|Hitem:123|h[Test]|h" }), true,
+        "a collected item link can populate the Blizzard tooltip")
+    test.eq(tooltipCalls[#tooltipCalls][1], "link", "links use SetHyperlink")
+    test.eq(UI.showItemTooltip(fakeTooltip, { itemId = 456 }), true,
+        "an item id can populate clients that expose SetItemByID")
+    test.eq(tooltipCalls[#tooltipCalls][1], "id", "supported clients use SetItemByID")
+    local hyperlinkOnly = {
+        SetHyperlink = function(_, value) tooltipCalls[#tooltipCalls + 1] = { "fallback", value } end,
+    }
+    test.eq(UI.showItemTooltip(hyperlinkOnly, { itemId = 789 }), true,
+        "older clients fall back to an item hyperlink")
+    test.eq(tooltipCalls[#tooltipCalls][2], "item:789", "fallback hyperlink contains the item id")
+
     test.eq(UI.rowLabel("raid", { display = "Piti", itemLevel = 230.75 }), "Piti (230)",
         "raid rows use the original parenthesized item level")
     test.eq(UI.rowLabel("resource", { display = "Piti", level = 80 }), "Piti (80)",
@@ -128,8 +148,12 @@ return function(test)
 
     -- Catalog titles are authoritative: raid IDs never expand back to long
     -- localized zone names, while selected currencies add their game icon.
-    test.eq(UI.columnHeader({ title = "SW", zoneId = 580 }).text, "SW",
+    local raidHeader = UI.columnHeader({ title = "SW", fullTitle = "太阳之井高地", zoneId = 580 })
+    test.eq(raidHeader.text, "SW",
         "compact raid title is not replaced by GetRealZoneText")
+    test.eq(raidHeader.tooltip, "太阳之井高地", "compact raid heading exposes the full raid name")
+    test.eq(Catalog.column("titan", "raid", "SWtitan").fullTitle, "太阳之井高地",
+        "the Titan catalog carries the full raid tooltip name")
     local currencyHeader = UI.columnHeader({
         title = "余烬",
         source = { kind = "currency", currencyId = 3403, showHeaderIcon = true },
@@ -150,12 +174,10 @@ return function(test)
     test.eq(fallbackHeader.text, "余烬", "missing currency data falls back to the catalog title")
     test.eq(fallbackHeader.tooltip, "余烬", "missing currency data has a safe tooltip")
 
-    test.eq(UI.headerControls("pinned", true).canHide, true, "pinned headers can hide columns")
-    test.eq(UI.headerControls("preview", true).canHide, false, "preview headers cannot hide columns")
-    test.eq(UI.headerControls("pinned", false).canHide, false, "required headers cannot be hidden")
     test.eq(UI.headerControls("pinned", true).canAdd, true, "pinned sections expose settings")
+    test.eq(UI.headerControls("preview", true).canAdd, false, "preview sections do not expose settings")
     test.eq(type(UI.SetMode), "function", "entry can declare preview or pinned rendering")
-    test.eq(type(UI.SetColumnHandler), "function", "entry can inject the column visibility handler")
+    test.eq(UI.SetColumnHandler, nil, "per-heading X removal is not part of the renderer")
     test.eq(type(UI.SetSettingsHandler), "function", "entry can inject the section settings handler")
     local resourceLayout = layout.sections[2]
     local lastResourceColumn = resourceLayout.columns[#resourceLayout.columns]
@@ -235,6 +257,14 @@ return function(test)
     end
     test.eq(string.find(source, "GetRealZoneText", 1, true), nil,
         "renderer never expands compact raid headings back to full zone names")
+    test.eq(string.find(source, "__closeButton", 1, true), nil,
+        "headers never create the removed hover X")
+    test.eq(string.find(source, "SetWordWrap(false)", 1, true) ~= nil, true,
+        "pooled row labels cannot wrap into another line")
+    test.eq(string.find(source, "ClearAllPoints", 1, true) ~= nil, true,
+        "pooled regions clear stale anchors before reuse")
+    test.eq(string.find(source, "SetFrameLevel", 1, true) ~= nil, true,
+        "item buttons are raised above the row click surface")
 
     -- Equipment icons use Blizzard's official tooltip, not a hand-built one.
     for _, required in ipairs({

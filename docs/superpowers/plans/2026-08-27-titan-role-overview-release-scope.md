@@ -351,4 +351,4 @@ Resolve the shared inbox through `git rev-parse --path-format=absolute --git-com
 
 - [ ] **Step 7: Request game validation**
 
-Ask the maintainer to `/reload`, open the pinned and hover versions, and verify independent raid columns, item and currency tooltips, large numbers, multiple item icons, header `×`, section `+`, settings restoration, and window layering. Do not claim visual completion before screenshots and interaction results are received.
+Ask the maintainer to `/reload`, open the pinned and hover versions, and verify independent raid columns, item and currency tooltips, large numbers, multiple item icons, section `+`, settings restoration, and window layering. Do not claim visual completion before screenshots and interaction results are received.
