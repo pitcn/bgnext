@@ -112,6 +112,21 @@ function M.previewShouldRemain(isPinned, entryVisible, entryHovered)
     return entryVisible == true and entryHovered == true
 end
 
+-- The runtime owns both the initial redraw and the low-frequency maintenance
+-- ticker for visible windows. Fall back to one direct redraw only when runtime
+-- wiring is unavailable (for example during a partial load), never both.
+function M.syncVisibility(runtime, ui, visible)
+    if runtime and type(runtime.setVisible) == "function" then
+        runtime.setVisible(nil, visible == true)
+        return "runtime"
+    end
+    if visible == true and ui and type(ui.Refresh) == "function" then
+        ui.Refresh()
+        return "ui"
+    end
+    return nil
+end
+
 -- A delete request is always keyed by family, realm and name together so a
 -- same-name character on another realm can never be removed by mistake.
 function M.deleteRequest(row, family)
@@ -375,12 +390,9 @@ function M.setPinned(value)
         window:SetScript("OnUpdate", nil)
         if pinned then placeWindow("pinned") end
         window:SetShown(pinned)
-        if pinned and BG.BGNext.OwnCharactersUI and BG.BGNext.OwnCharactersUI.Refresh then
-            BG.BGNext.OwnCharactersUI.Refresh()
-        end
     end
     local runtime = BG.BGNext.OwnCharactersRuntime
-    if runtime and type(runtime.setVisible) == "function" then runtime.setVisible(nil, pinned) end
+    M.syncVisibility(runtime, BG.BGNext.OwnCharactersUI, pinned)
 end
 
 function M.isPinned()
@@ -405,10 +417,7 @@ function M.showPreview()
         placeWindow("preview")
         window:SetShown(true)
         local runtime = BG.BGNext.OwnCharactersRuntime
-        if runtime and type(runtime.setVisible) == "function" then runtime.setVisible(nil, true) end
-        if BG.BGNext.OwnCharactersUI and BG.BGNext.OwnCharactersUI.Refresh then
-            BG.BGNext.OwnCharactersUI.Refresh()
-        end
+        M.syncVisibility(runtime, BG.BGNext.OwnCharactersUI, true)
         local elapsed = 0
         window:SetScript("OnUpdate", function(_, delta)
             elapsed = elapsed + (type(delta) == "number" and delta or 0)
@@ -438,7 +447,7 @@ function M.hidePreview()
             window:Hide()
         end
         local runtime = BG.BGNext.OwnCharactersRuntime
-        if runtime and type(runtime.setVisible) == "function" then runtime.setVisible(nil, false) end
+        M.syncVisibility(runtime, BG.BGNext.OwnCharactersUI, false)
     end
 end
 

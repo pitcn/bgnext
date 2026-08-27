@@ -104,6 +104,27 @@ return function(test)
     test.eq(Entry.previewShouldRemain(true, false, false), true,
         "a deliberately pinned window is independent of hover state")
 
+    -- The runtime owns the redraw that happens when a window becomes visible.
+    -- Entry wiring must not redraw a second time after asking the runtime to
+    -- start its visible-window lifecycle.
+    local visibilityCalls, directRefreshes = 0, 0
+    local handled = Entry.syncVisibility({
+        setVisible = function(_, visible)
+            visibilityCalls = visibilityCalls + 1
+            test.eq(visible, true, "the requested visible state reaches the runtime")
+        end,
+    }, { Refresh = function() directRefreshes = directRefreshes + 1 end }, true)
+    test.eq(handled, "runtime", "the runtime owns visible-window refresh when available")
+    test.eq(visibilityCalls, 1, "visibility is forwarded exactly once")
+    test.eq(directRefreshes, 0, "entry does not duplicate the runtime redraw")
+
+    local fallbackRefreshes = 0
+    handled = Entry.syncVisibility(nil, {
+        Refresh = function() fallbackRefreshes = fallbackRefreshes + 1 end,
+    }, true)
+    test.eq(handled, "ui", "plain UI refresh remains a safe fallback without a runtime")
+    test.eq(fallbackRefreshes, 1, "the fallback redraw happens exactly once")
+
     -- Deletion is keyed by family, realm and name together.
     local root = {}
     Model.upsert(root, "titan", {
