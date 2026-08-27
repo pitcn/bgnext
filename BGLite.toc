@@ -38,6 +38,11 @@ Core\BGNext\RoleOverviewSettings.lua
 Core\BGNext\OwnCharactersUI.lua
 Core\BGNext\RoleOverviewEntry.lua
 Core\BGNext\OwnCharactersRuntime.lua
+Core\BGNext\AuctionPresetStore.lua
+Core\BGNext\ControlledAutoBid.lua
+Core\BGNext\AuctionBidMessage.lua
+Core\BGNext\AuctionBidUI.lua
+Core\BGNext\AuctionPresetRuntime.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
