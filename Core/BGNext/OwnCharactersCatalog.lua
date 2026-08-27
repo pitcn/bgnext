@@ -57,62 +57,24 @@ local function resource(id, title, kind, width, total, source, defaultVisible, c
     }
 end
 
--- Columns every supported client can attempt. Order follows the approved
--- design: professions, equipment, currencies, honor, gold.
-local function commonResources(extra)
-    local columns = {
-        resource("prof1", "专业1", "profession", "normal", false, { kind = "profession", index = 1 }),
-        resource("prof2", "专业2", "profession", "normal", false, { kind = "profession", index = 2 }),
-        resource("equipment", "装备", "items", "dynamic-items", false, { kind = "equipment" }),
-    }
-    for _, column in ipairs(extra or {}) do
-        columns[#columns + 1] = column
-    end
-    columns[#columns + 1] = resource("honor", "荣誉", "number", "narrow", true, { kind = "currency", key = "honor" })
-    columns[#columns + 1] = resource("money", "金币", "money", "normal", true, { kind = "money" })
-    return columns
-end
-
 local CATALOG = {
     vanilla = {
-        raidColumns = {
-            raid("MC", 409, "熔火之心", "era"),
-            raid("BWL", 469, "黑翼之巢", "era"),
-            raid("ZUG", 309, "祖尔格拉布", "era"),
-            raid("AQL", 509, "安其拉废墟", "era"),
-            raid("TAQ", 531, "安其拉神殿", "era"),
-            raid("NAXX", 533, "纳克萨玛斯", "era"),
-            raid("BD", 48, "黑暗深渊", "sod"),
-            raid("Gno", 90, "诺莫瑞根", "sod"),
-            raid("Temple", 109, "沉没的神庙", "sod"),
-            raid("MCsod", 409, "熔火之心", "sod"),
-            raid("ZUGsod", 309, "祖尔格拉布", "sod"),
-            raid("BWLsod", 469, "黑翼之巢", "sod"),
-            raid("Worldsod", 249, "世界Boss", "sod"),
-        },
-        resourceColumns = commonResources(),
+        status = "unverified",
+        raidColumns = {},
+        resourceColumns = {},
     },
     tbc = {
-        raidColumns = {
-            raid("KZ", 532, "卡拉赞"),
-            raid("GL", 565, "格鲁尔的巢穴"),
-            raid("SSC", 548, "毒蛇风暴"),
-            raid("BT", 534, "海山黑庙"),
-        },
-        resourceColumns = commonResources(),
+        status = "unverified",
+        raidColumns = {},
+        resourceColumns = {},
     },
     wrath = {
-        raidColumns = {
-            raid("NAXX", 533, "纳克萨玛斯"),
-            raid("ULD", 603, "奥杜尔"),
-            raid("TOC", 649, "十字军的试炼"),
-            raid("ICC", 631, "冰冠堡垒"),
-        },
-        resourceColumns = commonResources({
-            resource("emblem", "徽章", "number", "narrow", true, { kind = "currency", key = "emblem" }),
-        }),
+        status = "unverified",
+        raidColumns = {},
+        resourceColumns = {},
     },
     titan = {
+        status = "tested-in-game",
         raidColumns = {
             raid("SWtitan", 580, "SW", nil, { 580 }, true, "00BFFF"),
             raid("ZAtitan", 568, "ZAM", nil, { 568 }, true, "00BFFF"),
@@ -163,31 +125,19 @@ local CATALOG = {
         },
     },
     cata = {
-        raidColumns = {
-            raid("BOT", 671, "暮光堡垒"),
-            raid("FL", 720, "火焰之地"),
-            raid("DS", 967, "巨龙之魂"),
-        },
-        resourceColumns = commonResources({
-            resource("valor", "勇气点数", "number", "narrow", true, { kind = "currency", key = "valor" }),
-        }),
+        status = "unverified",
+        raidColumns = {},
+        resourceColumns = {},
     },
     mop = {
-        raidColumns = {
-            raid("MSV", 1008, "P1三本"),
-            raid("TOT", 1098, "雷电王座"),
-            raid("SOO", 1136, "决战奥格瑞玛"),
-        },
-        resourceColumns = commonResources({
-            resource("valor", "勇气点数", "number", "narrow", true, { kind = "currency", key = "valor" }),
-        }),
+        status = "unverified",
+        raidColumns = {},
+        resourceColumns = {},
     },
     retail = {
-        raidColumns = {
-            raid("VS", 2912, "P1三本"),
-            raid("VA", 3004, "VA"),
-        },
-        resourceColumns = commonResources(),
+        status = "unverified",
+        raidColumns = {},
+        resourceColumns = {},
     },
 }
 
@@ -211,9 +161,15 @@ function M.forFamily(family)
     if not catalog then return nil end
     return {
         family = family,
+        status = catalog.status,
         raidColumns = clone(catalog.raidColumns),
         resourceColumns = clone(catalog.resourceColumns),
     }
+end
+
+function M.status(family)
+    local catalog = type(family) == "string" and CATALOG[family] or nil
+    return catalog and catalog.status or "unverified"
 end
 
 function M.column(family, section, columnId)

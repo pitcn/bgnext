@@ -310,7 +310,8 @@ return function(test)
 
     Settings.setVisible(root, "titan", "raid", "MCtitan", false)
     test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), false, "hiding is remembered")
-    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), true, "titan settings do not affect mop")
+    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false,
+        "unverified mop has no visible placeholder column")
 
     Settings.setVisible(root, "mop", "raid", "MSV", false)
     test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false, "mop hiding is remembered")
@@ -324,7 +325,8 @@ return function(test)
     Settings.resetFamily(root, "titan")
     test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "reset restores catalog defaults")
     test.eq(Settings.isVisible(root, "titan", "resource", "titanShard", titanCatalog), true, "reset restores every section")
-    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false, "reset touches only the chosen family")
+    test.eq(Settings.isVisible(root, "mop", "raid", "MSV", mopCatalog), false,
+        "reset does not invent an unverified mop column")
 
     -- Settings feed the projection, and hiding never deletes snapshot data.
     Settings.setVisible(root, "titan", "resource", "titanShard", false)

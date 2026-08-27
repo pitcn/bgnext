@@ -40,6 +40,20 @@ return function(test)
     test.eq(type(titan.raidColumns), "table", "titan raid columns exist")
     test.eq(type(titan.resourceColumns), "table", "titan resource columns exist")
     test.eq(Catalog.defaultVisible("titan", "raid", "MCtitan"), true, "default is explicit")
+    test.eq(Catalog.status("titan"), "tested-in-game", "titan is the release-ready catalog")
+    for _, family in ipairs({ "vanilla", "tbc", "wrath", "cata", "mop", "retail" }) do
+        test.eq(Catalog.status(family), "unverified", family .. " remains unverified")
+        local catalog = Catalog.forFamily(family)
+        test.eq(#catalog.raidColumns, 0, family .. " exposes no unreliable raid placeholders")
+        test.eq(#catalog.resourceColumns, 0, family .. " exposes no unreliable resource placeholders")
+    end
+
+    local seenTitanInstances = {}
+    for _, column in ipairs(titan.raidColumns) do
+        test.eq(#column.source.instanceIds, 1, column.id .. " maps to one instance")
+        test.eq(seenTitanInstances[column.source.instanceIds[1]], nil, column.id .. " has a unique instance")
+        seenTitanInstances[column.source.instanceIds[1]] = column.id
+    end
 
     -- Descriptor shape is enforced for every column of every family.
     local validKind = {
@@ -52,8 +66,10 @@ return function(test)
     for _, family in ipairs(families) do
         local catalog = Catalog.forFamily(family)
         test.eq(type(catalog), "table", family .. " has a catalog")
-        test.eq(#catalog.raidColumns > 0, true, family .. " declares raid columns")
-        test.eq(#catalog.resourceColumns > 0, true, family .. " declares resource columns")
+        if family == "titan" then
+            test.eq(#catalog.raidColumns > 0, true, "titan declares raid columns")
+            test.eq(#catalog.resourceColumns > 0, true, "titan declares resource columns")
+        end
 
         local seen = {}
         for _, section in ipairs({ "raidColumns", "resourceColumns" }) do
@@ -84,9 +100,10 @@ return function(test)
             test.eq(column.total, false, family .. "/" .. column.id .. " raid column has no total")
         end
 
-        -- Gold is the one resource every supported client exposes via GetMoney().
-        test.eq(Catalog.column(family, "resource", "money") ~= nil, true, family .. " exposes gold")
-        test.eq(Catalog.column(family, "resource", "money").kind, "money", family .. " gold is money-kind")
+        if family == "titan" then
+            test.eq(Catalog.column(family, "resource", "money") ~= nil, true, "titan exposes gold")
+            test.eq(Catalog.column(family, "resource", "money").kind, "money", "titan gold is money-kind")
+        end
     end
 
     -- Deterministic order across calls.
@@ -108,10 +125,10 @@ return function(test)
     -- Families expose only their own instances.
     test.eq(Catalog.column("titan", "raid", "MCtitan") ~= nil, true, "titan has MCtitan")
     test.eq(Catalog.column("mop", "raid", "MCtitan"), nil, "mop does not carry titan raids")
-    test.eq(Catalog.column("mop", "raid", "MSV") ~= nil, true, "mop has MSV")
+    test.eq(Catalog.column("mop", "raid", "MSV"), nil, "unverified mop exposes no synthetic P1 group")
     test.eq(Catalog.column("titan", "raid", "MSV"), nil, "titan does not carry mop raids")
-    test.eq(Catalog.column("retail", "raid", "VS") ~= nil, true, "retail has VS")
-    test.eq(Catalog.column("vanilla", "raid", "MC") ~= nil, true, "vanilla has MC")
+    test.eq(Catalog.column("retail", "raid", "VS"), nil, "unverified retail exposes no synthetic P1 group")
+    test.eq(Catalog.column("vanilla", "raid", "MC"), nil, "unverified vanilla exposes no placeholder raid")
     test.eq(Catalog.column("titan", "raid", "MC"), nil, "titan uses suffixed raid keys")
 
     -- Titan follows the original visible resource summary. Full equipment is
@@ -142,6 +159,7 @@ return function(test)
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")
     test.eq(Catalog.forFamily(nil), nil, "missing family is safe")
+    test.eq(Catalog.status("nope"), "unverified", "unknown family is never presented as supported")
     test.eq(Catalog.column("titan", "raid", "nope"), nil, "unknown column is nil")
     test.eq(Catalog.column("titan", "nope", "MCtitan"), nil, "unknown section is nil")
     test.eq(Catalog.defaultVisible("nope", "raid", "MCtitan"), false, "unknown family defaults to hidden")
