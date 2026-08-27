@@ -1,0 +1,247 @@
+-- BGNext own-character snapshots.
+--
+-- Stores only the last-seen snapshot of a character the user was actually
+-- logged into, under BiaoGe.BGNext.ownCharacters[clientFamily][realmId][player].
+-- This module is pure data: it never creates frames, reads Blizzard APIs or
+-- sends messages, and it never records another player, an account identifier,
+-- a score or any historical series.
+
+BG = BG or {}
+BG.BGNext = BG.BGNext or {}
+
+local M = {}
+
+-- Only these snapshot fields may reach SavedVariables. Anything else the
+-- collector or a corrupted save happens to carry is dropped on write.
+local SNAPSHOT_FIELDS = {
+    player = "string",
+    realmId = "any",
+    realmName = "string",
+    faction = "string",
+    class = "string",
+    level = "number",
+    itemLevel = "number",
+    money = "number",
+    updatedAt = "number",
+    equipment = "table",
+    currencies = "table",
+    items = "table",
+    raidStates = "table",
+    professions = "table",
+}
+
+local EQUIPMENT_FIELDS = {
+    itemId = "number", itemLevel = "number", quality = "number",
+    icon = "any", count = "number", link = "string",
+}
+
+local RAID_STATE_FIELDS = {
+    completed = "boolean", progress = "number", total = "number",
+    difficulty = "any", resetsAt = "number",
+}
+
+local PROFESSION_FIELDS = {
+    name = "string", skill = "number", maxSkill = "number",
+    icon = "any", cooldownEndsAt = "number",
+}
+
+local function isKey(value)
+    return type(value) == "number" or (type(value) == "string" and value ~= "")
+end
+
+local function accepts(expected, value)
+    return expected == "any" or type(value) == expected
+end
+
+-- Copies only whitelisted fields of a nested record; unknown keys are dropped.
+local function copyRecord(source, fields)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for key, expected in pairs(fields) do
+        local value = source[key]
+        if value ~= nil and accepts(expected, value) then
+            copy[key] = value
+        end
+    end
+    return copy
+end
+
+-- Maps of key -> whitelisted record.
+local function copyRecordMap(source, fields)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for key, record in pairs(source) do
+        if isKey(key) then
+            local entry = copyRecord(record, fields)
+            if entry and next(entry) ~= nil then
+                copy[key] = entry
+            end
+        end
+    end
+    return copy
+end
+
+-- Maps of key -> plain count/amount. Non-numeric values are discarded rather
+-- than carried through as opaque data.
+local function copyNumberMap(source)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for key, value in pairs(source) do
+        if isKey(key) and type(value) == "number" then
+            copy[key] = value
+        end
+    end
+    return copy
+end
+
+local function sanitize(snapshot)
+    if type(snapshot) ~= "table" then return nil end
+    if not isKey(snapshot.realmId) then return nil end
+    if type(snapshot.player) ~= "string" or snapshot.player == "" then return nil end
+
+    local clean = {}
+    for key, expected in pairs(SNAPSHOT_FIELDS) do
+        local value = snapshot[key]
+        if value ~= nil and accepts(expected, value) then
+            clean[key] = value
+        end
+    end
+
+    clean.equipment = copyRecordMap(snapshot.equipment, EQUIPMENT_FIELDS)
+    clean.raidStates = copyRecordMap(snapshot.raidStates, RAID_STATE_FIELDS) or {}
+    clean.professions = copyRecordMap(snapshot.professions, PROFESSION_FIELDS)
+    clean.currencies = copyNumberMap(snapshot.currencies)
+    clean.items = copyNumberMap(snapshot.items)
+    return clean
+end
+
+function M.ensureRoot(root)
+    if type(root) ~= "table" then return nil end
+    root.ownCharacters = type(root.ownCharacters) == "table" and root.ownCharacters or {}
+    return root.ownCharacters
+end
+
+local function familyTable(root, clientFamily, create)
+    if type(root) ~= "table" or not isKey(clientFamily) then return nil end
+    local store = type(root.ownCharacters) == "table" and root.ownCharacters or nil
+    if not store then
+        if not create then return nil end
+        store = M.ensureRoot(root)
+    end
+    local family = store[clientFamily]
+    if type(family) ~= "table" then
+        if not create then return nil end
+        family = {}
+        store[clientFamily] = family
+    end
+    return family
+end
+
+local function realmTable(root, clientFamily, realmId, create)
+    local family = familyTable(root, clientFamily, create)
+    if not family or not isKey(realmId) then return nil end
+    local realm = family[realmId]
+    if type(realm) ~= "table" then
+        if not create then return nil end
+        realm = {}
+        family[realmId] = realm
+    end
+    return realm
+end
+
+-- Replaces the stored snapshot for one own character. Returns the stored copy,
+-- or nil when the input is not a usable own-character snapshot.
+function M.upsert(root, clientFamily, snapshot)
+    if not isKey(clientFamily) then return nil end
+    local clean = sanitize(snapshot)
+    if not clean then return nil end
+    local realm = realmTable(root, clientFamily, clean.realmId, true)
+    if not realm then return nil end
+    realm[clean.player] = clean
+    return clean
+end
+
+function M.get(root, clientFamily, realmId, player)
+    local realm = realmTable(root, clientFamily, realmId, false)
+    if not realm or type(player) ~= "string" then return nil end
+    local stored = realm[player]
+    return type(stored) == "table" and stored or nil
+end
+
+-- Returns snapshots ordered by realm then character so the table renders in a
+-- stable order regardless of SavedVariables hash order.
+function M.list(root, clientFamily)
+    local family = familyTable(root, clientFamily, false)
+    local rows = {}
+    if not family then return rows end
+    for realmId, realm in pairs(family) do
+        if type(realm) == "table" then
+            for player, snapshot in pairs(realm) do
+                if type(snapshot) == "table" and type(player) == "string" then
+                    rows[#rows + 1] = snapshot
+                end
+            end
+        end
+    end
+    table.sort(rows, function(a, b)
+        local ra, rb = tostring(a.realmId), tostring(b.realmId)
+        if ra ~= rb then return ra < rb end
+        return tostring(a.player) < tostring(b.player)
+    end)
+    return rows
+end
+
+-- Weekly state is valid only until its official reset. Expired entries are
+-- deleted outright; they are never demoted into a previous-week record.
+function M.expireRaidStates(root, now)
+    if type(now) ~= "number" then return end
+    local store = type(root) == "table" and root.ownCharacters or nil
+    if type(store) ~= "table" then return end
+    for _, family in pairs(store) do
+        if type(family) == "table" then
+            for _, realm in pairs(family) do
+                if type(realm) == "table" then
+                    for _, snapshot in pairs(realm) do
+                        local states = type(snapshot) == "table" and snapshot.raidStates or nil
+                        if type(states) == "table" then
+                            for id, state in pairs(states) do
+                                local resetsAt = type(state) == "table" and state.resetsAt or nil
+                                if type(resetsAt) == "number" and now >= resetsAt then
+                                    states[id] = nil
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Deletion requires the full family+realm+name key so that two same-name
+-- characters on different realms can never be removed by one action.
+function M.delete(root, clientFamily, realmId, player)
+    local realm = realmTable(root, clientFamily, realmId, false)
+    if not realm or type(player) ~= "string" then return false end
+    if realm[player] == nil then return false end
+    realm[player] = nil
+    if next(realm) == nil then
+        local family = familyTable(root, clientFamily, false)
+        if family then family[realmId] = nil end
+    end
+    return true
+end
+
+function M.clearFamily(root, clientFamily)
+    local store = type(root) == "table" and root.ownCharacters or nil
+    if type(store) ~= "table" or not isKey(clientFamily) then return end
+    store[clientFamily] = nil
+end
+
+function M.clearAll(root)
+    if type(root) ~= "table" then return end
+    root.ownCharacters = {}
+end
+
+BG.BGNext.OwnCharacters = M
+return M
