@@ -59,6 +59,14 @@ return function(test)
     test.eq(UI.rowCenterY(raid.rows[1].y), raid.rows[1].y - UI.metrics.rowHeight / 2,
         "row content is vertically centred inside the stripe")
 
+    local titleRegion = { width = 120, naturalWidth = 168 }
+    function titleRegion:SetWidth(value) self.width = value end
+    function titleRegion:SetText(value) self.text = value end
+    function titleRegion:GetStringWidth() return math.min(self.width, self.naturalWidth) end
+    test.eq(UI.fitTextWidth(titleRegion, "< 角色团本完成总览 >", 600), 168,
+        "title measurement first removes a pooled narrow-width constraint")
+    test.eq(titleRegion.width, 168, "title region is resized to its full measured width")
+
     -- Categories are columns: laid out horizontally in projected order.
     test.eq(#raid.columns, #projection.raid.columns, "every visible column is laid out")
     for index, column in ipairs(raid.columns) do

@@ -61,6 +61,21 @@ function M.rowCenterY(rowTop)
     return rowTop - M.metrics.rowHeight / 2
 end
 
+function M.fitTextWidth(region, value, maximumWidth)
+    if not region or type(region.SetWidth) ~= "function"
+        or type(region.SetText) ~= "function" or type(region.GetStringWidth) ~= "function" then
+        return 0
+    end
+    local limit = type(maximumWidth) == "number" and math.max(0, maximumWidth) or 0
+    region:SetWidth(limit)
+    region:SetText(value or "")
+    local measured = region:GetStringWidth()
+    if type(measured) ~= "number" then measured = 0 end
+    measured = math.min(limit, math.max(0, measured))
+    region:SetWidth(measured)
+    return measured
+end
+
 M.textures = {
     complete = "Interface\\RaidFrame\\ReadyCheck-Ready",
     settings = "Interface\\GossipFrame\\BinderGossipIcon",
@@ -491,12 +506,12 @@ function M.Draw(layout)
         local title = nextText()
         title:SetPoint("TOPLEFT", frame, M.metrics.padding, section.titleY)
         title:SetTextColor(M.colors.title.r, M.colors.title.g, M.colors.title.b)
-        title:SetText(L[section.title])
-        title:SetSize(title:GetStringWidth(), M.metrics.sectionTitleHeight)
+        local titleWidth = M.fitTextWidth(title, L[section.title], layout.width - M.metrics.padding * 2)
+        title:SetHeight(M.metrics.sectionTitleHeight)
 
         local hint = nextText()
         hint:SetPoint("LEFT", title, "RIGHT", 8, 0)
-        hint:SetSize(math.max(0, layout.width - M.metrics.padding * 2 - title:GetStringWidth() - 8),
+        hint:SetSize(math.max(0, layout.width - M.metrics.padding * 2 - titleWidth - 8),
             M.metrics.sectionTitleHeight)
         hint:SetTextColor(M.colors.hint.r, M.colors.hint.g, M.colors.hint.b)
         local hintText = L[section.hint]

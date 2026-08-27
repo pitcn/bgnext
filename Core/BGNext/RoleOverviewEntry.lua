@@ -101,6 +101,12 @@ function M.windowPresentation(mode)
     }
 end
 
+function M.prepareNewWindow(target)
+    if not target or type(target.Hide) ~= "function" then return false end
+    target:Hide()
+    return true
+end
+
 -- A delete request is always keyed by family, realm and name together so a
 -- same-name character on another realm can never be removed by mistake.
 function M.deleteRequest(row, family)
@@ -264,6 +270,7 @@ end
 local function ensureWindow()
     if window then return window end
     window = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    M.prepareNewWindow(window)
     window:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\ChatFrame\\ChatFrameBackground",

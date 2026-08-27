@@ -91,6 +91,11 @@ return function(test)
     test.eq(fixed.strata, "HIGH", "pinned window keeps the original high strata")
     test.eq(fixed.point, "CENTER", "an unsaved pinned window defaults to the screen center")
 
+    local hidden = false
+    local newWindow = { Hide = function() hidden = true end }
+    test.eq(Entry.prepareNewWindow(newWindow), true, "a newly created role window is initialized")
+    test.eq(hidden, true, "a newly created role window starts hidden until explicit interaction")
+
     -- Deletion is keyed by family, realm and name together.
     local root = {}
     Model.upsert(root, "titan", {
