@@ -127,7 +127,7 @@ function M.columnHeader(column, currencyInfo)
         descriptor.tooltip = info.name
     end
     if type(icon) ~= "number" and type(icon) ~= "string" then return descriptor end
-    descriptor.text = "|T" .. tostring(icon) .. ":14:14|t"
+    descriptor.text = "|T" .. tostring(icon) .. ":20:20|t"
     descriptor.iconFileID = icon
     return descriptor
 end

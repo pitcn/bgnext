@@ -64,6 +64,8 @@ return function(test)
     test.eq(resourceById.mainProfession.color, "ADFF2F", "profession header keeps the original green")
     test.eq(resourceById.weapons.color, "C084FC", "weapon header keeps the original purple")
     test.eq(resourceById.legendaryItems.color, "ff8000", "legendary header keeps the original orange")
+    test.eq(resourceById.upgradeItems.width >= View.metrics.columnWidths.narrow, true,
+        "an empty upgrade-item column still fits its complete heading")
     test.eq(resourceById.money.color, "FFD700", "gold header keeps the original gold")
 
     local professionView = View.project(input({

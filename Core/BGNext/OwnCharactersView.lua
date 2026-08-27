@@ -157,7 +157,7 @@ local function measureColumns(columns, rows, totals)
         local widthClass = column.width
         local width
         if widthClass == "dynamic-items" then
-            width = columnWidth(column)
+            width = math.max(M.metrics.columnWidths.narrow, columnWidth(column))
         elseif column.kind == "number" or column.kind == "money" then
             width = M.metrics.columnWidths.narrow
             for _, row in ipairs(rows or {}) do

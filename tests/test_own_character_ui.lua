@@ -161,7 +161,7 @@ return function(test)
         test.eq(id, 3403, "currency header resolves the declared currency id")
         return { name = "泰坦余烬", iconFileID = 123456 }
     end)
-    test.eq(currencyHeader.text, "|T123456:14:14|t", "currency heading is icon-only")
+    test.eq(currencyHeader.text, "|T123456:20:20|t", "currency heading uses a readable icon-only size")
     test.eq(currencyHeader.tooltip, "泰坦余烬", "currency tooltip uses its official full name")
     local plainHeader = UI.columnHeader({
         title = "荣誉", source = { kind = "currency", currencyId = 1901 },

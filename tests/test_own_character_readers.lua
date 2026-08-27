@@ -127,6 +127,24 @@ return function(test)
     }), titanRaidColumns).professions()
     test.eq(numericProfessions[1].icon, 136241, "numeric profession texture file IDs are retained")
 
+    local classicProfessions = Adapters.readers("titan", api({
+        GetProfessions = function() return nil end,
+        GetProfessionInfo = function() return nil end,
+        GetNumSkillLines = function() return 4 end,
+        GetSkillLineInfo = function(index)
+            if index == 1 then return "专业", true, true end
+            if index == 2 then return "锻造", false, nil, 441, 0, 0, 450, true end
+            if index == 3 then return "工程学", false, nil, 450, 0, 0, 450, true end
+            return "烹饪", false, nil, 450, 0, 0, 450, false
+        end,
+        GetSpellTexture = function(name) return "interface/icons/" .. name end,
+    }), titanRaidColumns).professions()
+    test.eq(#classicProfessions, 2, "classic skill lines fall back to the two primary professions")
+    test.eq(classicProfessions[1].name, "锻造", "classic fallback retains the profession name")
+    test.eq(classicProfessions[1].skill, 441, "classic fallback retains the skill rank")
+    test.eq(classicProfessions[1].icon, "interface/icons/锻造", "classic fallback resolves an available icon")
+    test.eq(classicProfessions[2].name, "工程学", "secondary skills are excluded from the fallback")
+
     -- Titan resources use the verified game IDs and table-returning currency API.
     local resources = Adapters.readers("titan", api({
         C_CurrencyInfo = {

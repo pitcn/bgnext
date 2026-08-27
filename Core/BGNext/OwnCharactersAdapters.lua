@@ -353,31 +353,74 @@ function M.readRaidStates(api, raidColumns)
     return states
 end
 
+local function professionTexture(api, name)
+    local texture = M.safeCall(api and api.GetSpellTexture, name)
+    if type(texture) == "number" or (type(texture) == "string" and texture ~= "") then
+        return texture
+    end
+    local spellApi = api and api.C_Spell
+    texture = M.safeCall(type(spellApi) == "table" and spellApi.GetSpellTexture or nil, name)
+    if type(texture) == "number" or (type(texture) == "string" and texture ~= "") then
+        return texture
+    end
+    local ok, _, _, legacyTexture = callAll(api and api.GetSpellInfo, name)
+    if ok and (type(legacyTexture) == "number"
+        or (type(legacyTexture) == "string" and legacyTexture ~= "")) then
+        return legacyTexture
+    end
+end
+
+-- Some Classic-family clients expose GetProfessions but return no primary
+-- profession indexes. Their own skill-line list still marks primary skills as
+-- abandonable, which lets us read the logged-in character without a localized
+-- profession-name table or access to another player.
+local function readSkillLineProfessions(api)
+    local ok, count = callAll(api and api.GetNumSkillLines)
+    if not ok or type(count) ~= "number" then return nil end
+    local result = {}
+    for index = 1, count do
+        local infoOk, name, isHeader, _, rank, _, _, maxRank, isAbandonable =
+            callAll(api.GetSkillLineInfo, index)
+        if infoOk and isHeader ~= true and (isAbandonable == true or isAbandonable == 1)
+            and type(name) == "string" and name ~= "" then
+            result[#result + 1] = {
+                name = name,
+                skill = type(rank) == "number" and rank or nil,
+                maxSkill = type(maxRank) == "number" and maxRank or nil,
+                icon = professionTexture(api, name),
+            }
+            if #result == 2 then break end
+        end
+    end
+    if #result == 0 then return nil end
+    return result
+end
+
 -- Reads the two primary professions into an index-keyed table (position 1 and
 -- 2 only; secondary skills are intentionally not part of this overview).
 function M.readProfessions(api)
     local getProfs = api and api.GetProfessions
     local getInfo = api and api.GetProfessionInfo
-    if type(getProfs) ~= "function" or type(getInfo) ~= "function" then return nil end
-
-    local _, prof1, prof2 = callAll(getProfs)
     local result = {}
-    for position, index in ipairs({ prof1, prof2 }) do
-        if type(index) == "number" then
-            local ok, name, texture, rank, maxRank = callAll(getInfo, index)
-            if ok and type(name) == "string" and name ~= "" then
-                result[position] = {
-                    name = name,
-                    skill = type(rank) == "number" and rank or nil,
-                    maxSkill = type(maxRank) == "number" and maxRank or nil,
-                    icon = (type(texture) == "number" or (type(texture) == "string" and texture ~= ""))
-                        and texture or nil,
-                }
+    if type(getProfs) == "function" and type(getInfo) == "function" then
+        local _, prof1, prof2 = callAll(getProfs)
+        for position, index in ipairs({ prof1, prof2 }) do
+            if type(index) == "number" then
+                local ok, name, texture, rank, maxRank = callAll(getInfo, index)
+                if ok and type(name) == "string" and name ~= "" then
+                    result[position] = {
+                        name = name,
+                        skill = type(rank) == "number" and rank or nil,
+                        maxSkill = type(maxRank) == "number" and maxRank or nil,
+                        icon = (type(texture) == "number" or (type(texture) == "string" and texture ~= ""))
+                            and texture or nil,
+                    }
+                end
             end
         end
     end
-    if next(result) == nil then return nil end
-    return result
+    if next(result) ~= nil then return result end
+    return readSkillLineProfessions(api)
 end
 
 -- Reads the player's own currencies and item-count tokens. Honor is always
@@ -493,7 +536,8 @@ function M.canReadColumn(family, api, column)
                 or type(api.GetItemInfo) == "function" or type(api.GetItemIcon) == "function")
     end
     if source.kind == "profession" or source.kind == "profession-summary" then
-        return type(api.GetProfessions) == "function" and type(api.GetProfessionInfo) == "function"
+        return (type(api.GetProfessions) == "function" and type(api.GetProfessionInfo) == "function")
+            or (type(api.GetNumSkillLines) == "function" and type(api.GetSkillLineInfo) == "function")
     end
     if source.kind == "currency" then
         local key = source.key or column.id
