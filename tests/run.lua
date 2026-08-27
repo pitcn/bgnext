@@ -17,6 +17,7 @@ local suites = {
     "tests/test_own_characters.lua",
     "tests/test_own_character_adapters.lua",
     "tests/test_own_character_collector.lua",
+    "tests/test_own_character_view.lua",
 }
 
 for _, path in ipairs(suites) do
