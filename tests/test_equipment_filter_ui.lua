@@ -22,6 +22,10 @@ return function(test)
     test.eq(source:find("IconButtons", 1, true) ~= nil, true, "profile icon chooser retained")
     test.eq(source:find("#current.order * 35 - 10", 1, true), nil,
         "shortcut container preserves trailing spacing before settings")
+    test.eq(source:find("main:SetSize(560, 700)", 1, true) ~= nil, true,
+        "settings backdrop contains every rule section")
+    test.eq(source:find("main:SetBackdropColor(0, 0, 0, 1)", 1, true) ~= nil, true,
+        "settings backdrop is opaque over the bill")
 
     local toc = assert(io.open("BGLite.toc", "rb"))
     local tocSource = toc:read("*a")

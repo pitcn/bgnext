@@ -69,6 +69,8 @@ return function(test)
         "BGLite filter engine reads the BGNext active profile accessor")
     test.eq(source:find("BiaoGe.FilterClassItemDB", 1, true), nil,
         "BGLite filter engine does not write or read the legacy profile database")
+    test.eq(source:find("local editor = filterFrame and (filterFrame.EditFrame or filterFrame.AddFrame)", 1, true) ~= nil,
+        true, "filter refresh accepts either the BGNext editor or the legacy placeholder")
     test.eq(source:find("C_ChatInfo.SendAddonMessage", 1, true), nil,
         "local equipment filtering adds no addon communication")
 end

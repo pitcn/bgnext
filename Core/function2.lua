@@ -450,7 +450,9 @@ do
             end
         end
 
-        BG.FilterClassItemMainFrame.AddFrame:Hide()
+        local filterFrame = BG.FilterClassItemMainFrame
+        local editor = filterFrame and (filterFrame.EditFrame or filterFrame.AddFrame)
+        if editor then editor:Hide() end
         if not BG.ItemLibMainFrame:IsVisible() then
             BG.itemLibNeedUpdate = true
         end
