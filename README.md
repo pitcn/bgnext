@@ -20,6 +20,8 @@ BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活�
 - 基线完整性：由 [SHA-256 清单](docs/baseline/BGLite-2.4.0.sha256)、[明确覆盖清单](docs/baseline/BGNext-overrides.sha256)和自动检查共同保护
 - 当前阶段：在开发分支建立安全基线、测试框架和首版功能
 
+角色总览目前优先适配周年时光服；其他客户端不会显示未经核验的合并副本或通用货币占位。各版本的实际状态见[兼容性矩阵](docs/compatibility.md)。未完成对应客户端实机验收的功能不会标记为已支持。
+
 仓库记录了 BGLite 2.4.0 上游分发快照的全部 188 个文件。来源哈希只证明文件身份，不代表所有上游行为已经通过 BGNext 安全审计；BGNext 对必要修改逐文件登记、测试和复核。详见[基线说明](docs/baseline/README.md)。
 
 ## 项目目的
@@ -86,6 +88,7 @@ BGNext 由社区共同维护。我们欢迎插件作者、玩家、测试者、�
 - [版权与权利说明](COPYRIGHT.md)
 - [变更日志](CHANGELOG.md)
 - [支持说明](SUPPORT.md)
+- [兼容性矩阵](docs/compatibility.md)
 
 ## 版权与免责声明
 
