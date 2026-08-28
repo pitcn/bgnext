@@ -2944,3 +2944,23 @@ do -- Mail history
     L["（只会导入前40个名字）"] = "(Only the first 40 names will be imported)"
 
 end
+
+do -- BGNext current-raid trade and mail reconciliation
+    L["交易记录（当前团）"] = "Trade log (current raid)"
+    L["邮件记录（当前团）"] = "Mail log (current raid)"
+    L["清空当前团记录"] = "Clear current raid records"
+    L["收件人/发件人"] = "Recipient / sender"
+    L["状态"] = "Status"
+    L["方向"] = "Direction"
+    L["寄出"] = "Sent"
+    L["已完成"] = "Done"
+    L["已取消"] = "Cancelled"
+    L["已寄出"] = "Mailed"
+    L["待核对"] = "To reconcile"
+    L["失败"] = "Failed"
+    L["当前团还没有交易记录。"] = "No trades recorded for the current raid yet."
+    L["当前团还没有邮件记录。"] = "No mails recorded for the current raid yet."
+    L["已清空当前团的交易与邮件记录。"] = "Cleared the current raid's trade and mail records."
+    L["只保留当前或最近一次未结算团本，最长七日。"] = "Keeps only the current or most recent unsettled raid, for at most seven days."
+    L["确认清空当前团的交易与邮件记录吗？\n只清除当前团结算记录，不影响表格账单、心愿清单和角色总览。"] = "Clear the current raid's trade and mail records?\nOnly the current-raid settlement records are removed; the bill, wishlist and character overview are not affected."
+end

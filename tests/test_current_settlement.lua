@@ -28,6 +28,17 @@ return function(test)
     test.eq(trade.append(root, { raidId = "raid-b", player = "乙", amount = 200, time = 102 }), false, "other raid trade rejected")
     test.eq(trade.append(root, { raidId = "raid-a", player = "", amount = 200, time = 102 }), false, "unnamed trade rejected")
 
+    -- a repeated success event for the same trade must not create a second record
+    test.eq(trade.append(root, {
+        raidId = "raid-a",
+        player = "甲",
+        itemId = 1,
+        amount = 100,
+        time = 101,
+        status = "complete",
+    }), false, "duplicate trade event rejected")
+    test.eq(#root.currentSettlement.trades, 1, "duplicate trade event not stored")
+
     test.eq(mail.append(root, {
         raidId = "raid-a",
         player = "甲",
@@ -41,5 +52,33 @@ return function(test)
     }), true, "current mail accepted")
     test.eq(root.currentSettlement.mails[1].subject, nil, "mail subject discarded")
     test.eq(root.currentSettlement.mails[1].body, nil, "mail body discarded")
+
+    -- a repeated mail success event must not create a second record
+    test.eq(mail.append(root, {
+        raidId = "raid-a",
+        player = "甲",
+        itemId = 1,
+        amount = 100,
+        time = 103,
+        status = "sent",
+        direction = "outgoing",
+    }), false, "duplicate mail event rejected")
+    test.eq(#root.currentSettlement.mails, 1, "duplicate mail event not stored")
+
     test.eq(mail.append(root, { raidId = "raid-a", player = "甲", amount = 1, time = 100 + 7 * 86400 }), false, "expired mail rejected")
+
+    -- status and direction accept only declared reconciliation states, never free text
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "丙", itemId = 2, amount = 50, time = 104, status = "私人备注",
+    }), false, "free-text trade status rejected")
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "丙", itemId = 2, amount = 50, time = 104, status = "cancelled",
+    }), true, "cancelled trade stored as cancelled")
+    test.eq(root.currentSettlement.trades[2].status, "cancelled", "cancelled trade is never upgraded to success")
+    test.eq(mail.append(root, {
+        raidId = "raid-a", player = "丙", amount = 50, time = 105, status = "私人备注", direction = "outgoing",
+    }), false, "free-text mail status rejected")
+    test.eq(mail.append(root, {
+        raidId = "raid-a", player = "丙", amount = 50, time = 105, status = "sent", direction = "私人备注",
+    }), false, "free-text mail direction rejected")
 end

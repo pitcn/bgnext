@@ -15,6 +15,24 @@ return function(test)
     local trade = readAll("Core/Module/Trade.lua")
     local clear = readAll("Core/Module/ClearBiaoGe.lua")
     local sendMail = readAll("Core/Module/SendMail.lua")
+    local settlementRuntime = readAll("Core/BGNext/CurrentSettlementRuntime.lua")
+
+    -- The current-raid settlement layers are loaded and wired to the confirmed
+    -- BGLite success results, not to a new scan or poll.
+    test.eq(toc:find("Core\\BGNext\\CurrentSettlementView.lua", 1, true) ~= nil, true,
+        "settlement projection is loaded")
+    test.eq(toc:find("Core\\BGNext\\CurrentSettlementRuntime.lua", 1, true) ~= nil, true,
+        "settlement collector is loaded")
+    test.eq(toc:find("Core\\BGNext\\CurrentSettlementUI.lua", 1, true) ~= nil, true,
+        "settlement tables are loaded")
+    test.eq(settlementRuntime:find("ERR_TRADE_COMPLETE", 1, true) ~= nil, true,
+        "trade collection stays on the confirmed trade completion result")
+    test.eq(sendMail:find("ERR_MAIL_SENT", 1, true) ~= nil, true,
+        "mail collection stays on the confirmed send result")
+    test.eq(sendMail:find("CurrentSettlementRuntime.notifyMailSent", 1, true) ~= nil, true,
+        "batch mail reports only its own executed send result")
+    test.eq(main:find("CurrentSettlementUI.installEntry", 1, true) ~= nil, true,
+        "current-raid record entries are installed on the main window")
 
     test.eq(toc:find("Core\\Module\\TradeHistory.lua", 1, true), nil, "legacy trade history is not loaded")
     test.eq(toc:find("Core\\Module\\MailHistory.lua", 1, true), nil, "legacy mail history is not loaded")

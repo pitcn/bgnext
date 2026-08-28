@@ -374,6 +374,10 @@ BG.Init(function()
             if BG.BGNext and BG.BGNext.OwnCharactersRuntime then
                 BG.BGNext.OwnCharactersRuntime.install()
             end
+            -- BGNext: 交易记录（当前团）与邮件记录（当前团）入口。
+            if BG.BGNext and BG.BGNext.CurrentSettlementUI then
+                BG.BGNext.CurrentSettlementUI.installEntry(BG.MainFrame)
+            end
         end)
 
         securecall(BG.ReceiveUI)

@@ -24,6 +24,8 @@ Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
+Core\BGNext\CurrentSettlementView.lua
+Core\BGNext\CurrentSettlementRuntime.lua
 Core\BGNext\ReleaseInfo.lua
 Core\BGNext\Wishlist.lua
 Core\BGNext\WishlistReminder.lua
@@ -60,6 +62,7 @@ Core\TongBao\Channel.lua
 Core\BiaoGe.lua
 Core\BGNext\EquipmentFilterUI.lua
 Core\BGNext\WishlistUI.lua
+Core\BGNext\CurrentSettlementUI.lua
 Core\BGNext\About.lua
 
 Core\Module\ClearBiaoGe.lua

@@ -25,9 +25,13 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 
 ## Allowed settlement record fields
 
-Trade records may contain only `player`, `itemId`, `amount`, `time`, and `status`. Mail records may contain only `player`, `itemId`, `amount`, `time`, `status`, and `direction`. Both are accepted only when their `raidId` matches the active settlement.
+Trade records may contain only `player`, `itemId`, `amount`, `time`, and `status`. Mail records may contain only `player`, `itemId`, `amount`, `time`, `status`, and `direction`. Both are accepted only when their `raidId` matches the active settlement, and the accepted record is rebuilt field by field from that whitelist, so `raidId` itself is never copied into a record: it exists only once, as `currentSettlement.raidId`.
 
-Mail subject, body, unrelated attachments, chat text, account identifiers, device identifiers, GUIDs, private notes, and cross-raid aggregates are prohibited.
+The values of `status` and `direction` are whitelisted as well, so free text cannot reach storage through them. Trade `status` accepts only `complete`, `pending`, `failed`, or `cancelled`; mail `status` accepts only `sent`, `pending`, or `failed`; mail `direction`, when present, accepts only `outgoing` or `incoming`. A record whose whitelisted fields are all equal to an already stored record is rejected, so a repeated event cannot become a second row.
+
+`currentSettlement.raidId` is derived from BGLite's existing per-table `BiaoGe[<table>].raidRoster` stamp (its raid table key and `time`). No new identifier is generated, no roster content is copied, and a new stamp replaces the previous settlement rather than accumulating alongside it.
+
+Mail subject, body, unrelated attachments, chat text, account identifiers, device identifiers, GUIDs, private notes, and cross-raid aggregates are prohibited. `BiaoGe.tradeHistory`, `BiaoGe.mailHistory`, and `BiaoGe.History` are never read or migrated.
 
 ## Own-character overview data
 

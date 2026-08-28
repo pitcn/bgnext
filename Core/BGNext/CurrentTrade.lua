@@ -4,6 +4,15 @@ BG.BGNext = BG.BGNext or {}
 local M = {}
 local FIELDS = { "player", "itemId", "amount", "time", "status" }
 
+-- Reconciliation states only. Free text is rejected so notes, chat or mail
+-- content can never reach the stored record through the status field.
+local STATUS = {
+    complete = true,
+    pending = true,
+    failed = true,
+    cancelled = true,
+}
+
 local function isCurrent(root, record)
     local settlement = root and root.currentSettlement
     if not settlement or record.raidId ~= settlement.raidId then
@@ -15,6 +24,9 @@ local function isCurrent(root, record)
     if type(record.time) ~= "number" then
         return false
     end
+    if not STATUS[record.status] then
+        return false
+    end
     if settlement.startedAt and record.time < settlement.startedAt then
         return false
     end
@@ -22,6 +34,22 @@ local function isCurrent(root, record)
         return false
     end
     return true
+end
+
+local function isDuplicate(records, copy)
+    for _, existing in ipairs(records) do
+        local same = true
+        for _, field in ipairs(FIELDS) do
+            if existing[field] ~= copy[field] then
+                same = false
+                break
+            end
+        end
+        if same then
+            return true
+        end
+    end
+    return false
 end
 
 function M.append(root, record)
@@ -32,7 +60,11 @@ function M.append(root, record)
     for _, field in ipairs(FIELDS) do
         copy[field] = record[field]
     end
-    table.insert(root.currentSettlement.trades, copy)
+    local records = root.currentSettlement.trades
+    if isDuplicate(records, copy) then
+        return false
+    end
+    table.insert(records, copy)
     return true
 end
 

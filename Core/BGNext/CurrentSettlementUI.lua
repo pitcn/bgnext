@@ -1,0 +1,547 @@
+local AddonName, ns = ...
+local L = ns and ns.L or setmetatable({}, {
+    __index = function(_, key) return tostring(key) end,
+})
+
+BG = BG or {}
+BG.BGNext = BG.BGNext or {}
+
+-- Player-facing tables for the single current-raid settlement.
+--
+-- Two clearly scoped windows, built from the existing BGLite frame, scroll,
+-- button, font and tooltip helpers so the handling matches the rest of the
+-- addon. There is no raid selector, no player statistics page and no card
+-- dashboard: one stored event is one table row, for the current raid only.
+local M = {}
+
+local ROW_HEIGHT = 20
+local ROW_GAP = 2
+local HEADER_HEIGHT = 22
+local COLUMN_GAP = 4
+local WINDOW_HEIGHT = 380
+local CLEAR_POPUP = "BGNextClearCurrentSettlement"
+
+local COLUMNS = {
+    trade = {
+        { key = "item", label = L["物品"], width = 190, justify = "LEFT" },
+        { key = "player", label = L["交易对象"], width = 110, justify = "LEFT" },
+        { key = "amount", label = L["金额"], width = 80, justify = "RIGHT" },
+        { key = "time", label = L["时间"], width = 80, justify = "CENTER" },
+        { key = "status", label = L["状态"], width = 80, justify = "CENTER" },
+    },
+    mail = {
+        { key = "item", label = L["物品"], width = 190, justify = "LEFT" },
+        { key = "player", label = L["收件人/发件人"], width = 110, justify = "LEFT" },
+        { key = "amount", label = L["金额"], width = 80, justify = "RIGHT" },
+        { key = "time", label = L["时间"], width = 80, justify = "CENTER" },
+        { key = "direction", label = L["方向"], width = 60, justify = "CENTER" },
+        { key = "status", label = L["状态"], width = 80, justify = "CENTER" },
+    },
+}
+
+local TITLES = {
+    trade = "交易记录（当前团）",
+    mail = "邮件记录（当前团）",
+}
+
+local EMPTY_TEXT = {
+    trade = "当前团还没有交易记录。",
+    mail = "当前团还没有邮件记录。",
+}
+
+local STATUS_LABELS = {
+    trade = {
+        complete = "已完成",
+        pending = "待核对",
+        failed = "失败",
+        cancelled = "已取消",
+    },
+    mail = {
+        sent = "已寄出",
+        pending = "待核对",
+        failed = "失败",
+    },
+}
+
+local DIRECTION_LABELS = {
+    outgoing = "寄出",
+    incoming = "收到",
+}
+
+local function view()
+    return BG.BGNext and BG.BGNext.CurrentSettlementView
+end
+
+local function lifecycle()
+    return BG.BGNext and BG.BGNext.DataLifecycle
+end
+
+local function database()
+    return BG.BGNext and BG.BGNext.DB
+end
+
+local function serverNow()
+    if type(time) == "function" then
+        return time()
+    end
+    return nil
+end
+
+function M.columns(kind)
+    return COLUMNS[kind] or COLUMNS.trade
+end
+
+function M.title(kind)
+    return L[TITLES[kind] or TITLES.trade]
+end
+
+function M.emptyText(kind)
+    return L[EMPTY_TEXT[kind] or EMPTY_TEXT.trade]
+end
+
+function M.statusLabel(kind, status)
+    local labels = STATUS_LABELS[kind] or STATUS_LABELS.trade
+    local label = labels[status]
+    if not label then
+        return L["待核对"]
+    end
+    return L[label]
+end
+
+function M.statusColor(kind, status)
+    local V = view()
+    if V then
+        return V.statusColor(kind, status)
+    end
+    return 0.5, 0.5, 0.5
+end
+
+function M.directionLabel(direction)
+    local label = DIRECTION_LABELS[direction]
+    if not label then
+        return ""
+    end
+    return L[label]
+end
+
+-- The tooltip is driven only by the stored item id; nothing else about the row
+-- is used to look an item up.
+function M.tooltipTarget(row)
+    if type(row) ~= "table" then
+        return nil
+    end
+    if type(row.itemId) == "number" then
+        return row.itemId
+    end
+    return nil
+end
+
+function M.rows(root, kind, options)
+    local V = view()
+    if not V then
+        return {}, true
+    end
+    if kind == "mail" then
+        return V.mails(root, options)
+    end
+    return V.trades(root, options)
+end
+
+-- Opening a page always runs the retention check first, so an expired
+-- settlement is deleted rather than displayed.
+function M.prepare(root, now)
+    local life = lifecycle()
+    if not life or type(root) ~= "table" or type(now) ~= "number" then
+        return false
+    end
+    life.purgeExpired(root, now)
+    return true
+end
+
+-- Clears the current settlement only. The bill, purchase log, wishlist,
+-- equipment filters, character overview and every other setting are untouched.
+function M.clear(root)
+    local life = lifecycle()
+    if not life or type(root) ~= "table" then
+        return false
+    end
+    life.clearSettlement(root)
+    return true
+end
+
+function M.clearConfirmText()
+    return L["确认清空当前团的交易与邮件记录吗？\n只清除当前团结算记录，不影响表格账单、心愿清单和角色总览。"]
+end
+
+function M.contentWidth(kind)
+    local total = 0
+    for _, column in ipairs(M.columns(kind)) do
+        total = total + column.width + COLUMN_GAP
+    end
+    return total
+end
+
+function M.columnOffsets(kind)
+    local offsets, x = {}, 0
+    for index, column in ipairs(M.columns(kind)) do
+        offsets[index] = x
+        x = x + column.width + COLUMN_GAP
+    end
+    return offsets
+end
+
+function M.showItemTooltip(tooltip, itemId)
+    if type(tooltip) ~= "table" or type(itemId) ~= "number" then
+        return false
+    end
+    if type(tooltip.SetItemByID) == "function" then
+        tooltip:SetItemByID(itemId)
+        return true
+    end
+    if type(tooltip.SetHyperlink) == "function" then
+        tooltip:SetHyperlink("item:" .. string.format("%d", itemId))
+        return true
+    end
+    return false
+end
+
+local function itemDisplay(itemId)
+    if type(itemId) ~= "number" then
+        return "", nil
+    end
+    local text, texture
+    if type(GetItemInfo) == "function" then
+        local name, link = GetItemInfo(itemId)
+        text = link or name
+        texture = select(10, GetItemInfo(itemId))
+    end
+    if not texture and type(GetItemInfoInstant) == "function" then
+        texture = select(5, GetItemInfoInstant(itemId))
+    end
+    return text or ("item:" .. string.format("%d", itemId)), texture
+end
+
+------------------------------------------------------------------------
+-- Rendering. Nothing below runs outside the game.
+------------------------------------------------------------------------
+
+local windows = {}
+local entryButtons
+
+local function newCell(row, column, offset)
+    local cell = CreateFrame("Frame", nil, row)
+    cell:SetSize(column.width, ROW_HEIGHT)
+    cell:SetPoint("LEFT", offset, 0)
+    cell.text = cell:CreateFontString()
+    cell.text:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
+    cell.text:SetAllPoints()
+    cell.text:SetJustifyH(column.justify)
+    cell.text:SetWordWrap(false)
+    return cell
+end
+
+local function acquireRow(win, index)
+    local row = win.rowPool[index]
+    if row then
+        return row
+    end
+    row = CreateFrame("Frame", nil, win.child)
+    row:SetSize(win.contentWidth, ROW_HEIGHT)
+    row:SetPoint("TOPLEFT", 0, -(index - 1) * (ROW_HEIGHT + ROW_GAP))
+    row:EnableMouse(true)
+
+    row.stripe = row:CreateTexture()
+    row.stripe:SetAllPoints()
+    row.stripe:SetColorTexture(0.5, 0.5, 0.5, 0.3)
+    row.stripe:Hide()
+    row:SetScript("OnEnter", function(self) self.stripe:Show() end)
+    row:SetScript("OnLeave", function(self) self.stripe:Hide() end)
+
+    row.cells = {}
+    local offsets = win.offsets
+    for position, column in ipairs(M.columns(win.kind)) do
+        row.cells[column.key] = newCell(row, column, offsets[position])
+    end
+
+    local itemCell = row.cells.item
+    if itemCell then
+        itemCell:EnableMouse(true)
+        itemCell.icon = itemCell:CreateTexture()
+        itemCell.icon:SetSize(16, 16)
+        itemCell.icon:SetPoint("LEFT", 0, 0)
+        itemCell.text:ClearAllPoints()
+        itemCell.text:SetPoint("LEFT", itemCell.icon, "RIGHT", 2, 0)
+        itemCell.text:SetPoint("RIGHT", 0, 0)
+        itemCell:SetScript("OnEnter", function(self)
+            row.stripe:Show()
+            local itemId = M.tooltipTarget(row.data)
+            if not itemId or type(GameTooltip) ~= "table" then
+                return
+            end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
+            GameTooltip:ClearLines()
+            M.showItemTooltip(GameTooltip, itemId)
+            GameTooltip:Show()
+        end)
+        itemCell:SetScript("OnLeave", function()
+            row.stripe:Hide()
+            if type(GameTooltip) == "table" and GameTooltip.Hide then
+                GameTooltip:Hide()
+            end
+        end)
+    end
+
+    win.rowPool[index] = row
+    return row
+end
+
+local function fillRow(win, row, data)
+    row.data = data
+    local cells = row.cells
+
+    local itemCell = cells.item
+    if itemCell then
+        local text, texture = itemDisplay(data.itemId)
+        itemCell.text:SetText(text)
+        itemCell.icon:SetTexture(texture)
+        itemCell.icon:SetShown(texture ~= nil)
+    end
+    if cells.player then
+        cells.player.text:SetText(data.player or "")
+        cells.player.text:SetTextColor(1, 0.82, 0)
+    end
+    if cells.amount then
+        cells.amount.text:SetText(data.amountText or "")
+        cells.amount.text:SetTextColor(1, 0.82, 0)
+    end
+    if cells.time then
+        cells.time.text:SetText(data.timeText or "")
+        cells.time.text:SetTextColor(0.8, 0.8, 0.8)
+    end
+    if cells.direction then
+        cells.direction.text:SetText(M.directionLabel(data.directionKey))
+        cells.direction.text:SetTextColor(0.8, 0.8, 0.8)
+    end
+    if cells.status then
+        cells.status.text:SetText(M.statusLabel(win.kind, data.statusKey))
+        cells.status.text:SetTextColor(M.statusColor(win.kind, data.statusKey))
+    end
+    row:Show()
+end
+
+function M.Refresh(kind)
+    local win = windows[kind]
+    if not win or not win.frame:IsShown() then
+        return
+    end
+    local root = database()
+    local now = serverNow()
+    M.prepare(root, now)
+    local rows, isEmpty = M.rows(root, kind, { now = now })
+
+    for _, row in ipairs(win.rowPool) do
+        row:Hide()
+    end
+    for index, data in ipairs(rows) do
+        fillRow(win, acquireRow(win, index), data)
+    end
+    win.child:SetHeight(math.max(#rows * (ROW_HEIGHT + ROW_GAP), win.scrollHeight))
+    win.emptyText:SetShown(isEmpty and true or false)
+end
+
+local function createWindow(kind)
+    if type(CreateFrame) ~= "function" or type(BG.CreateMainFrame) ~= "function"
+        or type(BG.CreateScrollFrame) ~= "function" then
+        return nil
+    end
+
+    local contentWidth = M.contentWidth(kind)
+    local frame = BG.CreateMainFrame()
+    frame:SetSize(contentWidth + 40, WINDOW_HEIGHT)
+    frame:SetPoint("CENTER")
+    frame:Hide()
+    if frame.titleText then
+        frame.titleText:SetText(M.title(kind))
+    end
+
+    local win = {
+        kind = kind,
+        frame = frame,
+        contentWidth = contentWidth,
+        offsets = M.columnOffsets(kind),
+        rowPool = {},
+    }
+
+    -- Column headers
+    local header = CreateFrame("Frame", nil, frame)
+    header:SetSize(contentWidth, HEADER_HEIGHT)
+    header:SetPoint("TOPLEFT", 15, -28)
+    for position, column in ipairs(M.columns(kind)) do
+        local text = header:CreateFontString()
+        text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
+        text:SetSize(column.width, HEADER_HEIGHT)
+        text:SetPoint("LEFT", win.offsets[position], 0)
+        text:SetJustifyH(column.justify)
+        text:SetTextColor(0, 0.75, 1)
+        text:SetText(column.label)
+    end
+
+    local scrollHeight = WINDOW_HEIGHT - 28 - HEADER_HEIGHT - 46
+    local scroll, child = BG.CreateScrollFrame(frame, contentWidth + 10, scrollHeight)
+    scroll:SetPoint("TOPLEFT", 12, -(28 + HEADER_HEIGHT))
+    win.scroll = scroll
+    win.child = child
+    win.scrollHeight = scrollHeight
+    if type(BG.HookScrollBarShowOrHide) == "function" and scroll.scroll then
+        BG.HookScrollBarShowOrHide(scroll.scroll)
+    end
+
+    local empty = child:CreateFontString()
+    empty:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
+    empty:SetPoint("TOP", 0, -12)
+    empty:SetTextColor(0.7, 0.7, 0.7)
+    empty:SetText(M.emptyText(kind))
+    empty:Hide()
+    win.emptyText = empty
+
+    local clearButton = BG.CreateButton(frame)
+    clearButton:SetSize(150, 22)
+    clearButton:SetPoint("BOTTOMRIGHT", -12, 10)
+    clearButton:SetText(L["清空当前团记录"])
+    clearButton:SetScript("OnClick", function()
+        if BG.PlaySound then BG.PlaySound(1) end
+        M.ensureClearPopup()
+        if type(StaticPopup_Show) == "function" then
+            StaticPopup_Show(CLEAR_POPUP)
+        end
+    end)
+    clearButton:SetScript("OnEnter", function(self)
+        if type(GameTooltip) ~= "table" then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 0)
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine(L["清空当前团记录"], 1, 1, 1, true)
+        GameTooltip:AddLine(M.clearConfirmText(), 1, 0.82, 0, true)
+        GameTooltip:Show()
+    end)
+    clearButton:SetScript("OnLeave", function()
+        if type(GameTooltip) == "table" and GameTooltip.Hide then GameTooltip:Hide() end
+    end)
+    win.clearButton = clearButton
+
+    local scopeText = frame:CreateFontString()
+    scopeText:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
+    scopeText:SetPoint("BOTTOMLEFT", 14, 14)
+    scopeText:SetTextColor(0.6, 0.6, 0.6)
+    scopeText:SetText(L["只保留当前或最近一次未结算团本，最长七日。"])
+
+    frame:SetScript("OnShow", function() M.Refresh(kind) end)
+
+    windows[kind] = win
+    return win
+end
+
+function M.ensureClearPopup()
+    if type(StaticPopupDialogs) ~= "table" then
+        return false
+    end
+    if StaticPopupDialogs[CLEAR_POPUP] then
+        return true
+    end
+    StaticPopupDialogs[CLEAR_POPUP] = {
+        text = M.clearConfirmText(),
+        button1 = L["是"],
+        button2 = L["否"],
+        OnAccept = function()
+            if not M.clear(database()) then
+                return
+            end
+            if BG.SendSystemMessage then
+                BG.SendSystemMessage(L["已清空当前团的交易与邮件记录。"])
+            end
+            M.Refresh("trade")
+            M.Refresh("mail")
+        end,
+        OnCancel = function() end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        showAlert = true,
+    }
+    return true
+end
+
+local function ensureWindow(kind)
+    local win = windows[kind]
+    if win then
+        return win
+    end
+    return createWindow(kind)
+end
+
+function M.Show(kind)
+    local win = ensureWindow(kind)
+    if not win then
+        return false
+    end
+    win.frame:Show()
+    M.Refresh(kind)
+    return true
+end
+
+function M.Toggle(kind)
+    local win = ensureWindow(kind)
+    if not win then
+        return false
+    end
+    if win.frame:IsShown() then
+        win.frame:Hide()
+    else
+        M.Show(kind)
+    end
+    return true
+end
+
+-- Entry buttons on the main window, next to the character overview entry so the
+-- familiar bottom-right control row keeps its habit.
+function M.installEntry(mainFrame)
+    if entryButtons then
+        return entryButtons
+    end
+    if not mainFrame or type(CreateFrame) ~= "function" or type(BG.CreateButton) ~= "function" then
+        return nil
+    end
+
+    local created = {}
+    local previous
+    -- Built right to left so the visible order is 交易记录, 邮件记录, 角色总览.
+    for _, kind in ipairs({ "mail", "trade" }) do
+        local button = BG.CreateButton(mainFrame)
+        button:SetSize(120, 20)
+        if previous then
+            button:SetPoint("RIGHT", previous, "LEFT", -4, 0)
+        elseif BG.ButtonRoleOverview then
+            button:SetPoint("RIGHT", BG.ButtonRoleOverview, "LEFT", -8, 0)
+        else
+            button:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -10, 8)
+        end
+        button:SetText(M.title(kind))
+        local fontString = button.GetFontString and button:GetFontString()
+        if fontString then
+            button:SetWidth(math.max(100, fontString:GetStringWidth() + 16))
+        end
+        button:SetScript("OnClick", function()
+            if BG.PlaySound then BG.PlaySound(1) end
+            M.Toggle(kind)
+        end)
+        previous = button
+        created[kind] = button
+    end
+
+    BG.ButtonCurrentTradeRecord = created.trade
+    BG.ButtonCurrentMailRecord = created.mail
+    entryButtons = created
+    return created
+end
+
+BG.BGNext.CurrentSettlementUI = M
+return M

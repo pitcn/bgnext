@@ -1516,6 +1516,13 @@ local function RoadSendMail()
                             end
                         end
                     end
+                    -- BGNext: 收集本插件刚刚执行成功的这一封工资邮件，
+                    -- 不读取收件箱，不保存主题或正文。
+                    if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
+                        local goldAmount = tonumber(mainFrame.moneyEdit:GetText()) or 0
+                        BG.BGNext.CurrentSettlementRuntime.notifyMailSent(
+                            BG.GSN(lastSend.fullName), goldAmount)
+                    end
                 end
             end)
 
