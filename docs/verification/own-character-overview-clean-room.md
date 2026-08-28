@@ -19,9 +19,11 @@ A catalog entry only means BGNext can build a column list for that family. It do
 
 No newly added family is marked "supported". Vanilla 60, TBC, Mists and Retail are testable but remain pending until their respective real clients confirm detection, independent raid states, local summaries and safe degradation. Wrath and Cataclysm remain empty and unverified; Season of Discovery is explicitly excluded.
 
+Six unverified MoP candidate currencies/items (currency 3350/3407/3414/3416, items 256883/247796) have been removed from the runtime catalog and its ID maps; the research stays in docs and tests only. Profession cooldowns stay hidden and now also require their spell to resolve to a localized name via the Blizzard spell API before the column is offered. Currency cells surface caps (total/weekly) only in hover tooltips and only when the currency API actually returns them; a missing field is never shown as a zero.
+
 ## Automated evidence
 
-- `tools/run-lua-tests.ps1` — all suites report `failed=0` (`passed=22` at last run).
+- `tools/run-lua-tests.ps1` — all suites report `failed=0` (`passed=27` at last run).
 - `tools/verify-baseline.ps1` — 188-file upstream manifest intact, with explicit BGNext override hashes for only the files changed here.
 - `git diff --check` — no whitespace errors.
 - Privacy scan (`SendAddonMessage|SendChatMessage|C_ChatInfo|INSPECT_READY|COMBAT_LOG_EVENT|CHAT_MSG` across `Core/BGNext/OwnCharacters*.lua` and `Core/BGNext/RoleOverview*.lua`) — no matches.
