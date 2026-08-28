@@ -1,5 +1,5 @@
 ## Interface: 11508, 11509, 20506, 30405, 38002, 40402, 50503, 50504, 50505, 120005, 120007, 120100
-## Title: <BGNext> |cff00BFFFBGNext|r
+## Title: <BGNext> |cff00BFFFBGNext|r 金团表格
 ## Notes: /bgn or /bgnext
 ## IconTexture: Interface\AddOns\BGLite\Media\icon\icon.tga
 ## Author: 国服社区共创
