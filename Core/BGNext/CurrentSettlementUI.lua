@@ -17,6 +17,7 @@ local M = {}
 local ROW_HEIGHT = 20
 local ROW_GAP = 2
 local HEADER_HEIGHT = 22
+local FILTER_HEIGHT = 24
 local COLUMN_GAP = 4
 local WINDOW_HEIGHT = 380
 local CLEAR_POPUP = "BGNextClearCurrentSettlement"
@@ -81,6 +82,9 @@ local function database()
 end
 
 local function serverNow()
+    if type(GetServerTime) == "function" then
+        return GetServerTime()
+    end
     if type(time) == "function" then
         return time()
     end
@@ -147,6 +151,31 @@ function M.rows(root, kind, options)
     return V.trades(root, options)
 end
 
+function M.filterRows(rows, filter)
+    if filter == nil or filter == "all" then
+        return rows
+    end
+    local filtered = {}
+    for _, row in ipairs(rows or {}) do
+        local matches = row.statusKey == filter
+        if filter == "complete" and row.statusKey == "sent" then
+            matches = true
+        end
+        if matches then
+            filtered[#filtered + 1] = row
+        end
+    end
+    return filtered
+end
+
+function M.setTradeStatus(root, index, status)
+    local store = BG.BGNext and BG.BGNext.CurrentTrade
+    if not store or type(store.setStatus) ~= "function" then
+        return false
+    end
+    return store.setStatus(root, index, status)
+end
+
 -- Opening a page always runs the retention check first, so an expired
 -- settlement is deleted rather than displayed.
 function M.prepare(root, now)
@@ -179,6 +208,11 @@ function M.contentWidth(kind)
         total = total + column.width + COLUMN_GAP
     end
     return total
+end
+
+function M.scrollOuterWidth(kind)
+    -- BG.CreateScrollFrame reserves 31 px for its scrollbar internally.
+    return M.contentWidth(kind) + 31
 end
 
 function M.columnOffsets(kind)
@@ -291,6 +325,33 @@ local function acquireRow(win, index)
         end)
     end
 
+
+    local statusCell = row.cells.status
+    if statusCell and win.kind == "trade" then
+        statusCell:EnableMouse(true)
+        statusCell:SetScript("OnMouseUp", function(_, mouseButton)
+            if mouseButton ~= "LeftButton" or not row.data then
+                return
+            end
+            local nextStatus = row.data.statusKey == "pending" and "complete" or "pending"
+            if M.setTradeStatus(database(), row.data.index, nextStatus) then
+                M.Refresh("trade")
+            end
+        end)
+        statusCell:SetScript("OnEnter", function(self)
+            row.stripe:Show()
+            if type(GameTooltip) ~= "table" then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
+            GameTooltip:ClearLines()
+            GameTooltip:AddLine(L["左键切换待核对/已完成"], 1, 0.82, 0, true)
+            GameTooltip:Show()
+        end)
+        statusCell:SetScript("OnLeave", function()
+            row.stripe:Hide()
+            if type(GameTooltip) == "table" and GameTooltip.Hide then GameTooltip:Hide() end
+        end)
+    end
+
     win.rowPool[index] = row
     return row
 end
@@ -337,7 +398,9 @@ function M.Refresh(kind)
     local root = database()
     local now = serverNow()
     M.prepare(root, now)
-    local rows, isEmpty = M.rows(root, kind, { now = now })
+    local rows = M.rows(root, kind, { now = now })
+    rows = M.filterRows(rows, win.filter)
+    local isEmpty = #rows == 0
 
     for _, row in ipairs(win.rowPool) do
         row:Hide()
@@ -357,7 +420,7 @@ local function createWindow(kind)
 
     local contentWidth = M.contentWidth(kind)
     local frame = BG.CreateMainFrame()
-    frame:SetSize(contentWidth + 40, WINDOW_HEIGHT)
+    frame:SetSize(contentWidth + 48, WINDOW_HEIGHT)
     frame:SetPoint("CENTER")
     frame:Hide()
     if frame.titleText then
@@ -372,10 +435,37 @@ local function createWindow(kind)
         rowPool = {},
     }
 
+    win.filter = "all"
+    win.filterButtons = {}
+    local previousFilter
+    local function bindFilter(button, key)
+        button:SetScript("OnClick", function()
+            win.filter = key
+            M.Refresh(kind)
+        end)
+    end
+    for _, option in ipairs({
+        { key = "all", label = "全部" },
+        { key = "pending", label = "待核对" },
+        { key = "complete", label = "已完成" },
+    }) do
+        local button = BG.CreateButton(frame)
+        button:SetSize(70, 20)
+        if previousFilter then
+            button:SetPoint("LEFT", previousFilter, "RIGHT", 4, 0)
+        else
+            button:SetPoint("TOPLEFT", 14, -28)
+        end
+        button:SetText(L[option.label])
+        bindFilter(button, option.key)
+        win.filterButtons[option.key] = button
+        previousFilter = button
+    end
+
     -- Column headers
     local header = CreateFrame("Frame", nil, frame)
     header:SetSize(contentWidth, HEADER_HEIGHT)
-    header:SetPoint("TOPLEFT", 15, -28)
+    header:SetPoint("TOPLEFT", 15, -(28 + FILTER_HEIGHT))
     for position, column in ipairs(M.columns(kind)) do
         local text = header:CreateFontString()
         text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
@@ -386,15 +476,12 @@ local function createWindow(kind)
         text:SetText(column.label)
     end
 
-    local scrollHeight = WINDOW_HEIGHT - 28 - HEADER_HEIGHT - 46
-    local scroll, child = BG.CreateScrollFrame(frame, contentWidth + 10, scrollHeight)
-    scroll:SetPoint("TOPLEFT", 12, -(28 + HEADER_HEIGHT))
+    local scrollHeight = WINDOW_HEIGHT - 28 - FILTER_HEIGHT - HEADER_HEIGHT - 46
+    local scroll, child = BG.CreateScrollFrame(frame, M.scrollOuterWidth(kind), scrollHeight)
+    scroll:SetPoint("TOPLEFT", 12, -(28 + FILTER_HEIGHT + HEADER_HEIGHT))
     win.scroll = scroll
     win.child = child
     win.scrollHeight = scrollHeight
-    if type(BG.HookScrollBarShowOrHide) == "function" and scroll.scroll then
-        BG.HookScrollBarShowOrHide(scroll.scroll)
-    end
 
     local empty = child:CreateFontString()
     empty:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")

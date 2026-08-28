@@ -88,7 +88,22 @@ return function(test)
     test.eq(ui.tooltipTarget({ itemId = "11" }), nil, "tooltip refuses a non-numeric item id")
     test.eq(ui.tooltipTarget({}), nil, "a row without an item has no tooltip")
 
-    -- 6. clearing removes the settlement only
+    -- 6. filtering and reconciliation are explicit, local and reversible.
+    test.eq(#ui.filterRows(rows, "all"), 1, "all filter keeps every row")
+    test.eq(#ui.filterRows(rows, "pending"), 0, "pending filter excludes completed rows")
+    test.eq(#ui.filterRows(rows, "complete"), 1, "complete filter keeps completed rows")
+    test.eq(ui.setTradeStatus(root, rows[1].index, "pending"), true,
+        "a completed row can be returned to pending")
+    rows = ui.rows(root, "trade", { now = 1300, dateFn = stubDate })
+    test.eq(rows[1].statusKey, "pending", "reconciliation status change is visible")
+    test.eq(ui.setTradeStatus(root, rows[1].index, "complete"), true,
+        "a pending row can be marked complete")
+    test.eq(ui.setTradeStatus(root, rows[1].index, "failed"), false,
+        "the reconciliation action cannot invent failure states")
+    test.eq(ui.scrollOuterWidth("trade") - ui.contentWidth("trade"), 31,
+        "scroll frame reserves the helper's scrollbar inset without clipping rows")
+
+    -- 7. clearing removes the settlement only
     test.eq(type(ui.clearConfirmText()), "string", "clearing asks for confirmation")
     test.eq(ui.clear(root), true, "clear reported success")
     test.eq(root.currentSettlement.raidId, nil, "settlement identity cleared")
@@ -106,7 +121,7 @@ return function(test)
     test.eq(root.auctionPresets ~= nil, true, "auction presets survive")
     test.eq(root.settings ~= nil, true, "settings survive")
 
-    -- 7. an expired settlement is purged before the table is shown
+    -- 8. an expired settlement is purged before the table is shown
     life.beginSettlement(root, "raid-b", 2000)
     test.eq(trade.append(root, {
         raidId = "raid-b", player = "丙", itemId = 22, amount = 300, time = 2100, status = "complete",
@@ -117,7 +132,7 @@ return function(test)
     test.eq(#rows, 0, "no expired rows are displayed")
     test.eq(isEmpty, true, "expired settlement shows the empty state")
 
-    -- 8. defence in depth on the source
+    -- 9. defence in depth on the source
     local source = readAll("Core/BGNext/CurrentSettlementUI.lua")
     for _, forbidden in ipairs({
         "SendAddonMessage", "SendChatMessage", "NotifyInspect",

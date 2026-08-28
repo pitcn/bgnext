@@ -1,6 +1,6 @@
 # 当前团交易与邮件核对 — 净室设计与实现说明
 
-- **状态**: ready_for_codex_review（TDD 实现完成，实机验收未做）
+- **状态**: ready_for_codex_review（TDD 实现与安全加固完成，实机验收未做）
 - **日期**: 2026-08-27
 - **分支**: `codex/v0.1.0`
 - **基线**: BGLite 2.4.0（本次修改 6 个已声明覆盖文件：`BGLite.toc`、`Core/BiaoGe.lua`、`Core/Module/SendMail.lua`、`Locales/zhCN.lua`、`Locales/zhTW.lua`、`Locales/enUS.lua`，逐文件更新哈希）
@@ -19,7 +19,7 @@
 
 | 约束 | 实现位置 |
 |------|---------|
-| 只保留**一个**当前或最近一次未结算团本 | `DataLifecycle.beginSettlement` 在 `raidId` 变化时直接覆盖，不追加 |
+| 只保留**一个**当前或最近一次未结算团本 | 不同表格、主动清表或过期时覆盖，不追加；同一团不同 Boss 刷新名单时间不会清空 |
 | **最长七日** | `currentSettlement.expiresAt`；`DataLifecycle.purgeExpired` |
 | 新结算 / 用户清空 / 满七日 / 不属于当前团 任一先到即清除 | `beginSettlement`（新）/ `clearSettlement`（用户）/ `purgeExpired`（七日）/ `isCurrent` 的 `raidId` 校验（归属） |
 | 交易字段白名单 `player, itemId, amount, time, status` | `CurrentTrade.lua` 的 `FIELDS`，逐字段重建副本 |
@@ -32,13 +32,15 @@
 | **不做玩家统计** | 投影层零聚合、零分组、零排行；一条记录一行 |
 | **不新增通信** | 无 `SendAddonMessage` / `SendChatMessage` / HTTP / 遥测（测试内源码扫描） |
 | 无法可靠确认归属就忽略 | `activeSettlement` 返回 nil 即整体放弃写入，绝不猜测 |
+| 只接受当前团成员 | 写入前用既有 `raidRoster.roster` 临时核对交易对象/工资收件人，不复制名单 |
+| 邮件仅限团队名单 | 只为批量邮寄的 `raid` 范围建立一次性内存令牌；自定义名单不记录 |
 
 ## 3. 架构（三层，严格分层）
 
 ```
 数据白名单层  Core/BGNext/CurrentTrade.lua           字段+值白名单、归属校验、去重（已有，本次加固）
               Core/BGNext/CurrentMail.lua
-              Core/BGNext/DataLifecycle.lua          单团 + 七日保留（已有，未改）
+              Core/BGNext/DataLifecycle.lua          单团 + 七日保留、稳定来源标识（已有，本次加固）
 
 纯投影层      Core/BGNext/CurrentSettlementView.lua   只读 currentSettlement，排序/格式化/空态（新增，纯函数）
 
@@ -48,7 +50,7 @@ UI/运行时层   Core/BGNext/CurrentSettlementUI.lua     渲染 + 用户操作�
 
 依赖方向：`Runtime → 白名单层`、`UI → View → 白名单层`。View 与 UI 的纯函数部分不依赖任何 WoW 全局，可离线测试；`CreateFrame` 只出现在 UI 的函数体内。事件监听、数据清洗、Frame 创建分处三个文件。
 
-## 4. 团本归属判定（关键设计，无新增字段）
+## 4. 团本归属判定（关键设计）
 
 BGLite 已经在击杀 Boss 时给当前表格盖了团队名单时间戳：`BiaoGe[<表格>].raidRoster = { time, realm, roster }`（`Core/Module/Loot.lua:312`），并在 `BG.ClearBiaoGe("biaoge", FB)` 时清除（`ClearBiaoGe.lua:72`）。本次**复用该已有戳**，不生成新标识、不复制名单内容：
 
@@ -58,10 +60,12 @@ raidId = <表格键> .. "@" .. <raidRoster.time>
 
 判定分两级，刻意不对称：
 
-- **建立**结算（`M.raidId`）要求证据完整：`IsInRaid(1)` 为真、`BG.FB1` 为非空字符串、该表格已有 `raidRoster.time`、`raidRoster.realm` 与当前服务器一致（两者都已知时）、戳距今不足七日。任一不满足 → 返回 nil，**不建立**结算。
-- **追加**记录只要求：已有未过期结算，且事件来自插件已确认的成功结果。
+- **建立**结算（`M.raidId`）要求证据完整：`IsInRaid(1)` 为真、实际检测到的副本 `BG.FB2` 为非空字符串、该表格已有 `raidRoster.time`、`raidRoster.realm` 与当前服务器一致（两者都已知时）、戳距今不足七日。任一不满足 → 返回 nil，**不建立**结算。
+- **追加**记录要求：已有未过期结算、事件来自插件已确认的成功结果、对象属于该团名单。散团后工资邮件仍可使用已保存于 BGLite 表格中的名单核对，但名单不复制到 BGNext。
 
-这样做的理由：工资邮件通常在散团后、离开团队后才寄。若追加也要求「此刻仍在团队里」，最常见的真实场景反而记不上；若建立也放宽，则会凭空造出一个团本。新的 `raidRoster` 戳会自动覆盖上一个结算，满足「新团清旧团」。
+这样做的理由：工资邮件通常在散团后、离开团队后才寄。若追加也要求「此刻仍在团队里」，最常见的真实场景反而记不上；若建立也放宽，则会凭空造出一个团本。BGLite 会在每个 Boss 后重写 `raidRoster.time`，因此不能把时间戳变化误判为新团；BGNext 额外保存最小来源字段 `sourceFb/sourceRealm`，同一来源保持首个 `raidId`。
+
+同一副本的新团队由 BGLite 已有的 `BG.IsNotSameTeam` 口径判定（既有名单是否超过一天、服务器是否一致、当前成员与表格名单重合度是否至少 60%）。在 `ENCOUNTER_START` 检查一次：此时玩家已确定身处实际副本，且 BGLite 尚未用击杀后的名单覆盖旧名单；真实交易/邮件写入前也会再次检查。判定为新团队时先清除旧结算，本次事件不写入，直到 BGLite 为新团写入新的名单戳。BGNext 不复制名单。刻意不监听普通 `GROUP_ROSTER_UPDATE`、`PLAYER_ENTERING_WORLD` 或离开副本事件：散团时成员逐个离开不能误删仍待发工资的结算。
 
 **同时修好一个既有缺口**：`DataLifecycle.beginSettlement` / `beginRaid` 此前在运行时**没有任何调用方**，所以游戏里 `currentSettlement.raidId` 永远是 nil。新增的 Runtime 层是它的第一个真实调用者。
 
@@ -74,7 +78,8 @@ raidId = <表格键> .. "@" .. <raidRoster.time>
 
 补充规则：
 
-- 交易去重用一个内存 `booked` 标记，`TRADE_SHOW` / `TRADE_CLOSED` 时复位，防止客户端重复播报同一次完成。
+- 交易去重用一个内存 `booked` 标记，只在下一次 `TRADE_SHOW` 时复位，防止交易关闭后的延迟重复成功消息再次入账。
+- 工资邮件在真正调用 `SendMail` 前建立一次性的内存令牌；仅 `raid` 范围、同一收件人和同一金额的首个成功结果可消费它。自定义名单和重复结果都被拒绝。
 - **失败 / 取消 / 关窗 / 超时都不进入采集**：交易只在 `ERR_TRADE_COMPLETE` 后写，邮件只在 `ERR_MAIL_SENT` 后写；`recordMail` 还要求 `mail.sent == true`，`tradeRows` 要求 `trade.completed == true`。
 - 邮件只写 `status = "sent"`、`direction = "outgoing"`——插件只执行寄出，从不读收件箱，因此永远不会伪造「收到」。
 - 无 `currentSettlement` ⇒ `activeSettlement` 返回 nil ⇒ 一行不写。
@@ -111,6 +116,7 @@ M.formatTime(value, dateFn)    -- dateFn 可注入，pcall 保护
 - 表格式信息结构：列头 + 定宽列 + 行悬停条纹 + 滚动区，与主表格习惯一致；不做卡片仪表盘、不做跨团本选择器、不做玩家统计页。
 - 物品格显示图标 + 物品链接，鼠标悬停出 `GameTooltip`；tooltip **只**由存储的数字 `itemId` 驱动（`M.tooltipTarget` 仅接受 number）。
 - 状态列按 §6 配色明确区分 成功 / 待核对 / 失败或取消。
+- 顶部提供「全部 / 待核对 / 已完成」本地筛选；交易状态格可左键在「待核对 / 已完成」间切换，用于人工核对，不产生通信。
 - 「清空当前团记录」按钮 → `StaticPopup` 二次确认；确认后**只**调用 `DataLifecycle.clearSettlement`，表格账单、心愿清单、角色总览、装备筛选、其他设置一律不动。
 - 打开页面先跑保留期检查（`M.prepare` → `purgeExpired`），过期数据先删后显。
 - 窗口底部常驻范围说明「只保留当前或最近一次未结算团本，最长七日。」
@@ -125,7 +131,7 @@ M.formatTime(value, dateFn)    -- dateFn 可注入，pcall 保护
 
 新增 `tests/test_current_settlement_view.lua`、`tests/test_current_settlement_runtime.lua`、`tests/test_current_settlement_ui.lua`，并扩充 `tests/test_current_settlement.lua`、`tests/test_baseline_safety.lua`；全部注册进 `tests/run.lua`。行为断言优先走公开接口，源码扫描只作为**安全禁用项的纵深防御**（`SendAddonMessage` / `SendChatMessage` / `NotifyInspect` / `COMBAT_LOG_EVENT_UNFILTERED` / `tradeHistory` / `mailHistory` / `BiaoGe.History` / `GetInboxText`）。
 
-覆盖：无结算拒绝写入、`raidId` 不匹配拒绝、两个字段白名单、主题/正文被丢弃、交易去重、邮件去重、新团清旧团、七日过期清除、手动清空只清结算、两个投影只读各自集合、稳定排序且无按玩家聚合、空态、tooltip 仅由 `itemId` 驱动、无法归属不记录、取消/失败不伪装成成功。
+覆盖：无结算拒绝写入、`raidId` 不匹配拒绝、两个字段白名单、主题/正文被丢弃、交易去重、邮件一次性令牌、非团员/自定义名单拒绝、同团不同 Boss 不清空、不同副本清旧团、七日过期清除、手动清表同步清结算、手动清空只清结算、两个投影只读各自集合、稳定排序且无按玩家聚合、筛选与人工核对、空态、tooltip 仅由 `itemId` 驱动、无法归属不记录、取消/失败不伪装成成功。
 
 回归：`test_current_purchases.lua`（我买的）与受控自动出价 / 心愿清单 / 装备筛选 / 角色总览的既有测试全部保持通过。
 

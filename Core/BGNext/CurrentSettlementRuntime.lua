@@ -14,6 +14,14 @@ BG.BGNext = BG.BGNext or {}
 local M = {}
 
 local MAX_AGE = 7 * 86400
+local pendingMail
+
+local function serverNow()
+    if type(GetServerTime) == "function" then
+        return GetServerTime()
+    end
+    return time()
+end
 
 local function lifecycle()
     return BG.BGNext and BG.BGNext.DataLifecycle
@@ -25,6 +33,13 @@ end
 
 local function mailStore()
     return BG.BGNext and BG.BGNext.CurrentMail
+end
+
+local function refreshUI(kind)
+    local ui = BG.BGNext and BG.BGNext.CurrentSettlementUI
+    if ui and type(ui.Refresh) == "function" then
+        ui.Refresh(kind)
+    end
 end
 
 -- A settlement identity may only be established while the evidence is
@@ -68,12 +83,27 @@ local function activeSettlement(root, context)
         return nil
     end
     local now = type(context) == "table" and context.now or nil
-    local raidId = M.raidId(context)
-    if raidId and type(now) == "number" then
-        life.beginSettlement(root, raidId, now)
-    end
     if type(now) == "number" then
         life.purgeExpired(root, now)
+    end
+    if type(context) == "table" and context.inRaid == true and context.sameTeam == false then
+        if root.currentSettlement and root.currentSettlement.raidId ~= nil then
+            life.clearSettlement(root)
+        end
+        return nil
+    end
+    local raidId = M.raidId(context)
+    if raidId and type(now) == "number" then
+        local current = root.currentSettlement
+        local sameSource = current and current.raidId ~= nil
+            and current.sourceFb == context.fb
+            and (current.sourceRealm == nil or context.realm == nil or current.sourceRealm == context.realm)
+        if not sameSource then
+            life.beginSettlement(root, raidId, now, {
+                fb = context.fb,
+                realm = context.realm,
+            })
+        end
     end
     local settlement = root.currentSettlement
     if not settlement or settlement.raidId == nil then
@@ -116,6 +146,45 @@ local function itemIds(value, itemIdOf)
         end
     end
     return ids
+end
+
+local function normalizedName(context, name)
+    if type(name) ~= "string" then
+        return nil
+    end
+    local fn = context and context.normalizeName
+    if type(fn) == "function" then
+        local ok, value = pcall(fn, name)
+        if ok and type(value) == "string" then
+            return value
+        end
+    end
+    return name
+end
+
+local function isRosterMember(root, context, player)
+    local settlement = root and root.currentSettlement
+    local roster = context and context.roster
+    if not settlement or not settlement.raidId or type(roster) ~= "table"
+        or type(roster.roster) ~= "table" then
+        return false
+    end
+    if settlement.sourceFb and context.fb and settlement.sourceFb ~= context.fb then
+        return false
+    end
+    if settlement.sourceRealm and roster.realm and settlement.sourceRealm ~= roster.realm then
+        return false
+    end
+    local wanted = normalizedName(context, player)
+    if not wanted then
+        return false
+    end
+    for _, name in ipairs(roster.roster) do
+        if normalizedName(context, name) == wanted then
+            return true
+        end
+    end
+    return false
 end
 
 -- Only the gold one side actually put up counts as the settlement amount; it is
@@ -189,7 +258,7 @@ end
 function M.recordTrade(root, context, trade)
     local raidId = activeSettlement(root, context)
     local store = tradeStore()
-    if not raidId or not store then
+    if not raidId or not store or not isRosterMember(root, context, trade and trade.target) then
         return 0
     end
     local now = context.now
@@ -206,11 +275,14 @@ function M.recordTrade(root, context, trade)
             written = written + 1
         end
     end
+    if written > 0 then
+        refreshUI("trade")
+    end
     return written
 end
 
 function M.recordMail(root, context, mail)
-    if type(mail) ~= "table" or mail.sent ~= true then
+    if type(mail) ~= "table" or mail.sent ~= true or mail.scope ~= "raid" then
         return false
     end
     local player = mail.player
@@ -219,10 +291,10 @@ function M.recordMail(root, context, mail)
     end
     local raidId = activeSettlement(root, context)
     local store = mailStore()
-    if not raidId or not store then
+    if not raidId or not store or not isRosterMember(root, context, player) then
         return false
     end
-    return store.append(root, {
+    local written = store.append(root, {
         raidId = raidId,
         player = player,
         itemId = type(mail.itemId) == "number" and mail.itemId or nil,
@@ -231,36 +303,79 @@ function M.recordMail(root, context, mail)
         status = "sent",
         direction = "outgoing",
     })
+    if written then
+        refreshUI("mail")
+    end
+    return written
 end
 
 -- Live wiring. Everything below only runs inside the game.
 local function liveContext()
-    local fb = BG.FB1
+    local root = BG.BGNext and BG.BGNext.DB
+    local settlement = root and root.currentSettlement
+    local inRaid = IsInRaid and IsInRaid(1) and true or false
+    local fb = inRaid and BG.FB2 or (settlement and settlement.sourceFb)
     local roster
     if type(fb) == "string" and type(BiaoGe) == "table" and type(BiaoGe[fb]) == "table" then
         roster = BiaoGe[fb].raidRoster
+    end
+    local sameTeam
+    if inRaid and type(fb) == "string" and type(BG.IsNotSameTeam) == "function" then
+        local ok, isDifferent = pcall(BG.IsNotSameTeam, fb)
+        if ok then
+            sameTeam = not isDifferent
+        end
     end
     return {
         fb = fb,
         roster = roster,
         realm = BG.realmName,
-        inRaid = IsInRaid and IsInRaid(1) and true or false,
-        now = time(),
+        inRaid = inRaid,
+        normalizeName = BG.GSN,
+        sameTeam = sameTeam,
+        now = serverNow(),
     }
 end
 
 M.liveContext = liveContext
 
+function M.onTableCleared(root, fb)
+    local settlement = root and root.currentSettlement
+    local life = lifecycle()
+    if not settlement or not settlement.raidId or not life or settlement.sourceFb ~= fb then
+        return false
+    end
+    life.clearSettlement(root)
+    return true
+end
+
 -- Called by the batch mail flow at its own confirmed send result.
-function M.notifyMailSent(player, amount)
+function M.notifyMailAttempt(player, amount, scope)
+    if scope ~= "raid" or type(player) ~= "string" or not player:find("%S") then
+        pendingMail = nil
+        return false
+    end
+    pendingMail = {
+        player = player,
+        amount = tonumber(amount),
+        scope = scope,
+    }
+    return true
+end
+
+function M.notifyMailSent(player, amount, scope)
     local root = BG.BGNext and BG.BGNext.DB
-    if not root then
+    local pending = pendingMail
+    pendingMail = nil
+    if not root or not pending or pending.player ~= player
+        or pending.amount ~= tonumber(amount) or pending.scope ~= scope then
         return false
     end
     return M.recordMail(root, liveContext(), {
         sent = true,
-        player = player,
-        amount = amount,
+        scope = pending.scope,
+        player = pending.player,
+        amount = pending.amount,
     })
 end
 
@@ -270,8 +385,20 @@ if BG.Init then
         -- repeats the completion message.
         local booked = false
 
-        BG.RegisterEvent({ "TRADE_SHOW", "TRADE_CLOSED" }, function()
+        BG.RegisterEvent("TRADE_SHOW", function()
             booked = false
+        end)
+
+        -- At encounter start the player is confirmed inside the detected
+        -- instance and BGLite has not yet replaced the table roster with the
+        -- just-finished boss roster. This is the safe moment to distinguish a
+        -- second group in the same instance. Leaving the instance and ordinary
+        -- roster churn never run this check, so pending wage records survive.
+        BG.RegisterEvent("ENCOUNTER_START", function()
+            local root = BG.BGNext and BG.BGNext.DB
+            if root then
+                activeSettlement(root, liveContext())
+            end
         end)
 
         BG.RegisterEvent("UI_INFO_MESSAGE", function(_, _, _, text)

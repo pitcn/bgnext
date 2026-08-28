@@ -4,9 +4,18 @@ BG.BGNext = BG.BGNext or {}
 local M = {}
 local MAX_AGE = 7 * 86400
 
+local function serverNow()
+    if type(GetServerTime) == "function" then
+        return GetServerTime()
+    end
+    return time()
+end
+
 local function emptySettlement()
     return {
         raidId = nil,
+        sourceFb = nil,
+        sourceRealm = nil,
         startedAt = nil,
         expiresAt = nil,
         trades = {},
@@ -32,14 +41,25 @@ function M.clearSettlement(root)
     root.currentSettlement = emptySettlement()
 end
 
-function M.beginSettlement(root, raidId, now)
+function M.beginSettlement(root, raidId, now, source)
     local current = root.currentSettlement
     if current.raidId ~= raidId or (current.expiresAt and now >= current.expiresAt) then
         M.clearSettlement(root)
         current = root.currentSettlement
         current.raidId = raidId
+        current.sourceFb = source and source.fb or nil
+        current.sourceRealm = source and source.realm or nil
         current.startedAt = now
         current.expiresAt = now + MAX_AGE
+    elseif source then
+        -- Upgrade an in-flight settlement created before source attribution
+        -- was introduced without discarding its current-raid records.
+        if current.sourceFb == nil then
+            current.sourceFb = source.fb
+        end
+        if current.sourceRealm == nil then
+            current.sourceRealm = source.realm
+        end
     end
     return current
 end
@@ -72,7 +92,7 @@ if BG.Init then
     BG.Init(function()
         BiaoGe = type(BiaoGe) == "table" and BiaoGe or {}
         BG.BGNext.DB = M.ensureRoot(BiaoGe)
-        M.purgeExpired(BG.BGNext.DB, time())
+        M.purgeExpired(BG.BGNext.DB, serverNow())
     end)
 end
 

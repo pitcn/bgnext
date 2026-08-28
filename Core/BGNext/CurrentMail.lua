@@ -34,6 +34,12 @@ local function isCurrent(root, record)
     if record.direction ~= nil and not DIRECTION[record.direction] then
         return false
     end
+    if record.itemId ~= nil and type(record.itemId) ~= "number" then
+        return false
+    end
+    if record.amount ~= nil and (type(record.amount) ~= "number" or record.amount < 0) then
+        return false
+    end
     if settlement.startedAt and record.time < settlement.startedAt then
         return false
     end

@@ -18,6 +18,7 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 | `auctionPresets.increment` | User-entered per-bid step amount (positive integer) | Controlled auto-bid step | Local until changed or cleared | Existing BGLite auction flow only while auto-bid is explicitly armed | Edit before arming / clear | Medium |
 | `auctionPresets.cap` | User-entered psychological maximum price (positive integer ≥ increment) | Controlled auto-bid ceiling | Local until changed or cleared | Existing BGLite auction flow only while auto-bid is explicitly armed | Edit before arming / clear | Medium |
 | `currentSettlement.raidId` | Current raid context | Enforce one-settlement scope | One settlement, maximum seven days | None | New raid/manual clear/expiry | Medium |
+| `currentSettlement.sourceFb` / `sourceRealm` | Existing BGLite table key and current realm | Keep the settlement identity stable when BGLite refreshes its roster timestamp after each boss | Cleared with settlement | None | New raid/manual clear/expiry | Low |
 | `currentSettlement.startedAt` / `expiresAt` | Local/server time | Enforce retention | Cleared with settlement | None | Manual clear | Low |
 | `currentSettlement.trades` | Current-settlement trade events | Reconciliation | One settlement, maximum seven days | None | Manual clear | Medium |
 | `currentSettlement.mails` | Current-settlement mail events | Reconciliation | One settlement, maximum seven days | None | Manual clear | Medium |
@@ -29,7 +30,9 @@ Trade records may contain only `player`, `itemId`, `amount`, `time`, and `status
 
 The values of `status` and `direction` are whitelisted as well, so free text cannot reach storage through them. Trade `status` accepts only `complete`, `pending`, `failed`, or `cancelled`; mail `status` accepts only `sent`, `pending`, or `failed`; mail `direction`, when present, accepts only `outgoing` or `incoming`. A record whose whitelisted fields are all equal to an already stored record is rejected, so a repeated event cannot become a second row.
 
-`currentSettlement.raidId` is derived from BGLite's existing per-table `BiaoGe[<table>].raidRoster` stamp (its raid table key and `time`). No new identifier is generated, no roster content is copied, and a new stamp replaces the previous settlement rather than accumulating alongside it.
+`currentSettlement.raidId` is initially derived from BGLite's existing per-table `BiaoGe[<table>].raidRoster` stamp (its raid table key and `time`). BGLite refreshes that timestamp after every boss, so BGNext keeps the first identity stable while BGLite's existing same-team check still identifies the group as the same. A different table, a same-instance new-team result, explicit table clear, or expiry replaces it. `sourceFb` and `sourceRealm` contain only that attribution metadata; roster content is never copied into `BiaoGe.BGNext`.
+
+Runtime attribution is stricter than storage validation: a trade or batch-mail result is accepted only when its counterparty appears in BGLite's existing roster for the active settlement. That roster is read transiently and is not copied. Batch mail must also originate from the existing `raid` recipient scope; custom recipient lists are rejected. Identical client result messages are guarded by memory-only attempt state before they reach storage.
 
 Mail subject, body, unrelated attachments, chat text, account identifiers, device identifiers, GUIDs, private notes, and cross-raid aggregates are prohibited. `BiaoGe.tradeHistory`, `BiaoGe.mailHistory`, and `BiaoGe.History` are never read or migrated.
 

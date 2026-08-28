@@ -11,6 +11,10 @@ return function(test)
     root.currentSettlement.trades[1] = { amount = 100 }
     life.beginSettlement(root, "raid-a", 200)
     test.eq(#root.currentSettlement.trades, 1, "same raid preserved")
+    life.beginSettlement(root, "raid-a", 200, { fb = "ICC", realm = "测试服" })
+    test.eq(root.currentSettlement.sourceFb, "ICC", "same raid backfills missing source table")
+    test.eq(root.currentSettlement.sourceRealm, "测试服", "same raid backfills missing source realm")
+    test.eq(#root.currentSettlement.trades, 1, "source backfill preserves same-raid records")
 
     life.beginSettlement(root, "raid-b", 300)
     test.eq(#root.currentSettlement.trades, 0, "new raid clears old data")
@@ -27,4 +31,22 @@ return function(test)
     life.beginRaid(root, "raid-d", 1200)
     test.eq(#root.currentRaid.purchases, 0, "new raid shopping cleared")
     test.eq(root.currentSettlement.raidId, "raid-d", "new raid settlement selected")
+
+    -- Login cleanup uses the same authoritative clock as runtime writes.
+    local init
+    BG = { BGNext = {}, Init = function(callback) init = callback end }
+    BiaoGe = {
+        BGNext = {
+            currentSettlement = {
+                raidId = "expired", startedAt = 1, expiresAt = 100,
+                trades = { { amount = 1 } }, mails = {},
+            },
+        },
+    }
+    GetServerTime = function() return 100 end
+    time = function() return 1 end
+    life = dofile("Core/BGNext/DataLifecycle.lua")
+    init()
+    test.eq(BiaoGe.BGNext.currentSettlement.raidId, nil,
+        "login expiry uses server time even when the local clock is behind")
 end

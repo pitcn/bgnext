@@ -1401,6 +1401,10 @@ local function RoadSendMail()
                 ClearSendMail()
                 SetSendMailMoney(money)
                 lastName = BG.GSN(fullName)
+                if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
+                    BG.BGNext.CurrentSettlementRuntime.notifyMailAttempt(
+                        lastName, money / 10000, BiaoGe.sendMail.member)
+                end
                 SendMail(lastName, SwitchVar(mainFrame.Edit1:GetText()), SwitchVar(mainFrame.Edit2:GetText()))
                 lastName = nil
                 if addFriend[fullName] then
@@ -1521,7 +1525,7 @@ local function RoadSendMail()
                     if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
                         local goldAmount = tonumber(mainFrame.moneyEdit:GetText()) or 0
                         BG.BGNext.CurrentSettlementRuntime.notifyMailSent(
-                            BG.GSN(lastSend.fullName), goldAmount)
+                            BG.GSN(lastSend.fullName), goldAmount, BiaoGe.sendMail.member)
                     end
                 end
             end)

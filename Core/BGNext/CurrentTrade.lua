@@ -27,12 +27,28 @@ local function isCurrent(root, record)
     if not STATUS[record.status] then
         return false
     end
+    if record.itemId ~= nil and type(record.itemId) ~= "number" then
+        return false
+    end
+    if record.amount ~= nil and (type(record.amount) ~= "number" or record.amount < 0) then
+        return false
+    end
     if settlement.startedAt and record.time < settlement.startedAt then
         return false
     end
     if settlement.expiresAt and record.time >= settlement.expiresAt then
         return false
     end
+    return true
+end
+
+function M.setStatus(root, index, status)
+    local settlement = root and root.currentSettlement
+    local record = settlement and settlement.trades and settlement.trades[index]
+    if not record or (status ~= "pending" and status ~= "complete") then
+        return false
+    end
+    record.status = status
     return true
 end
 

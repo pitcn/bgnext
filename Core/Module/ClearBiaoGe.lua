@@ -70,6 +70,9 @@ function BG.ClearBiaoGeUI()
             end
             BiaoGe[FB].tradeTbl = {}
             BiaoGe[FB].raidRoster = nil
+            if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
+                BG.BGNext.CurrentSettlementRuntime.onTableCleared(BG.BGNext.DB, FB)
+            end
             BiaoGe[FB].auctionLog = nil
             BiaoGe[FB].leaderInfo = nil
             BG.UpdateAuctionLogFrame()
