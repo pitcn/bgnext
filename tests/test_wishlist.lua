@@ -12,9 +12,11 @@ return function(test)
     test.eq(wish.setSlot(root, "realm", "A", "ICC", limits, 1, 4, 1, 5002), false, "boss out of range")
     test.eq(wish.setSlot(root, "realm", "A", "ICC", limits, 1, 1, 3, 5002), false, "slot out of range")
     test.eq(wish.setSlot(root, "realm", "A", "ICC", limits, 1, 2, 2, 5001), true, "duplicate item may occupy another original slot")
+    test.eq(wish.setSlot(root, "realm", "A", "ICC", limits, 2, 2, 1, 5001), true,
+        "the same item may be wished independently on another difficulty")
 
     local matches = wish.findItem(root, "realm", "A", "ICC", 5001)
-    test.eq(#matches, 2, "both matching slots returned")
+    test.eq(#matches, 3, "matching slots across both difficulties returned")
     test.eq(matches[1].difficultyIndex, 1, "matches sorted by difficulty")
     test.eq(matches[1].bossIndex, 2, "matches report boss")
     test.eq(matches[1].slotIndex, 1, "matches sorted by slot")
@@ -23,6 +25,8 @@ return function(test)
 
     test.eq(wish.clearSlot(root, "realm", "A", "ICC", 1, 2, 1), true, "right-click removal clears one slot")
     test.eq(wish.getSlot(root, "realm", "A", "ICC", 1, 2, 1), nil, "cleared slot is empty")
+    test.eq(wish.getSlot(root, "realm", "A", "ICC", 2, 2, 1), 5001,
+        "clearing normal difficulty preserves the heroic wish")
     wish.setSlot(root, "realm", "A", "TOC", limits, 1, 1, 1, 5100)
     test.eq(wish.clearRaid(root, "realm", "A", "ICC"), true, "clear removes current raid")
     test.eq(wish.getSlot(root, "realm", "A", "TOC", 1, 1, 1), 5100, "clear preserves other raid")
@@ -33,6 +37,23 @@ return function(test)
     test.eq(wish.itemIdFromValue("item:6002:0:0:0"), 6002, "item string parsed")
     test.eq(wish.itemIdFromValue("|cff0070dd|Hitem:6003::::::::|h[Test]|h|r"), 6003, "item link parsed")
     test.eq(wish.itemIdFromValue("not an item"), nil, "unrelated text rejected")
+
+    local resolveDrop = wish.resolveDrop
+    test.eq(type(resolveDrop), "function", "drop resolver is available for difficulty-specific wishlist slots")
+    if type(resolveDrop) == "function" then
+        local sharedItem = 105857
+        local difficultyNames = { "N", "H" }
+        local raidLoot = {
+            N = { boss14 = { sharedItem } },
+            H = { boss14 = { sharedItem } },
+        }
+        local function exactItem(left, right) return left == right end
+        local normal = resolveDrop(sharedItem, difficultyNames, raidLoot, 14, exactItem, 1, 14)
+        local heroic = resolveDrop(sharedItem, difficultyNames, raidLoot, 14, exactItem, 2, 14)
+        test.eq(normal and normal.difficultyIndex, 1, "shared MoP token resolves to the requested normal difficulty")
+        test.eq(heroic and heroic.difficultyIndex, 2, "shared MoP token resolves to the requested heroic difficulty")
+        test.eq(heroic and heroic.bossIndex, 14, "shared MoP token remains assigned to Garrosh")
+    end
 
     local function resolver(itemId)
         if itemId == 6001 or itemId == 6002 or itemId == 6003 then

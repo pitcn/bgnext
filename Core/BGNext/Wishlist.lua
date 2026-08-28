@@ -46,6 +46,54 @@ function M.itemIdFromValue(value)
     return nil
 end
 
+-- Resolve an item against a raid loot catalog. Some encounters use the same
+-- item ID for more than one difficulty (for example Garrosh essence tokens in
+-- MoP). When a concrete wishlist cell is being edited, prefer that exact
+-- difficulty/boss before falling back to the catalog's normal search order.
+function M.resolveDrop(itemId, difficultyNames, raidLoot, bossLimit, sameItem,
+    preferredDifficultyIndex, preferredBossIndex)
+    if not validItemId(itemId) or type(difficultyNames) ~= "table"
+        or type(raidLoot) ~= "table" or not validPositiveIndex(bossLimit)
+        or type(sameItem) ~= "function"
+    then
+        return nil
+    end
+
+    local function matches(difficultyIndex, bossIndex)
+        local difficultyName = difficultyNames[difficultyIndex]
+        local difficultyLoot = difficultyName and raidLoot[difficultyName]
+        local drops = difficultyLoot and difficultyLoot["boss" .. bossIndex]
+        if type(drops) ~= "table" then return false end
+        for _, droppedItemId in ipairs(drops) do
+            if sameItem(itemId, droppedItemId) then return true end
+        end
+        return false
+    end
+
+    if validPositiveIndex(preferredDifficultyIndex)
+        and validPositiveIndex(preferredBossIndex)
+        and preferredBossIndex <= bossLimit
+        and matches(preferredDifficultyIndex, preferredBossIndex)
+    then
+        return {
+            difficultyIndex = preferredDifficultyIndex,
+            bossIndex = preferredBossIndex,
+        }
+    end
+
+    for difficultyIndex in ipairs(difficultyNames) do
+        for bossIndex = 1, bossLimit do
+            if matches(difficultyIndex, bossIndex) then
+                return {
+                    difficultyIndex = difficultyIndex,
+                    bossIndex = bossIndex,
+                }
+            end
+        end
+    end
+    return nil
+end
+
 local function getRaid(root, realmId, player, raidId, create)
     if type(root) ~= "table" or type(root.wishlist) ~= "table" then
         return nil

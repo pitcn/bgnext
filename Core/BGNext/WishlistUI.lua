@@ -172,23 +172,12 @@ if runtimeReady() then
         return tonumber(left) == tonumber(right)
     end
 
-    local function resolveDrop(itemId, raidId)
+    local function resolveDrop(itemId, raidId, preferredDifficultyIndex, preferredBossIndex)
         local difficulties = BG.difficultyTable and BG.difficultyTable[raidId]
         local raidLoot = BG.Loot and BG.Loot[raidId]
         if not difficulties or not raidLoot then return nil end
-        for difficultyIndex, difficultyName in ipairs(difficulties) do
-            local difficultyLoot = raidLoot[difficultyName]
-            if difficultyLoot then
-                for bossIndex = 1, hopeMaxb[raidId] or 0 do
-                    for _, droppedItemId in ipairs(difficultyLoot["boss" .. bossIndex] or {}) do
-                        if sameItem(itemId, droppedItemId) then
-                            return { difficultyIndex = difficultyIndex, bossIndex = bossIndex }
-                        end
-                    end
-                end
-            end
-        end
-        return nil
+        return wishlist.resolveDrop(itemId, difficulties, raidLoot, hopeMaxb[raidId] or 0, sameItem,
+            preferredDifficultyIndex, preferredBossIndex)
     end
 
     local function localMessage(message)
@@ -292,7 +281,7 @@ if runtimeReady() then
             end
             return false
         end
-        local location = resolveDrop(itemId, raidId)
+        local location = resolveDrop(itemId, raidId, slot.hopenandu, slot.bossnum)
         if not location or location.difficultyIndex ~= slot.hopenandu or location.bossIndex ~= slot.bossnum then
             return false
         end
