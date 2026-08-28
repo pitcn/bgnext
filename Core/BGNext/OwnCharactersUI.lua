@@ -175,6 +175,52 @@ function M.columnHeader(column, currencyInfo, spellInfo)
     return descriptor
 end
 
+-- Builds the localized tooltip lines for a currency value cell. The name comes
+-- from Blizzard's currency API (injected as `currencyInfo` for tests, defaulting
+-- to the live API); every cap line appears only when the cell actually carries
+-- it, so a missing limit never renders a fabricated zero. Returns nil when the
+-- cell has no confirmed currency id — item-backed "currency" columns carry no
+-- id and therefore no currency tooltip.
+function M.currencyTooltip(cell, currencyInfo)
+    if type(cell) ~= "table" or type(cell.currencyId) ~= "number" then return nil end
+    local resolver = type(currencyInfo) == "function" and currencyInfo or liveCurrencyInfo
+    local ok, info = pcall(resolver, cell.currencyId)
+    local name = nil
+    if ok and type(info) == "table" and type(info.name) == "string" and info.name ~= "" then
+        name = info.name
+    end
+    local lines = {}
+    if type(cell.value) == "number" then
+        lines[#lines + 1] = L["当前数量"] .. " " .. tostring(cell.value)
+    end
+    if type(cell.maxQuantity) == "number" then
+        lines[#lines + 1] = L["总上限"] .. " " .. tostring(cell.maxQuantity)
+    end
+    if type(cell.quantityEarnedThisWeek) == "number" then
+        lines[#lines + 1] = L["本周获得"] .. " " .. tostring(cell.quantityEarnedThisWeek)
+    end
+    if type(cell.maxWeeklyQuantity) == "number" then
+        lines[#lines + 1] = L["每周上限"] .. " " .. tostring(cell.maxWeeklyQuantity)
+    end
+    if #lines == 0 then return nil end
+    return { name = name, lines = lines }
+end
+
+-- Populates a Blizzard tooltip with a currency cell: the official name as the
+-- title, then one line per present field. Returns false when there is nothing
+-- to show or the tooltip cannot take text.
+function M.showCurrencyTooltip(tooltip, cell, currencyInfo)
+    local info = M.currencyTooltip(cell, currencyInfo)
+    if not info or not tooltip or type(tooltip.SetText) ~= "function" then return false end
+    tooltip:SetText(info.name or L["货币"])
+    if type(tooltip.AddLine) == "function" then
+        for _, line in ipairs(info.lines) do
+            tooltip:AddLine(line)
+        end
+    end
+    return true
+end
+
 -- Picks the source for Blizzard's official item tooltip. A collected item link
 -- is preferred (it preserves the exact item), otherwise the item id. Returning
 -- nil means there is nothing safe to show.
@@ -298,7 +344,7 @@ local settingsHandler
 local renderMode = "pinned"
 local pool = {
     rows = {}, texts = {}, textures = {}, buttons = {}, itemButtons = {},
-    headerButtons = {}, addButtons = {},
+    headerButtons = {}, addButtons = {}, valueButtons = {},
 }
 
 -- The entry module supplies the projection. Keeping it a callback is what
@@ -419,6 +465,15 @@ local function hideHeaderTooltip(self)
     hideItemTooltip()
 end
 
+local function showValueTooltip(self)
+    if not GameTooltip or type(GameTooltip.SetOwner) ~= "function" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    if M.showCurrencyTooltip(GameTooltip, self.__cell)
+        and type(GameTooltip.Show) == "function" then
+        GameTooltip:Show()
+    end
+end
+
 local function acquireHeaderButton(parent, index)
     local item = pool.headerButtons[index]
     if not item then
@@ -470,6 +525,25 @@ local function acquireItemButton(parent, index)
     return item
 end
 
+local function acquireValueButton(parent, index)
+    local item = pool.valueButtons[index]
+    if not item then
+        item = CreateFrame("Button", nil, parent)
+        item:SetScript("OnEnter", showValueTooltip)
+        item:SetScript("OnLeave", hideItemTooltip)
+        item:SetScript("OnMouseDown", function(self, mouseButton)
+            if mouseButton == "RightButton" and rowHandler then
+                rowHandler(self.__section, self.__row)
+            end
+        end)
+        pool.valueButtons[index] = item
+    end
+    item:ClearAllPoints()
+    item:SetFrameLevel(parent:GetFrameLevel() + 3)
+    item:Show()
+    return item
+end
+
 local function resetPool()
     for _, item in ipairs(pool.texts) do item:Hide() end
     for _, item in ipairs(pool.textures) do item:Hide() end
@@ -477,6 +551,7 @@ local function resetPool()
     for _, item in ipairs(pool.itemButtons) do item:Hide() end
     for _, item in ipairs(pool.headerButtons) do item:Hide() end
     for _, item in ipairs(pool.addButtons) do item:Hide() end
+    for _, item in ipairs(pool.valueButtons) do item:Hide() end
 end
 
 local function cellText(cell, column)
@@ -495,7 +570,7 @@ function M.Draw(layout)
 
     frame:SetSize(layout.width, layout.height)
 
-    local textIndex, textureIndex, buttonIndex, itemButtonIndex, headerButtonIndex, addButtonIndex = 0, 0, 0, 0, 0, 0
+    local textIndex, textureIndex, buttonIndex, itemButtonIndex, headerButtonIndex, addButtonIndex, valueButtonIndex = 0, 0, 0, 0, 0, 0, 0
     local function nextText()
         textIndex = textIndex + 1
         return acquireText(frame, textIndex)
@@ -519,6 +594,10 @@ function M.Draw(layout)
     local function nextAddButton()
         addButtonIndex = addButtonIndex + 1
         return acquireAddButton(frame, addButtonIndex)
+    end
+    local function nextValueButton()
+        valueButtonIndex = valueButtonIndex + 1
+        return acquireValueButton(frame, valueButtonIndex)
     end
 
     if layout.isEmpty then
@@ -673,6 +752,18 @@ function M.Draw(layout)
                             value:SetJustifyH("CENTER")
                             value:SetTextColor(M.colors.text.r, M.colors.text.g, M.colors.text.b)
                             value:SetText(text)
+                        end
+                        -- A currency value with a confirmed id gets a hover
+                        -- surface so its caps can surface as a tooltip without
+                        -- crowding the cell body.
+                        if type(cell.currencyId) == "number" then
+                            local valueButton = nextValueButton()
+                            valueButton:SetPoint("CENTER", frame, "TOPLEFT",
+                                M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
+                            valueButton:SetSize(column.width, M.metrics.rowHeight)
+                            valueButton.__cell = cell
+                            valueButton.__section = section.key
+                            valueButton.__row = row
                         end
                     end
                 end

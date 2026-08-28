@@ -356,12 +356,26 @@ local function resourceCell(column, snapshot, now)
             local items = type(snapshot.items) == "table" and snapshot.items or nil
             value = items and items[key] or nil
         end
-        if type(value) == "table" then value = value.quantity end
-        if type(value) == "number" then
+        if type(value) == "table" then
+            local quantity = value.quantity
+            if type(quantity) == "number" then
+                cell.state = "value"
+                cell.value = quantity
+                cell.text = tostring(quantity)
+            end
+            if type(value.maxQuantity) == "number" then cell.maxQuantity = value.maxQuantity end
+            if type(value.quantityEarnedThisWeek) == "number" then
+                cell.quantityEarnedThisWeek = value.quantityEarnedThisWeek
+            end
+            if type(value.maxWeeklyQuantity) == "number" then
+                cell.maxWeeklyQuantity = value.maxWeeklyQuantity
+            end
+        elseif type(value) == "number" then
             cell.state = "value"
             cell.value = value
             cell.text = tostring(value)
         end
+        if type(source.currencyId) == "number" then cell.currencyId = source.currencyId end
         return cell
     end
 

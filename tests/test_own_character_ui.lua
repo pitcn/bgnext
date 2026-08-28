@@ -182,6 +182,50 @@ return function(test)
     test.eq(fallbackHeader.text, "余烬", "missing currency data falls back to the catalog title")
     test.eq(fallbackHeader.tooltip, "余烬", "missing currency data has a safe tooltip")
 
+    -- A currency value cell builds a tooltip from its confirmed id: the name is
+    -- Blizzard's own localized name, and each cap line appears only when the
+    -- API actually returned it. Missing fields stay hidden, never a fake zero.
+    local fullCapCell = {
+        value = 1000, maxQuantity = 3000,
+        quantityEarnedThisWeek = 400, maxWeeklyQuantity = 1000,
+        currencyId = 396,
+    }
+    local fullTip = UI.currencyTooltip(fullCapCell, function(id)
+        test.eq(id, 396, "currency tooltip resolves the confirmed cell id")
+        return { name = "勇气点数" }
+    end)
+    test.eq(fullTip.name, "勇气点数", "tooltip uses Blizzard's localized currency name")
+    test.eq(fullTip.lines[1], "当前数量 1000", "tooltip shows the current quantity")
+    test.eq(fullTip.lines[2], "总上限 3000", "tooltip shows the total cap")
+    test.eq(fullTip.lines[3], "本周获得 400", "tooltip shows weekly earnings")
+    test.eq(fullTip.lines[4], "每周上限 1000", "tooltip shows the weekly cap")
+
+    local quantityOnly = UI.currencyTooltip({ value = 42, currencyId = 396 },
+        function() return { name = "勇气点数" } end)
+    test.eq(quantityOnly.lines[1], "当前数量 42", "a quantity-only cell still shows its quantity")
+    test.eq(#quantityOnly.lines, 1, "missing caps are not shown as extra lines")
+
+    local missingName = UI.currencyTooltip({ value = 5, currencyId = 396 }, function() return nil end)
+    test.eq(missingName.name, nil, "a missing API name stays nil")
+    test.eq(#missingName.lines, 1, "only the quantity line survives without a name")
+
+    test.eq(UI.currencyTooltip({ value = 5 }, function() return { name = "x" } end), nil,
+        "a cell without a confirmed id has no currency tooltip")
+
+    -- showCurrencyTooltip writes the name once then appends each present line.
+    local currencyTooltipTitle, currencyTooltipLines = nil, {}
+    local fakeCurrencyTooltip = {
+        SetText = function(_, value) currencyTooltipTitle = value end,
+        AddLine = function(_, value) currencyTooltipLines[#currencyTooltipLines + 1] = value end,
+    }
+    test.eq(UI.showCurrencyTooltip(fakeCurrencyTooltip, fullCapCell, function()
+        return { name = "勇气点数" }
+    end), true, "a currency cell can populate the Blizzard tooltip")
+    test.eq(currencyTooltipTitle, "勇气点数", "the tooltip title is the currency name")
+    test.eq(#currencyTooltipLines, 4, "all four field lines reach the tooltip")
+    test.eq(UI.showCurrencyTooltip({ SetText = function() end }, { value = 5 }, function() return nil end),
+        false, "a cell without an id cannot populate a tooltip")
+
     -- Profession cooldown headings keep the compact title and resolve the
     -- client's own spell name for the tooltip, falling back when it is absent.
     local cooldownHeader = UI.columnHeader({

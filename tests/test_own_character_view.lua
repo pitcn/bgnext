@@ -386,6 +386,51 @@ return function(test)
     test.eq(mopCurrencyCells.valor.state, "value", "a capped currency still renders a value")
     test.eq(mopCurrencyCells.valor.value, 1000, "the currency record projects to its quantity")
     test.eq(mopCurrencyCells.valor.text, "1000", "the record quantity becomes the cell text")
+    test.eq(mopCurrencyCells.valor.maxQuantity, 3000, "the currency cell keeps its total cap")
+    test.eq(mopCurrencyCells.valor.currencyId, 396, "the currency cell keeps its confirmed id")
+    test.eq(mopCurrencyCells.valor.quantityEarnedThisWeek, nil,
+        "missing weekly earnings stay nil rather than a fabricated zero")
+
+    -- All four cap fields survive the projection untouched so the tooltip can
+    -- show every real limit the API returned; the body still shows only the
+    -- quantity. A wrong-typed cap is dropped, never coerced into a number.
+    local fullCapView = View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot({ currencies = {
+            valor = {
+                quantity = 1000, maxQuantity = 3000,
+                quantityEarnedThisWeek = 400, maxWeeklyQuantity = 1000,
+            },
+            justice = {
+                quantity = 7, maxQuantity = "3000", quantityEarnedThisWeek = "x",
+            },
+        } }) },
+        currentRealmId = 123, showAllRealms = false, now = 1000, visibility = {},
+    })
+    local fullCapCells = {}
+    for _, cell in ipairs(fullCapView.resource.rows[1].cells) do fullCapCells[cell.columnId] = cell end
+    test.eq(fullCapCells.valor.maxQuantity, 3000, "the total cap reaches the cell")
+    test.eq(fullCapCells.valor.quantityEarnedThisWeek, 400, "weekly earnings reach the cell")
+    test.eq(fullCapCells.valor.maxWeeklyQuantity, 1000, "the weekly cap reaches the cell")
+    test.eq(fullCapCells.justice.value, 7, "a partially capped currency still projects its quantity")
+    test.eq(fullCapCells.justice.maxQuantity, nil, "a wrong-typed cap is dropped")
+    test.eq(fullCapCells.justice.quantityEarnedThisWeek, nil, "a wrong-typed earning is dropped")
+
+    -- A legacy plain-number currency stays compatible: it still projects and
+    -- still carries its confirmed id for the name lookup, but has no caps.
+    local legacyCurrencyView = View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot({ currencies = { valor = 700 } }) },
+        currentRealmId = 123, showAllRealms = false, now = 1000, visibility = {},
+    })
+    local legacyCurrencyCells = {}
+    for _, cell in ipairs(legacyCurrencyView.resource.rows[1].cells) do legacyCurrencyCells[cell.columnId] = cell end
+    test.eq(legacyCurrencyCells.valor.value, 700, "a legacy number currency projects to its value")
+    test.eq(legacyCurrencyCells.valor.text, "700", "a legacy number currency keeps its text")
+    test.eq(legacyCurrencyCells.valor.maxQuantity, nil, "a legacy number currency has no cap")
+    test.eq(legacyCurrencyCells.valor.currencyId, 396, "a legacy number currency keeps its id")
 
     -- Height grows with rows and shrinks when characters are filtered out.
     test.eq(totals.height > view.height, true, "more characters make the window taller")
