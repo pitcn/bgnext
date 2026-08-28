@@ -107,6 +107,19 @@ return function(test)
 
     test.eq(byId.TKtitan.state, "empty", "TK remains independent from SSC")
 
+    -- A raid state carrying a difficulty letter surfaces that letter on its cell.
+    local difficultyView = View.project(input({
+        family = "retail",
+        catalog = Catalog.forFamily("retail"),
+        snapshots = { snapshot({
+            raidStates = { VA = { completed = true, resetsAt = 9000, difficultyLabel = "M" } },
+        }) },
+    }))
+    local retailCells = {}
+    for _, cell in ipairs(difficultyView.raid.rows[1].cells) do retailCells[cell.columnId] = cell end
+    test.eq(retailCells.VA.state, "complete", "a labelled retail raid is still complete")
+    test.eq(retailCells.VA.difficultyLabel, "M", "the raid cell carries its difficulty letter")
+
     -- Real reset countdown, surfaced as a section-level hint.
     test.eq(View.formatCountdown(1000, 1000 + 2 * 86400 + 3 * 3600), "2天3小时", "countdown spans days and hours")
     test.eq(View.formatCountdown(1000, 1000 + 3 * 3600 + 20 * 60), "3小时20分", "countdown spans hours and minutes")

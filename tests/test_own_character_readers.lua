@@ -107,6 +107,43 @@ return function(test)
     test.eq(raidStates.TKtitan.completed, nil, "a partial TK lockout is not complete")
     test.eq(raidStates.TKtitan.resetsAt, 10400, "TK keeps its own reset")
 
+    -- Retail raids lock per difficulty; the overview keeps the highest cleared
+    -- difficulty (M > H > N) as one cell carrying an explicit letter.
+    local retailCatalog = Catalog.forFamily("retail")
+    local retailRaidApi = api({
+        GetNumSavedInstances = function() return 3 end,
+        GetSavedInstanceInfo = function(index)
+            if index == 1 then
+                return "当前赛季团本", 900101, 3600, 14, true, false, 1, true,
+                    20, "普通", 6, 6, nil, 3004
+            elseif index == 2 then
+                return "当前赛季团本", 900102, 3600, 15, true, false, 1, true,
+                    20, "英雄", 6, 3, nil, 3004
+            elseif index == 3 then
+                return "当前赛季团本", 900103, 3600, 16, true, false, 1, true,
+                    20, "史诗", 6, 6, nil, 3004
+            end
+            return nil
+        end,
+    })
+    local retailStates = Adapters.readers("retail", retailRaidApi,
+        retailCatalog.raidColumns, retailCatalog.resourceColumns).raidStates()
+    test.eq(retailStates.VA.difficultyLabel, "M", "retail keeps the highest cleared difficulty")
+    test.eq(retailStates.VA.difficulty, 16, "retail records the mythic difficulty ID")
+    test.eq(retailStates.VA.completed, true, "the mythic lockout completes the raid")
+
+    -- A retail lockout with an unknown difficulty ID stays numeric and unlabelled
+    -- rather than guessing a letter.
+    local unknownDifficulty = Adapters.readers("retail", api({
+        GetNumSavedInstances = function() return 1 end,
+        GetSavedInstanceInfo = function()
+            return "当前赛季团本", 900104, 3600, 7, true, false, 1, true,
+                20, "未知", 6, 6, nil, 3004
+        end,
+    }), retailCatalog.raidColumns, retailCatalog.resourceColumns).raidStates()
+    test.eq(unknownDifficulty.VA.difficulty, 7, "an unknown difficulty ID stays numeric")
+    test.eq(unknownDifficulty.VA.difficultyLabel, nil, "an unknown difficulty ID has no label")
+
     -- Professions read the two primary skill lines into index-keyed entries.
     local profApi = api({
         GetProfessions = function() return 164, 165, nil, nil, nil, nil end,

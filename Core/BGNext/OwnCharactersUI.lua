@@ -617,6 +617,14 @@ function M.Draw(layout)
                         check:SetSize(M.metrics.iconSize, M.metrics.iconSize)
                         check:SetPoint("LEFT", frame, "TOPLEFT", M.metrics.padding + column.x,
                             M.rowCenterY(row.y))
+                        if cell.difficultyLabel then
+                            local label = nextText()
+                            label:SetPoint("LEFT", check, "RIGHT", 2, 0)
+                            label:SetSize(M.metrics.columnGap, M.metrics.iconSize)
+                            label:SetJustifyH("LEFT")
+                            label:SetTextColor(M.colors.complete.r, M.colors.complete.g, M.colors.complete.b)
+                            label:SetText(cell.difficultyLabel)
+                        end
                     elseif cell.state == "items" then
                         for slot, item in ipairs(cell.items) do
                             local icon = nextItemButton()

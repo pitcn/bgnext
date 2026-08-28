@@ -105,7 +105,7 @@ return function(test)
         vanilla = { 409, 249, 469, 309, 509, 531, 533 },
         tbc = { 532, 565, 544, 548, 550, 534, 564, 568, 580 },
         mop = { 1008, 1009, 996, 1098, 1136 },
-        retail = { 3004, 2912, 2939, 2913, 1592 },
+        retail = { 3004, 2987, 2912, 2939, 2913, 1592 },
     }
     for family, expected in pairs(expectedRaidInstances) do
         local catalog = Catalog.forFamily(family)
@@ -119,7 +119,7 @@ return function(test)
     end
     test.eq(Catalog.defaultVisible("retail", "raid", "VA"), true,
         "the BGLite current-season Retail raid is visible")
-    for _, id in ipairs({ "VS", "DR", "MQD", "Micosis" }) do
+    for _, id in ipairs({ "TG", "VS", "DR", "MQD", "Micosis" }) do
         test.eq(Catalog.defaultVisible("retail", "raid", id), false,
             "the Retail previous-season column " .. id .. " is hidden by default")
     end
@@ -328,4 +328,29 @@ return function(test)
         C_CurrencyInfo = { GetCurrencyInfo = function() return { quantity = 0 } end },
     }, Catalog.column("titan", "resource", "honor")), true,
         "Titan honor can use the currency API without UnitHonor")
+
+    -- Retail declares its 29 candidate currencies but registers no currency ID
+    -- for any of them, so canReadColumn hides each one until a real-client check
+    -- confirms the ID. Retail also exposes no profession cooldown columns.
+    local retailCatalog = Catalog.forFamily("retail")
+    local retailCurrencyCount, retailCooldownCount = 0, 0
+    for _, column in ipairs(retailCatalog.resourceColumns) do
+        if column.source.kind == "currency" and column.id:match("^currency%d+$") then
+            retailCurrencyCount = retailCurrencyCount + 1
+            test.eq(column.source.currencyId, nil, column.id .. " registers no unverified currency ID")
+            test.eq(Adapters.currencyId("retail", column.id), nil, column.id .. " has no currency ID")
+            test.eq(Catalog.defaultVisible("retail", "resource", column.id), false,
+                column.id .. " stays hidden until confirmed")
+            test.eq(Adapters.canReadColumn("retail", {
+                C_CurrencyInfo = { GetCurrencyInfo = function() return { quantity = 0 } end },
+            }, column), false, column.id .. " is not readable without a verified ID")
+        end
+        if column.source.kind == "profession-cooldown" then
+            retailCooldownCount = retailCooldownCount + 1
+        end
+    end
+    test.eq(retailCurrencyCount, 29, "retail declares its 29 candidate currencies")
+    test.eq(retailCooldownCount, 0, "retail has no profession cooldown columns")
+    test.eq(Catalog.column("retail", "raid", "TG") ~= nil, true, "retail declares the pending TG candidate raid")
+    test.eq(Catalog.column("retail", "raid", "TG").source.instanceIds[1], 2987, "TG maps its commented BGLite instance")
 end

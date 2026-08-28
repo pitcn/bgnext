@@ -41,7 +41,7 @@ local EQUIPMENT_FIELDS = {
 local RAID_STATE_FIELDS = {
     completed = "boolean", progress = "number", total = "number",
     completedParts = "number", totalParts = "number",
-    difficulty = "number", resetsAt = "number",
+    difficulty = "number", difficultyLabel = "string", resetsAt = "number",
 }
 
 local PROFESSION_FIELDS = {

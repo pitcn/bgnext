@@ -370,10 +370,28 @@ function M.readEquipment(api)
     return slots
 end
 
+-- Verified retail difficulty IDs from BGLite's BG.diffIDTbl (Core/DB/DB.lua):
+-- the modern client reports Normal/Heroic/Mythic as 14/15/16. Any other
+-- difficulty ID stays numeric and renders without a letter, so a classic or
+-- private-server lockout can never be mislabelled as Mythic.
+local DIFFICULTY_LABELS = { [14] = "N", [15] = "H", [16] = "M" }
+
+local function difficultyRank(label)
+    if label == "M" then return 3 end
+    if label == "H" then return 2 end
+    if label == "N" then return 1 end
+    return 0
+end
+
 -- Reads the saved-instance lockouts for the raids this family renders. Only
 -- columns whose zoneId matches a saved instance produce a state; a lockout with
 -- no reset time still records progress/completion but not a countdown.
-function M.readRaidStates(api, raidColumns)
+--
+-- Retail raids are locked separately per difficulty, so a retail column keeps
+-- the highest cleared difficulty (M > H > N) as one cell carrying a difficulty
+-- letter. Every other family keeps the first matching lockout per instance, so
+-- classic and private-server behaviour is unchanged.
+function M.readRaidStates(api, raidColumns, family)
     local getNum = api and api.GetNumSavedInstances
     local getInfo = api and api.GetSavedInstanceInfo
     if type(getNum) ~= "function" or type(getInfo) ~= "function" then return nil end
@@ -399,33 +417,76 @@ function M.readRaidStates(api, raidColumns)
 
     local states = {}
     local seenInstances = {}
+    local byDifficulty = {}
     for index = 1, count do
         local ok, name, lockoutId, reset, difficulty, locked, extended, mostSig, isRaid,
             maxPlayers, difficultyName, numEncounters, encounterProgress, _, instanceId = callAll(getInfo, index)
         local mapping = byInstance[instanceId]
-        if ok and locked == true and isRaid == true and mapping and not seenInstances[instanceId] then
-            seenInstances[instanceId] = true
-            local state = states[mapping.columnId] or {
-                progress = 0,
-                total = 0,
-                completedParts = 0,
-                totalParts = mapping.totalParts,
-            }
-            if type(difficulty) == "number" then state.difficulty = difficulty end
-            if type(numEncounters) == "number" and type(encounterProgress) == "number" then
-                state.total = state.total + numEncounters
-                state.progress = state.progress + encounterProgress
-                if numEncounters > 0 and encounterProgress >= numEncounters then
-                    state.completedParts = state.completedParts + 1
+        if ok and locked == true and isRaid == true and mapping then
+            local label = type(difficulty) == "number" and DIFFICULTY_LABELS[difficulty] or nil
+            if family == "retail" and label then
+                local rank = difficultyRank(label)
+                local ranked = byDifficulty[mapping.columnId]
+                if not ranked then
+                    ranked = {}
+                    byDifficulty[mapping.columnId] = ranked
                 end
+                local state = ranked[rank] or {
+                    progress = 0,
+                    total = 0,
+                    completedParts = 0,
+                    totalParts = mapping.totalParts,
+                    difficulty = type(difficulty) == "number" and difficulty or nil,
+                    difficultyLabel = label,
+                }
+                if type(numEncounters) == "number" and type(encounterProgress) == "number" then
+                    state.total = state.total + numEncounters
+                    state.progress = state.progress + encounterProgress
+                    if numEncounters > 0 and encounterProgress >= numEncounters then
+                        state.completedParts = state.completedParts + 1
+                    end
+                end
+                if type(reset) == "number" and reset >= 0 and type(nowValue) == "number" then
+                    local resetsAt = nowValue + reset
+                    if state.resetsAt == nil or resetsAt < state.resetsAt then state.resetsAt = resetsAt end
+                end
+                ranked[rank] = state
+            elseif not seenInstances[instanceId] then
+                seenInstances[instanceId] = true
+                local state = states[mapping.columnId] or {
+                    progress = 0,
+                    total = 0,
+                    completedParts = 0,
+                    totalParts = mapping.totalParts,
+                }
+                if type(difficulty) == "number" then state.difficulty = difficulty end
+                if type(numEncounters) == "number" and type(encounterProgress) == "number" then
+                    state.total = state.total + numEncounters
+                    state.progress = state.progress + encounterProgress
+                    if numEncounters > 0 and encounterProgress >= numEncounters then
+                        state.completedParts = state.completedParts + 1
+                    end
+                end
+                if type(reset) == "number" and reset >= 0 and type(nowValue) == "number" then
+                    local resetsAt = nowValue + reset
+                    if state.resetsAt == nil or resetsAt < state.resetsAt then state.resetsAt = resetsAt end
+                end
+                states[mapping.columnId] = state
             end
-            if type(reset) == "number" and reset >= 0 and type(nowValue) == "number" then
-                local resetsAt = nowValue + reset
-                if state.resetsAt == nil or resetsAt < state.resetsAt then state.resetsAt = resetsAt end
-            end
-            states[mapping.columnId] = state
         end
     end
+
+    -- Collapse each retail column to its highest cleared difficulty.
+    for columnId, ranked in pairs(byDifficulty) do
+        local best
+        for _, entry in pairs(ranked) do
+            if not best or difficultyRank(entry.difficultyLabel) > difficultyRank(best.difficultyLabel) then
+                best = entry
+            end
+        end
+        if best then states[columnId] = best end
+    end
+
     for _, state in pairs(states) do
         if state.totalParts > 0 and state.completedParts == state.totalParts then
             state.completed = true
@@ -633,7 +694,7 @@ function M.readers(family, api, raidColumns, resourceColumns)
         money = function() return M.readMoney(api) end,
         now = function() return M.readNow(api) end,
         equipment = function() return M.readEquipment(api) end,
-        raidStates = function() return M.readRaidStates(api, raidColumns) end,
+        raidStates = function() return M.readRaidStates(api, raidColumns, family) end,
         professions = function() return M.readProfessions(api) end,
         resources = function() return M.readResources(api, family, resourceColumns) end,
     }

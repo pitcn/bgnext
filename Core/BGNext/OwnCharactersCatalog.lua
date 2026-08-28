@@ -304,12 +304,31 @@ local CATALOG = {
         status = "pending-in-game-verification",
         raidColumns = {
             raid("VA", 3004, "VA", "当前赛季团本", nil, { 3004 }, true, "00BFFF"),
+            -- 潮缚石窟 is present in the BGLite baseline only as a commented-out
+            -- candidate (Core/DB/DB.lua), so it stays a hidden pending column.
+            raid("TG", 2987, "TG", "潮缚石窟", nil, { 2987 }, false, "00BFFF"),
             raid("VS", 2912, "VS", "P1团本", nil, { 2912 }, false, "00BFFF"),
             raid("DR", 2939, "DR", "梦境裂隙", nil, { 2939 }, false, "00BFFF"),
             raid("MQD", 2913, "MQD", "进军奎尔丹纳斯", nil, { 2913 }, false, "00BFFF"),
             raid("Micosis", 1592, "Micosis", "孢陨幽境", nil, { 1592 }, false, "00BFFF"),
         },
-        resourceColumns = baseResourceColumns(),
+        -- Retail shares only the local summary columns plus a list of candidate
+        -- currency IDs. None of the candidates is registered with a currency ID
+        -- yet, so canReadColumn() hides every one until a real-client check
+        -- confirms the ID; they never render a guessed value. Retail has no
+        -- profession cooldown columns.
+        resourceColumns = (function()
+            local columns = baseResourceColumns()
+            for _, id in ipairs({
+                3319, 3316, 3373, 3376, 3377, 3379, 3385, 3392, 3400,
+                3256, 3257, 3258, 3259, 3260, 3261, 3262, 3263, 3264, 3265, 3266,
+                3028, 3310, 3212, 3378, 3383, 3341, 3343, 3345, 3347,
+            }) do
+                columns[#columns + 1] = resource("currency" .. id, "候选货币", "number", "narrow", false,
+                    { kind = "currency", key = "currency" .. id }, false, "FFFFFF")
+            end
+            return columns
+        end)(),
     },
 }
 

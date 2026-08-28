@@ -184,6 +184,7 @@ local function raidCell(column, snapshot, now)
     local state = states and states[column.id] or nil
     if type(state) ~= "table" then return cell end
     if type(state.resetsAt) == "number" then cell.resetsAt = state.resetsAt end
+    if type(state.difficultyLabel) == "string" then cell.difficultyLabel = state.difficultyLabel end
     if type(state.resetsAt) == "number" and type(now) == "number" and now >= state.resetsAt then
         return cell
     end
