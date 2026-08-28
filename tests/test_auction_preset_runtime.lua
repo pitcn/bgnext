@@ -103,7 +103,12 @@ return function(test)
         _G.wa = {
             GN = function() return opts.selfName or "Me" end,
             GetFrameTotolHeight = function(count) return count * 110 end,
-            AutoButton_OnClick = function(self) if self and self.owner then self.owner.isAuto = true end end,
+            AutoButton_OnClick = function(self)
+                if self and self.owner then
+                    self.owner.isAuto = true
+                    self.owner.hide:Disable()
+                end
+            end,
             Hide_OnClick = function(self)
                 local f = self and self.owner
                 if f and f.hide and f.hide:IsEnabled() then
@@ -377,6 +382,45 @@ return function(test)
     end
 
     -- ---------------------------------------------------------------------
+    -- Regression: reaching the cap is terminal and releases runtime resources
+    -- without overwriting the visible `cap` status.
+    -- ---------------------------------------------------------------------
+    do
+        -- The starting price is already above the cap: never become the active
+        -- frame and never acquire the collapse lock.
+        resetEnv()
+        local atArm = newBidFrame({ auctionID = 12, money = 1100, player = nil })
+        attachFrame(atArm)
+        local armState = armFrame(atArm, "100", "1000")
+        test.eq(armState.sm.status, "cap", "arming above the cap preserves the cap terminal state")
+        test.eq(atArm.hide.enabled, true, "arming above the cap never leaves a collapse lock")
+        inRaid = false
+        BG.BGNext.AuctionPresetRuntime.onRosterUpdate()
+        test.eq(armState.sm.status, "cap", "a cap-at-arm frame is no longer the active runtime frame")
+
+        -- A queued counter-bid exists, then a newer price makes the next bid
+        -- exceed the cap. The queued timer must be cancelled and the active
+        -- runtime ownership released while status remains `cap`.
+        resetEnv()
+        local afterPrice = newBidFrame({ auctionID = 12, money = 100, player = nil })
+        attachFrame(afterPrice)
+        local priceState = armFrame(afterPrice, "100", "1000")
+        clock = 0.1
+        bidMsg("BiaoGeAuction", "SendMyMoney,12,200", "RAID", "Other-TestRealm", nil)
+        test.eq(#timers, 1, "an early counter-bid is queued before the cap event")
+        clock = 0.2
+        bidMsg("BiaoGeAuction", "SendMyMoney,12,950", "RAID", "Other-TestRealm", nil)
+        test.eq(priceState.sm.status, "cap", "an outbid beyond the next allowed amount reaches cap")
+        test.eq(timers[1].canceled, true, "reaching cap cancels the queued send")
+        test.eq(priceState.pendingTimer, nil, "reaching cap clears the queued timer reference")
+        test.eq(priceState.pendingAmount, nil, "reaching cap clears the queued amount")
+        test.eq(afterPrice.hide.enabled, true, "reaching cap releases the BGNext collapse lock")
+        inRaid = false
+        BG.BGNext.AuctionPresetRuntime.onRosterUpdate()
+        test.eq(priceState.sm.status, "cap", "later runtime stop events do not overwrite the cap status")
+    end
+
+    -- ---------------------------------------------------------------------
     -- Fix 7: unrelated addon messages are ignored before any fail-closed check.
     -- ---------------------------------------------------------------------
     do
@@ -488,6 +532,7 @@ return function(test)
         test.eq(st.sm.status, "armed", "my feature arms while the built-in is off")
         wa.AutoButton_OnClick({ owner = f })
         test.eq(st.sm.status, "idle", "turning the built-in on stops my auto-bid")
+        test.eq(f.hide.enabled, false, "the built-in auto-bid retains ownership of the collapse lock")
     end
 
     -- ---------------------------------------------------------------------

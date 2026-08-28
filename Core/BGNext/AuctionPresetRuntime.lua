@@ -206,7 +206,10 @@ local function setCollapseLock(bidFrame, locked)
             hide:Disable()
         end
     else
-        if st.collapseWasEnabled then
+        -- The built-in auto-bid and the terminal auction state also own this
+        -- safety lock.  Releasing BGNext's lock must not undo a newer lock
+        -- acquired by either of them while BGNext was armed.
+        if st.collapseWasEnabled and not bidFrame.isAuto and not bidFrame.IsEnd then
             hide:Enable()
         end
         st.collapseWasEnabled = nil
@@ -217,7 +220,7 @@ end
 -- Sending (single coalesced SendMyMoney, cancelable timer, generation guard)
 -- ---------------------------------------------------------------------------
 
-local function stopFrame(bidFrame, reason)
+local function releaseRuntime(bidFrame)
     local st = bidFrame and bidFrame[ACTIVE_KEY]
     if not st then
         return
@@ -228,12 +231,20 @@ local function stopFrame(bidFrame, reason)
         st.pendingTimer = nil
     end
     st.pendingAmount = nil
-    SM.stop(st.sm, reason)
     setCollapseLock(bidFrame, false)
     if activeFrame == bidFrame then
         activeFrame = nil
     end
     refresh(bidFrame, st)
+end
+
+local function stopFrame(bidFrame, reason)
+    local st = bidFrame and bidFrame[ACTIVE_KEY]
+    if not st then
+        return
+    end
+    SM.stop(st.sm, reason)
+    releaseRuntime(bidFrame)
 end
 
 local function doSend(bidFrame, st, amount)
@@ -331,10 +342,14 @@ local function arm(bidFrame, st)
         realm = selfRealm(),
     })
 
-    if st.sm.status == "invalid" then
-        region.statusText:SetText(SM.statusText(st.sm))
-        region.statusText:SetTextColor(1, 0.3, 0.3)
-        refresh(bidFrame, st)
+    if st.sm.status ~= "armed" then
+        -- `cap` and `invalid` are terminal state-machine outcomes. Release any
+        -- previous transport/UI ownership without replacing their user-visible
+        -- reason with a generic stopped state.
+        releaseRuntime(bidFrame)
+        if st.sm.status == "invalid" then
+            region.statusText:SetTextColor(1, 0.3, 0.3)
+        end
         return
     end
 
@@ -440,7 +455,12 @@ function M.onAddonMessage(self, event, prefix, message, distribution, sender, ta
         bidder = fullSender,
     }, now())
 
-    if decision and decision.bid then
+    if st.sm.status ~= "armed" then
+        -- Reaching the cap is terminal: cancel a coalesced send, unlock the
+        -- visible card and relinquish active-frame ownership while preserving
+        -- status="cap" for the user.
+        releaseRuntime(activeFrame)
+    elseif decision and decision.bid then
         sendBid(activeFrame, st, decision.bid)
     else
         refresh(activeFrame, st)
