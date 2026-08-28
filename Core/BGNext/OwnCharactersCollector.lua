@@ -84,6 +84,8 @@ function M.collect(env)
     if resources then
         snapshot.currencies = type(resources.currencies) == "table" and resources.currencies or nil
         snapshot.items = type(resources.items) == "table" and resources.items or nil
+        snapshot.professionCooldowns = type(resources.professionCooldowns) == "table"
+            and resources.professionCooldowns or nil
     end
 
     return snapshot

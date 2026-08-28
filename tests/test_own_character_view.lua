@@ -315,6 +315,45 @@ return function(test)
     end
     test.eq(totals.raid.totals, nil, "the raid section has no totals row")
 
+    -- Profession cooldowns project to a ready checkmark or a countdown string.
+    local cdView = View.project({
+        family = "vanilla",
+        catalog = Catalog.forFamily("vanilla"),
+        snapshots = { snapshot({
+            professionCooldowns = {
+                transmute = { ready = true },
+                mooncloth = { endsAt = 1000 + 3 * 86400 + 2 * 3600 },
+                saltShaker = { endsAt = 1000 + 5 * 60 },
+            },
+        }) },
+        currentRealmId = 123,
+        showAllRealms = false,
+        now = 1000,
+        visibility = {},
+    })
+    local cdCells = {}
+    for _, cell in ipairs(cdView.resource.rows[1].cells) do cdCells[cell.columnId] = cell end
+    test.eq(cdCells.transmute.state, "complete", "a ready cooldown renders as complete")
+    test.eq(cdCells.transmute.ready, true, "a ready cooldown is flagged ready")
+    test.eq(cdCells.mooncloth.state, "cooldown", "a cooling cooldown renders as a countdown")
+    test.eq(cdCells.mooncloth.text, "3天2小时", "cooldown countdown spans days and hours")
+    test.eq(cdCells.saltShaker.text, "5分", "cooldown under an hour shows minutes")
+
+    local expiredCd = View.project({
+        family = "vanilla",
+        catalog = Catalog.forFamily("vanilla"),
+        snapshots = { snapshot({ professionCooldowns = { transmute = { endsAt = 500 } } }) },
+        currentRealmId = 123,
+        showAllRealms = false,
+        now = 1000,
+        visibility = {},
+    })
+    for _, cell in ipairs(expiredCd.resource.rows[1].cells) do
+        if cell.columnId == "transmute" then
+            test.eq(cell.state, "complete", "an expired cooldown is ready, never a negative countdown")
+        end
+    end
+
     -- Height grows with rows and shrinks when characters are filtered out.
     test.eq(totals.height > view.height, true, "more characters make the window taller")
 

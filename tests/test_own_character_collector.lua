@@ -100,6 +100,17 @@ return function(test)
     test.eq(rich.items.bagFree, 4, "item counts are collected")
     test.eq(rich.professions[1].name, "锻造", "professions are collected")
 
+    -- Profession cooldowns ride the same resources reader as currencies/items.
+    local cdCollected = Collector.collect(baseEnv({
+        resources = function()
+            return { currencies = {}, items = {}, professionCooldowns = { transmute = { ready = true } } }
+        end,
+    }))
+    test.eq(cdCollected.professionCooldowns.transmute.ready, true, "profession cooldowns are collected")
+    test.eq(Collector.collect(baseEnv({
+        resources = function() return { currencies = {}, items = {} } end,
+    })).professionCooldowns, nil, "a resources reader without cooldowns stores none")
+
     -- Event registration is restricted to a reviewed own-character allowlist.
     local registered = {}
     local frame = {

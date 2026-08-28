@@ -47,7 +47,9 @@ local CAPABILITIES = {
 -- unverified column must render blank, never wrong.
 local CURRENCY_IDS = {
     vanilla = {},
-    tbc = {},
+    tbc = {
+        arenaPoints = 1900,
+    },
     wrath = {},
     titan = {
         titanEmber = 3403,
@@ -68,8 +70,12 @@ local CURRENCY_IDS = {
 -- only a verified in-game ID belongs here; an unlisted key resolves to nil and
 -- its column stays hidden.
 local ITEM_IDS = {
-    vanilla = {},
-    tbc = {},
+    vanilla = {
+        atieshFragment = 22726,
+    },
+    tbc = {
+        badgeOfJustice = 29434,
+    },
     wrath = {},
     titan = {},
     cata = {},
@@ -225,6 +231,60 @@ function M.readMoney(api)
     local money = M.safeCall(api and api.GetMoney)
     if type(money) ~= "number" then return nil end
     return money
+end
+
+-- Reads the logged-in character's rested XP amount. The Classic-family client
+-- exposes GetXPExhaustion; modern clients use C_PlayerInfo.GetRestExperience.
+-- Either way only the amount is recorded, never the level-split maximum, and a
+-- missing or protected API degrades to nil instead of a fabricated zero.
+function M.readRestExperience(api)
+    if type(api) ~= "table" then return nil end
+    local xp
+    local legacy = api.GetXPExhaustion
+    if type(legacy) == "function" then
+        xp = M.safeCall(legacy)
+    else
+        local playerInfo = api.C_PlayerInfo
+        local modern = type(playerInfo) == "table" and playerInfo.GetRestExperience or nil
+        if type(modern) == "function" then
+            local ok, restXp = callAll(modern)
+            if ok then xp = restXp end
+        end
+    end
+    if type(xp) ~= "number" then return nil end
+    return xp
+end
+
+-- Reads one profession cooldown spell for the logged-in character. The modern
+-- C_Spell table API is preferred; the legacy GetSpellCooldown form is the
+-- fallback. A spell with no active cooldown reports duration zero, which is
+-- recorded as ready; a spell still cooling records only the time it ends.
+-- A missing API or a wrong-typed result yields nil so the column hides.
+function M.readProfessionCooldown(api, spellId)
+    if type(api) ~= "table" or type(spellId) ~= "number" then return nil end
+    local start, duration
+
+    local spellApi = api.C_Spell
+    local modern = type(spellApi) == "table" and spellApi.GetSpellCooldown or nil
+    if type(modern) == "function" then
+        local ok, info = callAll(modern, spellId)
+        if ok and type(info) == "table" then
+            start = info.startTime
+            duration = info.duration
+        end
+    end
+
+    if type(start) ~= "number" or type(duration) ~= "number" then
+        local legacy = api.GetSpellCooldown
+        if type(legacy) ~= "function" then return nil end
+        local ok, s, d = callAll(legacy, spellId)
+        if not ok then return nil end
+        start, duration = s, d
+    end
+
+    if type(start) ~= "number" or type(duration) ~= "number" then return nil end
+    if duration <= 0 then return { ready = true } end
+    return { endsAt = start + duration }
 end
 
 function M.readNow(api)
@@ -427,7 +487,7 @@ function M.readProfessions(api)
 end
 
 local function resourceWhitelist(columns)
-    local keys, prefixes = {}, {}
+    local keys, prefixes, cooldownSpells = {}, {}, {}
     for _, column in ipairs(columns or {}) do
         local source = type(column) == "table" and column.source or nil
         if type(source) == "table" then
@@ -435,10 +495,12 @@ local function resourceWhitelist(columns)
                 keys[source.key or column.id] = true
             elseif source.kind == "tracked-items" and type(source.prefix) == "string" then
                 prefixes[source.prefix] = true
+            elseif source.kind == "profession-cooldown" and type(source.spellId) == "number" then
+                cooldownSpells[source.key or column.id] = source.spellId
             end
         end
     end
-    return keys, prefixes
+    return keys, prefixes, cooldownSpells
 end
 
 -- Reads only resources that the current family's explicit catalog declares.
@@ -446,12 +508,19 @@ end
 -- pending columns stay absent from the snapshot as well as the UI.
 function M.readResources(api, family, resourceColumns)
     local result = { currencies = {}, items = {} }
-    local allowedKeys, allowedPrefixes = resourceWhitelist(resourceColumns)
+    local allowedKeys, allowedPrefixes, allowedCooldowns = resourceWhitelist(resourceColumns)
 
     local getHonor = api and api.UnitHonor
     if allowedKeys.honor and type(getHonor) == "function" then
         local honor = M.safeCall(getHonor, "player")
         if type(honor) == "number" then result.currencies.honor = honor end
+    end
+
+    local getRest = api and api.GetXPExhaustion
+    local getRestModern = api and api.C_PlayerInfo and api.C_PlayerInfo.GetRestExperience or nil
+    if allowedKeys.restXp and (type(getRest) == "function" or type(getRestModern) == "function") then
+        local restXp = M.readRestExperience(api)
+        if type(restXp) == "number" then result.currencies.restXp = restXp end
     end
 
     local ids = CURRENCY_IDS[family]
@@ -504,7 +573,17 @@ function M.readResources(api, family, resourceColumns)
         end
     end
 
-    if next(result.currencies) == nil and next(result.items) == nil then return nil end
+    local cooldowns = {}
+    for key, spellId in pairs(allowedCooldowns) do
+        local entry = M.readProfessionCooldown(api, spellId)
+        if type(entry) == "table" and next(entry) ~= nil then
+            cooldowns[key] = entry
+        end
+    end
+    if next(cooldowns) ~= nil then result.professionCooldowns = cooldowns end
+
+    if next(result.currencies) == nil and next(result.items) == nil
+        and next(result.professionCooldowns or {}) == nil then return nil end
     return result
 end
 
@@ -568,9 +647,18 @@ function M.canReadColumn(family, api, column)
                 or (type(api.C_CurrencyInfo) == "table" and type(api.C_CurrencyInfo.GetCurrencyInfo) == "function")
         end
         if key == "honor" then return type(api.UnitHonor) == "function" end
+        if key == "restXp" then
+            return type(api.GetXPExhaustion) == "function"
+                or (type(api.C_PlayerInfo) == "table" and type(api.C_PlayerInfo.GetRestExperience) == "function")
+        end
         local itemId = ITEM_IDS[family] and ITEM_IDS[family][key]
         if type(itemId) == "number" then return type(api.GetItemCount) == "function" end
         return false
+    end
+    if source.kind == "profession-cooldown" then
+        return type(source.spellId) == "number"
+            and (type(api.GetSpellCooldown) == "function"
+                or (type(api.C_Spell) == "table" and type(api.C_Spell.GetSpellCooldown) == "function"))
     end
     if source.kind == "tracked-items" then return type(api.GetItemCount) == "function" end
     return false

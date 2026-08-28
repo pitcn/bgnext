@@ -71,6 +71,36 @@ return function(test)
             family .. " never inherits Titan currencies")
     end
 
+    -- Vanilla adds the Atiesh fragment, rested XP and its three verified
+    -- profession cooldowns; TBC adds badges, honor, arena points and rested XP.
+    local vanillaResources = {}
+    for _, column in ipairs(Catalog.forFamily("vanilla").resourceColumns) do vanillaResources[column.id] = column end
+    test.eq(vanillaResources.atieshFragment ~= nil, true, "vanilla exposes the Atiesh fragment item")
+    test.eq(vanillaResources.atieshFragment.kind, "number", "the Atiesh fragment is a numeric item count")
+    test.eq(vanillaResources.atieshFragment.source.key, "atieshFragment", "the Atiesh fragment uses its own whitelist key")
+    test.eq(Adapters.currencyId("vanilla", "atieshFragment"), nil, "the Atiesh fragment is an item, not a currency")
+    test.eq(vanillaResources.restXp ~= nil, true, "vanilla exposes rested XP")
+    test.eq(Catalog.defaultVisible("vanilla", "resource", "restXp"), false, "rested XP stays hidden until verified")
+    test.eq(vanillaResources.transmute ~= nil, true, "vanilla exposes the transmute cooldown")
+    test.eq(vanillaResources.transmute.kind, "cooldown", "transmute is a cooldown column")
+    test.eq(vanillaResources.transmute.source.spellId, 17187, "transmute uses the verified spell id")
+    test.eq(vanillaResources.saltShaker.source.spellId, 19566, "salt shaker uses the verified spell id")
+    test.eq(vanillaResources.mooncloth.source.spellId, 18560, "mooncloth uses the verified spell id")
+    test.eq(Catalog.defaultVisible("vanilla", "resource", "transmute"), true, "transmute shows by default")
+    test.eq(Catalog.column("vanilla", "resource", "badgeOfJustice"), nil, "vanilla never carries the TBC badge")
+
+    local tbcResources = {}
+    for _, column in ipairs(Catalog.forFamily("tbc").resourceColumns) do tbcResources[column.id] = column end
+    test.eq(tbcResources.badgeOfJustice ~= nil, true, "tbc exposes the badge of justice item")
+    test.eq(tbcResources.badgeOfJustice.source.key, "badgeOfJustice", "the badge uses its own whitelist key")
+    test.eq(tbcResources.honor ~= nil, true, "tbc exposes honor via UnitHonor")
+    test.eq(tbcResources.arenaPoints ~= nil, true, "tbc declares arena points")
+    test.eq(Catalog.defaultVisible("tbc", "resource", "arenaPoints"), false, "tbc arena points stay hidden until verified")
+    test.eq(Adapters.currencyId("tbc", "arenaPoints"), 1900, "tbc arena points use currency 1900")
+    test.eq(tbcResources.restXp ~= nil, true, "tbc exposes rested XP")
+    test.eq(Catalog.column("tbc", "resource", "transmute"), nil, "tbc never carries a vanilla profession cooldown")
+    test.eq(Catalog.column("tbc", "resource", "atieshFragment"), nil, "tbc never carries the Atiesh fragment")
+
     local expectedRaidInstances = {
         vanilla = { 409, 249, 469, 309, 509, 531, 533 },
         tbc = { 532, 565, 544, 548, 550, 534, 564, 568, 580 },
@@ -104,7 +134,7 @@ return function(test)
     -- Descriptor shape is enforced for every column of every family.
     local validKind = {
         status = true, progress = true, number = true,
-        money = true, items = true, profession = true,
+        money = true, items = true, profession = true, cooldown = true,
     }
     local validWidth = {
         narrow = true, normal = true, wide = true, ["dynamic-items"] = true,

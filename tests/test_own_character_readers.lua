@@ -174,6 +174,49 @@ return function(test)
     test.eq(vanillaResources, nil,
         "a family does not collect honor or currencies absent from its explicit resource whitelist")
 
+    -- Rested XP, item counts and profession cooldowns are read only when the
+    -- family's explicit resource whitelist declares them.
+    local vanillaFull = Adapters.readers("vanilla", api({
+        GetXPExhaustion = function() return 4200 end,
+        GetItemCount = function(id) return id == 22726 and 12 or 0 end,
+        GetSpellCooldown = function(id)
+            if id == 17187 then return 1000, 7200 end
+            return 0, 0
+        end,
+    }), vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources()
+    test.eq(vanillaFull.currencies.restXp, 4200, "vanilla reads rested XP via GetXPExhaustion")
+    test.eq(vanillaFull.items.atieshFragment, 12, "vanilla reads the Atiesh fragment by item id")
+    test.eq(vanillaFull.professionCooldowns.transmute.endsAt, 8200, "a cooling transmute records its end time")
+    test.eq(vanillaFull.professionCooldowns.saltShaker.ready, true, "a zero-duration cooldown is ready")
+    test.eq(vanillaFull.professionCooldowns.mooncloth.ready, true, "the third vanilla cooldown is ready when idle")
+
+    -- The modern C_Spell table form is preferred over the legacy call.
+    local modernCd = Adapters.readers("vanilla", api({
+        GetSpellCooldown = false,
+        C_Spell = { GetSpellCooldown = function(id)
+            return { startTime = 1000, duration = 7200, isEnabled = true }
+        end },
+    }), vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources()
+    test.eq(modernCd.professionCooldowns.transmute.endsAt, 8200, "the modern C_Spell cooldown API is preferred")
+
+    -- Missing rest-XP, item and cooldown APIs leave those columns empty.
+    local noVanillaApi = api({ GetXPExhaustion = false, GetItemCount = false, GetSpellCooldown = false })
+    test.eq(Adapters.readers("vanilla", noVanillaApi,
+        vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources(), nil,
+        "missing vanilla resource APIs yield no resources")
+
+    -- TBC reads badges by item id, honor via UnitHonor and arena via currency 1900.
+    local tbcResources = Adapters.readers("tbc", api({
+        GetItemCount = function(id) return id == 29434 and 40 or 0 end,
+        UnitHonor = function() return 2500 end,
+        C_CurrencyInfo = { GetCurrencyInfo = function(id)
+            return id == 1900 and { quantity = 1500 } or { quantity = 0 }
+        end },
+    }), Catalog.forFamily("tbc").raidColumns, Catalog.forFamily("tbc").resourceColumns).resources()
+    test.eq(tbcResources.items.badgeOfJustice, 40, "tbc reads badges by item id")
+    test.eq(tbcResources.currencies.honor, 2500, "tbc reads honor via UnitHonor")
+    test.eq(tbcResources.currencies.arenaPoints, 1500, "tbc reads arena points via currency 1900")
+
     -- Missing, non-function or throwing APIs degrade to nil, never an error.
     local degraded = Adapters.readers("titan", api({
         UnitName = function() error("protected") end,

@@ -304,7 +304,7 @@ local function trackedItemsCell(column, snapshot)
     return cell
 end
 
-local function resourceCell(column, snapshot)
+local function resourceCell(column, snapshot, now)
     local source = column.source or {}
     if source.kind == "equipment" then
         return equipmentCell(column, snapshot)
@@ -320,6 +320,29 @@ local function resourceCell(column, snapshot)
             cell.state = "value"
             cell.value = snapshot.money
             cell.text = tostring(math.floor(snapshot.money / 10000))
+        end
+        return cell
+    end
+
+    if source.kind == "profession-cooldown" then
+        local key = source.key or column.id
+        local cooldowns = type(snapshot.professionCooldowns) == "table" and snapshot.professionCooldowns or nil
+        local entry = cooldowns and cooldowns[key] or nil
+        if type(entry) == "table" then
+            if entry.ready == true then
+                cell.state = "complete"
+                cell.ready = true
+            elseif type(entry.endsAt) == "number" then
+                local remaining = M.formatCountdown(now, entry.endsAt)
+                if remaining then
+                    cell.state = "cooldown"
+                    cell.endsAt = entry.endsAt
+                    cell.text = remaining
+                else
+                    cell.state = "complete"
+                    cell.ready = true
+                end
+            end
         end
         return cell
     end
@@ -513,7 +536,7 @@ function M.project(input)
 
         local resourceRow = baseRow(entry, family, index)
         for position, column in ipairs(resourceColumns) do
-            local cell = resourceCell(column, snapshot)
+            local cell = resourceCell(column, snapshot, now)
             resourceRow.cells[#resourceRow.cells + 1] = cell
             if column.total == true and type(cell.value) == "number" then
                 totals[column.id] = (totals[column.id] or 0) + cell.value
