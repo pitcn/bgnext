@@ -32,7 +32,6 @@ function M.ensureRoot(saved)
     root.equipmentFilters = root.equipmentFilters or {}
     root.ownCharacters = root.ownCharacters or {}
     root.currentRaid = root.currentRaid or {}
-    root.auctionPresets = root.auctionPresets or {}
     root.currentSettlement = root.currentSettlement or emptySettlement()
     return root
 end

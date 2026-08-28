@@ -118,7 +118,7 @@ return function(test)
     test.eq(root.wishlist ~= nil, true, "wishlist survives")
     test.eq(root.equipmentFilters ~= nil, true, "equipment filters survive")
     test.eq(root.ownCharacters ~= nil, true, "own-character overview survives")
-    test.eq(root.auctionPresets ~= nil, true, "auction presets survive")
+    test.eq(root.auctionPresets, nil, "no auto-bid presets are created")
     test.eq(root.settings ~= nil, true, "settings survive")
 
     -- 8. an expired settlement is purged before the table is shown

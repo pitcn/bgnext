@@ -6,6 +6,7 @@ return function(test)
 
     test.eq(saved.BGNext, root, "BGNext root attached")
     test.eq(root.schemaVersion, 1, "schema version")
+    test.eq(root.auctionPresets, nil, "duplicate auto-bid presets are not auto-created")
 
     life.beginSettlement(root, "raid-a", 100)
     root.currentSettlement.trades[1] = { amount = 100 }

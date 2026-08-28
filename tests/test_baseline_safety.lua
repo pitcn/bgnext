@@ -47,6 +47,16 @@ return function(test)
         "wishlist reminder includes local sound")
     test.eq(helpers:find("BG.BGNext.RoleOverviewEntry.togglePinned()", 1, true), nil,
         "startup RoleOverviewUI never toggles the user-controlled window")
+
+    -- The duplicate BGNext auto-bid stack was removed; only the retained BGLite
+    -- native auto-bid path (AuctionWA/AuctionWAEvent) loads, listens, and sends.
+    for _, module in ipairs({
+        "AuctionNames", "AuctionPresetStore", "ControlledAutoBid",
+        "AuctionBidMessage", "AuctionBidUI", "AuctionPresetRuntime",
+    }) do
+        test.eq(toc:find("Core\\BGNext\\" .. module .. ".lua", 1, true), nil,
+            "duplicate auto-bid module " .. module .. " is not loaded")
+    end
     for path, content in pairs({
         ["Core/BiaoGe.lua"] = main,
         ["Core/DB/DB.lua"] = database,
