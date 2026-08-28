@@ -355,6 +355,7 @@ local function resourceCell(column, snapshot, now)
             local items = type(snapshot.items) == "table" and snapshot.items or nil
             value = items and items[key] or nil
         end
+        if type(value) == "table" then value = value.quantity end
         if type(value) == "number" then
             cell.state = "value"
             cell.value = value

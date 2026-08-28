@@ -255,6 +255,53 @@ return function(test)
             key .. " stays hidden until real-client validation")
     end
 
+    -- MoP registers its currencies and cooldowns against the exact whitelist.
+    -- Only Valor, Justice, the bonus-roll seal and money show by default; every
+    -- candidate currency, item and cooldown stays hidden until client checks.
+    local mopCurrencyIds = {
+        valor = 396, justice = 395, roll = 776, conquest = 390, honor = 1901,
+        ironpawToken = 402, darkmoonTicket = 515, elderCharm = 697,
+        lesserCharm = 738, moguRune = 752, timelessCoin = 777,
+        currency3350 = 3350, currency3407 = 3407, currency3414 = 3414, currency3416 = 3416,
+    }
+    for key, id in pairs(mopCurrencyIds) do
+        test.eq(Adapters.currencyId("mop", key), id, "MoP " .. key .. " uses currency " .. tostring(id))
+        local column = Catalog.column("mop", "resource", key)
+        test.eq(column ~= nil, true, "MoP declares the " .. key .. " column")
+        test.eq(column.source.currencyId, id, "MoP " .. key .. " resolves its icon at runtime")
+    end
+    for _, id in ipairs({ "valor", "justice", "roll" }) do
+        test.eq(Catalog.defaultVisible("mop", "resource", id), true, "MoP " .. id .. " shows by default")
+    end
+    test.eq(Catalog.defaultVisible("mop", "resource", "money"), true, "MoP gold shows by default")
+    for _, id in ipairs({ "conquest", "honor", "ironpawToken", "darkmoonTicket",
+        "elderCharm", "lesserCharm", "moguRune", "timelessCoin",
+        "currency3350", "currency3407", "currency3414", "currency3416",
+        "item256883", "item247796" }) do
+        test.eq(Catalog.defaultVisible("mop", "resource", id), false,
+            "MoP " .. id .. " stays hidden until confirmed")
+    end
+    test.eq(Adapters.currencyId("mop", "item256883"), nil, "MoP candidate items are not currencies")
+    test.eq(Catalog.column("mop", "resource", "item256883").source.kind, "currency",
+        "MoP candidate items ride the currency-source column shape")
+    test.eq(Catalog.column("mop", "resource", "titanEmber"), nil, "MoP never inherits Titan currencies")
+
+    local mopCooldowns = {
+        transmuteLivingSteel = 114780, lightningSteelIngot = 138646,
+        shaCrystal = 116499, scrollOfWisdom = 112996,
+        facetsOfResearch = 131686, serpentsHeart = 140050,
+        magnificenceOfLeather = 140040, imperialSilk = 125557,
+        jardsPeculiarEnergy = 139176,
+    }
+    for key, spellId in pairs(mopCooldowns) do
+        local column = Catalog.column("mop", "resource", key)
+        test.eq(column ~= nil, true, "mop declares the " .. key .. " cooldown")
+        test.eq(column.kind, "cooldown", key .. " is a cooldown column")
+        test.eq(column.source.spellId, spellId, key .. " uses its verified spell id")
+        test.eq(Catalog.defaultVisible("mop", "resource", key), false,
+            key .. " stays hidden until real-client validation")
+    end
+
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")
     test.eq(Catalog.forFamily(nil), nil, "missing family is safe")

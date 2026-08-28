@@ -217,6 +217,28 @@ return function(test)
     test.eq(tbcResources.currencies.honor, 2500, "tbc reads honor via UnitHonor")
     test.eq(tbcResources.currencies.arenaPoints, 1500, "tbc reads arena points via currency 1900")
 
+    -- MoP reads capped currencies as records carrying the weekly caps; a
+    -- legacy family with the same API still stores a plain count.
+    local mopResources = Adapters.readers("mop", api({
+        C_CurrencyInfo = { GetCurrencyInfo = function(id)
+            if id == 396 then
+                return { quantity = 1000, maxQuantity = 3000, quantityEarnedThisWeek = 1000, maxWeeklyQuantity = 1000 }
+            end
+            if id == 395 then return { quantity = 500, maxQuantity = 4000 } end
+            return nil
+        end },
+    }), Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).resources()
+    test.eq(mopResources.currencies.valor.quantity, 1000, "MoP Valor records its quantity")
+    test.eq(mopResources.currencies.valor.maxQuantity, 3000, "MoP Valor records its maximum")
+    test.eq(mopResources.currencies.valor.quantityEarnedThisWeek, 1000, "MoP Valor records its weekly earned")
+    test.eq(mopResources.currencies.valor.maxWeeklyQuantity, 1000, "MoP Valor records its weekly cap")
+    test.eq(mopResources.currencies.justice.quantity, 500, "MoP Justice records its quantity")
+    test.eq(mopResources.currencies.justice.maxQuantity, 4000, "MoP Justice records its maximum")
+    test.eq(mopResources.currencies.justice.maxWeeklyQuantity, nil, "an absent cap stays empty")
+    local mopMissing = Adapters.readers("mop", api({ C_CurrencyInfo = false }),
+        Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).resources()
+    test.eq(mopMissing.currencies.valor, nil, "missing MoP currency API records no Valor")
+
     -- Missing, non-function or throwing APIs degrade to nil, never an error.
     local degraded = Adapters.readers("titan", api({
         UnitName = function() error("protected") end,

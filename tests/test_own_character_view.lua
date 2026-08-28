@@ -354,6 +354,25 @@ return function(test)
         end
     end
 
+    -- A capped MoP currency record projects to its quantity, so the renderer
+    -- shows the amount while the cap fields stay stored for later use.
+    local mopCurrencyView = View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot({ currencies = {
+            valor = { quantity = 1000, maxQuantity = 3000 },
+        } }) },
+        currentRealmId = 123,
+        showAllRealms = false,
+        now = 1000,
+        visibility = {},
+    })
+    local mopCurrencyCells = {}
+    for _, cell in ipairs(mopCurrencyView.resource.rows[1].cells) do mopCurrencyCells[cell.columnId] = cell end
+    test.eq(mopCurrencyCells.valor.state, "value", "a capped currency still renders a value")
+    test.eq(mopCurrencyCells.valor.value, 1000, "the currency record projects to its quantity")
+    test.eq(mopCurrencyCells.valor.text, "1000", "the record quantity becomes the cell text")
+
     -- Height grows with rows and shrinks when characters are filtered out.
     test.eq(totals.height > view.height, true, "more characters make the window taller")
 

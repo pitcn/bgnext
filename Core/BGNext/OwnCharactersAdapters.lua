@@ -62,7 +62,23 @@ local CURRENCY_IDS = {
         honor = 1901,
     },
     cata = {},
-    mop = {},
+    mop = {
+        valor = 396,
+        justice = 395,
+        roll = 776,
+        conquest = 390,
+        honor = 1901,
+        ironpawToken = 402,
+        darkmoonTicket = 515,
+        elderCharm = 697,
+        lesserCharm = 738,
+        moguRune = 752,
+        timelessCoin = 777,
+        currency3350 = 3350,
+        currency3407 = 3407,
+        currency3414 = 3414,
+        currency3416 = 3416,
+    },
     retail = {},
 }
 
@@ -79,7 +95,10 @@ local ITEM_IDS = {
     wrath = {},
     titan = {},
     cata = {},
-    mop = {},
+    mop = {
+        item256883 = 256883,
+        item247796 = 247796,
+    },
     retail = {},
 }
 
@@ -528,12 +547,25 @@ function M.readResources(api, family, resourceColumns)
     if type(getCurrency) ~= "function" and type(api and api.C_CurrencyInfo) == "table" then
         getCurrency = api.C_CurrencyInfo.GetCurrencyInfo
     end
+    -- MoP and Retail currencies carry weekly caps; their snapshots record the
+    -- cap fields alongside the amount. Legacy families keep a plain count.
+    local readCaps = family == "mop" or family == "retail"
     if ids and type(getCurrency) == "function" then
         for key, id in pairs(ids) do
             if allowedKeys[key] and type(id) == "number" then
                 local ok, first, amount = callAll(getCurrency, id)
-                if ok and type(first) == "table" then amount = first.quantity end
-                if ok and type(amount) == "number" then
+                if ok and type(first) == "table" then
+                    if readCaps then
+                        local record = {}
+                        for _, field in ipairs({ "quantity", "maxQuantity", "quantityEarnedThisWeek", "maxWeeklyQuantity" }) do
+                            if type(first[field]) == "number" then record[field] = first[field] end
+                        end
+                        if type(record.quantity) == "number" then result.currencies[key] = record end
+                    else
+                        amount = first.quantity
+                    end
+                end
+                if not readCaps and ok and type(amount) == "number" then
                     result.currencies[key] = amount
                 end
             end
