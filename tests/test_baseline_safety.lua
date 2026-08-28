@@ -10,6 +10,7 @@ return function(test)
     local main = readAll("Core/BiaoGe.lua")
     local database = readAll("Core/DB/DB.lua")
     local auction = readAll("Core/Module/Auction.lua")
+    local auctionWA = readAll("Core/Module/AuctionWA.lua")
     local wishlistReminder = readAll("Core/BGNext/WishlistReminder.lua")
     local helpers = readAll("Core/function2.lua")
     local trade = readAll("Core/Module/Trade.lua")
@@ -57,6 +58,9 @@ return function(test)
         test.eq(toc:find("Core\\BGNext\\" .. module .. ".lua", 1, true), nil,
             "duplicate auto-bid module " .. module .. " is not loaded")
     end
+    local autoDelay = auctionWA:match("function wa%.AutoSendLate%(%)(.-)function wa%.SetEndState") or ""
+    test.eq(autoDelay:find("random", 1, true), nil,
+        "native auto-bid timing is deterministic and cannot become timing randomization")
     for path, content in pairs({
         ["Core/BiaoGe.lua"] = main,
         ["Core/DB/DB.lua"] = database,

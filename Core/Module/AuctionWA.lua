@@ -1186,14 +1186,13 @@ BG.Init(function()
     local delay = tonumber(BiaoGe.Auction.aotoSendLate)
     if delay then
      delay = min(max(delay, 1), 5)
-     delay = random(1 * 10, delay * 10) / 10
      return delay
     end
    end
    if BG and BG.IsTitan then
-    return 1.5 + random(-5, 5) / 100
+    return 1.5
    end
-   return 0.5 + random(-5, 5) / 100
+   return 0.5
   end
  end
  function wa.SetEndState(bidFrame, text, r, g, b, barNotHide)
