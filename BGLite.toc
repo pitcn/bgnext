@@ -38,6 +38,7 @@ Core\BGNext\RoleOverviewSettings.lua
 Core\BGNext\OwnCharactersUI.lua
 Core\BGNext\RoleOverviewEntry.lua
 Core\BGNext\OwnCharactersRuntime.lua
+Core\BGNext\AuctionNames.lua
 Core\BGNext\AuctionPresetStore.lua
 Core\BGNext\ControlledAutoBid.lua
 Core\BGNext\AuctionBidMessage.lua

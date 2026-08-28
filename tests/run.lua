@@ -22,10 +22,12 @@ local suites = {
     "tests/test_own_character_view.lua",
     "tests/test_own_character_ui.lua",
     "tests/test_role_overview_entry.lua",
+    "tests/test_auction_names.lua",
     "tests/test_auction_preset_store.lua",
     "tests/test_controlled_auto_bid.lua",
     "tests/test_auction_bid_message.lua",
     "tests/test_auction_bid_ui.lua",
+    "tests/test_auction_preset_runtime.lua",
 }
 
 for _, path in ipairs(suites) do

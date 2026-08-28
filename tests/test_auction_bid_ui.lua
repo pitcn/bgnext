@@ -25,6 +25,11 @@ return function(test)
     test.eq(UI.isArmed("armed"), true, "armed is detected")
     test.eq(UI.isArmed("idle"), false, "idle is not armed")
 
+    -- The built-in auto-bid blocks my arm button (mutual exclusion).
+    test.eq(UI.armBlocked(nil), nil, "no frame is not blocked")
+    test.eq(UI.armBlocked({ isAuto = false }), nil, "an idle built-in state is not blocked")
+    test.eq(UI.armBlocked({ isAuto = true }), "内置自动出价已开启，请先关闭", "a running built-in auto-bid blocks my arm")
+
     -- Reading the two inputs validates and normalises them locally.
     local ok = UI.readConfig("100", "5000")
     test.eq(ok.increment, 100, "a valid increment is read")
@@ -48,7 +53,25 @@ return function(test)
     test.eq(type(UI.layout.regionWidth), "number", "the region width is numeric")
     test.eq(type(UI.layout.regionHeight), "number", "the region height is numeric")
     test.eq(UI.layout.regionWidth <= 310, true, "the region fits the bid frame width")
-    test.eq(UI.layout.regionHeight <= 73, true, "the region stays compact")
+
+    -- Boundary test: every control fits inside the region and none overlaps another.
+    local r = UI.rects()
+    local rects = { r.incrementLabel, r.incrementEdit, r.capLabel, r.capEdit, r.button, r.status }
+    local function overlaps(a, b)
+        return a.x < b.x + b.w and b.x < a.x + a.w and a.y < b.y + b.h and b.y < a.y + a.h
+    end
+    for i, rc in ipairs(rects) do
+        test.eq(rc.x >= 0 and rc.y >= 0, true, "rect " .. i .. " starts inside the region")
+        test.eq(rc.x + rc.w <= UI.layout.regionWidth, true, "rect " .. i .. " fits the region width")
+        test.eq(rc.y + rc.h <= UI.layout.regionHeight, true, "rect " .. i .. " fits the region height")
+    end
+    for i = 1, #rects do
+        for j = i + 1, #rects do
+            test.eq(overlaps(rects[i], rects[j]), false, "rect " .. i .. " and " .. j .. " do not overlap")
+        end
+    end
+    test.eq(r.incrementLabel.w, UI.layout.labelWidth, "labelWidth is used by the increment label")
+    test.eq(r.capLabel.w, UI.layout.labelWidth, "labelWidth is used by the cap label")
 
     -- Source-level invariants: the UI is presentation only, no side effects.
     local handle = io.open("Core/BGNext/AuctionBidUI.lua", "r")

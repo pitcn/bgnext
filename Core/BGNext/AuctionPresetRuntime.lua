@@ -2,56 +2,81 @@ BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
 -- Runtime wiring for the controlled auto-bid — the only layer that touches WoW
--- APIs. It chains the existing BGLite hooks and registers a CHAT_MSG_ADDON
--- observer, feeding the pure state machine and turning each `{ bid = amount }`
--- decision into a single gen1 SendMyMoney message.
+-- APIs. It chains the existing BGLite hooks (installed in BG.Init2, after the
+-- auction modules have defined BG.HookCreateAuction / BG.AuctionWAEnd) and
+-- registers a CHAT_MSG_ADDON observer. It feeds the pure state machine and turns
+-- each `{ bid = amount }` decision into a single gen1 SendMyMoney message.
 --
--- All state lives on the bid frame (memory-only) and is lost on reload. This
--- file is NOT unit-tested — it is the thin, unverified glue that must be
--- validated in a real client.
+-- All state lives on the bid frame (memory-only) and is lost on reload. Every
+-- WoW API is read through the global scope at call time so the unit test can
+-- inject fakes and drive this exact file.
 local M = {}
 
 local Store = BG.BGNext.AuctionPresetStore
 local SM = BG.BGNext.ControlledAutoBid
 local Msg = BG.BGNext.AuctionBidMessage
 local UI = BG.BGNext.AuctionBidUI
+local Names = BG.BGNext.AuctionNames
 
 local ACTIVE_KEY = "BGNextAutoBid"
 
--- The frame whose auto-bid is currently armed (nil when nothing is armed).
 local activeFrame = nil
+local installed = false
+
+-- ---------------------------------------------------------------------------
+-- WoW API accessors (call-time lookups, so the tests can swap in fakes)
+-- ---------------------------------------------------------------------------
 
 local function now()
-    return time()
+    if GetTimePreciseSec then
+        return GetTimePreciseSec()
+    end
+    return GetTime()
 end
 
-local function shortName(name)
-    if type(name) ~= "string" then return name end
-    return name:match("^([^%-]+)") or name
+local function selfRealm()
+    if BG and BG.realmName then
+        return BG.realmName
+    end
+    if GetRealmName then
+        return GetRealmName():gsub(" ", ""):gsub("-", "")
+    end
+    return ""
 end
 
-local function selfName()
-    if wa and wa.GN then return shortName(wa.GN()) end
-    return shortName(UnitName("player"))
+local function selfNameRaw()
+    if wa and wa.GN then
+        return wa.GN()
+    end
+    if UnitName then
+        return UnitName("player")
+    end
+    return nil
 end
 
 local function raidMemberSet()
     local set = {}
-    if not IsInRaid() then return set end
-    for i = 1, GetNumGroupMembers() do
-        local name = UnitName("raid" .. i)
-        if name then
-            set[shortName(name)] = true
-            set[name] = true
+    local realm = selfRealm()
+    local function add(name)
+        local full = Names.fullName(name, realm)
+        if full then
+            set[full] = true
         end
     end
-    local me = UnitName("player")
-    if me then
-        set[shortName(me)] = true
-        set[me] = true
+    if not IsInRaid or not IsInRaid() then
+        return set
     end
+    local n = GetNumGroupMembers and GetNumGroupMembers() or 0
+    for i = 1, n do
+        add(UnitName and UnitName("raid" .. i))
+    end
+    add(selfNameRaw())
     return set
 end
+
+-- ---------------------------------------------------------------------------
+-- Per-frame state and UI
+-- ---------------------------------------------------------------------------
 
 local function freshState()
     return {
@@ -59,16 +84,21 @@ local function freshState()
         pendingAmount = nil,
         pendingTimer = nil,
         region = nil,
+        gen = 0,
     }
 end
 
 local function refresh(bidFrame, st)
     local region = st.region
-    if not region then return end
+    if not region or not region.button then
+        return
+    end
     local status = st.sm.status
     region.statusText:SetText(SM.statusText(st.sm))
     region.statusText:SetTextColor(0.8, 0.8, 0.8)
     region.button:SetText(UI.buttonText(status))
+    -- Mutual exclusion: my arm button is disabled while the built-in auto-bid is on.
+    region.button:SetEnabled(UI.armBlocked(bidFrame) == nil)
     local locked = UI.inputsLocked(status)
     region.incrementEdit:SetEnabled(not locked)
     region.capEdit:SetEnabled(not locked)
@@ -76,37 +106,37 @@ end
 
 local function makeRegion(bidFrame)
     local L = UI.layout
+    local R = UI.rects()
     local region = CreateFrame("Frame", nil, bidFrame)
     region:SetSize(L.regionWidth, L.regionHeight)
     region:SetPoint("TOP", bidFrame, "BOTTOM", 0, -L.gap)
 
     local incLabel = region:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     incLabel:SetText(UI.LABELS.increment)
-    incLabel:SetPoint("TOPLEFT", region, "TOPLEFT", L.margin, -L.margin)
+    incLabel:SetPoint("TOPLEFT", region, "TOPLEFT", R.incrementLabel.x, -R.incrementLabel.y)
 
     local incEdit = CreateFrame("EditBox", nil, region, "InputBoxTemplate")
-    incEdit:SetSize(L.editWidth, L.editHeight)
-    incEdit:SetPoint("LEFT", incLabel, "RIGHT", L.gap, 0)
+    incEdit:SetSize(R.incrementEdit.w, R.incrementEdit.h)
+    incEdit:SetPoint("TOPLEFT", region, "TOPLEFT", R.incrementEdit.x, -R.incrementEdit.y)
     incEdit:SetNumeric(true)
     incEdit:SetAutoFocus(false)
 
     local capLabel = region:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     capLabel:SetText(UI.LABELS.cap)
-    capLabel:SetPoint("LEFT", incEdit, "RIGHT", L.gap * 2, 0)
+    capLabel:SetPoint("TOPLEFT", region, "TOPLEFT", R.capLabel.x, -R.capLabel.y)
 
     local capEdit = CreateFrame("EditBox", nil, region, "InputBoxTemplate")
-    capEdit:SetSize(L.editWidth, L.editHeight)
-    capEdit:SetPoint("LEFT", capLabel, "RIGHT", L.gap, 0)
+    capEdit:SetSize(R.capEdit.w, R.capEdit.h)
+    capEdit:SetPoint("TOPLEFT", region, "TOPLEFT", R.capEdit.x, -R.capEdit.y)
     capEdit:SetNumeric(true)
     capEdit:SetAutoFocus(false)
 
     local button = CreateFrame("Button", nil, region, "UIPanelButtonTemplate")
-    button:SetSize(L.buttonWidth, L.buttonHeight)
-    button:SetPoint("RIGHT", region, "RIGHT", -L.margin, 0)
-    button:SetText(UI.LABELS.arm)
+    button:SetSize(R.button.w, R.button.h)
+    button:SetPoint("TOPLEFT", region, "TOPLEFT", R.button.x, -R.button.y)
 
     local status = region:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    status:SetPoint("TOPLEFT", region, "TOPLEFT", L.margin, -(L.margin + L.editHeight + L.gap))
+    status:SetPoint("TOPLEFT", region, "TOPLEFT", R.status.x, -R.status.y)
     status:SetText("未启用")
     status:SetTextColor(0.8, 0.8, 0.8)
 
@@ -117,12 +147,57 @@ local function makeRegion(bidFrame)
     return region
 end
 
+-- ---------------------------------------------------------------------------
+-- Sending (single coalesced SendMyMoney, cancelable timer, generation guard)
+-- ---------------------------------------------------------------------------
+
+local function stopFrame(bidFrame, reason)
+    local st = bidFrame and bidFrame[ACTIVE_KEY]
+    if not st then
+        return
+    end
+    st.gen = st.gen + 1
+    if st.pendingTimer then
+        st.pendingTimer:Cancel()
+        st.pendingTimer = nil
+    end
+    st.pendingAmount = nil
+    SM.stop(st.sm, reason)
+    if activeFrame == bidFrame then
+        activeFrame = nil
+    end
+    refresh(bidFrame, st)
+end
+
 local function doSend(bidFrame, st, amount)
     local msg = Msg.buildBidMessage(st.sm.auctionId, amount)
-    C_ChatInfo.SendAddonMessage(Msg.ADDON_PREFIX, msg, "RAID")
+    local ok = pcall(function()
+        C_ChatInfo.SendAddonMessage(Msg.ADDON_PREFIX, msg, "RAID")
+    end)
+    if not ok then
+        -- SendAddonMessage threw: fail closed and show an explicit state.
+        stopFrame(bidFrame, "send-failed")
+        return
+    end
+    -- The send went out, but SendAddonMessage returns no success signal, so this
+    -- only advances the current price for throttle/dedup; leadership is not
+    -- claimed until my own bid echoes back.
     SM.markSent(st.sm, now())
     st.pendingAmount = nil
     refresh(bidFrame, st)
+end
+
+local function scheduleSend(bidFrame, st, delay)
+    st.gen = st.gen + 1
+    local myGen = st.gen
+    st.pendingTimer = C_Timer.NewTimer(delay, function()
+        st.pendingTimer = nil
+        if st.gen == myGen and st.sm.status == "armed" and st.pendingAmount ~= nil then
+            local amount = st.pendingAmount
+            st.pendingAmount = nil
+            doSend(bidFrame, st, amount)
+        end
+    end)
 end
 
 local function sendBid(bidFrame, st, amount)
@@ -130,23 +205,25 @@ local function sendBid(bidFrame, st, amount)
     if SM.canSend(s, now()) then
         doSend(bidFrame, st, amount)
     else
-        -- Coalesce rapid outbids into one send after the 1s floor (a single
-        -- deterministic delay, never a poll loop or randomised sniping delay).
+        -- Coalesce rapid outbids into one latest send after the 1s floor (a
+        -- single deterministic delay, never a poll loop or randomised sniping).
         st.pendingAmount = amount
         if not st.pendingTimer then
             local remaining = math.max(0.05, SM.MIN_INTERVAL - (now() - (s.lastBidAt or 0)))
-            st.pendingTimer = C_Timer.After(remaining, function()
-                st.pendingTimer = nil
-                if st.sm.status == "armed" and st.pendingAmount ~= nil then
-                    doSend(bidFrame, st, st.pendingAmount)
-                end
-            end)
+            scheduleSend(bidFrame, st, remaining)
         end
     end
 end
 
+-- ---------------------------------------------------------------------------
+-- Arming / toggling
+-- ---------------------------------------------------------------------------
+
 local function arm(bidFrame, st)
     local region = st.region
+    if UI.armBlocked(bidFrame) then
+        return
+    end
     local cfg = UI.readConfig(region.incrementEdit:GetText(), region.capEdit:GetText())
     if cfg.error then
         region.statusText:SetText(UI.errorText(cfg.error))
@@ -159,6 +236,11 @@ local function arm(bidFrame, st)
         Store.set(BG.BGNext.DB.auctionPresets, cfg)
     end
 
+    -- Atomic multi-auction switch: stop the previously armed frame first.
+    if activeFrame and activeFrame ~= bidFrame then
+        stopFrame(activeFrame, "change")
+    end
+
     local decision = SM.arm(st.sm, {
         auctionId = tostring(bidFrame.auctionID),
         itemId = bidFrame.itemID,
@@ -166,8 +248,9 @@ local function arm(bidFrame, st)
         cap = cfg.cap,
         currentPrice = bidFrame.money,
         currentBidder = bidFrame.player,
-        selfName = selfName(),
-    }, now())
+        selfName = selfNameRaw(),
+        realm = selfRealm(),
+    })
 
     if st.sm.status == "invalid" then
         region.statusText:SetText(SM.statusText(st.sm))
@@ -183,24 +266,11 @@ local function arm(bidFrame, st)
     end
 end
 
-local function stopFrame(bidFrame, reason)
-    local st = bidFrame and bidFrame[ACTIVE_KEY]
-    if not st then return end
-    if st.pendingTimer then
-        st.pendingTimer:Cancel()
-        st.pendingTimer = nil
-    end
-    st.pendingAmount = nil
-    SM.stop(st.sm, reason)
-    if activeFrame == bidFrame then
-        activeFrame = nil
-    end
-    refresh(bidFrame, st)
-end
-
 local function toggle(bidFrame)
     local st = bidFrame[ACTIVE_KEY]
-    if not st then return end
+    if not st then
+        return
+    end
     if st.sm.status == "armed" then
         stopFrame(bidFrame, "user")
     else
@@ -208,10 +278,20 @@ local function toggle(bidFrame)
     end
 end
 
-function M.attach(bidFrame)
-    if not bidFrame or bidFrame.auctionID == nil then return end
+-- ---------------------------------------------------------------------------
+-- Attach a bid frame (chained from BG.HookCreateAuction)
+-- ---------------------------------------------------------------------------
 
-    -- Starting to interact with a different auction stops any armed auto-bid.
+function M.attach(bidFrame)
+    if not bidFrame or bidFrame.auctionID == nil then
+        return
+    end
+    -- Gen2 rotating channels are out of scope: no region, no state, no gen1 fallback.
+    if bidFrame.isGen2 then
+        return
+    end
+
+    -- Interacting with a different auction stops any armed auto-bid.
     if activeFrame and activeFrame ~= bidFrame then
         local old = activeFrame[ACTIVE_KEY]
         if old and old.sm.status == "armed" then
@@ -225,37 +305,64 @@ function M.attach(bidFrame)
 
     if BG.BGNext.DB and BG.BGNext.DB.auctionPresets then
         local p = Store.get(BG.BGNext.DB.auctionPresets)
-        if p.increment then st.region.incrementEdit:SetText(tostring(p.increment)) end
-        if p.cap then st.region.capEdit:SetText(tostring(p.cap)) end
+        if p.increment then
+            st.region.incrementEdit:SetText(tostring(p.increment))
+        end
+        if p.cap then
+            st.region.capEdit:SetText(tostring(p.cap))
+        end
     end
 
     st.region.button:SetScript("OnClick", function()
         toggle(bidFrame)
     end)
+
+    -- Stop as soon as the auction frame hides/closes (the user can no longer see
+    -- the status, so the auto-bid must not keep running).
+    bidFrame:HookScript("OnHide", function()
+        stopFrame(bidFrame, "hidden")
+    end)
+
+    refresh(bidFrame, st)
 end
 
-function M.onAddonMessage(self, event, prefix, message, distribution, a4, a5)
-    if not activeFrame then return end
+-- ---------------------------------------------------------------------------
+-- Event handlers
+-- ---------------------------------------------------------------------------
+
+function M.onAddonMessage(self, event, prefix, message, distribution, arg4, arg5)
+    if not activeFrame then
+        return
+    end
     local st = activeFrame[ACTIVE_KEY]
-    if not st or st.sm.status ~= "armed" then return end
+    if not st or st.sm.status ~= "armed" then
+        return
+    end
 
-    local parsed = Msg.parse(prefix, message)
-    if not parsed then return end
+    local classified = Msg.classify(nil, prefix, message, distribution, arg4, arg5, st.sm.auctionId)
+    if classified.kind == "stop" then
+        stopFrame(activeFrame, classified.reason)
+        return
+    end
+    if classified.kind ~= "bid" then
+        return
+    end
 
-    -- CHAT_MSG_ADDON carries the sender as its last arg on this server family
-    -- (BGLite reads it from a fifth arg); fall back to the standard fourth arg.
-    local sender = a5 or a4
-    local reason = Msg.validateBidEvent(parsed, {
-        sender = sender,
+    local fullSender = Names.fullName(classified.sender, selfRealm())
+    local reason = Msg.validateBidEvent(classified.parsed, {
+        sender = fullSender,
         raidMembers = raidMemberSet(),
         auctionId = st.sm.auctionId,
     })
-    if reason then return end
+    if reason then
+        stopFrame(activeFrame, reason == "not-raid" and "invalid-sender" or "protocol")
+        return
+    end
 
     local decision = SM.onPrice(st.sm, {
-        auctionId = parsed.auctionId,
-        price = parsed.money,
-        bidder = shortName(sender),
+        auctionId = classified.parsed.auctionId,
+        price = classified.parsed.money,
+        bidder = fullSender,
     }, now())
 
     if decision and decision.bid then
@@ -266,36 +373,125 @@ function M.onAddonMessage(self, event, prefix, message, distribution, a4, a5)
 end
 
 function M.onAuctionEnd(endType, link, player, money, logs)
-    if not activeFrame then return end
-    local reason = ({ [1] = "success", [2] = "unsold", [3] = "cancel" })[endType]
-    if reason then
-        stopFrame(activeFrame, reason)
+    if not activeFrame then
+        return
     end
+    local reason = ({ [1] = "success", [2] = "unsold", [3] = "cancel" })[endType]
+    if not reason then
+        return
+    end
+    -- Precise matching: only the active auction's own end stops it. When the end
+    -- event cannot be tied to the active auction (no item link), fail closed.
+    if link == nil or link == "" then
+        stopFrame(activeFrame, "protocol")
+        return
+    end
+    if link ~= activeFrame.link then
+        return
+    end
+    stopFrame(activeFrame, reason)
 end
 
-function M.onRosterUpdate()
+function M.onRosterUpdate(self, event)
     if activeFrame and not IsInRaid() then
         stopFrame(activeFrame, "leave")
     end
 end
 
-BG.Init(function()
-    C_ChatInfo.RegisterAddonMessagePrefix(Msg.ADDON_PREFIX)
+function M.onLogout(self, event)
+    if activeFrame then
+        stopFrame(activeFrame, "reload")
+    end
+end
 
+function M.onLeavingWorld(self, event)
+    if activeFrame then
+        stopFrame(activeFrame, "leave")
+    end
+end
+
+-- ---------------------------------------------------------------------------
+-- Hook installation (BG.Init2 — after the auction modules define their hooks)
+-- ---------------------------------------------------------------------------
+
+local function wrapStackHeight()
+    if not wa or not wa.GetFrameTotolHeight or wa._bgnextWrapped then
+        return
+    end
+    wa._bgnextWrapped = true
+    local orig = wa.GetFrameTotolHeight
+    local extra = UI.layout.regionHeight + UI.layout.gap
+    wa.GetFrameTotolHeight = function(count)
+        local height = orig(count)
+        for i = 1, (count or 1) - 1 do
+            local f = BGA and BGA.Frames and BGA.Frames[i]
+            if f and not f.IsSmallWindow then
+                height = height + extra
+            end
+        end
+        return height
+    end
+end
+
+local function wrapAutoButton()
+    if not wa or not wa.AutoButton_OnClick or wa._bgnextAutoWrapped then
+        return
+    end
+    wa._bgnextAutoWrapped = true
+    local orig = wa.AutoButton_OnClick
+    wa.AutoButton_OnClick = function(self, ...)
+        orig(self, ...)
+        local bidFrame = self and self.owner
+        if bidFrame and bidFrame.isAuto then
+            stopFrame(bidFrame, "disabled")
+        end
+        local st = bidFrame and bidFrame[ACTIVE_KEY]
+        if st then
+            refresh(bidFrame, st)
+        end
+    end
+end
+
+function M.installHooks()
+    if installed then
+        return
+    end
+    installed = true
+
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        C_ChatInfo.RegisterAddonMessagePrefix(Msg.ADDON_PREFIX)
+    end
+
+    -- Chain the hooks defined by the auction modules during ADDON_LOADED. Doing
+    -- this in BG.Init2 guarantees they already exist, so the original hook is
+    -- always called before our own and nothing is overwritten.
     local origCreateAuction = BG.HookCreateAuction
     BG.HookCreateAuction = function(bidFrame)
-        if origCreateAuction then origCreateAuction(bidFrame) end
+        if origCreateAuction then
+            origCreateAuction(bidFrame)
+        end
         M.attach(bidFrame)
     end
 
     local origAuctionEnd = BG.AuctionWAEnd
     BG.AuctionWAEnd = function(endType, ...)
-        if origAuctionEnd then origAuctionEnd(endType, ...) end
+        if origAuctionEnd then
+            origAuctionEnd(endType, ...)
+        end
         M.onAuctionEnd(endType, ...)
     end
 
+    wrapStackHeight()
+    wrapAutoButton()
+
     BG.RegisterEvent("CHAT_MSG_ADDON", M.onAddonMessage)
     BG.RegisterEvent("GROUP_ROSTER_UPDATE", M.onRosterUpdate)
+    BG.RegisterEvent("PLAYER_LOGOUT", M.onLogout)
+    BG.RegisterEvent("PLAYER_LEAVING_WORLD", M.onLeavingWorld)
+end
+
+BG.Init2(function()
+    M.installHooks()
 end)
 
 BG.BGNext.AuctionPresetRuntime = M

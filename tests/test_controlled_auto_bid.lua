@@ -1,5 +1,6 @@
 return function(test)
     BG = { BGNext = {} }
+    dofile("Core/BGNext/AuctionNames.lua")
     local SM = dofile("Core/BGNext/ControlledAutoBid.lua")
 
     -- nextBid is the pure amount calculation: one increment over the current bid.
@@ -17,34 +18,74 @@ return function(test)
     test.eq(SM.onPrice(idle, { auctionId = "12", price = 300, bidder = "Other" }, 0), nil,
         "no bid is ever made before arming")
 
-    -- Arming with nobody having bid yet opens at the starting price.
+    -- Arming with nobody having bid yet opens at the starting price; leadership is
+    -- only confirmed once my own bid echoes back (SendAddonMessage returns no signal).
     local opened = SM.new()
     local decision = SM.arm(opened, {
         auctionId = "12", itemId = "item:123", increment = 100, cap = 1000,
-        currentPrice = 100, currentBidder = nil, selfName = "Me",
+        currentPrice = 100, currentBidder = nil, selfName = "Me", realm = "R",
     }, 0)
     test.eq(decision.bid, 100, "the opening bid is the starting price")
     test.eq(opened.status, "armed", "arming keeps the state armed")
-    test.eq(opened.leading, false, "the opening bid is not yet marked sent")
-    test.eq(SM.statusText(opened), "自动出价中", "before the send it reports auto-bidding in progress")
+    test.eq(opened.leading, false, "the opening bid is not yet confirmed leading")
     SM.markSent(opened, 0)
-    test.eq(opened.leading, true, "after the send I am leading")
-    test.eq(SM.statusText(opened), "当前本人领先", "after the send it reports leading")
+    test.eq(opened.leading, false, "a send alone never confirms leadership")
+    test.eq(SM.statusText(opened), "自动出价中", "before the echo it reports auto-bidding in progress")
+    local echo = SM.onPrice(opened, { auctionId = "12", price = 100, bidder = "Me" }, 0)
+    test.eq(echo.hold, true, "my own echo confirms leadership")
+    test.eq(opened.leading, true, "after the echo I am leading")
+    test.eq(SM.statusText(opened), "当前本人领先", "after the echo it reports leading")
+
+    -- An empty-string bidder is also "nobody has bid yet".
+    local empty = SM.new()
+    local openEmpty = SM.arm(empty, {
+        auctionId = "12", increment = 100, cap = 1000,
+        currentPrice = 100, currentBidder = "", selfName = "Me", realm = "R",
+    }, 0)
+    test.eq(openEmpty.bid, 100, "an empty-string bidder opens at the starting price")
 
     -- Arming when I am already the highest bidder holds instead of re-bidding.
     local already = SM.new()
     local held = SM.arm(already, {
         auctionId = "12", increment = 100, cap = 1000,
-        currentPrice = 500, currentBidder = "Me", selfName = "Me",
+        currentPrice = 500, currentBidder = "Me", selfName = "Me", realm = "R",
     }, 0)
     test.eq(held.hold, true, "already leading means no opening bid")
     test.eq(already.leading, true, "already leading is reflected")
+
+    -- Cross-realm self-leading: my own realm suffix is still me, never outbid.
+    local cross = SM.new()
+    local crossHeld = SM.arm(cross, {
+        auctionId = "12", increment = 100, cap = 1000,
+        currentPrice = 500, currentBidder = "Me-R", selfName = "Me", realm = "R",
+    }, 0)
+    test.eq(crossHeld.hold, true, "a same-realm full name holds as self")
+    test.eq(cross.leading, true, "cross-realm self is recognised as leading")
+
+    -- The same short name on a different realm is a different player.
+    local foreign = SM.new()
+    local foreignBid = SM.arm(foreign, {
+        auctionId = "12", increment = 100, cap = 1000,
+        currentPrice = 500, currentBidder = "Me-OtherRealm", selfName = "Me", realm = "R",
+    }, 0)
+    test.eq(foreignBid.bid, 600, "a same short name on another realm is outbid")
+
+    -- A cross-realm self echo also confirms leadership without re-bidding.
+    local crossEcho = SM.new()
+    SM.arm(crossEcho, {
+        auctionId = "12", increment = 100, cap = 1000,
+        currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R",
+    }, 0)
+    SM.markSent(crossEcho, 0)
+    local ce = SM.onPrice(crossEcho, { auctionId = "12", price = 600, bidder = "Me-R" }, 10)
+    test.eq(ce.hold, true, "a cross-realm self echo confirms without re-bidding")
+    test.eq(crossEcho.leading, true, "the cross-realm echo marks me leading")
 
     -- Arming against an outbid computes one increment over the other bidder.
     local chasing = SM.new()
     local chase = SM.arm(chasing, {
         auctionId = "12", increment = 100, cap = 1000,
-        currentPrice = 500, currentBidder = "Other", selfName = "Me",
+        currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R",
     }, 0)
     test.eq(chase.bid, 600, "arming against an outbid counters one increment")
 
@@ -59,23 +100,25 @@ return function(test)
     test.eq(SM.arm(SM.new(), { increment = 100, cap = 1000, currentPrice = 100 }, 0), nil,
         "a missing auction id is rejected")
 
-    -- An outbid from someone else triggers a counter-bid, then the echo is ignored.
+    -- An outbid from someone else triggers a counter-bid, then my echo confirms it.
     local run = SM.new()
     SM.arm(run, {
         auctionId = "12", increment = 100, cap = 1000,
-        currentPrice = 500, currentBidder = "Other", selfName = "Me",
+        currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R",
     }, 0)
     SM.markSent(run, 0)
     local r1 = SM.onPrice(run, { auctionId = "12", price = 700, bidder = "Other" }, 10)
     test.eq(r1.bid, 800, "an outbid is answered with one increment")
     SM.markSent(run, 10)
     test.eq(run.currentPrice, 800, "my counter-bid becomes the current price")
-    test.eq(SM.onPrice(run, { auctionId = "12", price = 800, bidder = "Me" }, 10), nil,
-        "my own echoed bid is ignored")
+    test.eq(run.leading, false, "a sent counter-bid is not yet confirmed leading")
+    local r2 = SM.onPrice(run, { auctionId = "12", price = 800, bidder = "Me" }, 10)
+    test.eq(r2.hold, true, "my own echoed bid confirms leadership")
+    test.eq(run.leading, true, "the echo makes me leading")
 
     -- The same price event is never answered twice.
     local dedup = SM.new()
-    SM.arm(dedup, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me" }, 0)
+    SM.arm(dedup, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R" }, 0)
     SM.markSent(dedup, 0)
     SM.onPrice(dedup, { auctionId = "12", price = 700, bidder = "Other" }, 10)
     SM.markSent(dedup, 10)
@@ -84,21 +127,21 @@ return function(test)
 
     -- A lower or stale price is ignored.
     local stale = SM.new()
-    SM.arm(stale, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me" }, 0)
+    SM.arm(stale, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R" }, 0)
     SM.markSent(stale, 0)
     test.eq(SM.onPrice(stale, { auctionId = "12", price = 400, bidder = "Other" }, 10), nil,
         "a lower price is ignored")
 
     -- A message about another auction is rejected.
     local wrongAuction = SM.new()
-    SM.arm(wrongAuction, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me" }, 0)
+    SM.arm(wrongAuction, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R" }, 0)
     SM.markSent(wrongAuction, 0)
     test.eq(SM.onPrice(wrongAuction, { auctionId = "99", price = 700, bidder = "Other" }, 10), nil,
         "a message for another auction is rejected")
 
     -- Reaching the cap stops and reports it.
     local capped = SM.new()
-    SM.arm(capped, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 900, currentBidder = "Other", selfName = "Me" }, 0)
+    SM.arm(capped, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 900, currentBidder = "Other", selfName = "Me", realm = "R" }, 0)
     SM.markSent(capped, 0)
     test.eq(capped.currentPrice, 1000, "the final bid at the cap is placed")
     test.eq(SM.onPrice(capped, { auctionId = "12", price = 1001, bidder = "Other" }, 10), nil,
@@ -108,7 +151,7 @@ return function(test)
 
     -- Throttling: sends within one second are flagged as too soon.
     local throttle = SM.new()
-    SM.arm(throttle, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me" }, 0)
+    SM.arm(throttle, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R" }, 0)
     SM.markSent(throttle, 0)
     test.eq(SM.canSend(throttle, 0.5), false, "a send within one second is throttled")
     test.eq(SM.canSend(throttle, 1.0), true, "a send at one second is allowed")
@@ -116,7 +159,7 @@ return function(test)
 
     -- Manual stop ends the auto-bid and blocks further bids.
     local manual = SM.new()
-    SM.arm(manual, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me" }, 0)
+    SM.arm(manual, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R" }, 0)
     SM.stop(manual, "user")
     test.eq(manual.status, "stopped", "a manual stop sets the stopped state")
     test.eq(SM.statusText(manual), "已手动停止", "the stopped state has its own text")
@@ -126,7 +169,7 @@ return function(test)
     -- Every terminal reason maps to the right state and clears the runtime.
     local function stopped(reason, expected)
         local s = SM.new()
-        SM.arm(s, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me" }, 0)
+        SM.arm(s, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 500, currentBidder = "Other", selfName = "Me", realm = "R" }, 0)
         SM.markSent(s, 0)
         SM.stop(s, reason)
         test.eq(s.status, expected, reason .. " maps to " .. expected)
@@ -141,13 +184,19 @@ return function(test)
     stopped("leave", "idle")
     stopped("reload", "idle")
     stopped("disabled", "idle")
+    stopped("hidden", "idle")
+    stopped("send-failed", "send-failed")
+    stopped("protocol", "protocol")
+    stopped("not-raid", "protocol")
+    stopped("no-sender", "protocol")
+    stopped("invalid-sender", "protocol")
 
     -- Fresh states are independent memory-only objects.
     local a = SM.new()
-    SM.arm(a, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 100, currentBidder = nil, selfName = "Me" }, 0)
+    SM.arm(a, { auctionId = "12", increment = 100, cap = 1000, currentPrice = 100, currentBidder = nil, selfName = "Me", realm = "R" }, 0)
     test.eq(SM.new().status, "idle", "a new state is always unarmed regardless of another state's activity")
 
-    -- The seven required UI states all have Chinese text.
+    -- The seven required UI states (plus the failure states) all have Chinese text.
     test.eq(SM.statusText({ status = "idle" }), "未启用", "idle text")
     test.eq(SM.statusText({ status = "armed", leading = false }), "自动出价中", "armed text")
     test.eq(SM.statusText({ status = "armed", leading = true }), "当前本人领先", "leading text")
@@ -155,6 +204,8 @@ return function(test)
     test.eq(SM.statusText({ status = "stopped" }), "已手动停止", "stopped text")
     test.eq(SM.statusText({ status = "ended" }), "拍卖已结束", "ended text")
     test.eq(SM.statusText({ status = "invalid" }), "当前拍卖数据无效", "invalid text")
+    test.eq(SM.statusText({ status = "send-failed" }), "发送失败", "send-failed text")
+    test.eq(SM.statusText({ status = "protocol" }), "协议异常", "protocol text")
 
     -- Source-level invariants: the state machine never communicates or persists.
     local handle = io.open("Core/BGNext/ControlledAutoBid.lua", "r")
