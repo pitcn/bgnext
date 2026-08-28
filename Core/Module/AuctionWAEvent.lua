@@ -620,7 +620,7 @@ BG.Init(function()
  end
  local function eventHandler(self, event, ...)
   if event == "CHAT_MSG_ADDON" then
-   local prefix, message, distribution, v, line = ...
+   local prefix, message, distribution, sender, target = ...
    local opcode, auctionIDStr, itemIDStr, moneyStr, durationStr, playerStr, modStr, linkStr, resetStr, extra
    local isGen2
    if prefix == wa.AddonChannel then
@@ -692,10 +692,24 @@ BG.Init(function()
    elseif opcode == "SendMyMoney" and distribution == "RAID" then
     local auctionID = tonumber(auctionIDStr)
     local money = tonumber(itemIDStr)
+    -- The bidder is the message sender (fourth argument), never the target
+    -- (fifth). Missing senders and non-raid senders are ignored without a bid.
+    if not sender or sender == "" then return end
+    local Sender = BG.BGNext and BG.BGNext.AuctionSender
+    if Sender then
+     local realm = (GetRealmName and GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+     local members = {}
+     for _, member in ipairs(wa.raidRosterInfo or {}) do
+      if member and member.name and member.name ~= "" then
+       members[#members + 1] = member.name
+      end
+     end
+     if not Sender.isRaidSender(sender, realm, members) then return end
+    end
     for v, frame in pairs(BGA.Frames) do
      if not frame.IsEnd and not frame.isPaused and frame.mod ~= "anonymous" and frame[auctionIdKey] == auctionID then
       if frame.start and money >= frame.money or money > frame.money then
-       wa.SetMoney(frame, money, line)
+       wa.SetMoney(frame, money, sender)
       end
       return
      end

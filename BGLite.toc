@@ -40,6 +40,7 @@ Core\BGNext\RoleOverviewSettings.lua
 Core\BGNext\OwnCharactersUI.lua
 Core\BGNext\RoleOverviewEntry.lua
 Core\BGNext\OwnCharactersRuntime.lua
+Core\BGNext\AuctionSender.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
