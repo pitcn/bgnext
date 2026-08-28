@@ -152,4 +152,74 @@ return function(test)
     test.eq(typed.equipment[1].icon, nil, "non-string equipment icon is dropped")
     test.eq(typed.raidStates.MCtitan.difficulty, nil, "non-number difficulty is dropped")
     test.eq(typed.professions[1].icon, nil, "non-string profession icon is dropped")
+
+    -- Currency values may be a plain count (Titan legacy) or a capped record.
+    local currencyRoot = {}
+    local capped = M.upsert(currencyRoot, "mop", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        currencies = {
+            valor = { quantity = 1000, maxQuantity = 3000, quantityEarnedThisWeek = 500, maxWeeklyQuantity = 1000 },
+            honor = 25,
+            broken = { quantity = "many" },
+            missingQuantity = { maxQuantity = 100 },
+        },
+    })
+    test.eq(capped.currencies.valor.quantity, 1000, "capped currency keeps its quantity")
+    test.eq(capped.currencies.valor.maxQuantity, 3000, "capped currency keeps the total cap")
+    test.eq(capped.currencies.valor.quantityEarnedThisWeek, 500, "capped currency keeps the weekly earned amount")
+    test.eq(capped.currencies.valor.maxWeeklyQuantity, 1000, "capped currency keeps the weekly cap")
+    test.eq(capped.currencies.honor, 25, "a plain numeric currency is still stored")
+    test.eq(capped.currencies.broken, nil, "a currency record with a non-numeric quantity is dropped")
+    test.eq(capped.currencies.missingQuantity, nil, "a currency record without a quantity is dropped")
+
+    -- Capped currency records are deep-copied like every other nested table.
+    local mutableCurrency = { quantity = 1000, maxQuantity = 3000 }
+    M.upsert(currencyRoot, "mop", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        currencies = { valor = mutableCurrency },
+    })
+    mutableCurrency.quantity = 1
+    test.eq(M.get(currencyRoot, "mop", 123, "Piti").currencies.valor.quantity, 1000,
+        "capped currency records are deep-copied")
+
+    -- Cap fields accept only numbers; a wrong-typed cap is dropped but quantity
+    -- survives so a partial API result still shows the real amount.
+    local partialCaps = M.upsert(currencyRoot, "mop", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        currencies = { justice = { quantity = 2000, maxQuantity = "lots", weeklyBad = true } },
+    })
+    test.eq(partialCaps.currencies.justice.quantity, 2000, "partial cap record keeps quantity")
+    test.eq(partialCaps.currencies.justice.maxQuantity, nil, "non-numeric cap is dropped")
+    test.eq(partialCaps.currencies.justice.weeklyBad, nil, "non-whitelisted cap field is dropped")
+
+    -- Profession cooldowns store only a ready flag or a future reset timestamp.
+    local cdRoot = {}
+    local cds = M.upsert(cdRoot, "vanilla", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        professionCooldowns = {
+            transmute = { ready = true },
+            mooncloth = { endsAt = 9000 },
+            mixed = { ready = true, endsAt = 9000 },
+            empty = {},
+            wrongType = { ready = "yes" },
+            badEnds = { endsAt = "soon" },
+        },
+    })
+    test.eq(cds.professionCooldowns.transmute.ready, true, "a ready cooldown is stored")
+    test.eq(cds.professionCooldowns.mooncloth.endsAt, 9000, "a cooldown endsAt timestamp is stored")
+    test.eq(cds.professionCooldowns.mixed.ready, true, "both cooldown fields may coexist")
+    test.eq(cds.professionCooldowns.mixed.endsAt, 9000, "coexisting endsAt is retained")
+    test.eq(cds.professionCooldowns.empty, nil, "an empty cooldown record is dropped")
+    test.eq(cds.professionCooldowns.wrongType, nil, "a non-boolean ready flag is dropped")
+    test.eq(cds.professionCooldowns.badEnds, nil, "a non-numeric endsAt is dropped")
+
+    -- Cooldown records are deep-copied so callers cannot mutate stored state.
+    local mutableCd = { ready = true }
+    M.upsert(cdRoot, "vanilla", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        professionCooldowns = { transmute = mutableCd },
+    })
+    mutableCd.ready = false
+    test.eq(M.get(cdRoot, "vanilla", 123, "Piti").professionCooldowns.transmute.ready, true,
+        "profession cooldown records are deep-copied")
 end

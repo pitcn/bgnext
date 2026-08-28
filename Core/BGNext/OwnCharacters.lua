@@ -28,6 +28,7 @@ local SNAPSHOT_FIELDS = {
     items = "table",
     raidStates = "table",
     professions = "table",
+    professionCooldowns = "table",
 }
 
 local TEXTURE_TYPES = { string = true, number = true }
@@ -46,6 +47,22 @@ local RAID_STATE_FIELDS = {
 local PROFESSION_FIELDS = {
     name = "string", skill = "number", maxSkill = "number",
     icon = TEXTURE_TYPES, cooldownEndsAt = "number",
+}
+
+-- A currency may carry optional cap fields; only `quantity` is required so a
+-- partial API result still records the real amount. Missing caps stay nil and
+-- render without a fabricated maximum.
+local CURRENCY_FIELDS = {
+    quantity = "number",
+    maxQuantity = "number",
+    quantityEarnedThisWeek = "number",
+    maxWeeklyQuantity = "number",
+}
+
+-- A profession cooldown is either ready or has a future reset timestamp.
+local PROFESSION_COOLDOWN_FIELDS = {
+    ready = "boolean",
+    endsAt = "number",
 }
 
 local function isKey(value)
@@ -98,6 +115,28 @@ local function copyNumberMap(source)
     return copy
 end
 
+-- Maps of key -> currency amount. A currency is either a plain count (the
+-- legacy Titan shape) or a record with an optional cap. A record is kept only
+-- when its `quantity` is a number, so an unknown cap or a wrong-typed value can
+-- never smuggle in a fabricated maximum.
+local function copyCurrencyMap(source)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for key, value in pairs(source) do
+        if isKey(key) then
+            if type(value) == "number" then
+                copy[key] = value
+            elseif type(value) == "table" then
+                local record = copyRecord(value, CURRENCY_FIELDS)
+                if record and type(record.quantity) == "number" then
+                    copy[key] = record
+                end
+            end
+        end
+    end
+    return copy
+end
+
 local function sanitize(snapshot)
     if type(snapshot) ~= "table" then return nil end
     if not isKey(snapshot.realmId) then return nil end
@@ -114,8 +153,9 @@ local function sanitize(snapshot)
     clean.equipment = copyRecordMap(snapshot.equipment, EQUIPMENT_FIELDS)
     clean.raidStates = copyRecordMap(snapshot.raidStates, RAID_STATE_FIELDS) or {}
     clean.professions = copyRecordMap(snapshot.professions, PROFESSION_FIELDS)
-    clean.currencies = copyNumberMap(snapshot.currencies)
+    clean.currencies = copyCurrencyMap(snapshot.currencies)
     clean.items = copyNumberMap(snapshot.items)
+    clean.professionCooldowns = copyRecordMap(snapshot.professionCooldowns, PROFESSION_COOLDOWN_FIELDS)
     return clean
 end
 
