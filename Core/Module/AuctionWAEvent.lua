@@ -667,7 +667,7 @@ BG.Init(function()
        SendChatMessage(format(L["{rt7}拍卖取消{rt7} %s"], frame.link), "RAID")
       end
       if BG and BG.AuctionWAEnd then
-       BG.AuctionWAEnd(3, frame.link, frame.player, frame.money)
+       BG.AuctionWAEnd(3, frame.link, frame.player, frame.money, nil, frame.auctionID)
       end
       After(wa.HIDEFRAME_TIME, function()
        wa.UpdateFrame(frame)

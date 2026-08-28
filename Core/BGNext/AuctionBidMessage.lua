@@ -15,13 +15,18 @@ BG.BGNext = BG.BGNext or {}
 --      fields, scientific notation, decimals, and out-of-range amounts are all
 --      rejected rather than silently accepted.
 --   2. The addon-message source adapter (extractSender / classify) — a bid is
---      only acted on when the CHAT_MSG_ADDON distribution is RAID and the sender
---      can be read from the real (fifth) argument position, never guessed.
+--      only acted on once it is a BiaoGeAuction + SendMyMoney candidate, and then
+--      only when its distribution is RAID and its sender is a real raid member.
 local M = {}
 
 M.ADDON_PREFIX = "BiaoGeAuction"
 M.OPCODE = "SendMyMoney"
 M.MAX_MONEY = 2147483647
+
+-- The verified CHAT_MSG_ADDON payload order is:
+--   prefix, text, channel, sender, target, zoneChannelID, localID, name, instanceID
+-- The sender is therefore the FOURTH argument and the target the FIFTH.
+M.SENDER_INDEX = 4
 
 -- Parse a gen1 addon message strictly. Returns
 --   { opcode, auctionId, auctionIdNum, money }
@@ -62,19 +67,20 @@ function M.parse(prefix, message)
     return { opcode = opcode, auctionId = auctionIdStr, auctionIdNum = auctionIdNum, money = money }
 end
 
--- Explicit sender extraction for a CHAT_MSG_ADDON event. The addon's target
--- client family delivers the event as
---   (prefix, message, distribution, target, sender)
--- and the verified baseline reads the sender from the FIFTH argument (arg5);
--- arg4 is the addon target and is never the sender. This is a fixed position,
--- not a `arg5 or arg4` fallback — a missing sender must fail closed, so the
--- runtime stops rather than guessing. `build` is accepted for future client
--- families but does not change the position on the supported clients.
-function M.extractSender(build, arg4, arg5)
-    return arg5
+-- Explicit sender extraction for a CHAT_MSG_ADDON event. The sender is the
+-- FOURTH argument (the target is the fifth). This is a fixed position, never a
+-- fallback — a missing sender must fail closed, so the runtime stops rather than
+-- guessing. `build` is accepted for future client families but does not change
+-- the position on the supported clients.
+function M.extractSender(build, sender, target)
+    return sender
 end
 
 -- Classify a full addon event into a single decision for the runtime.
+--
+-- Unrelated addon traffic is dropped first, BEFORE any fail-closed check, so a
+-- foreign addon's PARTY/WHISPER/GUILD message can never stop the auto-bid. Only
+-- a BiaoGeAuction + SendMyMoney candidate proceeds to the fail-closed checks.
 --
 -- Returns one of:
 --   { kind = "ignored" }             normal non-bid traffic — do nothing
@@ -85,20 +91,20 @@ end
 -- The stop reasons are "not-raid" (distribution is not RAID), "no-sender"
 -- (sender could not be read) and "malformed" (a SendMyMoney whose body violates
 -- the strict protocol).
-function M.classify(build, prefix, message, distribution, arg4, arg5, activeAuctionId)
-    if distribution ~= "RAID" then
-        return { kind = "stop", reason = "not-raid" }
-    end
-    local sender = M.extractSender(build, arg4, arg5)
-    if sender == nil or sender == "" then
-        return { kind = "stop", reason = "no-sender" }
-    end
+function M.classify(build, prefix, message, distribution, sender, target, activeAuctionId)
     if prefix ~= M.ADDON_PREFIX then
         return { kind = "ignored" }
     end
     local opcode = type(message) == "string" and message:match("^([^,]*)") or nil
     if opcode ~= M.OPCODE then
-        return { kind = "ignored" }
+        return { kind = "ignored" } -- BiaoGeAuction but not SendMyMoney (e.g. VersionCheck)
+    end
+    if distribution ~= "RAID" then
+        return { kind = "stop", reason = "not-raid" }
+    end
+    local senderName = M.extractSender(build, sender, target)
+    if senderName == nil or senderName == "" then
+        return { kind = "stop", reason = "no-sender" }
     end
     local parsed = M.parse(prefix, message)
     if parsed == nil then
@@ -107,7 +113,7 @@ function M.classify(build, prefix, message, distribution, arg4, arg5, activeAuct
     if activeAuctionId ~= nil and parsed.auctionId ~= activeAuctionId then
         return { kind = "wrong-auction" }
     end
-    return { kind = "bid", parsed = parsed, sender = sender }
+    return { kind = "bid", parsed = parsed, sender = senderName }
 end
 
 -- Validate a parsed bid event against the current context. Returns nil when the

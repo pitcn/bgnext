@@ -48,16 +48,22 @@ local function selfNameRaw()
     if wa and wa.GN then
         return wa.GN()
     end
+    if GetUnitName then
+        return GetUnitName("player", true)
+    end
     if UnitName then
         return UnitName("player")
     end
     return nil
 end
 
+-- The set of current raid members keyed by canonical full name. Cross-realm
+-- members are read as their full "Name-Realm" so "Alice" on my realm and "Alice"
+-- on another realm stay distinct.
 local function raidMemberSet()
     local set = {}
-    local realm = selfRealm()
-    local function add(name)
+    local myRealm = selfRealm()
+    local function add(name, realm)
         local full = Names.fullName(name, realm)
         if full then
             set[full] = true
@@ -68,9 +74,17 @@ local function raidMemberSet()
     end
     local n = GetNumGroupMembers and GetNumGroupMembers() or 0
     for i = 1, n do
-        add(UnitName and UnitName("raid" .. i))
+        local unit = "raid" .. i
+        if GetUnitName then
+            add(GetUnitName(unit, true), myRealm)
+        elseif UnitName then
+            local name, realm = UnitName(unit)
+            if name and name ~= "" then
+                add(name, (realm and realm ~= "") and realm or myRealm)
+            end
+        end
     end
-    add(selfNameRaw())
+    add(selfNameRaw(), myRealm)
     return set
 end
 
@@ -85,6 +99,7 @@ local function freshState()
         pendingTimer = nil,
         region = nil,
         gen = 0,
+        collapseWasEnabled = nil,
     }
 end
 
@@ -104,6 +119,14 @@ local function refresh(bidFrame, st)
     region.capEdit:SetEnabled(not locked)
 end
 
+-- Apply a rect's size and alignment to a FontString so the label/status actually
+-- occupy their reserved width (not just their point anchor).
+local function applyFontRect(fontString, rect)
+    fontString:SetSize(rect.w, rect.h)
+    fontString:SetJustifyH("LEFT")
+    fontString:SetJustifyV("MIDDLE")
+end
+
 local function makeRegion(bidFrame)
     local L = UI.layout
     local R = UI.rects()
@@ -114,6 +137,7 @@ local function makeRegion(bidFrame)
     local incLabel = region:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     incLabel:SetText(UI.LABELS.increment)
     incLabel:SetPoint("TOPLEFT", region, "TOPLEFT", R.incrementLabel.x, -R.incrementLabel.y)
+    applyFontRect(incLabel, R.incrementLabel)
 
     local incEdit = CreateFrame("EditBox", nil, region, "InputBoxTemplate")
     incEdit:SetSize(R.incrementEdit.w, R.incrementEdit.h)
@@ -124,6 +148,7 @@ local function makeRegion(bidFrame)
     local capLabel = region:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     capLabel:SetText(UI.LABELS.cap)
     capLabel:SetPoint("TOPLEFT", region, "TOPLEFT", R.capLabel.x, -R.capLabel.y)
+    applyFontRect(capLabel, R.capLabel)
 
     local capEdit = CreateFrame("EditBox", nil, region, "InputBoxTemplate")
     capEdit:SetSize(R.capEdit.w, R.capEdit.h)
@@ -137,14 +162,55 @@ local function makeRegion(bidFrame)
 
     local status = region:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     status:SetPoint("TOPLEFT", region, "TOPLEFT", R.status.x, -R.status.y)
+    applyFontRect(status, R.status)
     status:SetText("未启用")
     status:SetTextColor(0.8, 0.8, 0.8)
 
+    region.incrementLabel = incLabel
+    region.capLabel = capLabel
     region.incrementEdit = incEdit
     region.capEdit = capEdit
     region.button = button
     region.statusText = status
     return region
+end
+
+-- Show the region only while the card is expanded; hide it when collapsed.
+local function syncRegionVisibility(bidFrame)
+    local st = bidFrame and bidFrame[ACTIVE_KEY]
+    if not st or not st.region then
+        return
+    end
+    if bidFrame.IsSmallWindow then
+        st.region:Hide()
+    else
+        st.region:Show()
+    end
+end
+
+-- While armed, the collapse button is disabled (like the built-in auto-bid) so
+-- the user cannot hide the status region and keep bidding in the background. On
+-- stop the original button state is restored.
+local function setCollapseLock(bidFrame, locked)
+    local hide = bidFrame and bidFrame.hide
+    if not hide then
+        return
+    end
+    local st = bidFrame[ACTIVE_KEY]
+    if not st then
+        return
+    end
+    if locked then
+        st.collapseWasEnabled = hide:IsEnabled()
+        if st.collapseWasEnabled then
+            hide:Disable()
+        end
+    else
+        if st.collapseWasEnabled then
+            hide:Enable()
+        end
+        st.collapseWasEnabled = nil
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -163,6 +229,7 @@ local function stopFrame(bidFrame, reason)
     end
     st.pendingAmount = nil
     SM.stop(st.sm, reason)
+    setCollapseLock(bidFrame, false)
     if activeFrame == bidFrame then
         activeFrame = nil
     end
@@ -171,17 +238,28 @@ end
 
 local function doSend(bidFrame, st, amount)
     local msg = Msg.buildBidMessage(st.sm.auctionId, amount)
-    local ok = pcall(function()
-        C_ChatInfo.SendAddonMessage(Msg.ADDON_PREFIX, msg, "RAID")
+    local ok, result = pcall(function()
+        return C_ChatInfo.SendAddonMessage(Msg.ADDON_PREFIX, msg, "RAID")
     end)
     if not ok then
         -- SendAddonMessage threw: fail closed and show an explicit state.
         stopFrame(bidFrame, "send-failed")
         return
     end
-    -- The send went out, but SendAddonMessage returns no success signal, so this
-    -- only advances the current price for throttle/dedup; leadership is not
-    -- claimed until my own bid echoes back.
+    -- Newer clients return Enum.SendAddonMessageResult (Success == 0); older
+    -- clients return nil with no error. nil is a distinct "legacy success" branch
+    -- and must never be mistaken for a failure enum.
+    local success = 0
+    if Enum and Enum.SendAddonMessageResult and Enum.SendAddonMessageResult.Success ~= nil then
+        success = Enum.SendAddonMessageResult.Success
+    end
+    if result ~= nil and result ~= success then
+        stopFrame(bidFrame, "send-failed")
+        return
+    end
+    -- The send went out (or reported no error). This only advances the current
+    -- price for throttle/dedup; leadership is not claimed until my own bid
+    -- echoes back.
     SM.markSent(st.sm, now())
     st.pendingAmount = nil
     refresh(bidFrame, st)
@@ -236,7 +314,8 @@ local function arm(bidFrame, st)
         Store.set(BG.BGNext.DB.auctionPresets, cfg)
     end
 
-    -- Atomic multi-auction switch: stop the previously armed frame first.
+    -- Atomic multi-auction switch: only when the user arms a different frame do
+    -- we stop the previously armed one. Merely creating another frame never stops.
     if activeFrame and activeFrame ~= bidFrame then
         stopFrame(activeFrame, "change")
     end
@@ -260,6 +339,7 @@ local function arm(bidFrame, st)
     end
 
     activeFrame = bidFrame
+    setCollapseLock(bidFrame, true)
     refresh(bidFrame, st)
     if decision and decision.bid then
         sendBid(bidFrame, st, decision.bid)
@@ -291,14 +371,6 @@ function M.attach(bidFrame)
         return
     end
 
-    -- Interacting with a different auction stops any armed auto-bid.
-    if activeFrame and activeFrame ~= bidFrame then
-        local old = activeFrame[ACTIVE_KEY]
-        if old and old.sm.status == "armed" then
-            stopFrame(activeFrame, "change")
-        end
-    end
-
     local st = freshState()
     st.region = makeRegion(bidFrame)
     bidFrame[ACTIVE_KEY] = st
@@ -323,6 +395,7 @@ function M.attach(bidFrame)
         stopFrame(bidFrame, "hidden")
     end)
 
+    syncRegionVisibility(bidFrame)
     refresh(bidFrame, st)
 end
 
@@ -330,7 +403,9 @@ end
 -- Event handlers
 -- ---------------------------------------------------------------------------
 
-function M.onAddonMessage(self, event, prefix, message, distribution, arg4, arg5)
+-- CHAT_MSG_ADDON payload: prefix, text, channel, sender, target, ... (sender is
+-- the fourth argument, target the fifth).
+function M.onAddonMessage(self, event, prefix, message, distribution, sender, target)
     if not activeFrame then
         return
     end
@@ -339,7 +414,7 @@ function M.onAddonMessage(self, event, prefix, message, distribution, arg4, arg5
         return
     end
 
-    local classified = Msg.classify(nil, prefix, message, distribution, arg4, arg5, st.sm.auctionId)
+    local classified = Msg.classify(nil, prefix, message, distribution, sender, target, st.sm.auctionId)
     if classified.kind == "stop" then
         stopFrame(activeFrame, classified.reason)
         return
@@ -372,7 +447,10 @@ function M.onAddonMessage(self, event, prefix, message, distribution, arg4, arg5
     end
 end
 
-function M.onAuctionEnd(endType, link, player, money, logs)
+-- The end hook now carries auctionID as its sixth argument (after logs) so the
+-- runtime can associate the end to the exact auction. Item link is NOT used:
+-- the same item can have parallel auctions with different ids.
+function M.onAuctionEnd(endType, link, player, money, logs, auctionID)
     if not activeFrame then
         return
     end
@@ -380,13 +458,12 @@ function M.onAuctionEnd(endType, link, player, money, logs)
     if not reason then
         return
     end
-    -- Precise matching: only the active auction's own end stops it. When the end
-    -- event cannot be tied to the active auction (no item link), fail closed.
-    if link == nil or link == "" then
+    if auctionID == nil then
+        -- Cannot tie this end to any specific auction: fail closed.
         stopFrame(activeFrame, "protocol")
         return
     end
-    if link ~= activeFrame.link then
+    if tostring(auctionID) ~= tostring(activeFrame.auctionID) then
         return
     end
     stopFrame(activeFrame, reason)
@@ -425,11 +502,28 @@ local function wrapStackHeight()
         local height = orig(count)
         for i = 1, (count or 1) - 1 do
             local f = BGA and BGA.Frames and BGA.Frames[i]
-            if f and not f.IsSmallWindow then
+            local st = f and f[ACTIVE_KEY]
+            -- Only an expanded Gen1 card that actually has a region reserves the
+            -- extra height; collapsed and Gen2 cards never add blank space.
+            if f and not f.IsSmallWindow and not f.isGen2 and st and st.region then
                 height = height + extra
             end
         end
         return height
+    end
+end
+
+local function wrapHide()
+    if not wa or not wa.Hide_OnClick or wa._bgnextHideWrapped then
+        return
+    end
+    wa._bgnextHideWrapped = true
+    local orig = wa.Hide_OnClick
+    wa.Hide_OnClick = function(self, ...)
+        orig(self, ...)
+        for _, f in ipairs(BGA and BGA.Frames or {}) do
+            syncRegionVisibility(f)
+        end
     end
 end
 
@@ -482,6 +576,7 @@ function M.installHooks()
     end
 
     wrapStackHeight()
+    wrapHide()
     wrapAutoButton()
 
     BG.RegisterEvent("CHAT_MSG_ADDON", M.onAddonMessage)

@@ -36,37 +36,61 @@ return function(test)
     test.eq(Msg.parse("BiaoGeAuction", "SendMyMoney,12,2147483648"), nil, "an amount over the cap is rejected")
     test.eq(Msg.parse("BiaoGeAuction", "SendMyMoney,12,0007").money, 7, "leading zeros still parse as a number")
 
-    -- The explicit sender adapter reads the fifth argument, never the fourth.
-    test.eq(Msg.extractSender("build", "Target-Name", "Alice"), "Alice", "the sender is the fifth argument")
-    test.eq(Msg.extractSender("build", "Alice", nil), nil, "a missing fifth argument fails closed")
-    test.eq(Msg.extractSender("build", "Alice", ""), "", "an empty fifth argument is empty, not the target")
+    -- The sender is the FOURTH CHAT_MSG_ADDON argument (the target is the fifth).
+    -- extractSender reads the fixed fourth position and never falls back.
+    test.eq(Msg.SENDER_INDEX, 4, "the sender is the fourth argument")
+    test.eq(Msg.extractSender("build", "Alice", "Target"), "Alice", "the sender is the fourth argument")
+    test.eq(Msg.extractSender("build", nil, "Target"), nil, "a missing fourth argument fails closed")
+    test.eq(Msg.extractSender("build", "", "Target"), "", "an empty fourth argument is empty, not the target")
 
-    -- classify turns a raw event into one decision.
-    local function classify(prefix, message, distribution, arg4, arg5, active)
-        return Msg.classify("build", prefix, message, distribution, arg4, arg5, active)
+    -- classify turns a raw event into one decision. Unrelated traffic is dropped
+    -- first (before any fail-closed check); only a BiaoGeAuction + SendMyMoney
+    -- candidate proceeds to the distribution/sender/parse checks.
+    local function classify(prefix, message, distribution, sender, target, active)
+        return Msg.classify("build", prefix, message, distribution, sender, target, active)
     end
-    local bid = classify("BiaoGeAuction", "SendMyMoney,12,500000", "RAID", "Target", "Alice", "12")
+
+    -- A valid RAID bid for the active auction.
+    local bid = classify("BiaoGeAuction", "SendMyMoney,12,500000", "RAID", "Alice", "Target", "12")
     test.eq(bid.kind, "bid", "a RAID bid for the active auction is a bid")
-    test.eq(bid.sender, "Alice", "the classified bid carries the sender")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "PARTY", "Target", "Alice", "12").reason,
-        "not-raid", "a PARTY distribution is rejected")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "WHISPER", "Target", "Alice", "12").reason,
-        "not-raid", "a WHISPER distribution is rejected")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "INSTANCE_CHAT", "Target", "Alice", "12").reason,
-        "not-raid", "an INSTANCE_CHAT distribution is rejected")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "GUILD", "Target", "Alice", "12").reason,
-        "not-raid", "a GUILD distribution is rejected")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", nil, "Target", "Alice", "12").reason,
-        "not-raid", "a missing distribution is rejected")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "RAID", "Target", nil, "12").reason,
-        "no-sender", "a missing sender is rejected")
-    test.eq(classify("BiaoGeAuction", "StartAuction,12,500000", "RAID", "Target", "Alice", "12").kind,
-        "ignored", "a non-bid opcode is ignored")
-    test.eq(classify("BiaoGe", "SendMyMoney,12,500000", "RAID", "Target", "Alice", "12").kind,
+    test.eq(bid.sender, "Alice", "the classified bid carries the sender (4th arg)")
+
+    -- Unrelated addon messages (wrong prefix) are ignored even on a wrong distribution.
+    test.eq(classify("OtherAddon", "SendMyMoney,12,500000", "PARTY", "Alice", "Target", "12").kind,
+        "ignored", "an unrelated prefix on PARTY is ignored")
+    test.eq(classify("OtherAddon", "SendMyMoney,12,500000", "WHISPER", "Alice", "Target", "12").kind,
+        "ignored", "an unrelated prefix on WHISPER is ignored")
+    test.eq(classify("BiaoGe", "SendMyMoney,12,500000", "RAID", "Alice", "Target", "12").kind,
         "ignored", "another channel is ignored")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,abc", "RAID", "Target", "Alice", "12").reason,
+
+    -- A BiaoGeAuction message that is not SendMyMoney is ignored even on PARTY.
+    test.eq(classify("BiaoGeAuction", "VersionCheck,12,500000", "PARTY", nil, nil, "12").kind,
+        "ignored", "a VersionCheck opcode is ignored")
+    test.eq(classify("BiaoGeAuction", "StartAuction,12,500000", "RAID", "Alice", "Target", "12").kind,
+        "ignored", "a non-bid opcode is ignored")
+
+    -- A real SendMyMoney on a non-RAID distribution fails closed.
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "PARTY", "Alice", "Target", "12").reason,
+        "not-raid", "a PARTY distribution is rejected")
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "WHISPER", "Alice", "Target", "12").reason,
+        "not-raid", "a WHISPER distribution is rejected")
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "INSTANCE_CHAT", "Alice", "Target", "12").reason,
+        "not-raid", "an INSTANCE_CHAT distribution is rejected")
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "GUILD", "Alice", "Target", "12").reason,
+        "not-raid", "a GUILD distribution is rejected")
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", nil, "Alice", "Target", "12").reason,
+        "not-raid", "a missing distribution is rejected")
+
+    -- A SendMyMoney with a missing/empty sender fails closed.
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "RAID", nil, "Target", "12").reason,
+        "no-sender", "a missing sender is rejected")
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,500000", "RAID", "", "Target", "12").reason,
+        "no-sender", "an empty sender is rejected")
+
+    -- A malformed body fails closed; a bid for another auction is ignored.
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,12,abc", "RAID", "Alice", "Target", "12").reason,
         "malformed", "a malformed bid body fails closed")
-    test.eq(classify("BiaoGeAuction", "SendMyMoney,99,500000", "RAID", "Target", "Alice", "12").kind,
+    test.eq(classify("BiaoGeAuction", "SendMyMoney,99,500000", "RAID", "Alice", "Target", "12").kind,
         "wrong-auction", "a bid for another auction is ignored")
 
     -- A bid event is validated against the current raid and active auction.

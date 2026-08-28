@@ -1237,7 +1237,7 @@ BG.Init(function()
     end)
    end
    if BG and BG.AuctionWAEnd then
-    BG.AuctionWAEnd(1, bidFrame.link, bidFrame.player, bidFrame.money, bidFrame.logs)
+    BG.AuctionWAEnd(1, bidFrame.link, bidFrame.player, bidFrame.money, bidFrame.logs, bidFrame.auctionID)
    end
   else
    wa.SetEndState(bidFrame, L["流拍"], 1, 0, 0)
@@ -1253,7 +1253,7 @@ BG.Init(function()
     end
    end
    if BG and BG.AuctionWAEnd then
-    BG.AuctionWAEnd(2, bidFrame.link, bidFrame.player, bidFrame.money)
+    BG.AuctionWAEnd(2, bidFrame.link, bidFrame.player, bidFrame.money, nil, bidFrame.auctionID)
    end
   end
   After(wa.HIDEFRAME_TIME, function()
