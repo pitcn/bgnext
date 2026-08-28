@@ -53,6 +53,61 @@ return function(test)
         test.eq(normal and normal.difficultyIndex, 1, "shared MoP token resolves to the requested normal difficulty")
         test.eq(heroic and heroic.difficultyIndex, 2, "shared MoP token resolves to the requested heroic difficulty")
         test.eq(heroic and heroic.bossIndex, 14, "shared MoP token remains assigned to Garrosh")
+
+        local sharedCatalogs = {
+            vanilla60 = {
+                itemId = 20884,
+                difficulties = { "N" },
+                loot = { N = { boss1 = { 20884 }, boss6 = { 20884 } } },
+                targetDifficulty = 1,
+                targetBoss = 6,
+            },
+            tbc = {
+                itemId = 22450,
+                difficulties = { "N" },
+                loot = { N = { boss10 = { 22450 }, boss11 = { 22450 } } },
+                targetDifficulty = 1,
+                targetBoss = 11,
+            },
+            titan = {
+                itemId = 255126,
+                difficulties = { "N" },
+                loot = { N = { boss2 = { 255126 }, boss4 = { 255126 } } },
+                targetDifficulty = 1,
+                targetBoss = 4,
+            },
+            mop = {
+                itemId = 105857,
+                difficulties = { "N", "H" },
+                loot = {
+                    N = { boss14 = { 105857 } },
+                    H = { boss14 = { 105857 } },
+                },
+                targetDifficulty = 2,
+                targetBoss = 14,
+            },
+            retail = {
+                -- Retail loot is populated dynamically from Encounter Journal;
+                -- exercise the same N/H/M catalog shape with a shared runtime ID.
+                itemId = 999001,
+                difficulties = { "N", "H", "M" },
+                loot = {
+                    N = { boss1 = { 999001 } },
+                    H = { boss1 = { 999001 } },
+                    M = { boss1 = { 999001 } },
+                },
+                targetDifficulty = 3,
+                targetBoss = 1,
+            },
+        }
+        for family, catalog in pairs(sharedCatalogs) do
+            local location = resolveDrop(catalog.itemId, catalog.difficulties, catalog.loot, 14,
+                exactItem, catalog.targetDifficulty, catalog.targetBoss)
+            test.eq(location and location.difficultyIndex, catalog.targetDifficulty,
+                family .. " shared item resolves to the selected difficulty")
+            test.eq(location and location.bossIndex, catalog.targetBoss,
+                family .. " shared item resolves to the selected boss")
+        end
     end
 
     local function resolver(itemId)
