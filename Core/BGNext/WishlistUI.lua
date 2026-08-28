@@ -5,6 +5,40 @@ BG.BGNext = BG.BGNext or {}
 
 local M = { tabNumber = 3 }
 
+-- The wishlist equipment picker is the single shared frame BG.FrameZhuangbeiList,
+-- created by BG.SetListzhuangbei (which the normal bill slots also use). Its
+-- lifecycle lives here: at most one picker is open at a time, it is owned by the
+-- slot that opened it, and clicking that same slot again collapses it.
+local openPickerSlot = nil
+
+function M.hidePicker()
+    if BG.FrameZhuangbeiList and BG.FrameZhuangbeiList:IsShown() then
+        BG.FrameZhuangbeiList:Hide()
+    end
+end
+
+function M.closePicker()
+    M.hidePicker()
+    if openPickerSlot and openPickerSlot.ClearFocus then
+        openPickerSlot:ClearFocus()
+    end
+    openPickerSlot = nil
+end
+
+function M.openPicker(slot)
+    M.hidePicker()
+    if BG.SetListzhuangbei then BG.SetListzhuangbei(slot) end
+    openPickerSlot = slot
+end
+
+function M.togglePicker(slot)
+    if openPickerSlot == slot and BG.FrameZhuangbeiList and BG.FrameZhuangbeiList:IsShown() then
+        M.closePicker()
+    else
+        M.openPicker(slot)
+    end
+end
+
 local function pairedHorizontal(difficultyIndex, difficultyCount)
     if difficultyCount <= 1 then return 1 end
     local target = difficultyIndex % 2 == 1 and difficultyIndex + 1 or difficultyIndex - 1
@@ -316,6 +350,8 @@ if runtimeReady() then
                 self:ClearFocus()
             elseif IsControlKeyDown() and self:GetText() ~= "" and BG.GoToItemLib then
                 BG.GoToItemLib(self)
+            elseif button == "LeftButton" and not IsShiftKeyDown() and not IsControlKeyDown() then
+                if self:HasFocus() then M.togglePicker(self) end
             end
         end)
         slot:SetScript("OnMouseUp", function(self)
@@ -353,7 +389,7 @@ if runtimeReady() then
             self.focus:Show()
             BG.lastfocuszhuangbei = self
             BG.lastfocus = self
-            if BG.SetListzhuangbei then BG.SetListzhuangbei(self) end
+            M.openPicker(self)
             local boss = BG.HopeFrame[self.FB]
                 and BG.HopeFrame[self.FB]["nandu" .. self.hopenandu]
                 and BG.HopeFrame[self.FB]["nandu" .. self.hopenandu]["boss" .. self.bossnum]
@@ -380,11 +416,11 @@ if runtimeReady() then
         end)
         slot:SetScript("OnEnterPressed", function(self)
             self:ClearFocus()
-            if BG.FrameZhuangbeiList then BG.FrameZhuangbeiList:Hide() end
+            M.closePicker()
         end)
         slot:SetScript("OnEscapePressed", function(self)
             self:ClearFocus()
-            if BG.FrameZhuangbeiList then BG.FrameZhuangbeiList:Hide() end
+            M.closePicker()
         end)
         return slot
     end
@@ -640,6 +676,7 @@ if runtimeReady() then
         end
 
         local function showCurrentRaid()
+            M.closePicker()
             for _, raidId in ipairs(BG.FBtable or {}) do
                 local frame = BG["HopeFrame" .. raidId]
                 if raidId == BG.FB1 then
@@ -651,6 +688,7 @@ if runtimeReady() then
             end
         end
         BG.HopeMainFrame:SetScript("OnShow", showCurrentRaid)
+        BG.HopeMainFrame:SetScript("OnHide", M.closePicker)
         BG.Create_TabButton(M.tabNumber, L["心愿清单"] or "心愿清单", BG.HopeMainFrame)
 
         BG.ButtonImportHope = CreateFrame("Button", nil, BG.HopeMainFrame)
