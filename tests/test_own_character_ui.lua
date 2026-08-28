@@ -182,6 +182,23 @@ return function(test)
     test.eq(fallbackHeader.text, "余烬", "missing currency data falls back to the catalog title")
     test.eq(fallbackHeader.tooltip, "余烬", "missing currency data has a safe tooltip")
 
+    -- Profession cooldown headings keep the compact title and resolve the
+    -- client's own spell name for the tooltip, falling back when it is absent.
+    local cooldownHeader = UI.columnHeader({
+        title = "炼金转化",
+        source = { kind = "profession-cooldown", key = "alchemyTransmute", spellId = 66660 },
+    }, nil, function(id)
+        test.eq(id, 66660, "cooldown header resolves the declared spell id")
+        return "转化：琥珀"
+    end)
+    test.eq(cooldownHeader.text, "炼金转化", "cooldown heading keeps its compact catalog title")
+    test.eq(cooldownHeader.tooltip, "转化：琥珀", "cooldown tooltip uses Blizzard's localized spell name")
+    local cooldownFallback = UI.columnHeader({
+        title = "炼金转化",
+        source = { kind = "profession-cooldown", key = "alchemyTransmute", spellId = 66660 },
+    }, nil, function() return nil end)
+    test.eq(cooldownFallback.tooltip, "炼金转化", "a missing spell name falls back to the catalog title")
+
     test.eq(UI.headerControls("pinned", true).canAdd, true, "pinned sections expose settings")
     test.eq(UI.headerControls("preview", true).canAdd, false, "preview sections do not expose settings")
     test.eq(type(UI.SetMode), "function", "entry can declare preview or pinned rendering")

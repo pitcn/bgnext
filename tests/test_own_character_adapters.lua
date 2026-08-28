@@ -235,6 +235,26 @@ return function(test)
     test.eq(Catalog.column("titan", "resource", "stoneKeeper").title, "岩石", "Stone Keeper heading is compact")
     test.eq(Catalog.column("titan", "resource", "honor").title, "荣誉", "honor heading is compact")
 
+    -- Titan adds the ten verified profession cooldowns. They stay hidden until
+    -- real-client validation confirms each spell id, so none of them can leak a
+    -- hand-written name or an unverified cooldown into the default table.
+    local titanCooldowns = {
+        alchemyResearch = 60893, alchemyTransmute = 66660,
+        inscriptionResearch = 61177, minorInscription = 61288,
+        icyPrism = 62242, smeltTitansteel = 55208,
+        spellweave = 56003, ebonweave = 56002, moonshroud = 56001, glacialBag = 56005,
+    }
+    for key, spellId in pairs(titanCooldowns) do
+        local column = Catalog.column("titan", "resource", key)
+        test.eq(column ~= nil, true, "titan declares the " .. key .. " cooldown")
+        test.eq(column.kind, "cooldown", key .. " is a cooldown column")
+        test.eq(column.source.kind, "profession-cooldown", key .. " uses the profession-cooldown source")
+        test.eq(column.source.spellId, spellId, key .. " uses its verified spell id")
+        test.eq(column.total, false, key .. " never totals")
+        test.eq(Catalog.defaultVisible("titan", "resource", key), false,
+            key .. " stays hidden until real-client validation")
+    end
+
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")
     test.eq(Catalog.forFamily(nil), nil, "missing family is safe")

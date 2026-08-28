@@ -123,7 +123,24 @@ local function liveCurrencyInfo(currencyId)
     end
 end
 
-function M.columnHeader(column, currencyInfo)
+-- Resolves a spell's localized name from whichever spell API the client ships.
+-- Returns a string name, or nil when the API is absent or the spell is unknown.
+local function liveSpellInfo(spellId)
+    if type(C_Spell) == "table" and type(C_Spell.GetSpellInfo) == "function" then
+        local info = C_Spell.GetSpellInfo(spellId)
+        if type(info) == "table" and type(info.name) == "string" and info.name ~= "" then
+            return info.name
+        end
+        return nil
+    end
+    if type(GetSpellInfo) == "function" then
+        local name = GetSpellInfo(spellId)
+        if type(name) == "string" and name ~= "" then return name end
+    end
+    return nil
+end
+
+function M.columnHeader(column, currencyInfo, spellInfo)
     if type(column) ~= "table" then return { text = "", tooltip = "" } end
     local rawLabel = type(column.title) == "string" and column.title or ""
     local label = L[rawLabel]
@@ -131,6 +148,17 @@ function M.columnHeader(column, currencyInfo)
         and L[column.fullTitle] or label
     local descriptor = { text = label, tooltip = tooltip }
     local source = type(column.source) == "table" and column.source or nil
+    -- A profession cooldown heading keeps its compact catalog title and, when
+    -- the client can name the spell, surfaces Blizzard's own localized name as
+    -- the tooltip rather than a hand-written translation.
+    if source and source.kind == "profession-cooldown" and type(source.spellId) == "number" then
+        local resolver = type(spellInfo) == "function" and spellInfo or liveSpellInfo
+        local ok, name = pcall(resolver, source.spellId)
+        if ok and type(name) == "string" and name ~= "" then
+            descriptor.tooltip = name
+        end
+        return descriptor
+    end
     if not source or source.kind ~= "currency" or source.showHeaderIcon ~= true
         or type(source.currencyId) ~= "number" then
         return descriptor
