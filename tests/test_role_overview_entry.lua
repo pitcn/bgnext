@@ -22,6 +22,7 @@ return function(test)
     -- Slash commands toggle the pinned window.
     test.eq(Entry.intent("slash-role", {}), "toggle-pinned", "slash command toggles the pinned window")
     test.eq(Entry.intent("close", { pinned = true }), "unpin", "the close control unpins")
+    test.eq(Entry.intent("escape", { pinned = true }), "unpin", "escape unpins the fixed window")
     test.eq(Entry.intent("refresh", {}), "refresh", "the refresh control refreshes")
     test.eq(Entry.intent("settings", {}), "settings", "the settings control opens settings")
     test.eq(Entry.intent("nonsense", {}), nil, "unknown actions do nothing")
@@ -233,4 +234,8 @@ return function(test)
         "hiding the main addon closes any transient preview")
     test.eq(string.find(source, 'IsMouseOver', 1, true) ~= nil, true,
         "transient previews verify that the entry is still hovered")
+    test.eq(string.find(source, 'BGNextRoleOverviewFrame', 1, true) ~= nil, true,
+        "the role overview has a stable global frame name for UISpecialFrames")
+    test.eq(string.find(source, 'UISpecialFrames', 1, true) ~= nil, true,
+        "the fixed role overview participates in Blizzard escape handling")
 end

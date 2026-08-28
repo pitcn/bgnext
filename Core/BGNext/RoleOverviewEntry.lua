@@ -37,7 +37,7 @@ function M.intent(action, state)
         return state.pinned and "unpin" or "pin"
     end
     if action == "slash-role" then return "toggle-pinned" end
-    if action == "close" then return "unpin" end
+    if action == "close" or action == "escape" then return "unpin" end
     if action == "refresh" then return "refresh" end
     if action == "settings" then return "settings" end
     return nil
@@ -293,8 +293,11 @@ end
 
 local function ensureWindow()
     if window then return window end
-    window = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    window = CreateFrame("Frame", "BGNextRoleOverviewFrame", UIParent, "BackdropTemplate")
     M.prepareNewWindow(window)
+    if type(UISpecialFrames) == "table" then
+        table.insert(UISpecialFrames, "BGNextRoleOverviewFrame")
+    end
     window:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\ChatFrame\\ChatFrameBackground",
@@ -307,6 +310,16 @@ local function ensureWindow()
     if window.SetClampedToScreen then window:SetClampedToScreen(true) end
     window:EnableMouse(true)
     window:RegisterForDrag("LeftButton")
+    window:SetScript("OnHide", function()
+        local wasManaged = pinned or state.previewVisible == true
+        pinned = false
+        state.pinned = false
+        state.previewVisible = false
+        if wasManaged then
+            local runtime = BG.BGNext.OwnCharactersRuntime
+            M.syncVisibility(runtime, BG.BGNext.OwnCharactersUI, false)
+        end
+    end)
     window:SetScript("OnDragStart", function(self) self:StartMoving() end)
     window:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
@@ -389,6 +402,7 @@ end
 function M.setPinned(value)
     pinned = value and true or false
     state.pinned = pinned
+    state.previewVisible = false
     if pinned and not window then ensureWindow() end
     if window then
         window:SetScript("OnUpdate", nil)
@@ -418,6 +432,7 @@ function M.showPreview()
     if not M.previewShouldRemain(pinned, entryVisible == true, entryHovered == true) then return end
     ensureWindow()
     if not pinned then
+        state.previewVisible = true
         placeWindow("preview")
         window:SetShown(true)
         local runtime = BG.BGNext.OwnCharactersRuntime
@@ -446,6 +461,7 @@ end
 
 function M.hidePreview()
     if not pinned then
+        state.previewVisible = false
         if window then
             window:SetScript("OnUpdate", nil)
             window:Hide()
