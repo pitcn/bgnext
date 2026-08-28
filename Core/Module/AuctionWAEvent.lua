@@ -690,13 +690,13 @@ BG.Init(function()
      end
     end
    elseif opcode == "SendMyMoney" and distribution == "RAID" then
-    local auctionID = tonumber(auctionIDStr)
-    local money = tonumber(itemIDStr)
     -- The bidder is the message sender (fourth argument), never the target
     -- (fifth). Missing senders and non-raid senders are ignored without a bid.
     if not sender or sender == "" then return end
     local Sender = BG.BGNext and BG.BGNext.AuctionSender
     if Sender then
+     local auctionID, money = Sender.parseBid(auctionIDStr, itemIDStr)
+     if auctionID == nil then return end
      local realm = (GetRealmName and GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
      local members = {}
      for _, member in ipairs(wa.raidRosterInfo or {}) do
@@ -705,13 +705,13 @@ BG.Init(function()
       end
      end
      if not Sender.isRaidSender(sender, realm, members) then return end
-    end
-    for v, frame in pairs(BGA.Frames) do
-     if not frame.IsEnd and not frame.isPaused and frame.mod ~= "anonymous" and frame[auctionIdKey] == auctionID then
-      if frame.start and money >= frame.money or money > frame.money then
-       wa.SetMoney(frame, money, sender)
+     for v, frame in pairs(BGA.Frames) do
+      if not frame.IsEnd and not frame.isPaused and frame.mod ~= "anonymous" and frame[auctionIdKey] == auctionID then
+       if frame.start and money >= frame.money or money > frame.money then
+        wa.SetMoney(frame, money, sender)
+       end
+       return
       end
-      return
      end
     end
    elseif opcode == "VersionCheck" and distribution == "RAID" then

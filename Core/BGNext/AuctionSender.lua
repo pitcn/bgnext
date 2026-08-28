@@ -27,5 +27,14 @@ function M.isRaidSender(sender, realm, memberNames)
     return false
 end
 
+-- Parse the two numeric fields used by SendMyMoney. Both are mandatory; a
+-- malformed compatible client must be ignored before live auction comparisons.
+function M.parseBid(auctionIDStr, moneyStr)
+    local auctionID = tonumber(auctionIDStr)
+    local money = tonumber(moneyStr)
+    if auctionID == nil or money == nil then return nil end
+    return auctionID, money
+end
+
 BG.BGNext.AuctionSender = M
 return M
