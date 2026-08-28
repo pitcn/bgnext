@@ -1,9 +1,20 @@
 # 受控自动出价（含价格配置）— 净室设计说明
 
-- **状态**: ready_for_codex_review（设计定稿，进入 TDD 实现）
+- **状态**: superseded（实机测试否决并行自动出价，改回 BGLite 原生路径）
 - **日期**: 2026-08-27
 - **分支**: `codex/v0.1.0`
 - **基线**: BGLite 2.4.0（`docs/baseline/BGNext-overrides.sha256` 19 条覆盖，本次**不修改任何基线文件**）
+
+## 0. 裁决记录（2026-08-28 实机测试后修订）
+
+实机测试否决了本设计 §12 的「并行两套自动出价」决定。实际表现为重复自动出价、自身顶价、协议异常与消息回环。裁决改为：
+
+- **删除** BGNext 受控自动出价整层（`AuctionNames` / `AuctionPresetStore` / `ControlledAutoBid` / `AuctionBidMessage` / `AuctionBidUI` / `AuctionPresetRuntime`）及其测试，不再从 `BGLite.toc` 加载。
+- **改用** BGLite 原生自动出价路径（`Core/Module/AuctionWA.lua` + `AuctionWAEvent.lua`），不改动其原生 UI 与操作习惯。
+- `BiaoGe.BGNext.auctionPresets` 不再创建或读取；已有的本地值保持惰性、不读取、不静默删除，直至用户主动清除 BGNext 数据。
+- 原生路径出价发送者校验加固另见 `Core/Module/AuctionWAEvent.lua` 的 sender/target 修复。
+
+本文件其余内容保留为历史设计记录，不再作为实现依据。
 
 ## 1. 目标与产品语义（维护者已裁定）
 
