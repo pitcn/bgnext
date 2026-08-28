@@ -82,11 +82,11 @@ local CATALOG = {
         status = "pending-in-game-verification",
         raidColumns = {
             raid("MC", 409, "MC", "熔火之心", nil, { 409 }, true, "00BFFF"),
-            raid("ONY", 249, "ONY", "奥妮克希亚的巢穴", nil, { 249 }, true, "00BFFF"),
-            raid("BWL", 469, "BWL", "黑翼之巢", nil, { 469 }, true, "00BFFF"),
-            raid("ZUG", 309, "ZG", "祖尔格拉布", nil, { 309 }, true, "00BFFF"),
-            raid("AQL", 509, "AQ20", "安其拉废墟", nil, { 509 }, true, "00BFFF"),
-            raid("TAQ", 531, "AQ40", "安其拉神殿", nil, { 531 }, true, "00BFFF"),
+            raid("ONY", 249, "黑龙", "奥妮克希亚的巢穴", nil, { 249 }, true, "00BFFF"),
+            raid("BWL", 469, "黑翼", "黑翼之巢", nil, { 469 }, true, "00BFFF"),
+            raid("ZUG", 309, "祖格", "祖尔格拉布", nil, { 309 }, true, "00BFFF"),
+            raid("AQL", 509, "废墟", "安其拉废墟", nil, { 509 }, true, "00BFFF"),
+            raid("TAQ", 531, "安其拉", "安其拉神殿", nil, { 531 }, true, "00BFFF"),
             raid("NAXX", 533, "NAXX", "纳克萨玛斯", nil, { 533 }, true, "00BFFF"),
         },
         resourceColumns = {
@@ -115,15 +115,15 @@ local CATALOG = {
     tbc = {
         status = "pending-in-game-verification",
         raidColumns = {
-            raid("KZ", 532, "KZ", "卡拉赞", nil, { 532 }, true, "00BFFF"),
-            raid("GL", 565, "GL", "格鲁尔的巢穴", nil, { 565 }, true, "00BFFF"),
-            raid("ML", 544, "MAG", "玛瑟里顿的巢穴", nil, { 544 }, true, "00BFFF"),
-            raid("SSC", 548, "SSC", "毒蛇神殿", nil, { 548 }, true, "00BFFF"),
-            raid("TK", 550, "TK", "风暴要塞", nil, { 550 }, true, "00BFFF"),
-            raid("HS", 534, "HYJAL", "海加尔山之战", nil, { 534 }, true, "00BFFF"),
-            raid("BT", 564, "BT", "黑暗神殿", nil, { 564 }, true, "00BFFF"),
-            raid("ZA", 568, "ZA", "祖阿曼", nil, { 568 }, true, "00BFFF"),
-            raid("SW", 580, "SW", "太阳之井高地", nil, { 580 }, true, "00BFFF"),
+            raid("SW", 580, "太阳井", "太阳之井高地", nil, { 580 }, true, "00BFFF"),
+            raid("BT", 564, "黑庙", "黑暗神殿", nil, { 564 }, true, "00BFFF"),
+            raid("HS", 534, "海山", "海加尔山之战", nil, { 534 }, true, "00BFFF"),
+            raid("ZA", 568, "祖阿曼", "祖阿曼", nil, { 568 }, true, "00BFFF"),
+            raid("TK", 550, "风暴", "风暴要塞", nil, { 550 }, true, "00BFFF"),
+            raid("SSC", 548, "毒蛇", "毒蛇神殿", nil, { 548 }, true, "00BFFF"),
+            raid("GL", 565, "格鲁尔", "格鲁尔的巢穴", nil, { 565 }, true, "00BFFF"),
+            raid("ML", 544, "玛胖", "玛瑟里顿的巢穴", nil, { 544 }, true, "00BFFF"),
+            raid("KZ", 532, "卡拉赞", "卡拉赞", nil, { 532 }, true, "00BFFF"),
         },
         resourceColumns = {
             resource("mainProfession", "主专业", "profession", "wide", false,
@@ -154,17 +154,17 @@ local CATALOG = {
     titan = {
         status = "tested-in-game",
         raidColumns = {
-            raid("SWtitan", 580, "SW", "太阳之井高地", nil, { 580 }, true, "00BFFF"),
-            raid("ZAtitan", 568, "ZAM", "祖阿曼", nil, { 568 }, true, "00BFFF"),
+            raid("SWtitan", 580, "太阳井", "太阳之井高地", nil, { 580 }, true, "00BFFF"),
+            raid("ZAtitan", 568, "祖阿曼", "祖阿曼", nil, { 568 }, true, "00BFFF"),
             raid("TOCtitan", 649, "TOC", "十字军的试炼", nil, { 649 }, true, "00BFFF"),
             raid("ZUGtitan", 309, "ZG", "祖尔格拉布", nil, { 309 }, true, "00BFFF"),
             raid("NAXXtitan", 533, "NAXX", "纳克萨玛斯", nil, { 533 }, true, "00BFFF"),
+            raid("MCtitan", 409, "MC", "熔火之心", nil, { 409 }, true, "00BFFF"),
+            raid("VOAtitan", 624, "宝库", "阿尔卡冯的宝库", nil, { 624 }, true, "00BFFF"),
             raid("OStitan", 615, "黑曜石", "黑曜石圣殿", nil, { 615 }, false, "00BFFF"),
             raid("EOEtitan", 616, "永恒", "永恒之眼", nil, { 616 }, false, "00BFFF"),
             raid("SSCtitan", 548, "毒蛇", "毒蛇神殿", nil, { 548 }, false, "00BFFF"),
             raid("TKtitan", 550, "风暴", "风暴要塞", nil, { 550 }, false, "00BFFF"),
-            raid("MCtitan", 409, "MC", "熔火之心", nil, { 409 }, true, "00BFFF"),
-            raid("VOAtitan", 624, "宝库", "阿尔卡冯的宝库", nil, { 624 }, true, "00BFFF"),
             raid("Doomwalker", 119, "末日行者", "末日行者", nil, { 119 }, false, "99CCFF"),
             raid("DoomLordKazzak", 118, "末日领主", "末日领主卡扎克", nil, { 118 }, false, "99CCFF"),
             raid("Lanlongtitan", 116, "蓝龙", "艾索雷葛斯", nil, { 116 }, false, "99CCFF"),
@@ -230,11 +230,11 @@ local CATALOG = {
     mop = {
         status = "pending-in-game-verification",
         raidColumns = {
-            raid("MSV", 1008, "MSV", "魔古山宝库", nil, { 1008 }, true, "00BFFF"),
-            raid("HOF", 1009, "HOF", "恐惧之心", nil, { 1009 }, true, "00BFFF"),
-            raid("TES", 996, "TOES", "永春台", nil, { 996 }, true, "00BFFF"),
-            raid("TOT", 1098, "TOT", "雷电王座", nil, { 1098 }, true, "00BFFF"),
-            raid("SOO", 1136, "SOO", "决战奥格瑞玛", nil, { 1136 }, true, "00BFFF"),
+            raid("MSV", 1008, "宝库", "魔古山宝库", nil, { 1008 }, true, "00BFFF"),
+            raid("HOF", 1009, "恐惧", "恐惧之心", nil, { 1009 }, true, "00BFFF"),
+            raid("TES", 996, "永春", "永春台", nil, { 996 }, true, "00BFFF"),
+            raid("TOT", 1098, "雷电", "雷电王座", nil, { 1098 }, true, "00BFFF"),
+            raid("SOO", 1136, "奥格", "决战奥格瑞玛", nil, { 1136 }, true, "00BFFF"),
         },
         resourceColumns = {
             resource("mainProfession", "主专业", "profession", "wide", false,
@@ -303,14 +303,12 @@ local CATALOG = {
     retail = {
         status = "pending-in-game-verification",
         raidColumns = {
-            raid("VA", 3004, "VA", "当前赛季团本", nil, { 3004 }, true, "00BFFF"),
+            raid("DR", 2939, "梦境", "梦境裂隙", nil, { 2939 }, false, "00BFFF"),
+            raid("MQD", 2913, "奎尔", "进军奎尔丹纳斯", nil, { 2913 }, false, "00BFFF"),
+            raid("Micosis", 1592, "孢陨", "孢陨幽境", nil, { 1592 }, false, "00BFFF"),
             -- 潮缚石窟 is present in the BGLite baseline only as a commented-out
             -- candidate (Core/DB/DB.lua), so it stays a hidden pending column.
-            raid("TG", 2987, "TG", "潮缚石窟", nil, { 2987 }, false, "00BFFF"),
-            raid("VS", 2912, "VS", "P1团本", nil, { 2912 }, false, "00BFFF"),
-            raid("DR", 2939, "DR", "梦境裂隙", nil, { 2939 }, false, "00BFFF"),
-            raid("MQD", 2913, "MQD", "进军奎尔丹纳斯", nil, { 2913 }, false, "00BFFF"),
-            raid("Micosis", 1592, "Micosis", "孢陨幽境", nil, { 1592 }, false, "00BFFF"),
+            raid("TG", 2987, "潮缚", "潮缚石窟", nil, { 2987 }, false, "00BFFF"),
         },
         -- Retail shares only the local summary columns plus a list of candidate
         -- currency IDs. None of the candidates is registered with a currency ID

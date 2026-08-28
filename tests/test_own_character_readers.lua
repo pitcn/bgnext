@@ -114,35 +114,35 @@ return function(test)
         GetNumSavedInstances = function() return 3 end,
         GetSavedInstanceInfo = function(index)
             if index == 1 then
-                return "当前赛季团本", 900101, 3600, 14, true, false, 1, true,
-                    20, "普通", 6, 6, nil, 3004
+                return "梦境裂隙", 900101, 3600, 14, true, false, 1, true,
+                    20, "普通", 6, 6, nil, 2939
             elseif index == 2 then
-                return "当前赛季团本", 900102, 3600, 15, true, false, 1, true,
-                    20, "英雄", 6, 3, nil, 3004
+                return "梦境裂隙", 900102, 3600, 15, true, false, 1, true,
+                    20, "英雄", 6, 3, nil, 2939
             elseif index == 3 then
-                return "当前赛季团本", 900103, 3600, 16, true, false, 1, true,
-                    20, "史诗", 6, 6, nil, 3004
+                return "梦境裂隙", 900103, 3600, 16, true, false, 1, true,
+                    20, "史诗", 6, 6, nil, 2939
             end
             return nil
         end,
     })
     local retailStates = Adapters.readers("retail", retailRaidApi,
         retailCatalog.raidColumns, retailCatalog.resourceColumns).raidStates()
-    test.eq(retailStates.VA.difficultyLabel, "M", "retail keeps the highest cleared difficulty")
-    test.eq(retailStates.VA.difficulty, 16, "retail records the mythic difficulty ID")
-    test.eq(retailStates.VA.completed, true, "the mythic lockout completes the raid")
+    test.eq(retailStates.DR.difficultyLabel, "M", "retail keeps the highest cleared difficulty")
+    test.eq(retailStates.DR.difficulty, 16, "retail records the mythic difficulty ID")
+    test.eq(retailStates.DR.completed, true, "the mythic lockout completes the raid")
 
     -- A retail lockout with an unknown difficulty ID stays numeric and unlabelled
     -- rather than guessing a letter.
     local unknownDifficulty = Adapters.readers("retail", api({
         GetNumSavedInstances = function() return 1 end,
         GetSavedInstanceInfo = function()
-            return "当前赛季团本", 900104, 3600, 7, true, false, 1, true,
-                20, "未知", 6, 6, nil, 3004
+            return "梦境裂隙", 900104, 3600, 7, true, false, 1, true,
+                20, "未知", 6, 6, nil, 2939
         end,
     }), retailCatalog.raidColumns, retailCatalog.resourceColumns).raidStates()
-    test.eq(unknownDifficulty.VA.difficulty, 7, "an unknown difficulty ID stays numeric")
-    test.eq(unknownDifficulty.VA.difficultyLabel, nil, "an unknown difficulty ID has no label")
+    test.eq(unknownDifficulty.DR.difficulty, 7, "an unknown difficulty ID stays numeric")
+    test.eq(unknownDifficulty.DR.difficultyLabel, nil, "an unknown difficulty ID has no label")
 
     -- Professions read the two primary skill lines into index-keyed entries.
     local profApi = api({

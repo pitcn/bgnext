@@ -103,9 +103,9 @@ return function(test)
 
     local expectedRaidInstances = {
         vanilla = { 409, 249, 469, 309, 509, 531, 533 },
-        tbc = { 532, 565, 544, 548, 550, 534, 564, 568, 580 },
+        tbc = { 580, 564, 534, 568, 550, 548, 565, 544, 532 },
         mop = { 1008, 1009, 996, 1098, 1136 },
-        retail = { 3004, 2987, 2912, 2939, 2913, 1592 },
+        retail = { 2939, 2913, 1592, 2987 },
     }
     for family, expected in pairs(expectedRaidInstances) do
         local catalog = Catalog.forFamily(family)
@@ -117,12 +117,14 @@ return function(test)
                 family .. " instance order remains deterministic at " .. index)
         end
     end
-    test.eq(Catalog.defaultVisible("retail", "raid", "VA"), true,
-        "the BGLite current-season Retail raid is visible")
-    for _, id in ipairs({ "TG", "VS", "DR", "MQD", "Micosis" }) do
+    for _, id in ipairs({ "DR", "MQD", "Micosis", "TG" }) do
         test.eq(Catalog.defaultVisible("retail", "raid", id), false,
-            "the Retail previous-season column " .. id .. " is hidden by default")
+            "the Retail raid column " .. id .. " stays hidden until its name is confirmed")
     end
+    test.eq(Catalog.column("retail", "raid", "VA"), nil,
+        "the unnameable current-season placeholder is removed")
+    test.eq(Catalog.column("retail", "raid", "VS"), nil,
+        "the unnameable P1-group placeholder is removed")
 
     local seenTitanInstances = {}
     for _, column in ipairs(titan.raidColumns) do
@@ -206,7 +208,7 @@ return function(test)
     test.eq(Catalog.column("mop", "raid", "HOF") ~= nil, true, "mop exposes Heart of Fear independently")
     test.eq(Catalog.column("mop", "raid", "TES") ~= nil, true, "mop exposes Terrace independently")
     test.eq(Catalog.column("titan", "raid", "MSV"), nil, "titan does not carry mop raids")
-    test.eq(Catalog.column("retail", "raid", "VS") ~= nil, true, "retail keeps the BGLite P1 raid hidden")
+    test.eq(Catalog.column("retail", "raid", "VS"), nil, "retail drops the placeholder P1 group")
     test.eq(Catalog.column("vanilla", "raid", "MC") ~= nil, true, "vanilla exposes Molten Core")
     test.eq(Catalog.column("titan", "raid", "MC"), nil, "titan uses suffixed raid keys")
 
@@ -222,11 +224,69 @@ return function(test)
     test.eq(Catalog.column("titan", "resource", "equipment"), nil, "the old all-equipment main column is gone")
 
     local shortTitles = {
-        SWtitan = "SW", ZAtitan = "ZAM", TOCtitan = "TOC", ZUGtitan = "ZG",
+        SWtitan = "太阳井", ZAtitan = "祖阿曼", TOCtitan = "TOC", ZUGtitan = "ZG",
         NAXXtitan = "NAXX", MCtitan = "MC", VOAtitan = "宝库",
     }
     for id, title in pairs(shortTitles) do
         test.eq(Catalog.column("titan", "raid", id).title, title, id .. " uses the compact requested heading")
+    end
+
+    -- Player-visible raid headings use the requested Chinese short names and
+    -- never leak an internal key or placeholder text.
+    local function raidHeadings(family)
+        local result = {}
+        for _, column in ipairs(Catalog.forFamily(family).raidColumns) do
+            result[column.id] = column.title
+        end
+        return result
+    end
+    local vanillaHeadings = raidHeadings("vanilla")
+    test.eq(vanillaHeadings.MC, "MC", "vanilla MC keeps the conventional heading")
+    test.eq(vanillaHeadings.ONY, "黑龙", "vanilla Onyxia shows 黑龙")
+    test.eq(vanillaHeadings.BWL, "黑翼", "vanilla BWL shows 黑翼")
+    test.eq(vanillaHeadings.ZUG, "祖格", "vanilla ZG shows 祖格")
+    test.eq(vanillaHeadings.AQL, "废墟", "vanilla AQ20 shows 废墟")
+    test.eq(vanillaHeadings.TAQ, "安其拉", "vanilla AQ40 shows 安其拉")
+    test.eq(vanillaHeadings.NAXX, "NAXX", "vanilla Naxx keeps NAXX")
+
+    local tbcHeadings = raidHeadings("tbc")
+    test.eq(tbcHeadings.SW, "太阳井", "tbc Sunwell shows 太阳井")
+    test.eq(tbcHeadings.BT, "黑庙", "tbc Black Temple shows 黑庙")
+    test.eq(tbcHeadings.HS, "海山", "tbc Hyjal shows 海山")
+    test.eq(tbcHeadings.ZA, "祖阿曼", "tbc Zul'Aman shows 祖阿曼")
+    test.eq(tbcHeadings.TK, "风暴", "tbc Tempest Keep shows 风暴")
+    test.eq(tbcHeadings.SSC, "毒蛇", "tbc SSC shows 毒蛇")
+    test.eq(tbcHeadings.GL, "格鲁尔", "tbc Gruul shows 格鲁尔")
+    test.eq(tbcHeadings.ML, "玛胖", "tbc Magtheridon shows 玛胖")
+    test.eq(tbcHeadings.KZ, "卡拉赞", "tbc Karazhan shows 卡拉赞")
+
+    local mopHeadings = raidHeadings("mop")
+    test.eq(mopHeadings.MSV, "宝库", "mop Mogu'shan shows 宝库")
+    test.eq(mopHeadings.HOF, "恐惧", "mop Heart of Fear shows 恐惧")
+    test.eq(mopHeadings.TES, "永春", "mop Terrace shows 永春")
+    test.eq(mopHeadings.TOT, "雷电", "mop Throne of Thunder shows 雷电")
+    test.eq(mopHeadings.SOO, "奥格", "mop Siege of Orgrimmar shows 奥格")
+
+    local retailHeadings = raidHeadings("retail")
+    test.eq(retailHeadings.DR, "梦境", "retail 梦境裂隙 shows 梦境")
+    test.eq(retailHeadings.MQD, "奎尔", "retail 进军奎尔丹纳斯 shows 奎尔")
+    test.eq(retailHeadings.Micosis, "孢陨", "retail 孢陨幽境 shows 孢陨")
+    test.eq(retailHeadings.TG, "潮缚", "retail 潮缚石窟 shows 潮缚")
+
+    local forbiddenHeadings = {
+        ONY = true, BWL = true, AQ20 = true, AQ40 = true,
+        KZ = true, GL = true, MAG = true, SSC = true, TK = true,
+        HYJAL = true, BT = true, ZA = true, SW = true,
+        MSV = true, HOF = true, TOES = true, TOT = true, SOO = true,
+        ZAM = true, SWtitan = true, ZAtitan = true, VOAtitan = true,
+        VA = true, VS = true, DR = true, MQD = true, Micosis = true,
+        ["当前赛季团本"] = true, ["P1团本"] = true,
+    }
+    for _, family in ipairs(families) do
+        for _, column in ipairs(Catalog.forFamily(family).raidColumns) do
+            test.eq(forbiddenHeadings[column.title], nil,
+                family .. "/" .. column.id .. " never leaks an internal key or placeholder title")
+        end
     end
     test.eq(Catalog.column("titan", "resource", "legendaryItems").title, "已有", "legendary heading is compact")
     test.eq(Catalog.column("titan", "resource", "upgradeItems").title, "升级", "upgrade heading is compact")
