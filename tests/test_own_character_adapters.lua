@@ -322,7 +322,6 @@ return function(test)
         valor = 396, justice = 395, roll = 776, conquest = 390, honor = 1901,
         ironpawToken = 402, darkmoonTicket = 515, elderCharm = 697,
         lesserCharm = 738, moguRune = 752, timelessCoin = 777,
-        currency3350 = 3350, currency3407 = 3407, currency3414 = 3414, currency3416 = 3416,
     }
     for key, id in pairs(mopCurrencyIds) do
         test.eq(Adapters.currencyId("mop", key), id, "MoP " .. key .. " uses currency " .. tostring(id))
@@ -335,16 +334,21 @@ return function(test)
     end
     test.eq(Catalog.defaultVisible("mop", "resource", "money"), true, "MoP gold shows by default")
     for _, id in ipairs({ "conquest", "honor", "ironpawToken", "darkmoonTicket",
-        "elderCharm", "lesserCharm", "moguRune", "timelessCoin",
-        "currency3350", "currency3407", "currency3414", "currency3416",
-        "item256883", "item247796" }) do
+        "elderCharm", "lesserCharm", "moguRune", "timelessCoin" }) do
         test.eq(Catalog.defaultVisible("mop", "resource", id), false,
             "MoP " .. id .. " stays hidden until confirmed")
     end
-    test.eq(Adapters.currencyId("mop", "item256883"), nil, "MoP candidate items are not currencies")
-    test.eq(Catalog.column("mop", "resource", "item256883").source.kind, "currency",
-        "MoP candidate items ride the currency-source column shape")
     test.eq(Catalog.column("mop", "resource", "titanEmber"), nil, "MoP never inherits Titan currencies")
+
+    -- Unverified MoP candidate currencies and items are removed from the runtime
+    -- catalog and register no ID, so they can never be collected or shown.
+    for _, id in ipairs({ "currency3350", "currency3407", "currency3414", "currency3416",
+        "item256883", "item247796" }) do
+        test.eq(Catalog.column("mop", "resource", id), nil,
+            "unverified MoP candidate " .. id .. " is removed from the runtime catalog")
+        test.eq(Adapters.currencyId("mop", id), nil,
+            "unverified MoP candidate " .. id .. " registers no currency ID")
+    end
 
     local mopCooldowns = {
         transmuteLivingSteel = 114780, lightningSteelIngot = 138646,
@@ -361,6 +365,26 @@ return function(test)
         test.eq(Catalog.defaultVisible("mop", "resource", key), false,
             key .. " stays hidden until real-client validation")
     end
+
+    -- A profession cooldown is offered only when its spell also resolves to a
+    -- name, so an API surface alone never surfaces an unresolvable cooldown.
+    local smeltColumn = Catalog.column("titan", "resource", "smeltTitansteel")
+    test.eq(Adapters.canReadColumn("titan", {
+        GetSpellCooldown = function() return 0, 0 end,
+    }, smeltColumn), false,
+        "a cooldown API without a spell name cannot offer the column")
+    test.eq(Adapters.canReadColumn("titan", {
+        GetSpellCooldown = function() return 0, 0 end,
+        GetSpellInfo = function() return "熔炼泰坦精钢" end,
+    }, smeltColumn), true,
+        "a legacy spell-name resolution authorizes the cooldown")
+    test.eq(Adapters.canReadColumn("titan", {
+        C_Spell = {
+            GetSpellCooldown = function() return { startTime = 0, duration = 0 } end,
+            GetSpellInfo = function() return { name = "熔炼泰坦精钢" } end,
+        },
+    }, smeltColumn), true,
+        "a modern spell-name resolution authorizes the cooldown")
 
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")

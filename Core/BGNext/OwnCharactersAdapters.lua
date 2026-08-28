@@ -74,10 +74,6 @@ local CURRENCY_IDS = {
         lesserCharm = 738,
         moguRune = 752,
         timelessCoin = 777,
-        currency3350 = 3350,
-        currency3407 = 3407,
-        currency3414 = 3414,
-        currency3416 = 3416,
     },
     retail = {},
 }
@@ -95,10 +91,7 @@ local ITEM_IDS = {
     wrath = {},
     titan = {},
     cata = {},
-    mop = {
-        item256883 = 256883,
-        item247796 = 247796,
-    },
+    mop = {},
     retail = {},
 }
 
@@ -304,6 +297,34 @@ function M.readProfessionCooldown(api, spellId)
     if type(start) ~= "number" or type(duration) ~= "number" then return nil end
     if duration <= 0 then return { ready = true } end
     return { endsAt = start + duration }
+end
+
+-- Resolves a spell ID to a non-empty localized name via the Blizzard spell
+-- APIs, or nil when the name cannot be confirmed. A profession cooldown is
+-- only offered when its spell resolves, so a bare cooldown API surface alone
+-- never surfaces an unresolvable cooldown.
+local function resolveSpellName(api, spellId)
+    if type(api) ~= "table" or type(spellId) ~= "number" then return nil end
+
+    local spellApi = api.C_Spell
+    local modern = type(spellApi) == "table" and spellApi.GetSpellInfo or nil
+    if type(modern) == "function" then
+        local ok, info = callAll(modern, spellId)
+        if ok and type(info) == "table" and type(info.name) == "string"
+            and info.name ~= "" then
+            return info.name
+        end
+    end
+
+    local legacy = api.GetSpellInfo
+    if type(legacy) == "function" then
+        local ok, name = callAll(legacy, spellId)
+        if ok and type(name) == "string" and name ~= "" then
+            return name
+        end
+    end
+
+    return nil
 end
 
 function M.readNow(api)
@@ -752,6 +773,7 @@ function M.canReadColumn(family, api, column)
         return type(source.spellId) == "number"
             and (type(api.GetSpellCooldown) == "function"
                 or (type(api.C_Spell) == "table" and type(api.C_Spell.GetSpellCooldown) == "function"))
+            and resolveSpellName(api, source.spellId) ~= nil
     end
     if source.kind == "tracked-items" then return type(api.GetItemCount) == "function" end
     return false
