@@ -24,4 +24,6 @@ return function(test)
     end
     test.eq(builder:find("Get-ChildItem -LiteralPath $repositoryRoot -Recurse", 1, true), nil,
         "the builder never packages the whole repository")
+    test.eq(builder:find("Get-FileHash -Algorithm SHA256", 1, true) ~= nil, true,
+        "the builder emits a checksum for the release archive")
 end

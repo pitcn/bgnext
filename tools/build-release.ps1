@@ -114,5 +114,10 @@ try {
     }
 }
 
+$checksumPath = $outputFullPath + ".sha256"
+$checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $outputFullPath).Hash.ToLowerInvariant()
+Set-Content -LiteralPath $checksumPath -Value "$checksum  $([IO.Path]::GetFileName($outputFullPath))" -NoNewline
+
 Write-Output "package=$outputFullPath"
+Write-Output "checksum=$checksumPath"
 Write-Output "files=$($runtimeFiles.Count)"
