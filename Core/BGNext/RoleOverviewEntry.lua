@@ -550,6 +550,7 @@ function M.installEntry(mainFrame)
     end
     local presentation = M.entryPresentation(classFile)
     local button = CreateFrame("Button", nil, mainFrame)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
     button:SetSize(20, presentation.height)
     button:SetPoint(presentation.point, mainFrame, presentation.relativePoint,
         presentation.x, presentation.y)

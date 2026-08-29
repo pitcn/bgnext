@@ -262,6 +262,8 @@ return function(test)
         "footer clicks use a single OnClick path")
     test.eq(string.find(source, "buttonAction", 1, true) ~= nil, true,
         "footer clicks route through the shared buttonAction mapper")
+    test.eq(string.find(source, 'RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")', 1, true) ~= nil,
+        true, "footer registers every mouse button handled by OnClick")
     test.eq(string.find(source, 'Open("raid")', 1, true) ~= nil, true,
         "right click opens the role overview raid settings section")
 
