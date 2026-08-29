@@ -29,4 +29,28 @@ return function(test)
     test.eq(roleOpen[2].id, "role", "role remains second")
     test.eq(roleOpen[2].verb, "open", "hidden role receives open")
     test.eq(roleOpen[3].id, "settings", "settings remains last")
+
+    -- Every shipped locale carries the player-facing menu labels.
+    local menuKeys = { "打开金团表格", "关闭金团表格", "打开角色总览", "关闭角色总览", "设置" }
+    for _, locale in ipairs({ "zhCN", "zhTW", "enUS" }) do
+        local handle = io.open("Locales/" .. locale .. ".lua", "r")
+        local src = handle:read("*a")
+        handle:close()
+        for _, key in ipairs(menuKeys) do
+            test.eq(string.find(src, '["' .. key .. '"]', 1, true) ~= nil, true,
+                locale .. " ships the menu label " .. key)
+        end
+    end
+
+    -- The minimap adapts user input through the pure mapper and a dropdown,
+    -- never the legacy SetFBCD main-table toggle for the role overview.
+    local handle = io.open("Core/Module/minimap.lua", "r")
+    local minimapSource = handle:read("*a")
+    handle:close()
+    test.eq(string.find(minimapSource, "EntryInteractions.minimapAction", 1, true) ~= nil, true,
+        "minimap dispatches through the shared action mapper")
+    test.eq(string.find(minimapSource, "EasyMenu", 1, true) ~= nil, true,
+        "minimap right click opens a dropdown menu")
+    test.eq(string.find(minimapSource, "BG.SetFBCD", 1, true), nil,
+        "minimap no longer calls the legacy SetFBCD toggle")
 end
