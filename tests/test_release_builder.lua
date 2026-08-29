@@ -26,4 +26,8 @@ return function(test)
         "the builder never packages the whole repository")
     test.eq(builder:find("Get-FileHash -Algorithm SHA256", 1, true) ~= nil, true,
         "the builder emits a checksum for the release archive")
+    test.eq(builder:find("X-BGNext-Version", 1, true) ~= nil, true,
+        "the default archive name uses the BGNext release version")
+    test.eq(builder:find("Join-Path $repositoryRoot \"addon_version.txt\"") == nil, true,
+        "the upstream channel build number is not used as the BGNext release version")
 end

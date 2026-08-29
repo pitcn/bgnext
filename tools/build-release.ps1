@@ -7,7 +7,12 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $tocPath = Join-Path $repositoryRoot "BGLite.toc"
-$version = (Get-Content -LiteralPath (Join-Path $repositoryRoot "addon_version.txt") -Raw).Trim()
+$tocText = Get-Content -LiteralPath $tocPath -Raw
+$versionMatch = [regex]::Match($tocText, '(?m)^## X-BGNext-Version:\s*(\S+)\s*$')
+if (-not $versionMatch.Success) {
+    throw "BGLite.toc does not declare X-BGNext-Version"
+}
+$version = $versionMatch.Groups[1].Value
 
 if (-not $OutputPath) {
     $OutputPath = Join-Path $repositoryRoot ".local\packages\BGNext-$version.zip"
