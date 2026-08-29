@@ -270,4 +270,25 @@ return function(test)
         "hover preview waits with a one-shot timer")
     test.eq(string.find(source, "C_Timer.NewTicker", 1, true), nil,
         "hover preview never spins a recurring ticker")
+
+    -- The role overview key binding is independent of the main-table binding.
+    local bindings = io.open("Bindings.xml", "r")
+    local bindingSource = bindings:read("*a")
+    bindings:close()
+    test.eq(string.find(bindingSource, 'name="BIAOGE"', 1, true) ~= nil, true,
+        "the main-table binding is unchanged")
+    test.eq(string.find(bindingSource, 'name="BGNEXT_ROLE_OVERVIEW"', 1, true) ~= nil, true,
+        "a role overview binding distinct from BIAOGE is declared")
+    local roleBinding = bindingSource:match('name="BGNEXT_ROLE_OVERVIEW"[^>]*>(.-)</Binding>')
+    test.eq(type(roleBinding), "string", "the role binding has a body")
+    test.eq(string.find(roleBinding or "", "togglePinned", 1, true) ~= nil, true,
+        "the role binding calls the guarded role toggle")
+    test.eq(string.find(roleBinding or "", "MainFrame", 1, true), nil,
+        "the role binding never touches the main table")
+
+    local init = io.open("Core/DB/Init2.lua", "r")
+    local initSource = init:read("*a")
+    init:close()
+    test.eq(string.find(initSource, "BINDING_NAME_BGNEXT_ROLE_OVERVIEW", 1, true) ~= nil, true,
+        "the role binding display name is registered")
 end
