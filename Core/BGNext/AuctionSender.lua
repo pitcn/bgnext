@@ -27,6 +27,16 @@ function M.isRaidSender(sender, realm, memberNames)
     return false
 end
 
+function M.isController(sender, realm, roster)
+    if PlayerIdentity.key(sender, realm) == nil then return false end
+    for _, member in ipairs(roster or {}) do
+        if type(member) == "table" and PlayerIdentity.same(sender, member.name, realm) then
+            return member.rank == 2 or member.isML == true
+        end
+    end
+    return false
+end
+
 -- Parse the two numeric fields used by SendMyMoney. Both are mandatory; a
 -- malformed compatible client must be ignored before live auction comparisons.
 function M.parseBid(auctionIDStr, moneyStr)
@@ -34,6 +44,40 @@ function M.parseBid(auctionIDStr, moneyStr)
     local money = tonumber(moneyStr)
     if auctionID == nil or money == nil then return nil end
     return auctionID, money
+end
+
+function M.parseStart(auctionIDStr, itemIDStr, moneyStr, durationStr)
+    local auctionID = tonumber(auctionIDStr)
+    local itemID = tonumber(itemIDStr)
+    local money = tonumber(moneyStr)
+    local duration = tonumber(durationStr)
+    if not auctionID or auctionID <= 0 or not itemID or itemID <= 0 then return nil end
+    if not money or money < 0 or not duration or duration <= 0 or duration > 3600 then return nil end
+    return auctionID, itemID, money, duration
+end
+
+function M.shouldRespondVersion(state, sender, realm, memberNames, now, options)
+    if type(state) ~= "table" or type(now) ~= "number" then return false end
+    if not M.isRaidSender(sender, realm, memberNames) then return false end
+
+    options = options or {}
+    local senderCooldown = options.senderCooldown or 30
+    local globalWindow = options.globalWindow or 10
+    local globalLimit = options.globalLimit or 3
+    local senderKey = PlayerIdentity.key(sender, realm)
+    local lastResponse = state.bySender and state.bySender[senderKey]
+    if lastResponse and now >= lastResponse and now - lastResponse < senderCooldown then return false end
+
+    if type(state.windowStart) ~= "number" or now < state.windowStart or now - state.windowStart >= globalWindow then
+        state.windowStart = now
+        state.windowCount = 0
+    end
+    if (state.windowCount or 0) >= globalLimit then return false end
+
+    state.bySender = state.bySender or {}
+    state.bySender[senderKey] = now
+    state.windowCount = (state.windowCount or 0) + 1
+    return true
 end
 
 BG.BGNext.AuctionSender = M

@@ -10,8 +10,7 @@ wa.ver = "v4.0"
 function wa.GetVerNum(version)
  return tonumber(string.match(version, "v(%d+%.%d+)")) or 0
 end
--- 统一计时入口：优先 GetTimePreciseSec（毫秒精度，用于 1s 出价 CD、0.3s 中继 CD、暂停/恢复计时），
--- 经典服客户端若缺失则兜底 GetTime（毫秒 API 在 Classic 1.15/60 引擎存在性见 docs/09 A3 风险）。
+-- 拍卖计时优先使用高精度时钟；旧客户端没有该 API 时回退到 GetTime。
 function wa.Now()
  if GetTimePreciseSec then
   return GetTimePreciseSec()
@@ -835,7 +834,7 @@ BG.Init(function()
      end
     end
    end
-   -- 新高价到达即取消自动出价 ticker（v2.3.5 三处取消点之①）：避免旧 ticker 在延迟出价后重复顶价，
+   -- 新高价到达时取消旧计时器，避免延迟回调重复出价。
    -- 重投时机交给上方的 autoSendDelayFrame。
    if bidFrame.autoTimer then
     bidFrame.autoTimer:Cancel()
@@ -1164,12 +1163,12 @@ BG.Init(function()
    end
    if newAmount <= bidFrame.autoMoney then
     wa.SendMyMoneyMsg(bidFrame, newAmount)
-    -- v2.3.5 三处取消点之②：重建 ticker 前先取消旧 ticker，防堆叠
+    -- 重建前先取消旧计时器，确保每件物品只有一个自动出价任务。
     if bidFrame.autoTimer then
      bidFrame.autoTimer:Cancel()
     end
     bidFrame.autoTimer = C_Timer.NewTicker(3, function()
-     -- v2.3.5 三处取消点之③：回调开头自检，任一条件变化即取消并退出
+     -- 回调执行前重新检查状态，条件变化时立即停止。
      if bidFrame.IsEnd or not bidFrame.isAuto or bidFrame.isPaused or wa.IsMe(bidFrame) then
       if bidFrame.autoTimer then
        bidFrame.autoTimer:Cancel()

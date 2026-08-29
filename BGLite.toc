@@ -47,7 +47,6 @@ Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
 
-Core\Module\Receive.lua
 Core\Module\DuiZhang.lua
 
 Core\TongBao\ZhangDan.lua

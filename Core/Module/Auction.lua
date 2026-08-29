@@ -1065,6 +1065,19 @@ BG.Init(function()
         BG.raidBiaoGeVersion = {}
         BG.raidBiaoGeNewVersion = {}
         BG.raidAuctionVersion = {}
+        local Sender = BG.BGNext and BG.BGNext.AuctionSender
+        local versionResponseState = {}
+
+        local function GetRaidMemberNames()
+            local members = {}
+            for i = 1, GetNumGroupMembers() do
+                local name = GetRaidRosterInfo(i)
+                if name and name ~= "" then
+                    members[#members + 1] = name
+                end
+            end
+            return members
+        end
 
         -- 会员插件
         local guild = CreateFrame("Frame", nil, BG.MainFrame)
@@ -1200,8 +1213,8 @@ BG.Init(function()
             end
         end)
         BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
-            local prefix, msg, distType, sender = ...
-            sender = BG.GSN(sender)
+            local prefix, msg, distType, rawSender = ...
+            local sender = BG.GSN(rawSender)
             if prefix == "BiaoGe" and distType == "GUILD" then
                 if strfind(msg, "MyVer") then
                     local _, version = strsplit("-", msg)
@@ -1210,7 +1223,11 @@ BG.Init(function()
                 end
             elseif prefix == "BiaoGe" and distType == "RAID" then -- 插件版本
                 if msg == "VersionCheck" then
-                    C_ChatInfo.SendAddonMessage("BiaoGe", "MyVer-" .. BG.ver, "RAID")
+                    local realm = (GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+                    local members = GetRaidMemberNames()
+                    if Sender and Sender.shouldRespondVersion(versionResponseState, rawSender, realm, members, GetTime()) then
+                        C_ChatInfo.SendAddonMessage("BiaoGe", "MyVer-" .. BG.ver, "RAID")
+                    end
                 elseif strfind(msg, "MyVer") then
                     local _, version = strsplit("-", msg)
                     BG.raidBiaoGeVersion[sender] = version

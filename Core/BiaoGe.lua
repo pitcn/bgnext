@@ -380,7 +380,6 @@ BG.Init(function()
             end
         end)
 
-        securecall(BG.ReceiveUI)
         if BG.DuiZhangUI then securecall(BG.DuiZhangUI) end
         if BG.DuiZhangList then securecall(BG.DuiZhangList) end
         if BG.RoleOverviewUI then securecall(BG.RoleOverviewUI) end

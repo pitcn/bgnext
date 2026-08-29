@@ -17,6 +17,7 @@ return function(test)
     local clear = readAll("Core/Module/ClearBiaoGe.lua")
     local sendMail = readAll("Core/Module/SendMail.lua")
     local settlementRuntime = readAll("Core/BGNext/CurrentSettlementRuntime.lua")
+    local fbui = readAll("Core/FBUI/FBUI.xml")
 
     -- The current-raid settlement layers are loaded and wired to the confirmed
     -- BGLite success results, not to a new scan or poll.
@@ -40,6 +41,9 @@ return function(test)
     test.eq(main:find("TradeHistoryMainFrame", 1, true), nil, "legacy trade history frame is absent")
     test.eq(main:find("MailHistoryMainFrame", 1, true), nil, "legacy mail history frame is absent")
     test.eq(sendMail:find("MailHistoryMainFrame", 1, true), nil, "send-mail legacy history shortcut is absent")
+    test.eq(toc:find("Core\\Module\\Receive.lua", 1, true), nil, "legacy whole-table receiver is not loaded")
+    test.eq(main:find("BG.ReceiveUI", 1, true), nil, "startup cannot initialize the legacy receiver")
+    test.eq(fbui:find("ReceiveUIfunction.lua", 1, true), nil, "legacy receiver UI is outside the load graph")
     test.eq(database:find("BiaoGe.Hope", 1, true), nil, "legacy wishlist data is not initialized or migrated")
     test.eq(auction:find("BG.HopeFrame", 1, true), nil, "auction does not scan the removed legacy wishlist UI")
     test.eq(auction:find('WishlistReminder.notify("auction"', 1, true) ~= nil, true,

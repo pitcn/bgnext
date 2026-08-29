@@ -50,6 +50,8 @@ No other-player, cross-account, historical, communication, or migration data is 
 
 Automatic-bidding state is memory-only. Its auction identity, item identity, current price, increment, cap, next bid, status, and stop reason must not be written to SavedVariables. Reloading the UI destroys the state.
 
+Auction protocol authorization and version-response limits are also memory-only. BGNext compares the current message sender with the live raid roster; it does not retain a sender history. Cooldown counters are discarded on reload and are never written to SavedVariables.
+
 Local addon conflict detection reads only the current client’s addon metadata and enabled/loaded state. It sends no channel messages, writes no SavedVariables and does not inspect other players’ addon versions.
 
 Wishlist import/export never calls `SendChatMessage`, `C_ChatInfo.SendAddonMessage`, clipboard APIs, HTTP, telemetry or file APIs. BGNext only displays or accepts the text after an explicit user action.
