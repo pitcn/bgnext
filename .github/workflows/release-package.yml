@@ -39,6 +39,20 @@ jobs:
                 throw "Release contains denied file: $name"
               }
             }
+            $developmentPrefixes = @(
+              "BGLite/docs/adr/",
+              "BGLite/docs/agents/",
+              "BGLite/docs/baseline/",
+              "BGLite/docs/design/",
+              "BGLite/docs/release/",
+              "BGLite/docs/security/",
+              "BGLite/docs/testing/"
+            )
+            foreach ($prefix in $developmentPrefixes) {
+              if ($paths | Where-Object { $_.StartsWith($prefix) }) {
+                throw "Release contains development documentation: $prefix"
+              }
+            }
             if (-not ($paths -contains "BGLite/BGLite.toc")) {
               throw "Release archive has no BGLite/BGLite.toc"
             }

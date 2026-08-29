@@ -70,7 +70,10 @@ while ($xmlQueue.Count -gt 0) {
     }
 }
 
-foreach ($document in @("README.md", "CHANGELOG.md", "COPYRIGHT.md", "PRIVACY.md", "SECURITY.md", "CONTRIBUTORS.md")) {
+foreach ($document in @(
+    "README.md", "CHANGELOG.md", "COPYRIGHT.md", "SECURITY.md",
+    "docs/policies/PRIVACY.md", "docs/community/CONTRIBUTORS.md"
+)) {
     Add-RuntimeFile $document
 }
 

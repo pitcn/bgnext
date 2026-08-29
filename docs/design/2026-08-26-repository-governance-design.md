@@ -44,7 +44,7 @@ BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活�
 
 ## 5. 贡献者致谢
 
-仓库建立 `CONTRIBUTORS.md`，按贡献类型记录贡献者，不按贡献金额或个人影响力排序。可记录的类别包括：
+仓库在 `docs/community/CONTRIBUTORS.md` 按贡献类型记录贡献者，不按贡献金额或个人影响力排序。可记录的类别包括：
 
 - 代码与架构；
 - 测试与问题复现；
@@ -83,7 +83,7 @@ BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活�
 
 如依法产生必须缴纳或代扣代缴的税费，应单独记录并披露；扣除依法必须承担的税费后，剩余资金全部捐赠给具备合法资质、信息可核验的慈善组织。
 
-项目通过 `docs/CHARITY.md` 公开记录收入来源、金额、必要税费、受赠机构、捐赠日期和凭证链接。涉及身份证件、银行账号、地址等个人敏感信息的凭证必须脱敏后公开。不得以捐赠或赞助金额换取代码合并、功能优先级、维护权限、署名排序或审核豁免。
+项目通过 `docs/policies/CHARITY.md` 公开记录收入来源、金额、必要税费、受赠机构、捐赠日期和凭证链接。涉及身份证件、银行账号、地址等个人敏感信息的凭证必须脱敏后公开。不得以捐赠或赞助金额换取代码合并、功能优先级、维护权限、署名排序或审核豁免。
 
 ## 9. 文档与 GitHub 配置结构
 
@@ -91,16 +91,16 @@ BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活�
 
 - `README.md`：项目入口、缘起、目标、当前基线、安装、共创方式、合规原则、慈善承诺和免责声明。
 - `SECURITY.md`：支持版本、安全问题私下报告方式、响应流程和披露规则。
-- `PRIVACY.md`：数据清单、处理原则、导出与传输规则、用户控制和变更通知。
+- `docs/policies/PRIVACY.md`：数据清单、处理原则、导出与传输规则、用户控制和变更通知。
 - `CONTRIBUTING.md`：Issue、分支、提交、Pull Request、测试、版权和审查要求。
 - `CODE_OF_CONDUCT.md`：社区行为准则及处理机制。
 - `COPYRIGHT.md`：上游、第三方和新增贡献的权利说明；不擅自授予未获授权的许可证。
 - `CHANGELOG.md`：版本历史；首条只记录 BGLite 2.4.0 原版基线导入。
-- `CONTRIBUTORS.md`：按贡献类型整理的感谢名单及收录规则。
-- `SUPPORT.md`：使用问题、错误报告、安全问题的分流方式。
-- `docs/PROJECT_CHARTER.md`：治理结构、维护者职责、决策和发布规则。
-- `docs/COMPLIANCE.md`：允许、需评估和禁止功能的边界与评审清单。
-- `docs/CHARITY.md`：慈善政策、公开账目格式和凭证规则。
+- `docs/community/CONTRIBUTORS.md`：按贡献类型整理的感谢名单及收录规则。
+- `.github/SUPPORT.md`：使用问题、错误报告、安全问题的分流方式。
+- `docs/policies/PROJECT_CHARTER.md`：治理结构、维护者职责、决策和发布规则。
+- `docs/policies/COMPLIANCE.md`：允许、需评估和禁止功能的边界与评审清单。
+- `docs/policies/CHARITY.md`：慈善政策、公开账目格式和凭证规则。
 - `docs/baseline/BGLite-2.4.0.sha256`：188 个上游文件的 SHA-256 清单。
 - `.github/ISSUE_TEMPLATE/`：错误报告和功能建议表单。
 - `.github/pull_request_template.md`：测试、隐私、通信、素材和兼容性检查项。

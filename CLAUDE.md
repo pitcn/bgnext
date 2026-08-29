@@ -19,7 +19,7 @@ This file intentionally mirrors the mandatory rules in `AGENTS.md`. Claude and C
 
 ## Mandatory execution rules
 
-- Before runtime work, read `AGENTS.md`, `SECURITY.md`, `PRIVACY.md`, `docs/COMPLIANCE.md`, the approved design, and relevant ADR/data-inventory files.
+- Before runtime work, read `AGENTS.md`, `SECURITY.md`, `docs/policies/PRIVACY.md`, `docs/policies/COMPLIANCE.md`, the approved design, and relevant ADR/data-inventory files.
 - Use test-first development for behavior changes: observe the expected failing test before production code.
 - Document every new persistent or communicated field in the data inventory before merging.
 - Review each modified baseline file and update only its explicit hash; never bulk-accept baseline drift.
@@ -44,4 +44,4 @@ Use filename `yyyyMMdd-HHmmss--<sanitized-branch>--<short-task>.md` and status `
 
 - GitHub Issues is the issue and PRD tracker; see `docs/agents/issue-tracker.md`.
 - Use the five triage states in `docs/agents/triage-labels.md`.
-- This is a single-context repository; see `docs/agents/domain.md` and `docs/superpowers/specs/`.
+- This is a single-context repository; see `docs/agents/domain.md` and `docs/design/`.

@@ -51,4 +51,4 @@ BGLite 的团队拍卖和协作功能会使用《魔兽世界》提供的团队�
 
 ## 安全研究者致谢
 
-在报告者同意且不会暴露敏感信息的前提下，项目会在 Release Notes 或 [CONTRIBUTORS.md](CONTRIBUTORS.md) 中致谢有效安全报告。安全报告不能换取合并权限、财务回报或对项目规则的豁免。
+在报告者同意且不会暴露敏感信息的前提下，项目会在 Release Notes 或 [贡献者名单](docs/community/CONTRIBUTORS.md) 中致谢有效安全报告。安全报告不能换取合并权限、财务回报或对项目规则的豁免。

@@ -43,7 +43,7 @@ BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活�
 - 未经授权的代码、UI、图片、字体、声音或文案；
 - 规避平台审核、误导审查人员或在后台代替玩家完成敏感行为的实现。
 
-详细规则见[合规边界](docs/COMPLIANCE.md)、[隐私政策](PRIVACY.md)和[安全政策](SECURITY.md)。有疑义的功能先暂停，完成评估或取得平台书面确认后再决定。
+详细规则见[合规边界](docs/policies/COMPLIANCE.md)、[隐私政策](docs/policies/PRIVACY.md)和[安全政策](SECURITY.md)。有疑义的功能先暂停，完成评估或取得平台书面确认后再决定。
 
 ## 安装
 
@@ -65,29 +65,29 @@ BGNext 由社区共同维护。我们欢迎插件作者、玩家、测试者、�
 - 发现问题：提交[错误报告](https://github.com/pitcn/bgnext/issues/new?template=bug-report.yml)
 - 提议功能：提交[功能建议](https://github.com/pitcn/bgnext/issues/new?template=feature-request.yml)
 - 贡献实现：阅读[贡献指南](CONTRIBUTING.md)并提交 Pull Request
-- 获取帮助：阅读[支持说明](SUPPORT.md)
+- 获取帮助：阅读[支持说明](.github/SUPPORT.md)
 - 报告安全问题：遵循[安全政策](SECURITY.md)，不要公开利用细节或敏感数据
 
-代码、错误复现、兼容性测试、翻译、文字校对、设计和合规建议都属于有效贡献。贡献者会按贡献类型记录在[感谢名单](CONTRIBUTORS.md)及相关版本更新说明中；同类贡献不排名，也不会因赞助金额改变署名、权限或合并优先级。
+代码、错误复现、兼容性测试、翻译、文字校对、设计和合规建议都属于有效贡献。贡献者会按贡献类型记录在[感谢名单](docs/community/CONTRIBUTORS.md)及相关版本更新说明中；同类贡献不排名，也不会因赞助金额改变署名、权限或合并优先级。
 
 ## 慈善承诺
 
 与 BGNext 相关的全部活动奖金、赞助及其他项目收入均用于慈善捐赠，不作为维护者或贡献者的个人收益。
 
-依法必须缴纳或代扣代缴的税费会单独记录；扣除依法必须承担的税费后，剩余资金全部捐赠给具备合法资质、信息可核验的慈善组织。项目将公开脱敏后的收入、税费、受赠机构和捐赠凭证。详见[慈善与财务透明政策](docs/CHARITY.md)。
+依法必须缴纳或代扣代缴的税费会单独记录；扣除依法必须承担的税费后，剩余资金全部捐赠给具备合法资质、信息可核验的慈善组织。项目将公开脱敏后的收入、税费、受赠机构和捐赠凭证。详见[慈善与财务透明政策](docs/policies/CHARITY.md)。
 
 ## 项目文档
 
 - [贡献指南](CONTRIBUTING.md)
-- [贡献者与感谢名单](CONTRIBUTORS.md)
+- [贡献者与感谢名单](docs/community/CONTRIBUTORS.md)
 - [安全政策](SECURITY.md)
-- [隐私政策](PRIVACY.md)
-- [合规边界](docs/COMPLIANCE.md)
-- [项目治理章程](docs/PROJECT_CHARTER.md)
-- [慈善与财务透明政策](docs/CHARITY.md)
+- [隐私政策](docs/policies/PRIVACY.md)
+- [合规边界](docs/policies/COMPLIANCE.md)
+- [项目治理章程](docs/policies/PROJECT_CHARTER.md)
+- [慈善与财务透明政策](docs/policies/CHARITY.md)
 - [版权与权利说明](COPYRIGHT.md)
 - [变更日志](CHANGELOG.md)
-- [支持说明](SUPPORT.md)
+- [支持说明](.github/SUPPORT.md)
 - [兼容性矩阵](docs/compatibility.md)
 - [0.1.0 发布审计](docs/release/0.1.0-audit.md)
 

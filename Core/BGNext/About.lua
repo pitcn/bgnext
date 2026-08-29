@@ -46,7 +46,7 @@ function M.buildText(kind, info)
             "社区贡献",
             bulletList(info.credits.contributors),
             "",
-            "完整、可核验名单见仓库 CONTRIBUTORS.md。",
+            "完整、可核验名单见仓库 docs/community/CONTRIBUTORS.md。",
         }, "\n")
     end
     return ""
