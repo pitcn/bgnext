@@ -1,5 +1,5 @@
 .worktrees/
+.local/
 dist/
 *.zip
 *.sha256
-

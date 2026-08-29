@@ -16,6 +16,8 @@ local Maxb = ns.Maxb
 
 local RealmID = GetRealmID()
 local player = BG.playerName
+local realmName = (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName()
+local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
 
 BG.Init(function()
     BiaoGe.options.showAuctionLogFrame = BiaoGe.options.showAuctionLogFrame or 1
@@ -556,13 +558,8 @@ BG.Init(function()
                                     maijia:GetText() == "" and jine:GetText() == ""
                                 then
                                     yes = true
-                                    maijia:SetText(v.maijia or "")
+                                    BG.BGNext.BillBuyer.set(maijia, v.maijia, unpack(v.color or { 1, 1, 1 }))
                                     BiaoGe[FB]["boss" .. b]["maijia" .. i] = v.maijia
-                                    if v.color then
-                                        maijia:SetTextColor(unpack(v.color))
-                                    else
-                                        maijia:SetTextColor(1, 1, 1)
-                                    end
                                     for k in pairs(BG.playerClass) do
                                         BiaoGe[FB]["boss" .. b][k .. i] = v[k]
                                     end
@@ -1234,8 +1231,8 @@ BG.Init(function()
                             BG.auctionLogFrame.changeFrame.item:SetText(AddTexture(icon) .. link:gsub("%[", ""):gsub("%]", ""))
                             BG.auctionLogFrame.changeFrame.item.itemID = GetItemID(link)
                             BG.auctionLogFrame.changeFrame.maijia:ClearFocus()
-                            BG.auctionLogFrame.changeFrame.maijia:SetText(v.maijia or "")
-                            BG.auctionLogFrame.changeFrame.maijia:SetTextColor(unpack(v.color or { 1, 1, 1 }))
+                            BG.BGNext.BillBuyer.set(BG.auctionLogFrame.changeFrame.maijia, v.maijia,
+                                unpack(v.color or { 1, 1, 1 }))
                             BG.auctionLogFrame.changeFrame.jine:ClearFocus()
                             BG.auctionLogFrame.changeFrame.jine:SetText(v.jine or "")
                         end
@@ -2014,7 +2011,8 @@ BG.Init(function()
             local FB = BG.FB1
             BG.auctionTrade[tradeName] = {}
             for _, v in ipairs(BiaoGe[FB].auctionLog or {}) do
-                if v.type == 1 and not v.trade and v.maijia == tradeName then
+                if v.type == 1 and not v.trade and PlayerIdentity
+                    and PlayerIdentity.same(v.maijia, tradeName, realmName) then
                     tinsert(BG.auctionTrade[tradeName], BG.Copy(v))
                 end
             end

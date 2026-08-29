@@ -1,0 +1,67 @@
+name: Release package
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build runtime-only archive
+        shell: pwsh
+        run: ./tools/build-release.ps1 -OutputPath ./artifacts/BGNext.zip
+
+      - name: Audit archive
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path ./artifacts/BGNext.zip))
+          try {
+            $paths = @($archive.Entries | ForEach-Object FullName)
+            $denied = @(
+              "History.lua",
+              "TradeHistory.lua",
+              "MailHistory.lua",
+              "Receive.lua",
+              "ReceiveUIfunction.lua"
+            )
+            foreach ($name in $denied) {
+              if ($paths | Where-Object { $_.EndsWith("/$name") }) {
+                throw "Release contains denied file: $name"
+              }
+            }
+            $developmentPrefixes = @(
+              "BGLite/docs/adr/",
+              "BGLite/docs/agents/",
+              "BGLite/docs/baseline/",
+              "BGLite/docs/design/",
+              "BGLite/docs/release/",
+              "BGLite/docs/security/",
+              "BGLite/docs/testing/"
+            )
+            foreach ($prefix in $developmentPrefixes) {
+              if ($paths | Where-Object { $_.StartsWith($prefix) }) {
+                throw "Release contains development documentation: $prefix"
+              }
+            }
+            if (-not ($paths -contains "BGLite/BGLite.toc")) {
+              throw "Release archive has no BGLite/BGLite.toc"
+            }
+          } finally {
+            $archive.Dispose()
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BGNext-${{ github.sha }}
+          path: artifacts/BGNext.zip*
+          if-no-files-found: error

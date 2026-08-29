@@ -21,21 +21,6 @@ local player = BG.playerName
 do
     pcall(function()
     BiaoGe = BiaoGe or {}
-    if not BiaoGe.FilterClassItemDB then
-        BiaoGe.FilterClassItemDB = {}
-    end
-    if not BiaoGe.FilterClassItemDB[RealmID] then
-        BiaoGe.FilterClassItemDB[RealmID] = {}
-    end
-    if not BiaoGe.FilterClassItemDB[RealmID][player] then
-        BiaoGe.FilterClassItemDB[RealmID][player] = {chooseID=1}
-    end
-    if not BG.FilterClassItemDB then
-        BG.FilterClassItemDB = {ShuXing_filter={}, MainAttribute_filter={}}
-    end
-    if not BG.FilterClassItem_Default then
-        BG.FilterClassItem_Default = {TankKey={}}
-    end
     if not BG.FilterClassItemMainFrame then
         BG.FilterClassItemMainFrame = {AddFrame = CreateFrame("Frame")}
     end
@@ -113,6 +98,9 @@ do
     function BG.UpdateAllFilter()
     end
 
+    -- BiaoGe.lua invokes this hook unconditionally during startup. Keep it as
+    -- initialization-only: opening the BGNext overview is exclusively a user
+    -- action through its entry button or slash command.
     function BG.RoleOverviewUI()
     end
 
@@ -144,17 +132,55 @@ do
         ITEM_MOD_AGILITY_SHORT = "^%+%C-" .. ITEM_MOD_AGILITY_SHORT,
         ITEM_MOD_INTELLECT_SHORT = "^%+%C-" .. ITEM_MOD_INTELLECT_SHORT,
     }
+    local primaryStatKeys = {
+        STRENGTH = "ITEM_MOD_STRENGTH_SHORT",
+        AGILITY = "ITEM_MOD_AGILITY_SHORT",
+        INTELLECT = "ITEM_MOD_INTELLECT_SHORT",
+    }
+    local affixPatterns = {
+        STRENGTH = { value = { attribute.ITEM_MOD_STRENGTH_SHORT } },
+        AGILITY = { value = { attribute.ITEM_MOD_AGILITY_SHORT } },
+        INTELLECT = { value = { attribute.ITEM_MOD_INTELLECT_SHORT } },
+        SPIRIT = { value = { ITEM_MOD_SPIRIT_SHORT } },
+        MANA_REGEN = { value = { ITEM_MOD_MANA_REGENERATION } },
+        DEFENSE = { value = { STAT_CATEGORY_DEFENSE } },
+        PARRY = { value = { STAT_PARRY } },
+        DODGE = { value = { STAT_DODGE } },
+        BLOCK = { value = { ITEM_MOD_BLOCK_RATING_SHORT, ITEM_MOD_BLOCK_VALUE_SHORT } },
+        ATTACK_POWER = { value = { ITEM_MOD_ATTACK_POWER_SHORT } },
+        HIT = { value = { HIT_LCD, ITEM_MOD_HIT_RATING_SHORT } },
+        CRIT = { value = { STAT_CRITICAL_STRIKE, ITEM_MOD_CRIT_RATING_SHORT } },
+        HASTE = { value = { STAT_HASTE, ITEM_MOD_HASTE_RATING_SHORT } },
+        EXPERTISE = { value = { STAT_EXPERTISE } },
+        ARMOR_PEN = { value = { ITEM_MOD_ARMOR_PENETRATION_RATING } },
+        SPELL_POWER = { value = { ITEM_MOD_SPELL_POWER_SHORT } },
+        MASTERY = { value = { ITEM_MOD_MASTERY_RATING_SHORT, STAT_MASTERY } },
+        VERSATILITY = { value = { ITEM_MOD_VERSATILITY } },
+        RESILIENCE = { value = { RESILIENCE } },
+    }
+    local tankPatterns = {
+        STAT_CATEGORY_DEFENSE, STAT_PARRY, STAT_DODGE,
+        ITEM_MOD_BLOCK_RATING_SHORT, ITEM_MOD_BLOCK_VALUE_SHORT,
+    }
     local db
-    BG.Init(function()
-        player = BG.playerName or GetUnitName("player", true) or player
-        BiaoGe.FilterClassItemDB = BiaoGe.FilterClassItemDB or {}
-        BiaoGe.FilterClassItemDB[RealmID] = BiaoGe.FilterClassItemDB[RealmID] or {}
-        BiaoGe.FilterClassItemDB[RealmID][player] = BiaoGe.FilterClassItemDB[RealmID][player] or {}
-        db = BiaoGe.FilterClassItemDB[RealmID][player]
-        if db.chooseID and not db[db.chooseID] then
-            db.chooseID = nil -- lite 无装备库配置时停用过滤，避免 db[num] 崩溃
-        end
-    end)
+    local function GetRuntimeDB()
+        local getProfile = BG.BGNext and BG.BGNext.GetActiveEquipmentFilterProfile
+        local profile = getProfile and getProfile()
+        if not profile then return nil end
+        return {
+            chooseID = 1,
+            [1] = {
+                Armor = profile.armor or {},
+                Weapon = profile.weapon or {},
+                ShuXing = profile.affix or {},
+                Class = profile.classRestriction and { CLASS_RESTRICTION = true } or {},
+                BnetAccount = profile.ignoreBattleNetBound and { IGNORE_BNET_BOUND = true } or {},
+                Tank = profile.tankOnly and { TANK_ONLY = true } or {},
+                MainAttribute = profile.primaryStat or {},
+                Icon = profile.icon,
+            },
+        }
+    end
     function BG.Tooltip_SetItemByID(itemID)
         BiaoGeTooltip:SetOwner(UIParent, "ANCHOR_NONE")
         BiaoGeTooltip:ClearLines()
@@ -230,7 +256,7 @@ do
         end
     end
     local function GetDBShuXingInfo(name)
-        local tbl = BG.FilterClassItemDB.ShuXing_filter[name]
+        local tbl = affixPatterns[name]
         if tbl then
             return tbl.value, tbl.nothave
         end
@@ -268,7 +294,7 @@ do
         if not num then return end
         if strfind(TooltipText, CLASS) then
             for id, v in pairs(db[num].Class) do
-                if id == "过滤职业限定" then
+                if id == "CLASS_RESTRICTION" then
                     local c = UnitClass("player")
                     if not strfind(TooltipText, c) then
                         return true
@@ -281,7 +307,7 @@ do
         local num = db.chooseID
         if not num then return end
         for id in pairs(db[num].BnetAccount) do
-            if id == "忽略战网绑定" then
+            if id == "IGNORE_BNET_BOUND" then
                 if strfind(TooltipText, ITEM_BIND_TO_BNETACCOUNT) then
                     return true
                 end
@@ -289,15 +315,14 @@ do
         end
     end
     local function FilterTANK(TooltipText, typeID, EquipLoc)
-        if not BG.FilterClassItem_Default.TankKey then return end
         local num = db.chooseID
         if not num then return end
         if typeID == 4 and EquipLoc ~= "INVTYPE_TRINKET" and EquipLoc ~= "INVTYPE_RELIC" then
             for id, v in pairs(db[num].Tank) do
-                if id == "过滤坦克" then
+                if id == "TANK_ONLY" then
                     local tank
-                    for key, value in pairs(BG.FilterClassItem_Default.TankKey) do
-                        tank = strfind(TooltipText, value)
+                    for _, value in pairs(tankPatterns) do
+                        tank = value and strfind(TooltipText, value)
                         if tank then
                             break
                         end
@@ -318,7 +343,7 @@ do
         local stats = itemAttributeCache[itemID]
         if stats and next(stats) then
             for id, v in pairs(db[num].MainAttribute) do
-                if stats[BG.FilterClassItemDB.MainAttribute_filter[id]] then
+                if stats[primaryStatKeys[id]] then
                     return false
                 end
             end
@@ -328,6 +353,8 @@ do
     -- ITEM_BIND_TO_BNETACCOUNT
     function BG.FilterAll(itemID, typeID, EquipLoc, subclassID, tooltipText)
         if typeID == 9 then return false end
+        db = GetRuntimeDB()
+        if not db then return false end
         local TooltipText = tooltipText or BG.GetTooltipTextLeftAll(itemID)
         if FilterBnetAccount(TooltipText) then return false end
         if FilterArmor(typeID, EquipLoc, subclassID) then
@@ -345,17 +372,16 @@ do
         if FilterTANK(TooltipText, typeID, EquipLoc) then
             return true
         end
-        if BG.FilterClassItemDB.MainAttribute then
-            if FilterAttribute(itemID) then
-                return true
-            end
+        if FilterAttribute(itemID) then
+            return true
         end
     end
 
     function BG.FilterItem(bt, link)
         local text = link or bt:GetText()
         local itemID, _, _, EquipLoc, _, typeID, subclassID = GetItemInfoInstant(text)
-        local num = db.chooseID
+        db = GetRuntimeDB()
+        local num = db and db.chooseID
 
         if itemID and num then
             if BG.FilterAll(itemID, typeID, EquipLoc, subclassID) then
@@ -369,7 +395,8 @@ do
     function BG.UpdateFilter(bt, link)
         local link = link or bt:GetText()
         local itemID = GetItemID(link)
-        local num = db.chooseID
+        db = GetRuntimeDB()
+        local num = db and db.chooseID
         if not (link:find("item:") and itemID and num) then
             bt:SetAlpha(alpha_yes)
             return
@@ -389,6 +416,46 @@ do
         end)
     end
 
+    function BG.UpdateAuctionFilter(f, onUpdated)
+        f.filter = nil
+        local identity = BG.BGNext and BG.BGNext.PlayerIdentity
+        local isSelf = f.player and ((identity and identity.same(f.player, BG.playerName, GetRealmName()))
+            or (not identity and f.player == BG.playerName))
+        if isSelf then
+            BGA.aura_env.SetFrameColor(f, 1)
+            if onUpdated then onUpdated(false) end
+            return
+        end
+
+        local profile = GetRuntimeDB()
+        if not profile or not f.itemID then
+            BGA.aura_env.SetFrameColor(f, 0)
+            if onUpdated then onUpdated(false) end
+            return
+        end
+
+        local function applyFilter()
+            local _, _, _, _, _, _, _, _, equipLoc, _, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
+            local filtered = typeID and BG.FilterAll(f.itemID, typeID, equipLoc, subclassID) or false
+            f.filter = filtered or nil
+            BGA.aura_env.SetFrameColor(f, filtered and 2 or 0)
+            if onUpdated then onUpdated(filtered, bindType) end
+        end
+
+        local item = Item:CreateFromItemID(f.itemID)
+        item:ContinueOnItemLoad(function()
+            if not BG.itemCaches[f.itemID] then
+                BG.Tooltip_SetItemByID(f.itemID)
+                BG.After(0.01, function()
+                    applyFilter()
+                    BG.itemCaches[f.itemID] = true
+                end)
+            else
+                applyFilter()
+            end
+        end)
+    end
+
     function BG.UpdateAllFilter()
         local FB = BG.FB1
         for b = 1, Maxb[FB] do -- 当前表格
@@ -396,16 +463,6 @@ do
                 local bt = BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]
                 if bt then
                     BG.UpdateFilter(bt)
-                end
-            end
-        end
-        for n = 1, HopeMaxn[FB] do -- 心愿清单
-            for b = 1, HopeMaxb[FB] do
-                for i = 1, HopeMaxi do
-                    local bt = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                    if bt then
-                        BG.UpdateFilter(bt)
-                    end
                 end
             end
         end
@@ -436,35 +493,24 @@ do
             end
         end
 
-        BG.FilterClassItemMainFrame.AddFrame:Hide()
+        local filterFrame = BG.FilterClassItemMainFrame
+        local editor = filterFrame and (filterFrame.EditFrame or filterFrame.AddFrame)
+        if editor then editor:Hide() end
         if not BG.ItemLibMainFrame:IsVisible() then
             BG.itemLibNeedUpdate = true
         end
 
-        if BGA.Frames then
+        if BGA and BGA.Frames then
             for _, f in ipairs(BGA.Frames) do
-                f.filter = nil
-                if f.player and f.player == BG.playerName then
-                    BGA.aura_env.SetFrameColor(f, 1)
-                else
-                    if db.chooseID then
-                        local name, link, quality, level, _, _, _, _, EquipLoc, Texture, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
-                        if BG.FilterAll(f.itemID, typeID, EquipLoc, subclassID) then
-                            f.filter = true
-                            BGA.aura_env.SetFrameColor(f, 2)
-                        end
-                    end
-                    if not f.filter then
-                        BGA.aura_env.SetFrameColor(f, 0)
-                    end
-                end
+                BG.UpdateAuctionFilter(f)
             end
         end
     end
 
     -- 拾取通知
     function BG.LootFilterClassItem(link)
-        local num = db.chooseID
+        db = GetRuntimeDB()
+        local num = db and db.chooseID
         if not num then return "" end
 
         local icon = AddTexture(db[num].Icon)
@@ -640,8 +686,8 @@ do
         -- 已拥有图标
         BG.IsHave(self, true)
 
-        local num = BiaoGe.FilterClassItemDB[RealmID][player].chooseID -- 隐藏
-        if num ~= 0 then
+        local profile = BG.BGNext and BG.BGNext.GetActiveEquipmentFilterProfile and BG.BGNext.GetActiveEquipmentFilterProfile()
+        if profile then
             local _, class = UnitClass("player")
             BG.UpdateFilter(self)
         end
@@ -1678,16 +1724,14 @@ function BG.JiaoHuan(button, FB, b, i, t)
 
             BG.copy1.btzhuangbei:SetText(BG.copy2.zhuangbei or "")
             BG.copy1.btzhuangbei:SetCursorPosition(0)
-            BG.copy1.btmaijia:SetText(BG.copy2.maijia or "")
-            BG.copy1.btmaijia:SetCursorPosition(0)
-            BG.copy1.btmaijia:SetTextColor(unpack(BG.copy2.color or { 1, 1, 1 }))
+            BG.BGNext.BillBuyer.set(BG.copy1.btmaijia, BG.copy2.maijia,
+                unpack(BG.copy2.color or { 1, 1, 1 }))
             BG.copy1.btjine:SetText(BG.copy2.jine or "")
 
             BG.copy2.btzhuangbei:SetText(BG.copy1.zhuangbei or "")
             BG.copy2.btzhuangbei:SetCursorPosition(0)
-            BG.copy2.btmaijia:SetText(BG.copy1.maijia or "")
-            BG.copy2.btmaijia:SetCursorPosition(0)
-            BG.copy2.btmaijia:SetTextColor(unpack(BG.copy1.color or { 1, 1, 1 }))
+            BG.BGNext.BillBuyer.set(BG.copy2.btmaijia, BG.copy1.maijia,
+                unpack(BG.copy1.color or { 1, 1, 1 }))
             BG.copy2.btjine:SetText(BG.copy1.jine or "")
 
             local FB = BG.copy1.fb

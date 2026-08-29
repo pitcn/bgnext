@@ -9,14 +9,16 @@ local c1 = ns.c1
 
 do --英语说明书
     ns.instructionsText = {
-        "|cff00BFFF<BGLite Pure Edition Guide>|r",
-        "This edition has been security-cleaned and streamlined by the World of Warcraft China operations team. It retains only essential auction features; no new feature modules will be added, and maintenance is limited to security and stability.",
-        "Features and content unrelated to core auctions, together with all non-compliant and risky code, have been removed to provide a safer, cleaner, and lighter addon experience.",
-        "BGLite Pure Edition is a basic transitional option. Developers are encouraged to build safe and stable enhancements on this edition, giving players richer and more capable choices.",
-        "World of Warcraft China Operations Team",
+        "|cff00BFFF<BGNext Guide>|r",
+        "BGNext v0.1.0 is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
+        "Core auctions continue to use BGLite's existing public protocol. Players using BGNext and BGLite may participate in the same basic auction; consult the release notes for the actual compatibility test status.",
+        "Personal wishlists, own-character information, and personal helper data stay local and are not sent to the raid or outside the game. Current-raid trade and mail reconciliation keeps only the most recent raid for at most seven days and never stores mail bodies.",
+        "If another BiaoGe/BGLite-family addon is enabled on this client, BGNext warns the player but never disables it without confirmation.",
+        "Code, testing, translation, design, and security-review contributions are welcome through Issues and Pull Requests. Contributors are recorded in the credits and relevant release notes.",
+        "This project is not endorsed by upstream authors, the game operator, or any platform.",
         " ",
         "|cff00BFFFCommands:|r",
-        "|cffFFFFFF-Open: |r/BGLite or /gbg, or bind a key in the game settings.",
+        "|cffFFFFFF-Open: |r/bgn or /bgnext, or bind a key in the game settings. The legacy /bglite command remains available.",
         "|cffFFFFFF-Quick action: |rRight-click an input box to clear its contents.",
         "|cffFFFFFF-Automatic auction: |rALT+click an item in the table, bags, or chat to open the auction panel.",
         "|cffFFFFFF-Auction countdown: |rRight-click an item in chat to start the automatic countdown. (When you are the group Leader or item distributor)",
@@ -1312,6 +1314,7 @@ do
     L["|cffFFFFFF左键：|r打开表格"] = "|cffFFFFFFLeft: |r to open table"
     L["|cffFFFFFF右键：|r打开设置"] = "|cffFFFFFFRight:|rOpen Settings"
     L["BGLite版本"] = "BGLite version"
+    L["兼容插件版本"] = "Compatible addon versions"
     L["插件：%s"] = "AddOn: %s"
     L["拍卖WA版本"] = "Auction WA version"
     L["需全团安装拍卖WA，没安装的人将会看不到拍卖窗口"] = "Auction WA needs to be installed by the whole group, if you don't install it, you won't be able to see the auction window."
@@ -1685,6 +1688,21 @@ do
     L["不能即时生效的设置在重载后生效。"] = "Settings that cannot take effect instantly take effect after reloading."
     L["表格"] = "Tables"
     L["角色总览"] = "CharOverview"
+    -- BGNext: own-character overview
+    L["团本完成列"] = "Raid columns"
+    L["货币与资源列"] = "Currency and resource columns"
+    L["恢复当前版本默认列"] = "Restore this client's default columns"
+    L["专业1"] = "Profession 1"
+    L["专业2"] = "Profession 2"
+    L["泰坦碎片"] = "Titan Shard"
+    L["徽章"] = "Emblem"
+    L["勇气点数"] = "Valor Points"
+    L["< 角色团本完成总览 >"] = "< Raid Completion Overview >"
+    L["< 角色货币总览 >"] = "< Character Currency Overview >"
+    L["距离下次重置"] = "Next reset in"
+    L["中键或 Ctrl+左键固定，按住 Shift 显示全部服务器"] = "Middle-click or Ctrl+Left-click to pin, hold Shift for all realms"
+    L["合计"] = "Total"
+    L["尚无本地角色记录，登录角色后自动记录。"] = "No local characters yet. Log into a character to record it."
     L["|cffffffff< UI缩放 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的大小"] = "|cffffffff< UI Zoom >|r|cff808080 (right-click to restore settings)|r\n\n1, 'Improved Gouge' Form UI size"
     L["|cffffffff< UI透明度 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的透明度"] = "|cffffffff< UI Transparency >|r|cff808080 (right-click to restore settings)|r\n\n1, 'Improved Gouge' Form UI Transparency"
     L["UI透明度"] = "UI Transparency"
@@ -2925,4 +2943,25 @@ do -- Mail history
     L["金额不能为负数！"] = "The amount cannot be negative!"
     L["（只会导入前40个名字）"] = "(Only the first 40 names will be imported)"
 
+end
+
+do -- BGNext current-raid trade and mail reconciliation
+    L["交易记录（当前团）"] = "Trade log (current raid)"
+    L["邮件记录（当前团）"] = "Mail log (current raid)"
+    L["清空当前团记录"] = "Clear current raid records"
+    L["收件人/发件人"] = "Recipient / sender"
+    L["状态"] = "Status"
+    L["方向"] = "Direction"
+    L["寄出"] = "Sent"
+    L["已完成"] = "Done"
+    L["已取消"] = "Cancelled"
+    L["已寄出"] = "Mailed"
+    L["待核对"] = "To reconcile"
+    L["左键切换待核对/已完成"] = "Left-click to toggle To reconcile / Done"
+    L["失败"] = "Failed"
+    L["当前团还没有交易记录。"] = "No trades recorded for the current raid yet."
+    L["当前团还没有邮件记录。"] = "No mails recorded for the current raid yet."
+    L["已清空当前团的交易与邮件记录。"] = "Cleared the current raid's trade and mail records."
+    L["只保留当前或最近一次未结算团本，最长七日。"] = "Keeps only the current or most recent unsettled raid, for at most seven days."
+    L["确认清空当前团的交易与邮件记录吗？\n只清除当前团结算记录，不影响表格账单、心愿清单和角色总览。"] = "Clear the current raid's trade and mail records?\nOnly the current-raid settlement records are removed; the bill, wishlist and character overview are not affected."
 end

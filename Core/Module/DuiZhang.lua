@@ -409,13 +409,9 @@ function BG.DuiZhangUI()
                         if addons == "biaoge" then
                             local duizhangmaijia = BG.DuiZhangFrame[FB]["boss" .. b]["maijia" .. i]
                             local duizhangcolor = BG.DuiZhangFrame[FB]["boss" .. b]["color" .. i]
-                            maijia:SetText(duizhangmaijia or "")
+                            BG.BGNext.BillBuyer.set(maijia, duizhangmaijia,
+                                unpack(duizhangcolor or { 1, 1, 1 }))
                             BiaoGe[FB]["boss" .. b]["maijia" .. i] = duizhangmaijia
-                            if duizhangcolor then
-                                maijia:SetTextColor(unpack(duizhangcolor))
-                            else
-                                maijia:SetTextColor(1, 1, 1)
-                            end
                             for k in pairs(BG.playerClass) do
                                 BiaoGe[FB]["boss" .. b][k .. i] = BG.DuiZhangFrame[FB]["boss" .. b][k .. i]
                             end

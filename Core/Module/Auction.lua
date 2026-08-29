@@ -123,7 +123,7 @@ BG.Init(function()
     local function Addon_OnEnter(self, _, tooltip)
         if not self then return end
         if tooltip then
-            self.title = L["BGLite版本"] .. "(" .. RAID .. ")"
+            self.title = L["兼容插件版本"] .. "(" .. RAID .. ")"
             self.table = BG.raidBiaoGeVersion
             tooltip:SetOwner(self, "ANCHOR_NONE", 0, 0)
             tooltip:ClearLines()
@@ -1065,6 +1065,19 @@ BG.Init(function()
         BG.raidBiaoGeVersion = {}
         BG.raidBiaoGeNewVersion = {}
         BG.raidAuctionVersion = {}
+        local Sender = BG.BGNext and BG.BGNext.AuctionSender
+        local versionResponseState = {}
+
+        local function GetRaidMemberNames()
+            local members = {}
+            for i = 1, GetNumGroupMembers() do
+                local name = GetRaidRosterInfo(i)
+                if name and name ~= "" then
+                    members[#members + 1] = name
+                end
+            end
+            return members
+        end
 
         -- 会员插件
         local guild = CreateFrame("Frame", nil, BG.MainFrame)
@@ -1072,7 +1085,7 @@ BG.Init(function()
             guild:SetSize(1, 20)
             guild:SetPoint("BOTTOMLEFT", 10, 2)
             guild:Hide()
-            guild.title = L["BGLite版本"] .. "(" .. GUILD .. ")"
+            guild.title = L["兼容插件版本"] .. "(" .. GUILD .. ")"
             guild.title2 = GUILD .. L["插件：%s"]
             guild.table = BG.guildBiaoGeVersion
             guild.isGuild = true
@@ -1091,7 +1104,7 @@ BG.Init(function()
             addon:SetSize(1, 20)
             addon:SetPoint("LEFT", BG.ButtonGuildVer, "RIGHT", 0, 0)
             addon:Hide()
-            addon.title = L["BGLite版本"] .. "(" .. RAID .. ")"
+            addon.title = L["兼容插件版本"] .. "(" .. RAID .. ")"
             addon.title2 = L["插件：%s"]
             addon.table = BG.raidBiaoGeVersion
             addon.isAddon = true
@@ -1200,8 +1213,8 @@ BG.Init(function()
             end
         end)
         BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
-            local prefix, msg, distType, sender = ...
-            sender = BG.GSN(sender)
+            local prefix, msg, distType, rawSender = ...
+            local sender = BG.GSN(rawSender)
             if prefix == "BiaoGe" and distType == "GUILD" then
                 if strfind(msg, "MyVer") then
                     local _, version = strsplit("-", msg)
@@ -1210,7 +1223,11 @@ BG.Init(function()
                 end
             elseif prefix == "BiaoGe" and distType == "RAID" then -- 插件版本
                 if msg == "VersionCheck" then
-                    C_ChatInfo.SendAddonMessage("BiaoGe", "MyVer-" .. BG.ver, "RAID")
+                    local realm = (GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+                    local members = GetRaidMemberNames()
+                    if Sender and Sender.shouldRespondVersion(versionResponseState, rawSender, realm, members, GetTime()) then
+                        C_ChatInfo.SendAddonMessage("BiaoGe", "MyVer-" .. BG.ver, "RAID")
+                    end
                 elseif strfind(msg, "MyVer") then
                     local _, version = strsplit("-", msg)
                     BG.raidBiaoGeVersion[sender] = version
@@ -1351,24 +1368,14 @@ BG.Init(function()
             end
             if hasGZ then break end
         end
-        -- 心愿
-        for _, FB in ipairs(BG.GetAllFB()) do
-            for n = 1, HopeMaxn[FB] do
-                for b = 1, HopeMaxb[FB] do
-                    for i = 1, HopeMaxi do
-                        local zb = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                        if zb and itemID == GetItemID(zb:GetText()) then
-                            local itemType = f.itemFrame.itemTypeText
-                            itemType:SetText((itemType:GetText() or "") .. (hasGZ and " " or "") .. BG.STC_g1(L["<心愿>"]))
-                            hasHope = true
-                            break
-                        end
-                    end
-                    if hasHope then break end
-                end
-                if hasHope then break end
-            end
-            if hasHope then break end
+        -- BGNext 心愿仅检查当前角色、当前选择副本的本地清单。
+        -- 不再扫描已移除的旧心愿界面，也不读取其他角色或历史数据。
+        if BG.IsHope and BG.IsHope(itemID, BG.FB1) then
+            local itemType = f.itemFrame.itemTypeText
+            itemType:SetText((itemType:GetText() or "") .. (hasGZ and " " or "") .. BG.STC_g1(L["<心愿>"]))
+            hasHope = true
+            local _, itemLink = GetItemInfo(itemID)
+            BG.BGNext.WishlistReminder.notify("auction", itemID, BG.FB1, tostring(f), itemLink)
         end
         local isFold
         if hasGZ or hasHope then
@@ -1378,22 +1385,14 @@ BG.Init(function()
             ShowTooltipGlow(f)
         end
         -- 过滤
-        f.filter = nil
-        local num = BiaoGe.FilterClassItemDB[RealmId][player].chooseID
-        if num then
-            local name, link, quality, level, _, _, _, _, EquipLoc, Texture, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
-            if BG.FilterAll(f.itemID, typeID, EquipLoc, subclassID) then
-                f.filter = true
-                if not (f.player and f.player == BG.playerName) then
-                    BGA.aura_env.SetFrameColor(f, 2)
-                end
-                if not hasGZ and not hasHope and not isFold and bindType ~= 2 and BiaoGe.options.autoAuctionFold == 1 then
-                    f.notClick = true
-                    f.hide:Click()
-                    f.notClick = false
-                end
+        BG.UpdateAuctionFilter(f, function(filtered, bindType)
+            if filtered and not hasGZ and not hasHope and not isFold
+                and bindType ~= 2 and BiaoGe.options.autoAuctionFold == 1 then
+                f.notClick = true
+                f.hide:Click()
+                f.notClick = false
             end
-        end
+        end)
 
         tinsert(BG.auctionLogFrame.auctioning, f.itemID)
         BG.UpdateAuctioning()
@@ -1585,8 +1584,7 @@ BG.Init(function()
         local function OnClick(zhuangbei, maijia, jine, saveQianKuan, FB)
             local b, i, _, _maijia, _jine = HasEmptyGeZi(zhuangbei, FB)
             if b then
-                _maijia:SetText(maijia or "")
-                _maijia:SetTextColor(GetClassRGB(nil, "player"))
+                BG.BGNext.BillBuyer.set(_maijia, maijia, GetClassRGB(nil, "player"))
                 _jine:SetText(jine)
                 BiaoGe[FB]["boss" .. b]["maijia" .. i] = maijia
                 BiaoGe[FB]["boss" .. b]["jine" .. i] = jine

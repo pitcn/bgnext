@@ -1,6 +1,6 @@
 # BGNext
 
-基于 **BGLite 纯净版**的安全、透明、可持续社区共创维护项目。
+基于 **BGLite 2.4.0 上游分发版**开展独立安全审计与增强开发的社区共创维护项目。
 
 > [!IMPORTANT]
 > **安全、隐私和合规优先于功能完整度、开发速度、下载量、排名及任何经济激励。**
@@ -8,7 +8,7 @@
 
 ## 项目缘起
 
-BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活动」的响应。我们希望在 BGLite 纯净版的基础上，通过公开审查和社区协作，逐步提供稳定、实用、易用的团队协作功能。
+BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活动」的响应。我们以活动提供的 BGLite 上游为起点，通过公开审查和社区协作，逐步提供稳定、实用、易用的团队协作功能。
 
 本项目是独立、非官方的社区项目，不代表网易、暴雪或 BGLite 原作者的官方立场。活动名称只用于说明项目缘起，不构成合作、认证、推荐或商业背书。
 
@@ -18,9 +18,11 @@ BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活�
 - 基线提交：[`9e0b119`](https://github.com/pitcn/bgnext/commit/9e0b119c66a644cce0083b5ffe4e59c6c946d0f1)
 - 原版文件：188 个
 - 基线完整性：由 [SHA-256 清单](docs/baseline/BGLite-2.4.0.sha256)、[明确覆盖清单](docs/baseline/BGNext-overrides.sha256)和自动检查共同保护
-- 当前阶段：已完成 BGNext 品牌元数据改名；尚未增加自有运行功能
+- 当前阶段：0.1.0 发布候选；等待剩余实机验收和平台审核
 
-仓库以 BGLite 2.4.0 官方纯净版为上游基线。除覆盖清单明确记录的插件显示名称和界面品牌文字外，其余上游运行文件保持逐文件一致；覆盖内容不改变功能、存档或通信协议。
+角色总览已为永久 60、周年服 TBC、熊猫人和正式服建立独立实例目录与保守的本地摘要白名单，均等待对应客户端实机验证；探索赛季明确不加载该入口。任何客户端都不会显示未经核验的合并副本、版本货币、升级物品或特殊装备占位。各版本的实际状态见[兼容性矩阵](docs/compatibility.md)。未完成对应客户端实机验收的功能不会标记为已支持。
+
+仓库记录了 BGLite 2.4.0 上游分发快照的全部 188 个文件。来源哈希只证明文件身份，不代表所有上游行为已经通过 BGNext 安全审计；BGNext 对必要修改逐文件登记、测试和复核。详见[基线说明](docs/baseline/README.md)。
 
 ## 项目目的
 
@@ -41,20 +43,20 @@ BGNext 发起于对网易 DD 公开举办的「BGLite 增强版开发激励活�
 - 未经授权的代码、UI、图片、字体、声音或文案；
 - 规避平台审核、误导审查人员或在后台代替玩家完成敏感行为的实现。
 
-详细规则见[合规边界](docs/COMPLIANCE.md)、[隐私政策](PRIVACY.md)和[安全政策](SECURITY.md)。有疑义的功能先暂停，完成评估或取得平台书面确认后再决定。
+详细规则见[合规边界](docs/policies/COMPLIANCE.md)、[隐私政策](docs/policies/PRIVACY.md)和[安全政策](SECURITY.md)。有疑义的功能先暂停，完成评估或取得平台书面确认后再决定。
 
 ## 安装
 
-当前仓库用于建立官方基线和社区维护流程，普通玩家应优先使用通过网易 DD 或适用发布平台审核的正式版本。
+普通玩家应优先使用 GitHub Release 或通过网易 DD 等适用平台审核的正式版本，不要直接下载仓库源码替代发布包。
 
 用于本地测试时：
 
-1. 下载仓库代码。
-2. 将包含 `BGLite.toc` 的目录命名为 `BGLite`。
-3. 复制到对应游戏客户端的 `Interface/AddOns/` 目录。
+1. 下载发布页提供的 ZIP，并确认来源和版本号。
+2. 解压后应得到包含 `BGLite.toc` 的 `BGLite` 文件夹。
+3. 将该文件夹复制到对应游戏客户端的 `Interface/AddOns/` 目录。
 4. 完全退出并重新启动游戏，在插件列表中确认 BGNext 已启用。
 
-请勿把未经审核的开发分支作为正式版本分发。
+维护者使用 `tools/build-release.ps1` 从实际加载清单生成发布包。该流程会排除仓库中的测试、开发文档及已隔离的旧历史/整表接收源码；禁止直接压缩整个仓库作为 Release。
 
 ## 欢迎共创
 
@@ -63,29 +65,31 @@ BGNext 由社区共同维护。我们欢迎插件作者、玩家、测试者、�
 - 发现问题：提交[错误报告](https://github.com/pitcn/bgnext/issues/new?template=bug-report.yml)
 - 提议功能：提交[功能建议](https://github.com/pitcn/bgnext/issues/new?template=feature-request.yml)
 - 贡献实现：阅读[贡献指南](CONTRIBUTING.md)并提交 Pull Request
-- 获取帮助：阅读[支持说明](SUPPORT.md)
+- 获取帮助：阅读[支持说明](.github/SUPPORT.md)
 - 报告安全问题：遵循[安全政策](SECURITY.md)，不要公开利用细节或敏感数据
 
-代码、错误复现、兼容性测试、翻译、文字校对、设计和合规建议都属于有效贡献。贡献者会按贡献类型记录在[感谢名单](CONTRIBUTORS.md)及相关版本更新说明中；同类贡献不排名，也不会因赞助金额改变署名、权限或合并优先级。
+代码、错误复现、兼容性测试、翻译、文字校对、设计和合规建议都属于有效贡献。贡献者会按贡献类型记录在[感谢名单](docs/community/CONTRIBUTORS.md)及相关版本更新说明中；同类贡献不排名，也不会因赞助金额改变署名、权限或合并优先级。
 
 ## 慈善承诺
 
 与 BGNext 相关的全部活动奖金、赞助及其他项目收入均用于慈善捐赠，不作为维护者或贡献者的个人收益。
 
-依法必须缴纳或代扣代缴的税费会单独记录；扣除依法必须承担的税费后，剩余资金全部捐赠给具备合法资质、信息可核验的慈善组织。项目将公开脱敏后的收入、税费、受赠机构和捐赠凭证。详见[慈善与财务透明政策](docs/CHARITY.md)。
+依法必须缴纳或代扣代缴的税费会单独记录；扣除依法必须承担的税费后，剩余资金全部捐赠给具备合法资质、信息可核验的慈善组织。项目将公开脱敏后的收入、税费、受赠机构和捐赠凭证。详见[慈善与财务透明政策](docs/policies/CHARITY.md)。
 
 ## 项目文档
 
 - [贡献指南](CONTRIBUTING.md)
-- [贡献者与感谢名单](CONTRIBUTORS.md)
+- [贡献者与感谢名单](docs/community/CONTRIBUTORS.md)
 - [安全政策](SECURITY.md)
-- [隐私政策](PRIVACY.md)
-- [合规边界](docs/COMPLIANCE.md)
-- [项目治理章程](docs/PROJECT_CHARTER.md)
-- [慈善与财务透明政策](docs/CHARITY.md)
+- [隐私政策](docs/policies/PRIVACY.md)
+- [合规边界](docs/policies/COMPLIANCE.md)
+- [项目治理章程](docs/policies/PROJECT_CHARTER.md)
+- [慈善与财务透明政策](docs/policies/CHARITY.md)
 - [版权与权利说明](COPYRIGHT.md)
 - [变更日志](CHANGELOG.md)
-- [支持说明](SUPPORT.md)
+- [支持说明](.github/SUPPORT.md)
+- [兼容性矩阵](docs/compatibility.md)
+- [0.1.0 发布审计](docs/release/0.1.0-audit.md)
 
 ## 版权与免责声明
 

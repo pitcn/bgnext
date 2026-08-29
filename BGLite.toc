@@ -1,10 +1,12 @@
 ## Interface: 11508, 11509, 20506, 30405, 38002, 40402, 50503, 50504, 50505, 120005, 120007, 120100
-## Title: <BGNext> |cff00BFFFBGNext|r
-## Notes: /bglite or /gbg
+## Title: <BGNext> |cff00BFFFBGNext|r 金团表格
+## Notes: /bgn or /bgnext
 ## IconTexture: Interface\AddOns\BGLite\Media\icon\icon.tga
-## Author: CQZS (Lite)
+## Author: 国服社区共创
+## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.0
+## X-BGNext-Version: 0.1.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.0
@@ -16,11 +18,35 @@ Locales\enUS.lua
 Templates.xml
 Libs\embeds.xml
 Core\DB\DB.xml
+Core\BGNext\Init.lua
+Core\BGNext\Identity.lua
+Core\BGNext\ConflictGuard.lua
+Core\BGNext\DataLifecycle.lua
+Core\BGNext\CurrentTrade.lua
+Core\BGNext\CurrentMail.lua
+Core\BGNext\CurrentSettlementView.lua
+Core\BGNext\CurrentSettlementRuntime.lua
+Core\BGNext\ReleaseInfo.lua
+Core\BGNext\Wishlist.lua
+Core\BGNext\WishlistReminder.lua
+Core\BGNext\EquipmentFilterProfiles.lua
+Core\BGNext\EquipmentFilter.lua
+Core\BGNext\OwnCharacters.lua
+Core\BGNext\OwnCharactersAdapters.lua
+Core\BGNext\OwnCharactersCatalog.lua
+Core\BGNext\OwnCharactersCollector.lua
+Core\BGNext\OwnCharactersView.lua
+Core\BGNext\RoleOverviewSettings.lua
+Core\BGNext\OwnCharactersUI.lua
+Core\BGNext\RoleOverviewEntry.lua
+Core\BGNext\OwnCharactersRuntime.lua
+Core\BGNext\PlayerIdentity.lua
+Core\BGNext\BillBuyer.lua
+Core\BGNext\AuctionSender.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
 
-Core\Module\Receive.lua
 Core\Module\DuiZhang.lua
 
 Core\TongBao\ZhangDan.lua
@@ -30,6 +56,10 @@ Core\TongBao\QianKuan.lua
 Core\TongBao\Channel.lua
 
 Core\BiaoGe.lua
+Core\BGNext\EquipmentFilterUI.lua
+Core\BGNext\WishlistUI.lua
+Core\BGNext\CurrentSettlementUI.lua
+Core\BGNext\About.lua
 
 Core\Module\ClearBiaoGe.lua
 Core\Module\Loot.lua
@@ -39,8 +69,6 @@ Core\Module\AuctionLog.lua
 Core\Module\AuctionWA.lua
 Core\Module\AuctionWAEvent.lua
 Core\Module\Trade.lua
-Core\Module\TradeHistory.lua
-Core\Module\MailHistory.lua
 Core\Module\SendMail.lua
 Core\Module\QuickAccounting.lua
 Core\Module\ItemTooltip.lua

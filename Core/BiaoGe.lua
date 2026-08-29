@@ -137,7 +137,8 @@ BG.Init(function()
         VerText:SetPoint("BOTTOMLEFT", TitleText, "BOTTOMRIGHT", 0, 0)
         VerText:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
         VerText:SetTextColor(RGB("00BFFF"))
-        VerText:SetText(BG.ver)
+        local identity = BG.BGNext and BG.BGNext.Identity
+        VerText:SetText(identity and ("v" .. identity.version) or "")
         BG.VerText = VerText
 
         -- 说明书
@@ -349,60 +350,6 @@ BG.Init(function()
             t:SetText(L["对账"])
         end
     end
-    -- Lite: 恢复交易记录 / 邮件记录面板（原 BGLite 裁剪时整体删除，2026-08-24 按 BiaoGe v2.3.5 恢复，功能保持一致）
-    -- 交易记录
-    BG.TradeHistoryMainFrame = CreateFrame("Frame", "BG.TradeHistoryMainFrame", BG.MainFrame)
-    do
-        local mainFrame = BG.TradeHistoryMainFrame
-        mainFrame:Hide()
-        BG.BackBiaoGe(mainFrame)
-        mainFrame:SetScript("OnShow", function()
-            BG.FrameHide(0)
-            BiaoGe.lastFrame = "TradeHistory"
-            BG.TabButtonsFB:Hide()
-            if BG.NanDuDropDown then
-                BG.NanDuDropDown.DropDown:Hide()
-            end
-        end)
-        mainFrame:SetScript("OnHide", function(self)
-            if not self:IsShown() and BiaoGe.lastFrame == "TradeHistory" then
-                BiaoGe.lastFrame = nil
-            end
-        end)
-
-        local text = mainFrame:CreateFontString()
-        text:SetPoint("BOTTOMLEFT", BG.MainFrame, "BOTTOMLEFT", 35, 45)
-        text:SetFont(BIAOGE_TEXT_FONT, 20, "OUTLINE")
-        text:SetTextColor(RGB(BG.g1))
-        text:SetText(L["交易记录"])
-    end
-
-    -- 邮件记录
-    BG.MailHistoryMainFrame = CreateFrame("Frame", "BG.MailHistoryMainFrame", BG.MainFrame)
-    do
-        local mainFrame = BG.MailHistoryMainFrame
-        mainFrame:Hide()
-        BG.BackBiaoGe(mainFrame)
-        mainFrame:SetScript("OnShow", function()
-            BG.FrameHide(0)
-            BiaoGe.lastFrame = "MailHistory"
-            BG.TabButtonsFB:Hide()
-            if BG.NanDuDropDown then
-                BG.NanDuDropDown.DropDown:Hide()
-            end
-        end)
-        mainFrame:SetScript("OnHide", function(self)
-            if not self:IsShown() and BiaoGe.lastFrame == "MailHistory" then
-                BiaoGe.lastFrame = nil
-            end
-        end)
-
-        local text = mainFrame:CreateFontString()
-        text:SetPoint("BOTTOMLEFT", BG.MainFrame, "BOTTOMLEFT", 35, 45)
-        text:SetFont(BIAOGE_TEXT_FONT, 20, "OUTLINE")
-        text:SetTextColor(RGB(BG.g1))
-        text:SetText(L["邮件记录"])
-    end
     ----------生成各副本UI----------
     do
         for k, FB in pairs(BG.FBtable) do
@@ -418,9 +365,21 @@ BG.Init(function()
             lastbt = BG.XiaoFeiUI(lastbt)
             lastbt = BG.QianKuanUI(lastbt)
             BG.NotifyChannelUI(lastbt)
+
+            -- BGNext: 角色总览右下角入口、悬停预览与固定窗口。
+            if BG.BGNext and BG.BGNext.RoleOverviewEntry then
+                BG.BGNext.RoleOverviewEntry.installEntry(BG.MainFrame)
+            end
+            -- BGNext: 采集当前角色 -> 写入 -> 过期清理 -> 刷新 的运行时引导。
+            if BG.BGNext and BG.BGNext.OwnCharactersRuntime then
+                BG.BGNext.OwnCharactersRuntime.install()
+            end
+            -- BGNext: 交易记录（当前团）与邮件记录（当前团）入口。
+            if BG.BGNext and BG.BGNext.CurrentSettlementUI then
+                BG.BGNext.CurrentSettlementUI.installEntry(BG.MainFrame)
+            end
         end)
 
-        securecall(BG.ReceiveUI)
         if BG.DuiZhangUI then securecall(BG.DuiZhangUI) end
         if BG.DuiZhangList then securecall(BG.DuiZhangList) end
         if BG.RoleOverviewUI then securecall(BG.RoleOverviewUI) end
@@ -921,9 +880,6 @@ BG.Init(function()
 
         BG.FBMainFrameTabNum = 1
         BG.DuiZhangMainFrameTabNum = 4
-        -- Lite: 交易/邮件记录面板 tab 编号（对齐 v2.3.5，避让 1-8 主 tab 编号段）
-        BG.TradeHistoryMainFrameTabNum = 101
-        BG.MailHistoryMainFrameTabNum = 102
 
         local r, g, b = GetClassRGB(nil, "player")
         local onEnterDelay = .6
@@ -1016,20 +972,6 @@ BG.Init(function()
         -- 2026-08-24 策划决策：恢复对账底部 tab 入口（原 BGLite 裁剪时隐藏，功能本就完整）
         local bt = BG.Create_TabButton(BG.DuiZhangMainFrameTabNum, L["对账"], BG.DuiZhangMainFrame)
 
-        -- Lite: 恢复交易/邮件记录底部 tab（2026-08-24 按 BiaoGe v2.3.5 恢复，对齐 v2.3.5 :1748-1749）
-        -- 2026-08-25 策划：临时隐藏「交易记录」tab（仅隐藏 UI 入口，功能逻辑不动）
-        local bt = BG.Create_TabButton(BG.TradeHistoryMainFrameTabNum, L["交易记录"], BG.TradeHistoryMainFrame)
-        bt:Hide()
-        -- 从 tabButtons 锚点链移除隐藏项：否则「邮件记录」会锚定到隐藏按钮右侧、与「对账」之间留空；
-        -- 同时使 ClickTabButton(101)/lastFrame 恢复不再能显示该面板，彻底切断 UI 入口。
-        for i = #BG.tabButtons, 1, -1 do
-            if BG.tabButtons[i].num == BG.TradeHistoryMainFrameTabNum then
-                tremove(BG.tabButtons, i)
-                break
-            end
-        end
-        BG.Create_TabButton(BG.MailHistoryMainFrameTabNum, L["邮件记录"], BG.MailHistoryMainFrame)
-
         ----------更新已拥有----------
         do
             function BG.UpdateBiaoGeAllIsHaved()
@@ -1040,17 +982,6 @@ BG.Init(function()
                             local bt = BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]
                             if bt then
                                 BG.IsHave(bt)
-                            end
-                        end
-                    end
-                elseif BG.HopeMainFrame and BG.HopeMainFrame:IsVisible() then
-                    for n = 1, HopeMaxn[FB] do
-                        for b = 1, Maxb[FB] do
-                            for i = 1, BG.GetMaxi(FB, b) do
-                                local bt = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                                if bt then
-                                    BG.IsHave(bt)
-                                end
                             end
                         end
                     end
@@ -1189,35 +1120,6 @@ BG.Init(function()
                 end
             end
 
-            if BG.HopeMainFrame and BG.HopeMainFrame:IsVisible() then
-                local yes
-                for _, FB in pairs(BG.FBtable) do
-                    for n = 1, HopeMaxn[FB] do
-                        for b = 1, HopeMaxb[FB] do
-                            for i = 1, HopeMaxi do
-                                if BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i] then
-                                    local itemID = GetItemID(BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]:GetText())
-                                    if itemID then
-                                        local name, link, quality, level, _, _, _, _, _, Texture, _, typeID = GetItemInfo(itemID)
-                                        yes = string.find(itemIDs, tostring(itemID))
-                                        if yes then
-                                            BG.HopeFrameDs[FB .. 3]["nandu" .. n]["boss" .. b]["ds" .. i]:Show()
-                                            BG.OnUpdateTime(function(self, elapsed)
-                                                self.timeElapsed = self.timeElapsed + elapsed
-                                                if BiaoGe.options[name1] ~= 1 or self.timeElapsed >= BiaoGe.options[name2] then
-                                                    BG.HopeFrameDs[FB .. 3]["nandu" .. n]["boss" .. b]["ds" .. i]:Hide()
-                                                    self:SetScript("OnUpdate", nil)
-                                                    self:Hide()
-                                                end
-                                            end)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
         end)
     end
     ----------点击聊天/背包添加装备----------
@@ -1248,12 +1150,11 @@ BG.Init(function()
             local item, link, quality, level, _, _, _, _, _, Texture, _, typeID = GetItemInfo(link)
             if not link then return end
             if IsAltKeyDown() then
-                if BG.IsML then -- 开始拍卖
+                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
+                if action == "auction" then
                     BG.StartAuction(link, nil, nil, nil, button == "RightButton")
-                else            -- 关注装备
-                    if button ~= "RightButton" then
-                        BG.AddGuanZhu(link)
-                    end
+                elseif action == "wishlist" and BG.ToggleCurrentWish then
+                    BG.ToggleCurrentWish(link)
                 end
             elseif IsShiftKeyDown() then
                 Insert(link)
@@ -2006,15 +1907,21 @@ end
 
 -- 插件命令
 BG.Init2(function()
-    SlashCmdList["BIAOGE"] = function()
-        if not BG.MainFrame then
+    SlashCmdList["BGNEXT"] = function(message)
+        -- BGNext: "/bgn role" / "/bgnext role" opens the own-character overview
+        -- instead of toggling the main table. Every other argument keeps the
+        -- original main-table toggle.
+        local entry = BG.BGNext and BG.BGNext.RoleOverviewEntry
+        if entry and entry.dispatchSlash and entry.dispatchSlash(message, entry) then
             return
         end
-        BG.MainFrame:SetShown(not BG.MainFrame:IsVisible())
+        if BG.MainFrame then
+            BG.MainFrame:SetShown(not BG.MainFrame:IsVisible())
+        end
     end
-    SLASH_BIAOGE1 = "/biaoge"
-    SLASH_BIAOGE2 = "/gbg"
-    SLASH_BIAOGE3 = "/bglite"
+    SLASH_BGNEXT1 = "/bgn"
+    SLASH_BGNEXT2 = "/bgnext"
+    SLASH_BGNEXT3 = "/bglite"
 
     -- 解锁位置
     SlashCmdList["BIAOGEMOVE"] = function()

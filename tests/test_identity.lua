@@ -1,0 +1,36 @@
+return function(test)
+    BG = { BGNext = {} }
+    local identity = dofile("Core/BGNext/Identity.lua")
+
+    test.eq(identity.projectName, "BGNext", "project name")
+    test.eq(identity.version, "0.1.0", "BGNext release version")
+    test.eq(identity.upstreamName, "BGLite", "upstream name")
+    test.eq(identity.upstreamVersion, "2.4.0", "upstream version")
+    test.eq(identity.protocolVersion, "2.4.0", "BGLite compatibility version")
+    test.eq(identity.commands[1], "/bgn", "primary command")
+    test.eq(identity.commands[2], "/bgnext", "full command")
+    test.eq(identity.commands[3], "/bglite", "legacy command")
+    test.eq(identity.isPublicCommand("/bgn"), true, "primary command is public")
+    test.eq(identity.isPublicCommand("/bgnext"), true, "full command is public")
+    test.eq(identity.isPublicCommand("/bglite"), false, "legacy command stays hidden")
+    test.eq(identity.isRegisteredCommand("/bglite"), true, "legacy command remains registered")
+    test.eq(identity.isRegisteredCommand("/biaoge"), false, "old BiaoGe command removed")
+    test.eq(identity.isRegisteredCommand("/gbg"), false, "old gbg command removed")
+
+    local tocFile = assert(io.open("BGLite.toc", "rb"))
+    local toc = tocFile:read("*a")
+    tocFile:close()
+    test.eq(toc:find("## X-BGNext-Version: 0.1.0", 1, true) ~= nil, true, "BGNext metadata version")
+    test.eq(toc:find("## Version: 2.4.0", 1, true) ~= nil, true, "BGLite protocol version retained")
+
+    local coreFile = assert(io.open("Core/BiaoGe.lua", "rb"))
+    local core = coreFile:read("*a")
+    coreFile:close()
+    test.eq(core:find('SLASH_BGNEXT1 = "/bgn"', 1, true) ~= nil, true, "primary slash registered")
+    test.eq(core:find('SLASH_BGNEXT2 = "/bgnext"', 1, true) ~= nil, true, "full slash registered")
+    test.eq(core:find('SLASH_BGNEXT3 = "/bglite"', 1, true) ~= nil, true, "legacy slash registered")
+    test.eq(core:find('SLASH_BIAOGE1 = "/biaoge"', 1, true) == nil, true, "old BiaoGe slash removed")
+    test.eq(core:find('SLASH_BIAOGE2 = "/gbg"', 1, true) == nil, true, "old gbg slash removed")
+    test.eq(core:find('VerText:SetText(identity and ("v" .. identity.version) or "")', 1, true) ~= nil, true,
+        "version label does not repeat the adjacent BGNext title")
+end

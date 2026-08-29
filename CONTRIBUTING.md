@@ -2,7 +2,7 @@
 
 感谢你参与 BGNext。项目欢迎代码、测试、错误复现、翻译、文档、视觉设计、安全研究和合规建议。
 
-参与贡献即表示你同意遵守 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)、[SECURITY.md](SECURITY.md)、[PRIVACY.md](PRIVACY.md)和[合规边界](docs/COMPLIANCE.md)。
+参与贡献即表示你同意遵守 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)、[SECURITY.md](SECURITY.md)、[隐私政策](docs/policies/PRIVACY.md)和[合规边界](docs/policies/COMPLIANCE.md)。
 
 ## 开始之前
 
@@ -70,7 +70,7 @@ pwsh -NoProfile -File tools/verify-baseline.ps1
 
 ## 数据、安全和通信
 
-运行时贡献必须回答 [docs/COMPLIANCE.md](docs/COMPLIANCE.md) 的完整合规清单。特别注意：
+运行时贡献必须回答 [合规清单](docs/policies/COMPLIANCE.md)。特别注意：
 
 - 数据默认保存在玩家本地；
 - 游戏外导出或传输必须由用户主动触发并提前完整告知；
@@ -98,4 +98,4 @@ pwsh -NoProfile -File tools/verify-baseline.ps1
 
 ## 贡献者认可
 
-形成可核验实际价值的贡献会按类型记录在 [CONTRIBUTORS.md](CONTRIBUTORS.md)，并在相关 Release Notes 中引用 Pull Request 和贡献者。同类贡献不排名；赞助不会换取署名、权限或合并优先级。
+形成可核验实际价值的贡献会按类型记录在 [贡献者名单](docs/community/CONTRIBUTORS.md)，并在相关 Release Notes 中引用 Pull Request 和贡献者。同类贡献不排名；赞助不会换取署名、权限或合并优先级。

@@ -461,8 +461,7 @@ BG.Init(function()
             if not self.sureButton:IsEnabled() then return end
             local b, i, zhuangbei, maijia, jine, FB = HasEmptyGeZi(self.itemLink)
             if b then
-                maijia:SetText(self.maijia or "")
-                maijia:SetTextColor(unpack(self.color or { 1, 1, 1 }))
+                BG.BGNext.BillBuyer.set(maijia, self.maijia, unpack(self.color or { 1, 1, 1 }))
                 jine:SetText(GetJinE(self.jine))
                 BiaoGe[FB]["boss" .. b]["maijia" .. i] = self.maijia
                 BiaoGe[FB]["boss" .. b]["jine" .. i] = GetJinE(self.jine)

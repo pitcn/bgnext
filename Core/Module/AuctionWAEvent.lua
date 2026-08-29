@@ -87,7 +87,7 @@ BG.Init(function()
   for minLevel, frame in pairs(BGA.Frames) do
    if frame[auctionIdKey] == auctionID then
     return
-   end
+    end
   end
   local itemName, link, rarity, itemLevel, minLevel, itemType, itemSubType, minLevel, equipLoc, icon,
   minLevel, sellPrice, classID, subclassID = GetItemInfo(link or itemID)
@@ -503,7 +503,7 @@ BG.Init(function()
     auctionFrame.colorplayer = wa.SetClassCFF(player)
    end
    if player and player ~= "" then
-    if player == wa.GN() then
+    if wa.IsMe(auctionFrame) then
      fontString:SetText(L["|cffFFD100出价最高者：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
      auctionFrame:SetBackdropColor(unpack(wa.backdropColor_IsMe))
      auctionFrame:SetBackdropBorderColor(unpack(wa.backdropBorderColor_IsMe))
@@ -618,9 +618,28 @@ BG.Init(function()
   local modLabel = ""
   return modLabel
  end
+ local Sender = BG.BGNext and BG.BGNext.AuctionSender
+ local versionResponseState = {}
+ local function getRealm()
+  return (GetRealmName and GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+ end
+ local function getRaidMemberNames()
+  local members = {}
+  for _, member in ipairs(wa.raidRosterInfo or {}) do
+   if member and member.name and member.name ~= "" then
+    members[#members + 1] = member.name
+   end
+  end
+  return members
+ end
+ local function isAuthorizedController(sender)
+  if not Sender then return false end
+  local realm = getRealm()
+  return Sender.isController(sender, realm, wa.raidRosterInfo)
+ end
  local function eventHandler(self, event, ...)
   if event == "CHAT_MSG_ADDON" then
-   local prefix, message, distribution, v, line = ...
+   local prefix, message, distribution, sender, target = ...
    local opcode, auctionIDStr, itemIDStr, moneyStr, durationStr, playerStr, modStr, linkStr, resetStr, extra
    local isGen2
    if prefix == wa.AddonChannel then
@@ -631,15 +650,15 @@ BG.Init(function()
    end
    if not opcode then return end
    if opcode == "StartAuction" and distribution == "RAID" then
-    local auctionID = tonumber(auctionIDStr)
-    local itemID = tonumber(itemIDStr)
-    local money = tonumber(moneyStr)
-    local duration = tonumber(durationStr)
+    if not isAuthorizedController(sender) then return end
+    local auctionID, itemID, money, duration =
+     Sender.parseStart(auctionIDStr, itemIDStr, moneyStr, durationStr)
+    if not auctionID then return end
     local player = playerStr
     local mod = modStr
-    -- 匿名拍卖已移除（决策逆转 docs/07 §3.3）：匿名 StartAuction 不创建帧，静默忽略。常规拍卖（mod=normal）不受影响。
+    -- 不支持匿名拍卖消息；常规团队拍卖不受影响。
     if mod == "anonymous" then return end
-    local link = linkStr ~= "" and linkStr or nil
+    local link = linkStr and linkStr ~= "" and linkStr or nil
     local resetThreshold = isGen2 and tonumber(resetStr) or wa.REPEAT_TIME
     BG.OnItemLoad(link or itemID):ContinueOnItemLoad(function()
      wa.CreateAuction(auctionID, itemID, money, duration, player, mod, link, resetThreshold, isGen2)
@@ -656,7 +675,9 @@ BG.Init(function()
      end
     end)
    elseif opcode == "CancelAuction" and distribution == "RAID" then
+    if not isAuthorizedController(sender) then return end
     local auctionID = tonumber(auctionIDStr)
+    if not auctionID or auctionID <= 0 then return end
     for v, frame in pairs(BGA.Frames) do
      if frame[auctionIdKey] == auctionID and not frame.IsEnd then
       wa.SetEndState(frame, L["拍卖取消"], 1, 0, 0)
@@ -667,7 +688,7 @@ BG.Init(function()
        SendChatMessage(format(L["{rt7}拍卖取消{rt7} %s"], frame.link), "RAID")
       end
       if BG and BG.AuctionWAEnd then
-       BG.AuctionWAEnd(3, frame.link, frame.player, frame.money)
+       BG.AuctionWAEnd(3, frame.link, frame.player, frame.money, nil, frame.auctionID)
       end
       After(wa.HIDEFRAME_TIME, function()
        wa.UpdateFrame(frame)
@@ -676,34 +697,51 @@ BG.Init(function()
      end
     end
    elseif opcode == "PauseAuction" and distribution == "RAID" then
+    if not isAuthorizedController(sender) then return end
     local itemID = tonumber(auctionIDStr)
+    if not itemID or itemID <= 0 then return end
     for v, frame in pairs(BGA.Frames) do
      if frame.itemID == itemID and frame.isGen2 and not frame.IsEnd then
       wa.PauseAuction(frame)
      end
     end
    elseif opcode == "ResumeAuction" and distribution == "RAID" then
+    if not isAuthorizedController(sender) then return end
     local itemID = tonumber(auctionIDStr)
+    if not itemID or itemID <= 0 then return end
     for v, frame in pairs(BGA.Frames) do
      if frame.itemID == itemID and frame.isGen2 and not frame.IsEnd then
       wa.ResumeAuction(frame)
      end
     end
    elseif opcode == "SendMyMoney" and distribution == "RAID" then
-    local auctionID = tonumber(auctionIDStr)
-    local money = tonumber(itemIDStr)
-    for v, frame in pairs(BGA.Frames) do
-     if not frame.IsEnd and not frame.isPaused and frame.mod ~= "anonymous" and frame[auctionIdKey] == auctionID then
-      if frame.start and money >= frame.money or money > frame.money then
-       wa.SetMoney(frame, money, line)
+    -- The bidder is the message sender (fourth argument), never the target
+    -- (fifth). Missing senders and non-raid senders are ignored without a bid.
+    if not sender or sender == "" then return end
+    if Sender then
+     local auctionID, money = Sender.parseBid(auctionIDStr, itemIDStr)
+     if auctionID == nil then return end
+     local realm = getRealm()
+     local members = getRaidMemberNames()
+     if not Sender.isRaidSender(sender, realm, members) then return end
+     for v, frame in pairs(BGA.Frames) do
+      if not frame.IsEnd and not frame.isPaused and frame.mod ~= "anonymous" and frame[auctionIdKey] == auctionID then
+       if frame.start and money >= frame.money or money > frame.money then
+        wa.SetMoney(frame, money, sender)
+       end
+       return
       end
-      return
      end
     end
    elseif opcode == "VersionCheck" and distribution == "RAID" then
-    C_ChatInfo.SendAddonMessage(wa.AddonChannel, "MyVer" .. "," .. wa.ver, "RAID")
-   -- 匿名族三消息（AnonymousWhisperMyMoney / AnonymousSendMyMoney / AnonymousWinner）已移除。
-   -- 收到外部原版发来的匿名 opcode 自然落入链尾静默丢弃（识别但忽略），不回包、不中继、不落盘。
+    if Sender then
+     local realm = getRealm()
+     local members = getRaidMemberNames()
+     if Sender.shouldRespondVersion(versionResponseState, sender, realm, members, GetTime()) then
+      C_ChatInfo.SendAddonMessage(wa.AddonChannel, "MyVer" .. "," .. wa.ver, "RAID")
+     end
+    end
+   -- 不支持的匿名拍卖消息静默忽略，不回复、不转发、不持久化。
    end
   elseif event == "GROUP_ROSTER_UPDATE" then
    local canSend = wa.canSend()

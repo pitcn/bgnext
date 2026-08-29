@@ -10,8 +10,7 @@ wa.ver = "v4.0"
 function wa.GetVerNum(version)
  return tonumber(string.match(version, "v(%d+%.%d+)")) or 0
 end
--- 统一计时入口：优先 GetTimePreciseSec（毫秒精度，用于 1s 出价 CD、0.3s 中继 CD、暂停/恢复计时），
--- 经典服客户端若缺失则兜底 GetTime（毫秒 API 在 Classic 1.15/60 引擎存在性见 docs/09 A3 风险）。
+-- 拍卖计时优先使用高精度时钟；旧客户端没有该 API 时回退到 GetTime。
 function wa.Now()
  if GetTimePreciseSec then
   return GetTimePreciseSec()
@@ -38,6 +37,7 @@ end
 BG.Init(function()
  local font = BIAOGE_TEXT_FONT or STANDARD_TEXT_FONT
  local realmName = GetRealmName():gsub(" ", ""):gsub("%-", "")
+ local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
  do
   function wa.GN(unit)
    unit = unit or "player"
@@ -47,7 +47,10 @@ BG.Init(function()
    return GetUnitName(unit, true)
   end
   function wa.IsMe(bidFrame)
-   return bidFrame.player and bidFrame.player == wa.GN() or false
+   if not PlayerIdentity then
+    return bidFrame.player and bidFrame.player == wa.GN() or false
+   end
+   return PlayerIdentity.same(bidFrame.player, wa.GN(), realmName)
   end
   function wa.GFN(name)
    if not name then return end
@@ -772,7 +775,7 @@ BG.Init(function()
    bidFrame.colorplayer = wa.SetClassCFF(player)
    bidFrame.start = false
    local isLate = ((bidFrame.remaining or 10) <= wa.tooLateTime) and format("%.1f", bidFrame.remaining) or nil
-   if player == wa.GN() then
+   if wa.IsMe(bidFrame) then
     bidFrame.topMoneyText:SetText(L["|cffFFD100出价最高者：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
     wa.SetFrameColor(bidFrame, 1)
     tinsert(bidFrame.logs, { money = money, player = "|cff" .. wa.GREEN1 .. L["你"] .. "|r", time = isLate })
@@ -831,7 +834,7 @@ BG.Init(function()
      end
     end
    end
-   -- 新高价到达即取消自动出价 ticker（v2.3.5 三处取消点之①）：避免旧 ticker 在延迟出价后重复顶价，
+   -- 新高价到达时取消旧计时器，避免延迟回调重复出价。
    -- 重投时机交给上方的 autoSendDelayFrame。
    if bidFrame.autoTimer then
     bidFrame.autoTimer:Cancel()
@@ -1160,12 +1163,12 @@ BG.Init(function()
    end
    if newAmount <= bidFrame.autoMoney then
     wa.SendMyMoneyMsg(bidFrame, newAmount)
-    -- v2.3.5 三处取消点之②：重建 ticker 前先取消旧 ticker，防堆叠
+    -- 重建前先取消旧计时器，确保每件物品只有一个自动出价任务。
     if bidFrame.autoTimer then
      bidFrame.autoTimer:Cancel()
     end
     bidFrame.autoTimer = C_Timer.NewTicker(3, function()
-     -- v2.3.5 三处取消点之③：回调开头自检，任一条件变化即取消并退出
+     -- 回调执行前重新检查状态，条件变化时立即停止。
      if bidFrame.IsEnd or not bidFrame.isAuto or bidFrame.isPaused or wa.IsMe(bidFrame) then
       if bidFrame.autoTimer then
        bidFrame.autoTimer:Cancel()
@@ -1186,14 +1189,13 @@ BG.Init(function()
     local delay = tonumber(BiaoGe.Auction.aotoSendLate)
     if delay then
      delay = min(max(delay, 1), 5)
-     delay = random(1 * 10, delay * 10) / 10
      return delay
     end
    end
    if BG and BG.IsTitan then
-    return 1.5 + random(-5, 5) / 100
+    return 1.5
    end
-   return 0.5 + random(-5, 5) / 100
+   return 0.5
   end
  end
  function wa.SetEndState(bidFrame, text, r, g, b, barNotHide)
@@ -1224,7 +1226,7 @@ BG.Init(function()
    else
     bidFrame.currentMoneyText:SetText(L["|cff00FF00成交价：|r"] .. wa.FormatNumber(bidFrame.money))
    end
-   if bidFrame.player == wa.GN() then
+   if wa.IsMe(bidFrame) then
     bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
    else
     bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. bidFrame.colorplayer)
@@ -1237,7 +1239,7 @@ BG.Init(function()
     end)
    end
    if BG and BG.AuctionWAEnd then
-    BG.AuctionWAEnd(1, bidFrame.link, bidFrame.player, bidFrame.money, bidFrame.logs)
+    BG.AuctionWAEnd(1, bidFrame.link, bidFrame.player, bidFrame.money, bidFrame.logs, bidFrame.auctionID)
    end
   else
    wa.SetEndState(bidFrame, L["流拍"], 1, 0, 0)
@@ -1253,7 +1255,7 @@ BG.Init(function()
     end
    end
    if BG and BG.AuctionWAEnd then
-    BG.AuctionWAEnd(2, bidFrame.link, bidFrame.player, bidFrame.money)
+    BG.AuctionWAEnd(2, bidFrame.link, bidFrame.player, bidFrame.money, nil, bidFrame.auctionID)
    end
   end
   After(wa.HIDEFRAME_TIME, function()

@@ -1028,24 +1028,6 @@ local function RoadSendMail()
             bt:SetScript("OnLeave", GameTooltip_Hide)
         end
 
-        -- 邮寄记录
-        do
-            local bt = CreateFrame("Button", nil, mainFrame)
-            bt:SetPoint("LEFT", mainFrame.varButton, "RIGHT", 15, 0)
-            bt:SetNormalFontObject(BG.FontGreen15)
-            bt:SetDisabledFontObject(BG.FontDis15)
-            bt:SetHighlightFontObject(BG.FontWhite15)
-            bt:SetText(L["邮寄记录"])
-            bt:SetSize(bt:GetFontString():GetWidth(), 20)
-            BG.SetTextHighlightTexture(bt)
-            bt:SetScript("OnClick", function(self)
-                BG.PlaySound(1)
-                BG.MainFrame:Show()
-                BG.ClickTabButton(BG.MailHistoryMainFrameTabNum)
-                CloseAllBags()
-            end)
-        end
-
         -- 背景
         do
             local f = CreateFrame("Frame", nil, mainFrame, "InsetFrameTemplate")
@@ -1419,6 +1401,10 @@ local function RoadSendMail()
                 ClearSendMail()
                 SetSendMailMoney(money)
                 lastName = BG.GSN(fullName)
+                if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
+                    BG.BGNext.CurrentSettlementRuntime.notifyMailAttempt(
+                        lastName, money / 10000, BiaoGe.sendMail.member)
+                end
                 SendMail(lastName, SwitchVar(mainFrame.Edit1:GetText()), SwitchVar(mainFrame.Edit2:GetText()))
                 lastName = nil
                 if addFriend[fullName] then
@@ -1533,6 +1519,13 @@ local function RoadSendMail()
                                 break
                             end
                         end
+                    end
+                    -- BGNext: 收集本插件刚刚执行成功的这一封工资邮件，
+                    -- 不读取收件箱，不保存主题或正文。
+                    if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
+                        local goldAmount = tonumber(mainFrame.moneyEdit:GetText()) or 0
+                        BG.BGNext.CurrentSettlementRuntime.notifyMailSent(
+                            BG.GSN(lastSend.fullName), goldAmount, BiaoGe.sendMail.member)
                     end
                 end
             end)

@@ -82,7 +82,7 @@ BG.Init(function()
 
         function BG.CancelGuanZhuAndHopeInTrade(itemID)
             local name, link = GetItemInfo(itemID)
-            local haveguanzhu, havehope
+            local haveguanzhu
             for _, FB in pairs(BG.FBtable) do
                 for b = 1, Maxb[FB] do
                     for i = 1, BG.GetMaxi(FB, b) do
@@ -99,29 +99,10 @@ BG.Init(function()
                         end
                     end
                 end
-                for n = 1, HopeMaxn[FB] do
-                    for b = 1, HopeMaxb[FB] do
-                        for i = 1, HopeMaxi do
-                            local bt = BG.HopeFrame[FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i]
-                            if bt then
-                                local _itemID = GetItemID(bt:GetText())
-                                if _itemID == itemID then
-                                    bt:SetText("")
-                                    BiaoGe.Hope[RealmId][player][FB]["nandu" .. n]["boss" .. b]["zhuangbei" .. i] = nil
-                                    havehope = true
-                                end
-                            end
-                        end
-                    end
-                end
             end
 
-            if haveguanzhu and havehope then
-                BG.SendSystemMessage(format(L["已自动取消%s的关注和心愿。"], name))
-            elseif haveguanzhu then
+            if haveguanzhu then
                 BG.SendSystemMessage(format(L["已自动取消%s的关注。"], name))
-            elseif havehope then
-                BG.SendSystemMessage(format(L["已自动取消%s的心愿。"], name))
             end
         end
 
@@ -178,8 +159,7 @@ BG.Init(function()
                             hasGZ = true
                             local _r, _g, _b = GetClassRGB(Player)
                             item:SetText(L["罚款"])
-                            buyer:SetText(Player)
-                            buyer:SetTextColor(_r, _g, _b)
+                            BG.BGNext.BillBuyer.set(buyer, Player, _r, _g, _b)
                             money:SetText(Money + qiankuan)
                             BiaoGe[FB]["boss" .. b]["zhuangbei" .. i] = L["罚款"]
                             BiaoGe[FB]["boss" .. b]["maijia" .. i] = Player
@@ -318,9 +298,8 @@ BG.Init(function()
                     returnText = returnText .. AddTexture(icon) .. " |cffFFD700" .. money .. "|rg" .. qiankuanText .. "\n"
                     if saved then
                         -- 保存买家信息
-                        BG.Frame[FB]["boss" .. b]["maijia" .. i]:SetText(player)
-                        BG.Frame[FB]["boss" .. b]["maijia" .. i]:SetCursorPosition(0)
-                        BG.Frame[FB]["boss" .. b]["maijia" .. i]:SetTextColor(GetClassRGB(player))
+                        BG.BGNext.BillBuyer.set(BG.Frame[FB]["boss" .. b]["maijia" .. i], player,
+                            GetClassRGB(player))
                         BiaoGe[FB]["boss" .. b]["maijia" .. i] = player
                         for k in pairs(BG.playerClass) do
                             if player == BG.playerName then
@@ -387,9 +366,8 @@ BG.Init(function()
                                     not BiaoGe[FB]["boss" .. b]["qiankuan" .. i]
                                 then
                                     if saved then
-                                        BG.Frame[FB]["boss" .. b]["maijia" .. i]:SetText(Player)
-                                        BG.Frame[FB]["boss" .. b]["maijia" .. i]:SetCursorPosition(0)
-                                        BG.Frame[FB]["boss" .. b]["maijia" .. i]:SetTextColor(GetClassRGB(Player))
+                                        BG.BGNext.BillBuyer.set(BG.Frame[FB]["boss" .. b]["maijia" .. i], Player,
+                                            GetClassRGB(Player))
                                         BiaoGe[FB]["boss" .. b]["maijia" .. i] = Player
                                         for k in pairs(BG.playerClass) do
                                             if Player == BG.playerName then
