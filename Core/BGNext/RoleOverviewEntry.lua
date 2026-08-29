@@ -43,6 +43,21 @@ function M.intent(action, state)
     return nil
 end
 
+-- Maps a footer-button mouse button to an intent. Ordinary left click and the
+-- retained middle/Ctrl-left aliases all toggle the pinned window; right click
+-- opens settings. The controlDown flag is informational only.
+function M.buttonAction(button, controlDown)
+    if button == "RightButton" then return "settings" end
+    if button == "LeftButton" or button == "MiddleButton" then return "toggle" end
+    return nil
+end
+
+-- Hover preview waits a deliberate delay so a quick pass over the entry never
+-- flashes the window.
+function M.previewDelay()
+    return 0.2
+end
+
 -- The documented subcommand for /bgn and /bgnext.
 function M.parseCommand(message)
     if type(message) ~= "string" then return nil end
