@@ -17,11 +17,27 @@ function M.buildText(kind, info)
             info.projectName,
             info.summary,
             "作者：" .. info.author,
-            "本项目为独立、非官方社区项目，不代表上游作者或任何平台背书。",
-            "所有增强功能遵守本地优先、最小必要和可审计原则。",
+            "项目缘起",
+            "BGNext 响应网易DD发起的“BGLite增强版开发激励活动”而建立。项目由社区自行开发和维护，不是《魔兽世界》、网易DD或 BGLite 上游作者的官方产品，也不代表任何一方对本项目背书。",
+            "活动公告：" .. info.activityUrl,
+            "代码与版权",
+            "BGNext 以活动提供的 BGLite 2.4.0 纯净版为基础。BGLite 上游代码和既有通信标识保留原有权利归属；BGNext 新增功能代码由社区独立原创实现。插件提交明文源码，不使用代码混淆或加密。",
+            "数据与隐私",
+            table.concat({
+                "• 数据默认保存在玩家本地。",
+                "• 除当前团队协作所需的游戏内消息外，不自动向游戏外上传或同步数据。",
+                "• 不生成他人的历史信息记录，不建立第三方排名，也不做玩家画像。",
+                "• 导出或传输必须由玩家主动触发，并在操作前说明内容和用途。",
+                "• 不加入遥测、后门、远程控制或外部可执行程序。",
+            }, "\n"),
+            "公益承诺",
+            "与 BGNext 有关的活动奖金、赞助及其他项目收入不作为个人收益。依法必须承担的税费会单独记录；扣除这些税费后，剩余资金全部捐赠给具备合法资质、信息可核验的慈善组织，并公开脱敏后的收支和捐赠凭证。",
+            "社区共创",
+            "欢迎通过 GitHub 提交建议、问题和代码。贡献者、测试者及安全问题报告者会在征得同意后列入感谢名单。",
+            "项目地址：" .. info.repositoryUrl,
         }, "\n\n")
     elseif kind == "changelog" then
-        return "当前版本更新\n\n" .. bulletList(info.changelog)
+        return info.projectName .. " " .. info.version .. " 更新内容\n\n" .. bulletList(info.changelog)
     elseif kind == "credits" then
         return table.concat({
             "上游致谢",

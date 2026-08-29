@@ -13,8 +13,22 @@ return function(test)
     test.eq(type(info.credits.upstream), "table", "upstream credits")
 
     local about = dofile("Core/BGNext/About.lua")
-    test.eq(about.buildText("about", info):find("非官方", 1, true) ~= nil, true, "independent status disclosed")
-    test.eq(about.buildText("changelog", info):find(info.changelog[1], 1, true) ~= nil, true, "changelog rendered")
+    local aboutText = about.buildText("about", info)
+    test.eq(aboutText:find("非官方", 1, true) ~= nil, true, "independent status disclosed")
+    test.eq(aboutText:find("BGLite 2.4.0", 1, true) ~= nil, true, "upstream foundation disclosed")
+    test.eq(aboutText:find("新增功能代码由社区独立原创实现", 1, true) ~= nil, true,
+        "original enhancement scope disclosed")
+    test.eq(aboutText:find("不生成他人的历史信息记录", 1, true) ~= nil, true,
+        "other-player history boundary disclosed")
+    test.eq(aboutText:find("不建立第三方排名", 1, true) ~= nil, true,
+        "third-party ranking boundary disclosed")
+    test.eq(aboutText:find("全部捐赠", 1, true) ~= nil, true, "charity commitment disclosed")
+    test.eq(aboutText:find(info.activityUrl, 1, true) ~= nil, true, "public activity link disclosed")
+
+    local changelogText = about.buildText("changelog", info)
+    test.eq(changelogText:find("BGNext " .. info.version, 1, true) ~= nil, true, "release version rendered")
+    test.eq(changelogText:find(info.changelog[1], 1, true) ~= nil, true, "changelog rendered")
+    test.eq(changelogText:find("Lua 5.1", 1, true), nil, "player changelog avoids implementation jargon")
     test.eq(about.buildText("credits", info):find(info.credits.upstream[1], 1, true) ~= nil, true, "credits rendered")
 
     local aboutFile = assert(io.open("Core/BGNext/About.lua", "rb"))
