@@ -604,6 +604,21 @@ local function resourceWhitelist(columns)
     return keys, prefixes, cooldownSpells
 end
 
+local function normalizeCurrencyRecord(family, key, record)
+    if family ~= "mop" or key ~= "valor" then return record end
+    local weekly = record.quantityEarnedThisWeek
+    local maximum = record.maxQuantity
+    if type(weekly) ~= "number" or type(maximum) ~= "number" or maximum <= 0 then return record end
+
+    -- Some Mists Classic clients report Valor earned in hundredths while the
+    -- other fields use whole points. Only correct the value when the raw amount
+    -- is impossible against the total cap and the scaled value fits that cap.
+    if weekly > maximum and weekly % 100 == 0 and weekly / 100 <= maximum then
+        record.quantityEarnedThisWeek = weekly / 100
+    end
+    return record
+end
+
 -- Reads only resources that the current family's explicit catalog declares.
 -- A readable API alone is not permission to collect a value: absent and
 -- pending columns stay absent from the snapshot as well as the UI.
@@ -642,6 +657,7 @@ function M.readResources(api, family, resourceColumns)
                         for _, field in ipairs({ "quantity", "maxQuantity", "quantityEarnedThisWeek", "maxWeeklyQuantity" }) do
                             if type(first[field]) == "number" then record[field] = first[field] end
                         end
+                        normalizeCurrencyRecord(family, key, record)
                         if type(record.quantity) == "number" then result.currencies[key] = record end
                     else
                         amount = first.quantity

@@ -259,19 +259,29 @@ return function(test)
     local mopResources = Adapters.readers("mop", api({
         C_CurrencyInfo = { GetCurrencyInfo = function(id)
             if id == 396 then
-                return { quantity = 1000, maxQuantity = 3000, quantityEarnedThisWeek = 1000, maxWeeklyQuantity = 1000 }
+                return { quantity = 3900, maxQuantity = 6400, quantityEarnedThisWeek = 160000, maxWeeklyQuantity = 0 }
             end
             if id == 395 then return { quantity = 500, maxQuantity = 4000 } end
             return nil
         end },
     }), Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).resources()
-    test.eq(mopResources.currencies.valor.quantity, 1000, "MoP Valor records its quantity")
-    test.eq(mopResources.currencies.valor.maxQuantity, 3000, "MoP Valor records its maximum")
-    test.eq(mopResources.currencies.valor.quantityEarnedThisWeek, 1000, "MoP Valor records its weekly earned")
-    test.eq(mopResources.currencies.valor.maxWeeklyQuantity, 1000, "MoP Valor records its weekly cap")
+    test.eq(mopResources.currencies.valor.quantity, 3900, "MoP Valor records its quantity")
+    test.eq(mopResources.currencies.valor.maxQuantity, 6400, "MoP Valor records its maximum")
+    test.eq(mopResources.currencies.valor.quantityEarnedThisWeek, 1600,
+        "MoP Valor normalizes the client weekly amount from hundredths")
+    test.eq(mopResources.currencies.valor.maxWeeklyQuantity, 0, "MoP Valor records its weekly cap")
     test.eq(mopResources.currencies.justice.quantity, 500, "MoP Justice records its quantity")
     test.eq(mopResources.currencies.justice.maxQuantity, 4000, "MoP Justice records its maximum")
     test.eq(mopResources.currencies.justice.maxWeeklyQuantity, nil, "an absent cap stays empty")
+    local fixedValor = Adapters.readers("mop", api({
+        C_CurrencyInfo = { GetCurrencyInfo = function(id)
+            if id == 396 then
+                return { quantity = 3900, maxQuantity = 6400, quantityEarnedThisWeek = 1600 }
+            end
+        end },
+    }), Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).resources()
+    test.eq(fixedValor.currencies.valor.quantityEarnedThisWeek, 1600,
+        "a client that already returns whole Valor points is left unchanged")
     local mopMissing = Adapters.readers("mop", api({ C_CurrencyInfo = false }),
         Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).resources()
     test.eq(mopMissing.currencies.valor, nil, "missing MoP currency API records no Valor")
