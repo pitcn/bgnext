@@ -5,6 +5,7 @@ BG.BGNext = BG.BGNext or {}
 -- helpers (no WoW API) so the fail-closed checks are unit-testable. The caller
 -- supplies the normalized realm and the raw current raid-member name list.
 local M = {}
+local PlayerIdentity = assert(BG.BGNext.PlayerIdentity, "BGNext PlayerIdentity must load before AuctionSender")
 
 -- Canonical full name ("Name-Realm"). A name that already carries a realm
 -- suffix is kept verbatim; a bare name gains `realm`. Empty/missing -> nil.
@@ -19,10 +20,9 @@ end
 -- list of raw member names from the roster; each is canonicalized the same way
 -- before comparison. A missing/empty sender or an empty roster fails closed.
 function M.isRaidSender(sender, realm, memberNames)
-    local full = M.canonical(sender, realm)
-    if full == nil then return false end
+    if PlayerIdentity.key(sender, realm) == nil then return false end
     for _, name in ipairs(memberNames or {}) do
-        if M.canonical(name, realm) == full then return true end
+        if PlayerIdentity.same(sender, name, realm) then return true end
     end
     return false
 end

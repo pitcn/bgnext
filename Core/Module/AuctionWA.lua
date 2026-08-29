@@ -38,6 +38,7 @@ end
 BG.Init(function()
  local font = BIAOGE_TEXT_FONT or STANDARD_TEXT_FONT
  local realmName = GetRealmName():gsub(" ", ""):gsub("%-", "")
+ local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
  do
   function wa.GN(unit)
    unit = unit or "player"
@@ -47,7 +48,10 @@ BG.Init(function()
    return GetUnitName(unit, true)
   end
   function wa.IsMe(bidFrame)
-   return bidFrame.player and bidFrame.player == wa.GN() or false
+   if not PlayerIdentity then
+    return bidFrame.player and bidFrame.player == wa.GN() or false
+   end
+   return PlayerIdentity.same(bidFrame.player, wa.GN(), realmName)
   end
   function wa.GFN(name)
    if not name then return end
@@ -772,7 +776,7 @@ BG.Init(function()
    bidFrame.colorplayer = wa.SetClassCFF(player)
    bidFrame.start = false
    local isLate = ((bidFrame.remaining or 10) <= wa.tooLateTime) and format("%.1f", bidFrame.remaining) or nil
-   if player == wa.GN() then
+   if wa.IsMe(bidFrame) then
     bidFrame.topMoneyText:SetText(L["|cffFFD100出价最高者：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
     wa.SetFrameColor(bidFrame, 1)
     tinsert(bidFrame.logs, { money = money, player = "|cff" .. wa.GREEN1 .. L["你"] .. "|r", time = isLate })
@@ -1223,7 +1227,7 @@ BG.Init(function()
    else
     bidFrame.currentMoneyText:SetText(L["|cff00FF00成交价：|r"] .. wa.FormatNumber(bidFrame.money))
    end
-   if bidFrame.player == wa.GN() then
+   if wa.IsMe(bidFrame) then
     bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
    else
     bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. bidFrame.colorplayer)

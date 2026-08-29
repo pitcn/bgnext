@@ -503,7 +503,7 @@ BG.Init(function()
     auctionFrame.colorplayer = wa.SetClassCFF(player)
    end
    if player and player ~= "" then
-    if player == wa.GN() then
+    if wa.IsMe(auctionFrame) then
      fontString:SetText(L["|cffFFD100出价最高者：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
      auctionFrame:SetBackdropColor(unpack(wa.backdropColor_IsMe))
      auctionFrame:SetBackdropBorderColor(unpack(wa.backdropBorderColor_IsMe))

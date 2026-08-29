@@ -76,9 +76,7 @@ BG.Init(function()
                     else
                         if BG.maijiaButton then
                             BG.PlaySound(1)
-                            BG.maijiaButton:SetTextColor(GetClassRGB(name))
-                            BG.maijiaButton:SetText(name)
-                            BG.maijiaButton:SetCursorPosition(0)
+                            BG.BGNext.BillBuyer.set(BG.maijiaButton, name, GetClassRGB(name))
                         end
                     end
                 elseif button == "RightButton" then

@@ -37,6 +37,19 @@ return function(test)
         "settings backdrop contains every rule section")
     test.eq(source:find("main:SetBackdropColor(0, 0, 0, 1)", 1, true) ~= nil, true,
         "settings backdrop is opaque over the bill")
+    test.eq(source:find("updateProfileRows()\n    refreshItems()", 1, true) ~= nil, true,
+        "the active profile is applied after the initial bill UI exists")
+
+    local auction = assert(io.open("Core/Module/Auction.lua", "rb"))
+    local auctionSource = auction:read("*a")
+    auction:close()
+    local hookStart = assert(auctionSource:find("function BG.HookCreateAuction", 1, true))
+    local hookEnd = assert(auctionSource:find("-- 被顶价语音提醒", hookStart, true))
+    local hookSource = auctionSource:sub(hookStart, hookEnd - 1)
+    test.eq(hookSource:find("BG.UpdateAuctionFilter(f", 1, true) ~= nil, true,
+        "each newly created auction applies the active BGNext filter")
+    test.eq(hookSource:find("BiaoGe.FilterClassItemDB", 1, true), nil,
+        "auction filtering does not read the removed legacy profile database")
 
     local toc = assert(io.open("BGLite.toc", "rb"))
     local tocSource = toc:read("*a")

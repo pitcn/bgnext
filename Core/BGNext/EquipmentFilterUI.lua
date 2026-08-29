@@ -410,6 +410,7 @@ local function createUI()
     settings:SetScript("OnLeave", GameTooltip_Hide)
     main.SettingsButton = settings
     updateProfileRows()
+    refreshItems()
 end
 
 BG.FilterClassItemUI = function()

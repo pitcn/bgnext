@@ -416,6 +416,46 @@ do
         end)
     end
 
+    function BG.UpdateAuctionFilter(f, onUpdated)
+        f.filter = nil
+        local identity = BG.BGNext and BG.BGNext.PlayerIdentity
+        local isSelf = f.player and ((identity and identity.same(f.player, BG.playerName, GetRealmName()))
+            or (not identity and f.player == BG.playerName))
+        if isSelf then
+            BGA.aura_env.SetFrameColor(f, 1)
+            if onUpdated then onUpdated(false) end
+            return
+        end
+
+        local profile = GetRuntimeDB()
+        if not profile or not f.itemID then
+            BGA.aura_env.SetFrameColor(f, 0)
+            if onUpdated then onUpdated(false) end
+            return
+        end
+
+        local function applyFilter()
+            local _, _, _, _, _, _, _, _, equipLoc, _, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
+            local filtered = typeID and BG.FilterAll(f.itemID, typeID, equipLoc, subclassID) or false
+            f.filter = filtered or nil
+            BGA.aura_env.SetFrameColor(f, filtered and 2 or 0)
+            if onUpdated then onUpdated(filtered, bindType) end
+        end
+
+        local item = Item:CreateFromItemID(f.itemID)
+        item:ContinueOnItemLoad(function()
+            if not BG.itemCaches[f.itemID] then
+                BG.Tooltip_SetItemByID(f.itemID)
+                BG.After(0.01, function()
+                    applyFilter()
+                    BG.itemCaches[f.itemID] = true
+                end)
+            else
+                applyFilter()
+            end
+        end)
+    end
+
     function BG.UpdateAllFilter()
         local FB = BG.FB1
         for b = 1, Maxb[FB] do -- 当前表格
@@ -462,21 +502,7 @@ do
 
         if BGA and BGA.Frames then
             for _, f in ipairs(BGA.Frames) do
-                f.filter = nil
-                if f.player and f.player == BG.playerName then
-                    BGA.aura_env.SetFrameColor(f, 1)
-                else
-                    if GetRuntimeDB() then
-                        local name, link, quality, level, _, _, _, _, EquipLoc, Texture, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
-                        if BG.FilterAll(f.itemID, typeID, EquipLoc, subclassID) then
-                            f.filter = true
-                            BGA.aura_env.SetFrameColor(f, 2)
-                        end
-                    end
-                    if not f.filter then
-                        BGA.aura_env.SetFrameColor(f, 0)
-                    end
-                end
+                BG.UpdateAuctionFilter(f)
             end
         end
     end
@@ -1698,16 +1724,14 @@ function BG.JiaoHuan(button, FB, b, i, t)
 
             BG.copy1.btzhuangbei:SetText(BG.copy2.zhuangbei or "")
             BG.copy1.btzhuangbei:SetCursorPosition(0)
-            BG.copy1.btmaijia:SetText(BG.copy2.maijia or "")
-            BG.copy1.btmaijia:SetCursorPosition(0)
-            BG.copy1.btmaijia:SetTextColor(unpack(BG.copy2.color or { 1, 1, 1 }))
+            BG.BGNext.BillBuyer.set(BG.copy1.btmaijia, BG.copy2.maijia,
+                unpack(BG.copy2.color or { 1, 1, 1 }))
             BG.copy1.btjine:SetText(BG.copy2.jine or "")
 
             BG.copy2.btzhuangbei:SetText(BG.copy1.zhuangbei or "")
             BG.copy2.btzhuangbei:SetCursorPosition(0)
-            BG.copy2.btmaijia:SetText(BG.copy1.maijia or "")
-            BG.copy2.btmaijia:SetCursorPosition(0)
-            BG.copy2.btmaijia:SetTextColor(unpack(BG.copy1.color or { 1, 1, 1 }))
+            BG.BGNext.BillBuyer.set(BG.copy2.btmaijia, BG.copy1.maijia,
+                unpack(BG.copy1.color or { 1, 1, 1 }))
             BG.copy2.btjine:SetText(BG.copy1.jine or "")
 
             local FB = BG.copy1.fb

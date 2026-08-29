@@ -1368,22 +1368,14 @@ BG.Init(function()
             ShowTooltipGlow(f)
         end
         -- 过滤
-        f.filter = nil
-        local num = BiaoGe.FilterClassItemDB[RealmId][player].chooseID
-        if num then
-            local name, link, quality, level, _, _, _, _, EquipLoc, Texture, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
-            if BG.FilterAll(f.itemID, typeID, EquipLoc, subclassID) then
-                f.filter = true
-                if not (f.player and f.player == BG.playerName) then
-                    BGA.aura_env.SetFrameColor(f, 2)
-                end
-                if not hasGZ and not hasHope and not isFold and bindType ~= 2 and BiaoGe.options.autoAuctionFold == 1 then
-                    f.notClick = true
-                    f.hide:Click()
-                    f.notClick = false
-                end
+        BG.UpdateAuctionFilter(f, function(filtered, bindType)
+            if filtered and not hasGZ and not hasHope and not isFold
+                and bindType ~= 2 and BiaoGe.options.autoAuctionFold == 1 then
+                f.notClick = true
+                f.hide:Click()
+                f.notClick = false
             end
-        end
+        end)
 
         tinsert(BG.auctionLogFrame.auctioning, f.itemID)
         BG.UpdateAuctioning()
@@ -1575,8 +1567,7 @@ BG.Init(function()
         local function OnClick(zhuangbei, maijia, jine, saveQianKuan, FB)
             local b, i, _, _maijia, _jine = HasEmptyGeZi(zhuangbei, FB)
             if b then
-                _maijia:SetText(maijia or "")
-                _maijia:SetTextColor(GetClassRGB(nil, "player"))
+                BG.BGNext.BillBuyer.set(_maijia, maijia, GetClassRGB(nil, "player"))
                 _jine:SetText(jine)
                 BiaoGe[FB]["boss" .. b]["maijia" .. i] = maijia
                 BiaoGe[FB]["boss" .. b]["jine" .. i] = jine

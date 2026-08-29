@@ -1,5 +1,6 @@
 return function(test)
     BG = { BGNext = {} }
+    dofile("Core/BGNext/PlayerIdentity.lua")
     local Sender = dofile("Core/BGNext/AuctionSender.lua")
 
     -- Canonical full names keep cross-realm identities distinct.
@@ -15,6 +16,8 @@ return function(test)
     test.eq(Sender.isRaidSender("Alice", "Realm", { "Bob" }), false, "a non-member is ignored")
     test.eq(Sender.isRaidSender("Alice-OtherRealm", "Realm", { "Alice" }), false,
         "same short name on another realm is ignored")
+    test.eq(Sender.isRaidSender("Alice-My-Realm", "My Realm", { "Alice" }), true,
+        "realm display separators do not reject a real raid member")
     test.eq(Sender.isRaidSender(nil, "Realm", { "Alice" }), false, "a missing sender is ignored")
     test.eq(Sender.isRaidSender("", "Realm", { "Alice" }), false, "an empty sender is ignored")
     test.eq(Sender.isRaidSender("Alice", "Realm", {}), false, "an empty roster accepts no one")
@@ -45,4 +48,24 @@ return function(test)
         "the sender is validated against the current raid roster")
     test.eq(source:find("Sender.parseBid(auctionIDStr, itemIDStr)", 1, true) ~= nil, true,
         "protocol numbers are validated before live auction comparisons")
+
+    local auctionSource = assert(io.open("Core/Module/AuctionWA.lua", "rb")):read("*a")
+    test.eq(auctionSource:find("PlayerIdentity.same(bidFrame.player, wa.GN(), realmName)", 1, true) ~= nil,
+        true, "self-bid detection uses canonical player identity")
+    test.eq(auctionSource:find("if wa.IsMe(bidFrame) then return end", 1, true) ~= nil,
+        true, "automatic bidding stops when the local player is already highest")
+    test.eq(auctionSource:find("if player == wa.GN() then", 1, true), nil,
+        "live highest-bidder rendering uses canonical player identity")
+    test.eq(auctionSource:find("if bidFrame.player == wa.GN() then", 1, true), nil,
+        "auction-result rendering uses canonical player identity")
+
+    local eventSource = assert(io.open("Core/Module/AuctionWAEvent.lua", "rb")):read("*a")
+    test.eq(eventSource:find("if player == wa.GN() then", 1, true), nil,
+        "restored auction frames render the local bidder using canonical identity")
+    test.eq(eventSource:find("if wa.IsMe(auctionFrame) then", 1, true) ~= nil, true,
+        "restored auction frames show the original green local-player state")
+
+    local logSource = assert(io.open("Core/Module/AuctionLog.lua", "rb")):read("*a")
+    test.eq(logSource:find("PlayerIdentity.same(v.maijia, tradeName, realmName)", 1, true) ~= nil,
+        true, "trade-price lookup uses canonical player identity")
 end
