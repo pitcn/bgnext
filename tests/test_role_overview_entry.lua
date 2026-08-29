@@ -29,6 +29,18 @@ return function(test)
     test.eq(Entry.intent(nil, {}), nil, "a missing action does nothing")
     test.eq(Entry.intent("hover", nil), "preview", "a missing state is safe")
 
+    -- Footer role-overview button maps ordinary clicks to toggle, right to settings.
+    test.eq(Entry.buttonAction("LeftButton"), "toggle", "left click toggles the pinned window")
+    test.eq(Entry.buttonAction("LeftButton", false), "toggle", "a plain left click still toggles")
+    test.eq(Entry.buttonAction("LeftButton", true), "toggle", "ctrl+left click is a compat toggle alias")
+    test.eq(Entry.buttonAction("MiddleButton"), "toggle", "middle click is a compat toggle alias")
+    test.eq(Entry.buttonAction("RightButton"), "settings", "right click opens settings")
+    test.eq(Entry.buttonAction("Button4"), nil, "an unknown button does nothing")
+    test.eq(Entry.buttonAction(nil), nil, "a missing button does nothing")
+
+    -- Hover preview waits a deliberate delay so a quick pass never flashes.
+    test.eq(Entry.previewDelay(), 0.2, "hover preview waits a deliberate delay")
+
     -- Controls read settings, refresh, close left-to-right (close far right).
     local order = Entry.controlOrder()
     test.eq(order[1], "settings", "settings control comes first")
