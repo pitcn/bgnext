@@ -41,6 +41,11 @@ return function(test)
     -- Hover preview waits a deliberate delay so a quick pass never flashes.
     test.eq(Entry.previewDelay(), 0.2, "hover preview waits a deliberate delay")
 
+    -- A scheduled reveal fires only while its token is still current; a quick
+    -- enter-then-leave advances the token before the timer, so it never flashes.
+    test.eq(Entry.hoverTokenCurrent(3, 4), false, "a stale hover token never reveals the preview")
+    test.eq(Entry.hoverTokenCurrent(4, 4), true, "a current hover token may reveal the preview")
+
     -- Controls read settings, refresh, close left-to-right (close far right).
     local order = Entry.controlOrder()
     test.eq(order[1], "settings", "settings control comes first")
@@ -250,4 +255,19 @@ return function(test)
         "the role overview has a stable global frame name for UISpecialFrames")
     test.eq(string.find(source, 'UISpecialFrames', 1, true) ~= nil, true,
         "the fixed role overview participates in Blizzard escape handling")
+
+    -- The footer uses one OnClick path, never a split mouse-down/mouse-up that
+    -- could let a single physical click toggle twice.
+    test.eq(string.find(source, "OnMouseDown", 1, true), nil,
+        "footer clicks use a single OnClick path")
+    test.eq(string.find(source, "buttonAction", 1, true) ~= nil, true,
+        "footer clicks route through the shared buttonAction mapper")
+    test.eq(string.find(source, 'Open("raid")', 1, true) ~= nil, true,
+        "right click opens the role overview raid settings section")
+
+    -- Hover preview waits with a one-shot timer, never a recurring ticker.
+    test.eq(string.find(source, "C_Timer.After", 1, true) ~= nil, true,
+        "hover preview waits with a one-shot timer")
+    test.eq(string.find(source, "C_Timer.NewTicker", 1, true), nil,
+        "hover preview never spins a recurring ticker")
 end

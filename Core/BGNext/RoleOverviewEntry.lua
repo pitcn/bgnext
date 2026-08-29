@@ -58,6 +58,13 @@ function M.previewDelay()
     return 0.2
 end
 
+-- A scheduled hover reveal fires only while its token is still current. The
+-- entry advances the token on leave, pinning, disabling and main-frame hiding,
+-- so a stale token (captured before one of those) must never reveal a preview.
+function M.hoverTokenCurrent(captured, live)
+    return captured == live
+end
+
 -- The documented subcommand for /bgn and /bgnext.
 function M.parseCommand(message)
     if type(message) ~= "string" then return nil end
@@ -238,6 +245,14 @@ local pinned = false
 local state = { pinned = pinned }
 local window
 local entryButton
+local hoverToken = 0
+
+-- Advances the hover token and returns the new value. Any timer that captured
+-- an earlier value becomes stale and must not reveal the preview.
+local function advanceHoverToken()
+    hoverToken = hoverToken + 1
+    return hoverToken
+end
 
 local function placeWindow(mode)
     if not window then return end
@@ -418,6 +433,8 @@ function M.setPinned(value)
     pinned = value and true or false
     state.pinned = pinned
     state.previewVisible = false
+    -- Pinning (and unpinning through disable) cancels any pending hover reveal.
+    advanceHoverToken()
     if pinned and not window then ensureWindow() end
     if window then
         window:SetScript("OnUpdate", nil)
@@ -547,20 +564,30 @@ function M.installEntry(mainFrame)
     M.setAvailable(M.canOpen())
 
     if type(mainFrame.HookScript) == "function" then
-        mainFrame:HookScript("OnHide", function() M.hidePreview() end)
+        mainFrame:HookScript("OnHide", function()
+            advanceHoverToken()
+            M.hidePreview()
+        end)
     end
 
-    button:SetScript("OnEnter", M.showPreview)
-    button:SetScript("OnLeave", M.hidePreview)
-    button:SetScript("OnMouseDown", function(_, mouseButton)
-        if mouseButton == "MiddleButton" or (mouseButton == "LeftButton" and IsControlKeyDown()) then
-            M.togglePinned()
-        end
+    button:SetScript("OnEnter", function()
+        local token = advanceHoverToken()
+        C_Timer.After(M.previewDelay(), function()
+            if not M.hoverTokenCurrent(token, hoverToken) then return end
+            M.showPreview()
+        end)
     end)
-    button:SetScript("OnMouseUp", function(_, mouseButton)
-        if mouseButton == "RightButton" then
-            if BG.OpenOption then BG.OpenOption() end
-            if BG.MainFrame and BG.MainFrame.Hide then BG.MainFrame:Hide() end
+    button:SetScript("OnLeave", function()
+        advanceHoverToken()
+        M.hidePreview()
+    end)
+    button:SetScript("OnClick", function(_, mouseButton)
+        local intent = M.buttonAction(mouseButton, IsControlKeyDown())
+        if intent == "settings" then
+            local settings = BG.BGNext.RoleOverviewSettings
+            if settings and type(settings.Open) == "function" then settings.Open("raid") end
+        elseif intent == "toggle" then
+            M.togglePinned()
         end
     end)
 
