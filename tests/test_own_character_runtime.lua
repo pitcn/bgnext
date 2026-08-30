@@ -207,4 +207,19 @@ return function(test)
     local recovered = Runtime.collectAndStore(lockoutDeps)
     test.eq(recovered ~= nil, true, "a later collect recovers once identity is available")
     test.eq(recovered.player, "Piti", "recovered snapshot uses the current identity")
+
+    -- Init identity must override the live read only on retail. Non-retail
+    -- families (vanilla/tbc/wrath/titan/cata/mop) keep the original live
+    -- identity read, even when a stray init identity is present.
+    local nonRetailDeps = build()
+    nonRetailDeps.globals.playerName = "WrongName"
+    nonRetailDeps.globals.realmID = 999
+    nonRetailDeps.globals.realmName = "错误服"
+    local nonRetailSnapshot = Runtime.collectAndStore(nonRetailDeps)
+    test.eq(nonRetailSnapshot.player, "Piti",
+        "non-retail keeps the live player name, ignoring init identity")
+    test.eq(nonRetailSnapshot.realmId, 123,
+        "non-retail keeps the live realm id, ignoring init identity")
+    test.eq(nonRetailSnapshot.realmName, "时光II",
+        "non-retail keeps the live realm name, ignoring init identity")
 end
