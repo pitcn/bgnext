@@ -19,6 +19,10 @@ return function(test)
         true, "the first accepted ledger header binds its sender")
     test.eq(source:find("Capture.acceptSource(captureState, sender, realm, members, GetTime())", 1, true) ~= nil,
         true, "subsequent chat and addon fragments require the bound sender")
+    test.eq(source:find("Capture.parseMoney", 1, true) ~= nil, true,
+        "reconciliation amounts use bounded numeric parsing")
+    test.eq(source:find("Capture.parseItemID", 1, true) ~= nil, true,
+        "reconciliation addon item ids use bounded numeric parsing")
     test.eq(source:find('BG.RegisterEvent("PLAYER_LOGOUT"', 1, true) ~= nil, true,
         "logout clears runtime reconciliation state")
     test.eq(source:find('BG.RegisterEvent("GROUP_ROSTER_UPDATE"', 1, true) ~= nil, true,

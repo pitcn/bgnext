@@ -3,6 +3,8 @@ BG.BGNext = BG.BGNext or {}
 
 local PlayerIdentity = assert(BG.BGNext.PlayerIdentity, "BGNext PlayerIdentity must load before LedgerCapture")
 local M = {}
+M.MAX_ITEM_ID = 2147483647
+M.MAX_MONEY = 10000000
 
 local DEFAULTS = {
     maxLines = 200,
@@ -14,6 +16,21 @@ local DEFAULTS = {
 local function positiveInteger(value, fallback)
     if type(value) ~= "number" or value % 1 ~= 0 or value <= 0 then return fallback end
     return value
+end
+
+local function boundedInteger(value, minimum, maximum)
+    local number = tonumber(value)
+    if not number or number ~= number or number == math.huge or number == -math.huge then return nil end
+    if number % 1 ~= 0 or number < minimum or number > maximum then return nil end
+    return number
+end
+
+function M.parseMoney(value)
+    return boundedInteger(value, 0, M.MAX_MONEY)
+end
+
+function M.parseItemID(value)
+    return boundedInteger(value, 1, M.MAX_ITEM_ID)
 end
 
 local function reset(state)

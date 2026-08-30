@@ -198,7 +198,8 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
 
         if linshi_duizhang.yes == 1 then -- 金团账本
             jine = BG.MatchTableString(msg, locales["(%d+)金"])
-            if jine and tonumber(jine) ~= 0 then
+            jine = Capture.parseMoney(jine)
+            if jine and jine ~= 0 then
                 local aaa = {
                     zhuangbei = item,
                     jine = jine,
@@ -224,8 +225,9 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
             end
             jine = strmatch(msg, " (%d+)$") or strmatch(msg, "：(%d+)$")
             local j
-            if jine and tonumber(jine) then
-                j = jine
+            if jine then
+                j = Capture.parseMoney(jine)
+                if not j then return end
             elseif BG.FindTableString(msg, locales["打包交易"]) then
                 j = L["打包交易"]
             else
@@ -247,7 +249,7 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
         bigfootItem = strmatch(msg, h_item)
         return
     elseif bigfootyes and sender == linshi_duizhang.player and BG.FindTableString(msg, locales["^收入为："]) then
-        local jine = tonumber(strmatch(msg, "%d+"))
+        local jine = Capture.parseMoney(strmatch(msg, "%d+"))
         if bigfootItem and jine and jine ~= 0 then
             local entry = {
                 zhuangbei = bigfootItem,
@@ -312,11 +314,16 @@ BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
         for _, t in ipairs({ strsplit(",", text) }) do
             -- 24478 10000
             local itemID, jine = strsplit(" ", t)
-            if itemID and tonumber(itemID) then
+            itemID = Capture.parseItemID(itemID)
+            if itemID then
+                if jine ~= "t" then
+                    jine = Capture.parseMoney(jine)
+                    if not jine then return end
+                end
                 local entry = {
                     maijia = maijia,
                     jine = jine,
-                    itemID = tonumber(itemID),
+                    itemID = itemID,
                 }
                 if not Capture.appendEntry(captureState, entry, GetTime()) then AbortCapture() return end
                 tinsert(a, entry)
