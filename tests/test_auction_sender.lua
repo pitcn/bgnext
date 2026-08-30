@@ -87,6 +87,24 @@ return function(test)
     test.eq(Sender.shouldRespondVersion(rateState, "Alice", "Realm", members, 131), true,
         "a member may request again after the sender cooldown")
 
+    local bidRateState = {}
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 42, 200, 1), true,
+        "the first auction message is accepted")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 42, 200.5, 1), false,
+        "the same sender and auction are limited inside the interval")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 43, 200.5, 1), true,
+        "a different auction has an independent limit")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Bob", "Realm", members, 42, 200.5, 1), true,
+        "a different sender has an independent limit")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 42, 201, 1), true,
+        "the sender may bid again when the interval expires")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 42, 199, 1), false,
+        "a backwards clock does not bypass the limit")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Outsider", "Realm", members, 42, 210, 1), false,
+        "a non-member cannot allocate rate-limit state")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 0, 210, 1), false,
+        "an invalid auction id cannot allocate rate-limit state")
+
     -- The event handler must read the bidder from the sender (fourth argument),
     -- never from the target (fifth), and validate it against the current roster.
     local source = assert(io.open("Core/Module/AuctionWAEvent.lua", "rb")):read("*a")
@@ -108,11 +126,17 @@ return function(test)
         "start-auction fields are validated before item loading")
     test.eq(source:find("Sender.shouldRespondVersion(versionResponseState, sender, realm, members, GetTime())", 1, true) ~= nil,
         true, "auction version replies are rate-limited and restricted to raid members")
+    test.eq(source:find(
+        "Sender.shouldAcceptAuctionMessage(bidRateState, sender, realm, members, auctionID, GetTime(), 1)",
+        1, true) ~= nil, true, "live bids are rate-limited per sender and auction")
 
     local auctionModuleSource = assert(io.open("Core/Module/Auction.lua", "rb")):read("*a")
     test.eq(auctionModuleSource:find(
         "Sender.shouldRespondVersion(versionResponseState, rawSender, realm, members, GetTime())", 1, true) ~= nil,
         true, "legacy version replies use the same membership and rate-limit policy")
+    test.eq(auctionModuleSource:find(
+        "Sender.shouldAcceptAuctionMessage(happyRateState, sender, realm, members, auctionID, GetTime(), 5)",
+        1, true) ~= nil, true, "auction cheers have an independent five-second limit")
 
     local auctionSource = assert(io.open("Core/Module/AuctionWA.lua", "rb")):read("*a")
     test.eq(auctionSource:find("PlayerIdentity.same(bidFrame.player, wa.GN(), realmName)", 1, true) ~= nil,

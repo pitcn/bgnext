@@ -620,6 +620,7 @@ BG.Init(function()
  end
  local Sender = BG.BGNext and BG.BGNext.AuctionSender
  local versionResponseState = {}
+ local bidRateState = {}
  local function getRealm()
   return (GetRealmName and GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
  end
@@ -726,6 +727,9 @@ BG.Init(function()
      if not Sender.isRaidSender(sender, realm, members) then return end
      for v, frame in pairs(BGA.Frames) do
       if not frame.IsEnd and not frame.isPaused and frame.mod ~= "anonymous" and frame[auctionIdKey] == auctionID then
+       if not Sender.shouldAcceptAuctionMessage(bidRateState, sender, realm, members, auctionID, GetTime(), 1) then
+        return
+       end
        if frame.start and money >= frame.money or money > frame.money then
         wa.SetMoney(frame, money, sender)
        end

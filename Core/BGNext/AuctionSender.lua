@@ -9,6 +9,7 @@ local PlayerIdentity = assert(BG.BGNext.PlayerIdentity, "BGNext PlayerIdentity m
 
 M.MAX_ID = 2147483647
 M.MAX_MONEY = 10000000
+M.MAX_RATE_KEYS = 256
 
 local function boundedInteger(value, minimum, maximum)
     local number = tonumber(value)
@@ -86,6 +87,37 @@ function M.shouldRespondVersion(state, sender, realm, memberNames, now, options)
     state.bySender = state.bySender or {}
     state.bySender[senderKey] = now
     state.windowCount = (state.windowCount or 0) + 1
+    return true
+end
+
+function M.shouldAcceptAuctionMessage(state, sender, realm, memberNames, auctionID, now, interval)
+    if type(state) ~= "table" or type(now) ~= "number" or type(interval) ~= "number" or interval < 0 then
+        return false
+    end
+    if not M.isRaidSender(sender, realm, memberNames) then return false end
+    auctionID = boundedInteger(auctionID, 1, M.MAX_ID)
+    if not auctionID then return false end
+
+    local senderKey = PlayerIdentity.key(sender, realm)
+    local key = senderKey .. ":" .. auctionID
+    state.byKey = state.byKey or {}
+    local lastAccepted = state.byKey[key]
+    if lastAccepted then
+        if now < lastAccepted or now - lastAccepted < interval then return false end
+    elseif (state.keyCount or 0) >= M.MAX_RATE_KEYS then
+        for oldKey, timestamp in pairs(state.byKey) do
+            if type(timestamp) ~= "number" or now < timestamp or now - timestamp >= 60 then
+                state.byKey[oldKey] = nil
+                state.keyCount = math.max(0, (state.keyCount or 1) - 1)
+            end
+        end
+        if (state.keyCount or 0) >= M.MAX_RATE_KEYS then return false end
+    end
+
+    if not lastAccepted then
+        state.keyCount = (state.keyCount or 0) + 1
+    end
+    state.byKey[key] = now
     return true
 end
 

@@ -1428,6 +1428,18 @@ BG.Init(function()
             BG.autoAuctionHappySay_minMoney = 100000
         end
         if not BG.IsTitan then
+            local Sender = BG.BGNext and BG.BGNext.AuctionSender
+            local happyRateState = {}
+            local function GetHappyRaidMemberNames()
+                local members = {}
+                for i = 1, GetNumGroupMembers() do
+                    local name = GetRaidRosterInfo(i)
+                    if name and name ~= "" then
+                        members[#members + 1] = name
+                    end
+                end
+                return members
+            end
             local tbl = {
                 [[<%s>这波操作，直接把竞拍场变成了 "金币战场"，敌方全员溃败！]],
                 [[天呐！<%s>的金币像 "冰霜新星"一样冻住了所有竞争者！太强了！]],
@@ -1544,11 +1556,17 @@ BG.Init(function()
                 if not arg1 then return end
                 sender = BG.GSN(sender)
                 if arg1 == "SendMyMoney" and distType == "RAID" then
-                    local auctionID = tonumber(arg2)
-                    local money = tonumber(arg3)
+                    if not Sender then return end
+                    local auctionID, money = Sender.parseBid(arg2, arg3)
+                    if not auctionID then return end
                     if money and money >= BG.autoAuctionHappySay_minMoney then
                         for _, f in pairs(_G.BGA.Frames) do
                             if not f.IsEnd and not f.isPaused and f.auctionID == auctionID then
+                                local realm = (GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+                                local members = GetHappyRaidMemberNames()
+                                if not Sender.shouldAcceptAuctionMessage(happyRateState, sender, realm, members, auctionID, GetTime(), 5) then
+                                    return
+                                end
                                 if random(10) > 5 then
                                     local text = tbl[random(#tbl)]
                                     if text and sender then
