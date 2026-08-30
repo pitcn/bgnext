@@ -7,6 +7,16 @@ BG.BGNext = BG.BGNext or {}
 local M = {}
 local PlayerIdentity = assert(BG.BGNext.PlayerIdentity, "BGNext PlayerIdentity must load before AuctionSender")
 
+M.MAX_ID = 2147483647
+M.MAX_MONEY = 10000000
+
+local function boundedInteger(value, minimum, maximum)
+    local number = tonumber(value)
+    if not number or number ~= number or number == math.huge or number == -math.huge then return nil end
+    if number % 1 ~= 0 or number < minimum or number > maximum then return nil end
+    return number
+end
+
 -- Canonical full name ("Name-Realm"). A name that already carries a realm
 -- suffix is kept verbatim; a bare name gains `realm`. Empty/missing -> nil.
 function M.canonical(name, realm)
@@ -40,19 +50,18 @@ end
 -- Parse the two numeric fields used by SendMyMoney. Both are mandatory; a
 -- malformed compatible client must be ignored before live auction comparisons.
 function M.parseBid(auctionIDStr, moneyStr)
-    local auctionID = tonumber(auctionIDStr)
-    local money = tonumber(moneyStr)
-    if auctionID == nil or money == nil then return nil end
+    local auctionID = boundedInteger(auctionIDStr, 1, M.MAX_ID)
+    local money = boundedInteger(moneyStr, 0, M.MAX_MONEY)
+    if not auctionID or not money then return nil end
     return auctionID, money
 end
 
 function M.parseStart(auctionIDStr, itemIDStr, moneyStr, durationStr)
-    local auctionID = tonumber(auctionIDStr)
-    local itemID = tonumber(itemIDStr)
-    local money = tonumber(moneyStr)
-    local duration = tonumber(durationStr)
-    if not auctionID or auctionID <= 0 or not itemID or itemID <= 0 then return nil end
-    if not money or money < 0 or not duration or duration <= 0 or duration > 3600 then return nil end
+    local auctionID = boundedInteger(auctionIDStr, 1, M.MAX_ID)
+    local itemID = boundedInteger(itemIDStr, 1, M.MAX_ID)
+    local money = boundedInteger(moneyStr, 0, M.MAX_MONEY)
+    local duration = boundedInteger(durationStr, 1, 3600)
+    if not auctionID or not itemID or not money or not duration then return nil end
     return auctionID, itemID, money, duration
 end
 

@@ -46,6 +46,12 @@ return function(test)
     test.eq(Sender.parseBid("bad", "500"), nil, "a malformed auction id is rejected")
     test.eq(Sender.parseBid("42", nil), nil, "a missing bid amount is rejected")
     test.eq(Sender.parseBid("42", "bad"), nil, "a malformed bid amount is rejected")
+    test.eq(Sender.MAX_MONEY, 10000000, "the protocol publishes the supported gold ceiling")
+    test.eq(Sender.parseBid("0", "500"), nil, "a non-positive auction id is rejected")
+    test.eq(Sender.parseBid("42", "-1"), nil, "a negative bid amount is rejected")
+    test.eq(Sender.parseBid("42", "1.5"), nil, "a fractional bid amount is rejected")
+    test.eq(Sender.parseBid("42", "1e309"), nil, "an infinite bid amount is rejected")
+    test.eq(Sender.parseBid("42", "10000001"), nil, "a bid above the gold ceiling is rejected")
 
     local startID, itemID, startMoney, duration = Sender.parseStart("42", "123", "500", "30")
     test.eq(startID, 42, "a valid start auction id is accepted")
@@ -57,6 +63,12 @@ return function(test)
     test.eq(Sender.parseStart("42", "123", "-1", "30"), nil, "a negative start price is rejected")
     test.eq(Sender.parseStart("42", "123", "500", "0"), nil, "a non-positive duration is rejected")
     test.eq(Sender.parseStart("42", "123", "500", "3601"), nil, "an excessive duration is rejected")
+    test.eq(Sender.parseStart("42.5", "123", "500", "30"), nil, "a fractional auction id is rejected")
+    test.eq(Sender.parseStart("42", "123.5", "500", "30"), nil, "a fractional item id is rejected")
+    test.eq(Sender.parseStart("42", "123", "1e309", "30"), nil, "an infinite start price is rejected")
+    test.eq(Sender.parseStart("42", "123", "10000001", "30"), nil,
+        "a start price above the gold ceiling is rejected")
+    test.eq(Sender.parseStart("42", "123", "500", "1.5"), nil, "a fractional duration is rejected")
 
     local rateState = {}
     local members = { "Alice", "Bob", "Cara", "Dan" }
