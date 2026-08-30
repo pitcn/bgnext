@@ -88,7 +88,6 @@ BG.Init(function()
                     BiaoGe.options[name] = BG.options[name .. "reset"]
                 end
                 BG.MainFrame:SetScale(BiaoGe.options[name])
-                BG.ReceiveMainFrame:SetScale(tonumber(BiaoGe.options[name]) * 0.95)
                 if BG.FBCDFrame then
                     BG.FBCDFrame:SetScale(BiaoGe.options[name])
                 end
