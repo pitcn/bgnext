@@ -116,9 +116,9 @@ local function AddTexture(Texture, y, coord, width)
     elseif Texture == "QUEST" then -- 黄色感叹号
         tex = "Interface\\GossipFrame\\AvailableQuestIcon"
     elseif Texture == "BOX" then
-            tex = "Interface\\AddOns\\BGLite\\Media\\icon\\BOX"
+            tex = "Interface\\AddOns\\BGNext\\Media\\icon\\BOX"
     elseif Texture == "DD" then
-            tex = "Interface\\AddOns\\BGLite\\Media\\icon\\DD"
+            tex = "Interface\\AddOns\\BGNext\\Media\\icon\\DD"
     elseif Texture == "LEFT" then
         return "|A:NPE_LeftClick:0:0|a"
     elseif Texture == "RIGHT" then

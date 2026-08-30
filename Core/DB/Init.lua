@@ -54,7 +54,7 @@ do
     local f = CreateFrame("Frame")
     f:RegisterEvent("ADDON_LOADED")
     f:SetScript("OnEvent", function(self, event, addonName)
-        if addonName ~= "BGLite" then return end
+        if addonName ~= AddonName then return end
         self:UnregisterEvent("ADDON_LOADED")
         for _, func in ipairs(addonLoadedFuncs) do
             securecall(func)

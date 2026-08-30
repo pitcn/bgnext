@@ -6,7 +6,7 @@ local ldb = LibStub:GetLibrary("LibDataBroker-1.1", true)
 if not ldb then return end
 
 
-local plugin = ldb:NewDataObject(AddonName, { text = "BGNext", type = "data source", icon = "Interface\\AddOns\\BGLite\\Media\\icon\\icon.tga" })
+local plugin = ldb:NewDataObject(AddonName, { text = "BGNext", type = "data source", icon = "Interface\\AddOns\\BGNext\\Media\\icon\\icon.tga" })
 
 function plugin:OnClick(button) --function plugin.OnClick(self, button)
     if button == "LeftButton" then
