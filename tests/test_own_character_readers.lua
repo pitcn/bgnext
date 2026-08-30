@@ -269,7 +269,8 @@ return function(test)
     test.eq(mopResources.currencies.valor.maxQuantity, 6400, "MoP Valor records its maximum")
     test.eq(mopResources.currencies.valor.quantityEarnedThisWeek, 1600,
         "MoP Valor normalizes the client weekly amount from hundredths")
-    test.eq(mopResources.currencies.valor.maxWeeklyQuantity, 0, "MoP Valor records its weekly cap")
+    test.eq(mopResources.currencies.valor.maxWeeklyQuantity, nil,
+        "an API placeholder zero is not exposed as a real weekly cap")
     test.eq(mopResources.currencies.justice.quantity, 500, "MoP Justice records its quantity")
     test.eq(mopResources.currencies.justice.maxQuantity, 4000, "MoP Justice records its maximum")
     test.eq(mopResources.currencies.justice.maxWeeklyQuantity, nil, "an absent cap stays empty")

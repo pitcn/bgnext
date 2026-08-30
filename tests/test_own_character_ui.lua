@@ -199,6 +199,11 @@ return function(test)
     test.eq(fullTip.lines[2], "总上限 3000", "tooltip shows the total cap")
     test.eq(fullTip.lines[3], "本周获得 400", "tooltip shows weekly earnings")
     test.eq(fullTip.lines[4], "每周上限 1000", "tooltip shows the weekly cap")
+    local noWeeklyCap = UI.currencyTooltip({
+        currencyId = 396, value = 40, maxQuantity = 6400,
+        quantityEarnedThisWeek = 560, maxWeeklyQuantity = 0,
+    }, function() return { name = "勇气点数" } end)
+    test.eq(#noWeeklyCap.lines, 3, "a placeholder weekly cap of zero is hidden")
 
     local quantityOnly = UI.currencyTooltip({ value = 42, currencyId = 396 },
         function() return { name = "勇气点数" } end)

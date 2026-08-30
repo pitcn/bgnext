@@ -51,6 +51,10 @@ return function(test)
         "minimap dispatches through the shared action mapper")
     test.eq(string.find(minimapSource, "EasyMenu", 1, true) ~= nil, true,
         "minimap right click opens a dropdown menu")
+    test.eq(string.find(minimapSource, "BG.DropDownListIsVisible(BG.dropDown)", 1, true) ~= nil, true,
+        "a second right click detects the already-open entry menu")
+    test.eq(string.find(minimapSource, "LibBG:CloseDropDownMenus()", 1, true) ~= nil, true,
+        "a second right click closes the already-open entry menu")
     test.eq(string.find(minimapSource, "BG.SetFBCD", 1, true), nil,
         "minimap no longer calls the legacy SetFBCD toggle")
 end

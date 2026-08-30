@@ -54,6 +54,10 @@ end
 -- labels and actions never go stale. The role item is present only when the
 -- current client can actually open the role overview.
 local function openEntryMenu()
+    if BG.DropDownListIsVisible(BG.dropDown) then
+        LibBG:CloseDropDownMenus()
+        return
+    end
     local state = {
         mainShown = BG.MainFrame and BG.MainFrame:IsVisible() or false,
         roleShown = RoleOverviewEntry.isPinned(),

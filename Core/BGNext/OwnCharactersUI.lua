@@ -199,7 +199,7 @@ function M.currencyTooltip(cell, currencyInfo)
     if type(cell.quantityEarnedThisWeek) == "number" then
         lines[#lines + 1] = L["本周获得"] .. " " .. tostring(cell.quantityEarnedThisWeek)
     end
-    if type(cell.maxWeeklyQuantity) == "number" then
+    if type(cell.maxWeeklyQuantity) == "number" and cell.maxWeeklyQuantity > 0 then
         lines[#lines + 1] = L["每周上限"] .. " " .. tostring(cell.maxWeeklyQuantity)
     end
     if #lines == 0 then return nil end
