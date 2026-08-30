@@ -7,6 +7,7 @@ end
 
 return function(test)
     local builder = readAll("tools/build-release.ps1")
+    local workflow = readAll(".github/workflows/release-package.yml")
     local toc = readAll("BGLite.toc")
     local init = readAll("Core/DB/Init.lua")
     local main = readAll("Core/BiaoGe.lua")
@@ -40,6 +41,8 @@ return function(test)
         "the default archive name uses the BGNext release version")
     test.eq(builder:find("Join-Path $repositoryRoot \"addon_version.txt\"") == nil, true,
         "the upstream channel build number is not used as the BGNext release version")
+    test.eq(workflow:find('.FullName.Replace("\\", "/")', 1, true) ~= nil, true,
+        "the release audit normalizes Windows ZIP entry separators")
 
     test.eq(init:find('addonName ~= "BGLite"', 1, true), nil,
         "ADDON_LOADED follows the actual packaged addon name")

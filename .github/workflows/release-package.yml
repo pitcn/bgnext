@@ -26,7 +26,7 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path ./artifacts/BGNext.zip))
           try {
-            $paths = @($archive.Entries | ForEach-Object FullName)
+            $paths = @($archive.Entries | ForEach-Object { $_.FullName.Replace("\", "/") })
             $denied = @(
               "History.lua",
               "TradeHistory.lua",
