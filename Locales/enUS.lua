@@ -33,6 +33,16 @@ do --英语说明书
     }
 end
 
+do -- BGNext temporary current-raid reconciliation
+    L["开始对账"] = "Start reconciliation"
+    L["停止对账"] = "Stop reconciliation"
+    L["当前团队临时对账"] = "Temporary current-raid reconciliation"
+    L["只有点击开始后才会读取账单；数据不会写入插件保存文件，重载、离团或停止后立即清空。"] = "The next announced bill is read only after you start. It is not saved and is cleared on reload, leaving the raid, or stopping."
+    L["已停止对账并清空本次临时数据。"] = "Stopped reconciliation and cleared its temporary data."
+    L["已开始对账：仅临时读取当前团队接下来通报的一份账单。"] = "Reconciliation started. The next bill announced by the current raid will be read temporarily."
+    L["对账数据超出安全限制或等待超时，已停止本次对账。"] = "Reconciliation exceeded its safety limit or timed out and has been stopped."
+end
+
 do
     L["战斗的奖励"] = "Rewards of Battle"
     L["删除该站位图"] = "Delete This Positioning Map"

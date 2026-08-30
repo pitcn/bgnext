@@ -22,7 +22,7 @@ local function reset(state)
     state.expiresAt = nil
     state.sourceKey = nil
     state.lineCount = 0
-    state.entries = {}
+    state.entryCount = 0
 end
 
 local function isRaidMember(sender, realm, memberNames)
@@ -92,11 +92,11 @@ end
 
 function M.appendEntry(state, entry, now)
     if not M.isActive(state, now) or type(entry) ~= "table" then return false end
-    if #state.entries >= state.maxEntries then
+    if state.entryCount >= state.maxEntries then
         reset(state)
         return false
     end
-    state.entries[#state.entries + 1] = entry
+    state.entryCount = state.entryCount + 1
     return true
 end
 

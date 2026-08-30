@@ -31,6 +31,7 @@ local suites = {
     "tests/test_bill_buyer.lua",
     "tests/test_auction_sender.lua",
     "tests/test_ledger_capture.lua",
+    "tests/test_ledger_runtime_privacy.lua",
 }
 
 for _, path in ipairs(suites) do
