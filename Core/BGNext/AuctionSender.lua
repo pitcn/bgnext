@@ -18,6 +18,16 @@ local function boundedInteger(value, minimum, maximum)
     return number
 end
 
+-- Auction ids come from WoW's GetTime(), which is finite and positive but is
+-- not guaranteed to be an integer. Keep the id bounded without rejecting the
+-- fractional values emitted by compatible clients.
+local function boundedNumber(value, minimum, maximum)
+    local number = tonumber(value)
+    if not number or number ~= number or number == math.huge or number == -math.huge then return nil end
+    if number < minimum or number > maximum then return nil end
+    return number
+end
+
 -- Canonical full name ("Name-Realm"). A name that already carries a realm
 -- suffix is kept verbatim; a bare name gains `realm`. Empty/missing -> nil.
 function M.canonical(name, realm)
@@ -51,14 +61,14 @@ end
 -- Parse the two numeric fields used by SendMyMoney. Both are mandatory; a
 -- malformed compatible client must be ignored before live auction comparisons.
 function M.parseBid(auctionIDStr, moneyStr)
-    local auctionID = boundedInteger(auctionIDStr, 1, M.MAX_ID)
+    local auctionID = boundedNumber(auctionIDStr, 1, M.MAX_ID)
     local money = boundedInteger(moneyStr, 0, M.MAX_MONEY)
     if not auctionID or not money then return nil end
     return auctionID, money
 end
 
 function M.parseStart(auctionIDStr, itemIDStr, moneyStr, durationStr)
-    local auctionID = boundedInteger(auctionIDStr, 1, M.MAX_ID)
+    local auctionID = boundedNumber(auctionIDStr, 1, M.MAX_ID)
     local itemID = boundedInteger(itemIDStr, 1, M.MAX_ID)
     local money = boundedInteger(moneyStr, 0, M.MAX_MONEY)
     local duration = boundedInteger(durationStr, 1, 3600)
@@ -95,7 +105,7 @@ function M.shouldAcceptAuctionMessage(state, sender, realm, memberNames, auction
         return false
     end
     if not M.isRaidSender(sender, realm, memberNames) then return false end
-    auctionID = boundedInteger(auctionID, 1, M.MAX_ID)
+    auctionID = boundedNumber(auctionID, 1, M.MAX_ID)
     if not auctionID then return false end
 
     local senderKey = PlayerIdentity.key(sender, realm)

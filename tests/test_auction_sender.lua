@@ -42,6 +42,8 @@ return function(test)
     local auctionID, money = Sender.parseBid("42", "500")
     test.eq(auctionID, 42, "a numeric auction id is accepted")
     test.eq(money, 500, "a numeric bid amount is accepted")
+    local fractionalBidID = Sender.parseBid("42.5", "500")
+    test.eq(fractionalBidID, 42.5, "a bid keeps its GetTime-style fractional auction id")
     test.eq(Sender.parseBid(nil, "500"), nil, "a missing auction id is rejected")
     test.eq(Sender.parseBid("bad", "500"), nil, "a malformed auction id is rejected")
     test.eq(Sender.parseBid("42", nil), nil, "a missing bid amount is rejected")
@@ -63,7 +65,8 @@ return function(test)
     test.eq(Sender.parseStart("42", "123", "-1", "30"), nil, "a negative start price is rejected")
     test.eq(Sender.parseStart("42", "123", "500", "0"), nil, "a non-positive duration is rejected")
     test.eq(Sender.parseStart("42", "123", "500", "3601"), nil, "an excessive duration is rejected")
-    test.eq(Sender.parseStart("42.5", "123", "500", "30"), nil, "a fractional auction id is rejected")
+    local fractionalStartID = Sender.parseStart("42.5", "123", "500", "30")
+    test.eq(fractionalStartID, 42.5, "GetTime-style fractional auction ids are accepted")
     test.eq(Sender.parseStart("42", "123.5", "500", "30"), nil, "a fractional item id is rejected")
     test.eq(Sender.parseStart("42", "123", "1e309", "30"), nil, "an infinite start price is rejected")
     test.eq(Sender.parseStart("42", "123", "10000001", "30"), nil,
@@ -104,6 +107,8 @@ return function(test)
         "a non-member cannot allocate rate-limit state")
     test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 0, 210, 1), false,
         "an invalid auction id cannot allocate rate-limit state")
+    test.eq(Sender.shouldAcceptAuctionMessage(bidRateState, "Alice", "Realm", members, 42.5, 210, 1), true,
+        "a GetTime-style fractional auction id can allocate rate-limit state")
 
     -- The event handler must read the bidder from the sender (fourth argument),
     -- never from the target (fifth), and validate it against the current roster.
@@ -132,6 +137,31 @@ return function(test)
 
     local auctionModuleSource = assert(io.open("Core/Module/Auction.lua", "rb")):read("*a")
     test.eq(auctionModuleSource:find(
+        "function BG.SendStartAuctionMsg(itemID, money, duration, link)", 1, true) ~= nil, true,
+        "the outgoing start boundary exposes only legacy-compatible fields")
+    test.eq(auctionModuleSource:find(
+        'C_ChatInfo.SendAddonMessage("BiaoGeAuction", text, "RAID")', 1, true) ~= nil, true,
+        "outgoing auctions use the legacy-compatible prefix")
+    test.eq(auctionModuleSource:find(
+        'GetTime(), itemID, money, duration, "normal", link', 1, true) ~= nil, true,
+        "outgoing auctions always use normal mode")
+    test.eq(auctionModuleSource:find("BG.SendStartAuctionMsg(isGen2", 1, true), nil,
+        "the direct start path does not select a protocol generation")
+    test.eq(auctionModuleSource:find("mainFrame.dropDown2", 1, true), nil,
+        "the start window has no protocol-generation dropdown")
+    test.eq(auctionModuleSource:find("BiaoGe.Auction.mod", 1, true), nil,
+        "the start window has no single-option auction-mode state")
+    test.eq(auctionModuleSource:find("resetThreshold_OnEnter", 1, true), nil,
+        "the start window has no second-generation reset-threshold control")
+    test.eq(auctionModuleSource:find("local function UpdateFrame()", 1, true), nil,
+        "the removed protocol controls have no update helper")
+    test.eq(auctionModuleSource:find('edit._type = "duration"', 1, true) ~= nil, true,
+        "the compact start window keeps auction duration")
+    test.eq(auctionModuleSource:find('edit._type = "money"', 1, true) ~= nil, true,
+        "the compact start window keeps starting price")
+    test.eq(auctionModuleSource:find('edit._type = "count"', 1, true) ~= nil, true,
+        "the compact start window keeps auction quantity")
+    test.eq(auctionModuleSource:find(
         "Sender.shouldRespondVersion(versionResponseState, rawSender, realm, members, GetTime())", 1, true) ~= nil,
         true, "legacy version replies use the same membership and rate-limit policy")
     test.eq(auctionModuleSource:find(
@@ -155,6 +185,12 @@ return function(test)
         "restored auction frames show the original green local-player state")
 
     local logSource = assert(io.open("Core/Module/AuctionLog.lua", "rb")):read("*a")
+    test.eq(logSource:find("BG.SendStartAuctionMsg(isGen2", 1, true), nil,
+        "auction-log restart paths do not select a protocol generation")
     test.eq(logSource:find("PlayerIdentity.same(v.maijia, tradeName, realmName)", 1, true) ~= nil,
         true, "trade-price lookup uses canonical player identity")
+
+    local tradeSource = assert(io.open("Core/Module/Trade.lua", "rb")):read("*a")
+    test.eq(tradeSource:find("BG.SendStartAuctionMsg(isGen2", 1, true), nil,
+        "trade restart paths do not select a protocol generation")
 end

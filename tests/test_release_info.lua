@@ -4,7 +4,7 @@ return function(test)
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
-    test.eq(info.version, "0.2.1", "BGNext version is independent")
+    test.eq(info.version, "0.2.2", "BGNext version is independent")
     test.eq(info.upstreamVersion, "2.4.0", "upstream version remains disclosed")
     test.eq(info.protocolVersion, "2.4.0", "mixed-group protocol version remains compatible")
     test.eq(info.author, "国服社区共创", "community author")

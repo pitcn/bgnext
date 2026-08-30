@@ -297,9 +297,6 @@ BG.Init(function()
                 BG.PlaySound(1)
                 if BiaoGe.options.auctionLogChoose == 3 then
                     local db = BiaoGe[BG.FB1].auctionLog
-                    local isGen2 = BiaoGe.Auction.gen == 2
-                    local mod = BiaoGe.Auction.mod
-                    local resetThreshold = max(tonumber(BiaoGe.Auction.resetThreshold) or 0, 10)
                     local indexs = {}
                     for _, v in ipairs(BG.auctionLogFrame.choosed) do
                         if v.money and v.index then
@@ -318,7 +315,7 @@ BG.Init(function()
                     for _, v in ipairs(BG.auctionLogFrame.choosed) do
                         if v.money then
                             BG.After(delay, function()
-                                BG.SendStartAuctionMsg(isGen2, v.id, v.money, 20, mod, v.link, resetThreshold)
+                                BG.SendStartAuctionMsg(v.id, v.money, 20, v.link)
                             end)
                             delay = delay + 1
                         end
@@ -2257,10 +2254,7 @@ BG.Init(function()
             OnAccept = function()
                 local info = BG.pendingReAuction
                 if info then
-                    local isGen2 = BiaoGe.Auction.gen == 2
-                    local mod = BiaoGe.Auction.mod
-                    local resetThreshold = max(tonumber(BiaoGe.Auction.resetThreshold) or 0, 10)
-                    BG.SendStartAuctionMsg(isGen2, info.itemID, info.money, 20, mod, info.link, resetThreshold)
+                    BG.SendStartAuctionMsg(info.itemID, info.money, 20, info.link)
                     local FB = BG.FB2 or BG.FB1
                     if BiaoGe[FB].auctionLog then
                         for i, v in ipairs(BiaoGe[FB].auctionLog) do

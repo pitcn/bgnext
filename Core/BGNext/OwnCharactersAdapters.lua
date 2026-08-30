@@ -605,6 +605,12 @@ local function resourceWhitelist(columns)
 end
 
 local function normalizeCurrencyRecord(family, key, record)
+    -- The currency API uses zero when a weekly limit is unavailable or not
+    -- represented by the client. Zero is not a usable cap and must not be
+    -- presented as one.
+    if type(record.maxWeeklyQuantity) == "number" and record.maxWeeklyQuantity <= 0 then
+        record.maxWeeklyQuantity = nil
+    end
     if family ~= "mop" or key ~= "valor" then return record end
     local weekly = record.quantityEarnedThisWeek
     local maximum = record.maxQuantity
