@@ -102,14 +102,25 @@ return function(test)
 
     -- install registers only the reviewed events and collects once immediately.
     local d4, root4, spy4, ui4, api4 = build()
+    d4.family = "retail"
+    d4.catalog = Catalog.forFamily("retail")
+    d4.globals = { IsRetail = true }
     local registered = {}
+    local rejectedRetailEvent = false
     local frame = {
-        RegisterEvent = function(_, event) registered[#registered + 1] = event end,
+        RegisterEvent = function(_, event)
+            if event == "TRADE_SKILL_UPDATE" then
+                rejectedRetailEvent = true
+                error('Attempt to register unknown event "TRADE_SKILL_UPDATE"')
+            end
+            registered[#registered + 1] = event
+        end,
         SetScript = function() end,
     }
     d4.frame = frame
     d4.after = function(delay, fn) end
     Runtime.install(d4)
+    test.eq(rejectedRetailEvent, true, "install encounters the unsupported retail profession event")
     test.eq(#registered > 0, true, "install registers events")
     test.eq(spy4.upsert >= 1, true, "install performs an immediate collection")
     test.eq(api4.raidInfo, 1, "install requests saved-instance data once")

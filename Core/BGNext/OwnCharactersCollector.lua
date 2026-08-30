@@ -103,7 +103,10 @@ function M.installEvents(env, onSnapshot)
 
     for _, event in ipairs(M.allowedEvents) do
         if type(frame.RegisterEvent) == "function" then
-            frame:RegisterEvent(event)
+            -- Blizzard's client families do not expose an identical event set.
+            -- An unsupported allowlisted event must not abort the remaining
+            -- registrations or the immediate own-character collection.
+            pcall(frame.RegisterEvent, frame, event)
         end
     end
 
