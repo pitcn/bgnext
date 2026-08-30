@@ -29,6 +29,23 @@ return function(test)
     test.eq(Entry.intent(nil, {}), nil, "a missing action does nothing")
     test.eq(Entry.intent("hover", nil), "preview", "a missing state is safe")
 
+    -- Footer role-overview button maps ordinary clicks to toggle, right to settings.
+    test.eq(Entry.buttonAction("LeftButton"), "toggle", "left click toggles the pinned window")
+    test.eq(Entry.buttonAction("LeftButton", false), "toggle", "a plain left click still toggles")
+    test.eq(Entry.buttonAction("LeftButton", true), "toggle", "ctrl+left click is a compat toggle alias")
+    test.eq(Entry.buttonAction("MiddleButton"), "toggle", "middle click is a compat toggle alias")
+    test.eq(Entry.buttonAction("RightButton"), "settings", "right click opens settings")
+    test.eq(Entry.buttonAction("Button4"), nil, "an unknown button does nothing")
+    test.eq(Entry.buttonAction(nil), nil, "a missing button does nothing")
+
+    -- Hover preview waits a deliberate delay so a quick pass never flashes.
+    test.eq(Entry.previewDelay(), 0.2, "hover preview waits a deliberate delay")
+
+    -- A scheduled reveal fires only while its token is still current; a quick
+    -- enter-then-leave advances the token before the timer, so it never flashes.
+    test.eq(Entry.hoverTokenCurrent(3, 4), false, "a stale hover token never reveals the preview")
+    test.eq(Entry.hoverTokenCurrent(4, 4), true, "a current hover token may reveal the preview")
+
     -- Controls read settings, refresh, close left-to-right (close far right).
     local order = Entry.controlOrder()
     test.eq(order[1], "settings", "settings control comes first")
@@ -238,4 +255,42 @@ return function(test)
         "the role overview has a stable global frame name for UISpecialFrames")
     test.eq(string.find(source, 'UISpecialFrames', 1, true) ~= nil, true,
         "the fixed role overview participates in Blizzard escape handling")
+
+    -- The footer uses one OnClick path, never a split mouse-down/mouse-up that
+    -- could let a single physical click toggle twice.
+    test.eq(string.find(source, "OnMouseDown", 1, true), nil,
+        "footer clicks use a single OnClick path")
+    test.eq(string.find(source, "buttonAction", 1, true) ~= nil, true,
+        "footer clicks route through the shared buttonAction mapper")
+    test.eq(string.find(source, 'RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")', 1, true) ~= nil,
+        true, "footer registers every mouse button handled by OnClick")
+    test.eq(string.find(source, 'Open("raid")', 1, true) ~= nil, true,
+        "right click opens the role overview raid settings section")
+
+    -- Hover preview waits with a one-shot timer, never a recurring ticker.
+    test.eq(string.find(source, "C_Timer.After", 1, true) ~= nil, true,
+        "hover preview waits with a one-shot timer")
+    test.eq(string.find(source, "C_Timer.NewTicker", 1, true), nil,
+        "hover preview never spins a recurring ticker")
+
+    -- The role overview key binding is independent of the main-table binding.
+    local bindings = io.open("Bindings.xml", "r")
+    local bindingSource = bindings:read("*a")
+    bindings:close()
+    test.eq(string.find(bindingSource, 'name="BIAOGE"', 1, true) ~= nil, true,
+        "the main-table binding is unchanged")
+    test.eq(string.find(bindingSource, 'name="BGNEXT_ROLE_OVERVIEW"', 1, true) ~= nil, true,
+        "a role overview binding distinct from BIAOGE is declared")
+    local roleBinding = bindingSource:match('name="BGNEXT_ROLE_OVERVIEW"[^>]*>(.-)</Binding>')
+    test.eq(type(roleBinding), "string", "the role binding has a body")
+    test.eq(string.find(roleBinding or "", "togglePinned", 1, true) ~= nil, true,
+        "the role binding calls the guarded role toggle")
+    test.eq(string.find(roleBinding or "", "MainFrame", 1, true), nil,
+        "the role binding never touches the main table")
+
+    local init = io.open("Core/DB/Init2.lua", "r")
+    local initSource = init:read("*a")
+    init:close()
+    test.eq(string.find(initSource, "BINDING_NAME_BGNEXT_ROLE_OVERVIEW", 1, true) ~= nil, true,
+        "the role binding display name is registered")
 end

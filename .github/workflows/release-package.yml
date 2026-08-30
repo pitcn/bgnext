@@ -26,7 +26,7 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path ./artifacts/BGNext.zip))
           try {
-            $paths = @($archive.Entries | ForEach-Object FullName)
+            $paths = @($archive.Entries | ForEach-Object { $_.FullName.Replace("\", "/") })
             $denied = @(
               "History.lua",
               "TradeHistory.lua",
@@ -40,21 +40,21 @@ jobs:
               }
             }
             $developmentPrefixes = @(
-              "BGLite/docs/adr/",
-              "BGLite/docs/agents/",
-              "BGLite/docs/baseline/",
-              "BGLite/docs/design/",
-              "BGLite/docs/release/",
-              "BGLite/docs/security/",
-              "BGLite/docs/testing/"
+              "BGNext/docs/adr/",
+              "BGNext/docs/agents/",
+              "BGNext/docs/baseline/",
+              "BGNext/docs/design/",
+              "BGNext/docs/release/",
+              "BGNext/docs/security/",
+              "BGNext/docs/testing/"
             )
             foreach ($prefix in $developmentPrefixes) {
               if ($paths | Where-Object { $_.StartsWith($prefix) }) {
                 throw "Release contains development documentation: $prefix"
               }
             }
-            if (-not ($paths -contains "BGLite/BGLite.toc")) {
-              throw "Release archive has no BGLite/BGLite.toc"
+            if (-not ($paths -contains "BGNext/BGNext.toc")) {
+              throw "Release archive has no BGNext/BGNext.toc"
             }
           } finally {
             $archive.Dispose()

@@ -940,7 +940,7 @@ do
         BG.sound2 = 569593                      -- 升级音效
         BG.sound3 = SOUNDKIT.IG_MAINMENU_CLOSE  -- 菜单打开音效
 
-    local Interface = "Interface\\AddOns\\BGLite\\Media\\sound\\"
+    local Interface = "Interface\\AddOns\\BGNext\\Media\\sound\\"
         BG.soundAuthor = {
             { ID = "AI", addonName = AddonName, isBiaoGe = true },
         }
@@ -1113,9 +1113,6 @@ BG.Init(function()
 
     if not BiaoGe.point then
         BiaoGe.point = {}
-    end
-    if not BiaoGe.duizhang then
-        BiaoGe.duizhang = {}
     end
 
     for _, FB in ipairs(BG.FBtable) do

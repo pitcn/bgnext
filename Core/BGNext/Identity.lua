@@ -3,7 +3,7 @@ BG.BGNext = BG.BGNext or {}
 
 local M = {
     projectName = "BGNext",
-    version = "0.1.0",
+    version = "0.2.0",
     upstreamName = "BGLite",
     upstreamVersion = "2.4.0",
     protocolVersion = "2.4.0",

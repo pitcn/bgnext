@@ -10,7 +10,7 @@ local c1 = ns.c1
 do --英语说明书
     ns.instructionsText = {
         "|cff00BFFF<BGNext Guide>|r",
-        "BGNext v0.1.0 is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
+        "BGNext v0.2.0 is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
         "Core auctions continue to use BGLite's existing public protocol. Players using BGNext and BGLite may participate in the same basic auction; consult the release notes for the actual compatibility test status.",
         "Personal wishlists, own-character information, and personal helper data stay local and are not sent to the raid or outside the game. Current-raid trade and mail reconciliation keeps only the most recent raid for at most seven days and never stores mail bodies.",
         "If another BiaoGe/BGLite-family addon is enabled on this client, BGNext warns the player but never disables it without confirmation.",
@@ -31,6 +31,16 @@ do --英语说明书
     ns.updateText_before = {
 
     }
+end
+
+do -- BGNext temporary current-raid reconciliation
+    L["开始对账"] = "Start reconciliation"
+    L["停止对账"] = "Stop reconciliation"
+    L["当前团队临时对账"] = "Temporary current-raid reconciliation"
+    L["只有点击开始后才会读取账单；数据不会写入插件保存文件，重载、离团或停止后立即清空。"] = "The next announced bill is read only after you start. It is not saved and is cleared on reload, leaving the raid, or stopping."
+    L["已停止对账并清空本次临时数据。"] = "Stopped reconciliation and cleared its temporary data."
+    L["已开始对账：仅临时读取当前团队接下来通报的一份账单。"] = "Reconciliation started. The next bill announced by the current raid will be read temporarily."
+    L["对账数据超出安全限制或等待超时，已停止本次对账。"] = "Reconciliation exceeded its safety limit or timed out and has been stopped."
 end
 
 do
@@ -620,6 +630,9 @@ do
     L["角色总览的布局方式："] = "Layout of Character Overview:"
     L["打开/关闭表格"] = "Open /rf Form"
     L["打开/关闭角色总览"] = "Open /rf Character Overview"
+    L["打开金团表格"] = "Open Gold Table"
+    L["关闭金团表格"] = "Close Gold Table"
+    L["关闭角色总览"] = "Close Character Overview"
     L["密码：金团表格"] = "Password: Golden Corps Forms"
     L["|cff808080（CTRL+左键固定显示，长按SHIFT显示全服务器角色%s）|r"] = "|cff808080 (CTRL+Left click fixed display, long press SHIFT to display full server Character %s)|r"
     L["|cff808080（CTRL+左键固定显示，长按SHIFT显示当前服务器角色%s）|r"] = "|cff808080 (CTRL+Left click to fix display, long press SHIFT to display current server Character %s)|r"

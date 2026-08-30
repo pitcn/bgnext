@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $tocPath = Join-Path $repositoryRoot "BGLite.toc"
+$releaseTocName = "BGNext.toc"
 $tocText = Get-Content -LiteralPath $tocPath -Raw
 $versionMatch = [regex]::Match($tocText, '(?m)^## X-BGNext-Version:\s*(\S+)\s*$')
 if (-not $versionMatch.Success) {
@@ -106,12 +107,13 @@ $outputDirectory = Split-Path -Parent $outputFullPath
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 $stagingRoot = Join-Path ([IO.Path]::GetTempPath()) ("bgnext-release-" + [guid]::NewGuid().ToString("N"))
-$addonRoot = Join-Path $stagingRoot "BGLite"
+$addonRoot = Join-Path $stagingRoot "BGNext"
 try {
     New-Item -ItemType Directory -Path $addonRoot -Force | Out-Null
     foreach ($relativePath in $runtimeFiles) {
         $source = Join-Path $repositoryRoot $relativePath
-        $destination = Join-Path $addonRoot $relativePath
+        $releasePath = if ($relativePath -eq "BGLite.toc") { $releaseTocName } else { $relativePath }
+        $destination = Join-Path $addonRoot $releasePath
         New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
         Copy-Item -LiteralPath $source -Destination $destination
     }

@@ -17,6 +17,16 @@ if ver < 20000 or ver >= 100000 then
     ns.notShowAIText = true
 end
 
+do -- BGNext 当前团队临时对账
+    L["开始对账"] = true
+    L["停止对账"] = true
+    L["当前团队临时对账"] = true
+    L["只有点击开始后才会读取账单；数据不会写入插件保存文件，重载、离团或停止后立即清空。"] = true
+    L["已停止对账并清空本次临时数据。"] = true
+    L["已开始对账：仅临时读取当前团队接下来通报的一份账单。"] = true
+    L["对账数据超出安全限制或等待超时，已停止本次对账。"] = true
+end
+
 -- if true then return end
 -- ○
 local l = GetLocale()
@@ -25,7 +35,7 @@ if (l == "zhTW" or l == "enUS") then return end
 do --简体说明书
     ns.instructionsText = {
         "|cff00BFFF<BGNext 说明书>|r",
-        "BGNext v0.1.0 是基于 BGLite 2.4.0 维护的独立、非官方社区共创项目。",
+        "BGNext v0.2.0 是基于 BGLite 2.4.0 维护的独立、非官方社区共创项目。",
         "基础拍卖继续使用 BGLite 现有公开协议；不同玩家分别使用 BGNext 与 BGLite 时可以共同参与基础拍卖，实际兼容状态以版本说明中的测试结果为准。",
         "个人心愿、自有角色和个人辅助数据仅保存在本地，不向团队或游戏外发送。当前团本交易与邮件核对只保留最近一团，最长七日，不保存邮件正文。",
         "检测到本机同时启用其他表格/BGLite 系列插件时，BGNext 会提示玩家处理，但不会在未经确认时自动禁用插件。",
@@ -633,6 +643,9 @@ do
     L["角色总览的布局方式："] = true
     L["打开/关闭表格"] = true
     L["打开/关闭角色总览"] = true
+    L["打开金团表格"] = true
+    L["关闭金团表格"] = true
+    L["关闭角色总览"] = true
     L["密码：金团表格"] = true
     L["|cff808080（CTRL+左键固定显示，长按SHIFT显示全服务器角色%s）|r"] = true
     L["|cff808080（CTRL+左键固定显示，长按SHIFT显示当前服务器角色%s）|r"] = true

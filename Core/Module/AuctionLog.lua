@@ -605,7 +605,6 @@ BG.Init(function()
                 duizhang.FB = FB
                 duizhang.t = GetServerTime()
                 duizhang.time = date("%m-%d %H:%M:%S", GetServerTime())
-                duizhang.msgTbl = {}
                 duizhang.player = BG.STC_g1(L["自动拍卖记录"])
                 duizhang.sumjine = 0
                 duizhang.zhangdan = {}
@@ -622,7 +621,7 @@ BG.Init(function()
                         duizhang.sumjine = duizhang.sumjine + (tonumber(v.jine) or 0)
                     end
                 end
-                tinsert(BiaoGe.duizhang, duizhang)
+                tinsert(BG.sessionDuizhang, duizhang)
                 BG.DuiZhangList()
             end)
         end
