@@ -247,10 +247,7 @@ BG.Init(function()
                                                     self:SetScript("OnHyperlinkLeave", GameTooltip_Hide)
                                                 end,
                                                 OnAccept = function(self, data)
-                                                    local isGen2 = BiaoGe.Auction.gen == 2
-                                                    local mod = BiaoGe.Auction.mod
-                                                    local resetThreshold = max(tonumber(BiaoGe.Auction.resetThreshold) or 0, 10)
-                                                    BG.SendStartAuctionMsg(isGen2, data.itemID, data.money, 20, mod, data.link, resetThreshold)
+                                                    BG.SendStartAuctionMsg(data.itemID, data.money, 20, data.link)
                                                 end,
                                                 OnCancel = function()
                                                 end,
