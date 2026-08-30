@@ -830,7 +830,6 @@ function BG.DuiZhang0()
             myjine:SetText("")
         end
     end
-    BG.DuiZhangMainFrame.msgFrame:SetText("")
 end
 
 local function CopyBill(num, FB)

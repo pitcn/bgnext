@@ -7,6 +7,8 @@ return function(test)
         "reconciliation never reads or writes the legacy persisted ledger list")
     test.eq(source:find("msgTbl", 1, true), nil,
         "raw ledger chat is not retained")
+    test.eq(source:find("DuiZhangMainFrame.msgFrame", 1, true), nil,
+        "the removed raw-chat panel is not accessed")
     test.eq(source:find("SaveRaidMember", 1, true), nil,
         "the other raid roster is not copied into reconciliation state")
     test.eq(source:find("tinsert(bigfoot, msg)", 1, true), nil,
@@ -23,4 +25,20 @@ return function(test)
         "roster changes clear runtime reconciliation state")
     test.eq(source:find('L["开始对账"]', 1, true) ~= nil, true,
         "the UI exposes an explicit start action")
+
+    local mainSource = assert(io.open("Core/BiaoGe.lua", "rb")):read("*a")
+    test.eq(mainSource:find("if BG.DuiZhangMainFrame.msgBg then", 1, true) ~= nil, true,
+        "the shared frame tolerates the removed raw-chat panel")
+
+    local auctionLogSource = assert(io.open("Core/Module/AuctionLog.lua", "rb")):read("*a")
+    test.eq(auctionLogSource:find("tinsert(BiaoGe.duizhang", 1, true), nil,
+        "manual auction-log reconciliation does not restore persisted ledger history")
+    test.eq(auctionLogSource:find("tinsert(BG.sessionDuizhang, duizhang)", 1, true) ~= nil, true,
+        "manual auction-log reconciliation remains available in the current session")
+    test.eq(auctionLogSource:find("duizhang.msgTbl", 1, true), nil,
+        "manual auction-log reconciliation does not create a raw-chat field")
+
+    local databaseSource = assert(io.open("Core/DB/DB.lua", "rb")):read("*a")
+    test.eq(databaseSource:find("BiaoGe.duizhang", 1, true), nil,
+        "new installs do not initialize the retired persisted ledger field")
 end
