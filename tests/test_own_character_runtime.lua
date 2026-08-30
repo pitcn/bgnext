@@ -148,4 +148,63 @@ return function(test)
         "header hide persists the current-family preference")
     test.eq(Model.get(root6, "titan", 123, "Piti"), storedCharacter,
         "hiding a column does not replace the character snapshot")
+
+    -- Problem 3: on Retail the live UnitName/GetRealmID may be secret-protected
+    -- even though Core/DB/Init.lua already captured the logged-in character. The
+    -- runtime must prefer the validated init identity over the live re-read.
+    local function buildRetailIdentity()
+        local root = { settings = {} }
+        local spy = { upsert = 0 }
+        local model = {
+            upsert = function(r, f, s) spy.upsert = spy.upsert + 1 return Model.upsert(r, f, s) end,
+            expireRaidStates = function() end,
+            clearFamily = function() end,
+            clearAll = function() end,
+        }
+        local api = {
+            time = function() return 5000 end,
+            UnitName = function() error("secret value") end,
+            GetRealmID = function() error("secret value") end,
+            GetRealmName = function() error("secret value") end,
+        }
+        local deps = {
+            globals = {
+                IsRetail = true,
+                playerName = "Piti",
+                realmID = 123,
+                realmName = "时光II",
+                IsSecret = function() return false end,
+            },
+            family = "retail",
+            catalog = Catalog.forFamily("retail"),
+            root = root,
+            api = api,
+            adapters = Adapters,
+            collector = Collector,
+            model = model,
+            settings = Settings,
+            now = function() return 5000 end,
+            ui = { Refresh = function() end },
+        }
+        return deps, spy
+    end
+
+    local retailDeps, retailSpy = buildRetailIdentity()
+    local retailSnapshot = Runtime.collectAndStore(retailDeps)
+    test.eq(retailSnapshot ~= nil, true, "retail collects despite secret live identity APIs")
+    test.eq(retailSnapshot.player, "Piti", "retail uses the init-time player name")
+    test.eq(retailSnapshot.realmId, 123, "retail uses the init-time realm id")
+    test.eq(retailSpy.upsert, 1, "retail upserts the init-identity snapshot")
+
+    -- First-enter-world without identity and with secret live APIs fails safely;
+    -- once the init identity appears, a later collect recovers (no lockout).
+    local lockoutDeps = buildRetailIdentity()
+    lockoutDeps.globals = { IsRetail = true, IsSecret = function() return false end }
+    test.eq(Runtime.collectAndStore(lockoutDeps), nil, "no identity means no snapshot")
+    lockoutDeps.globals.playerName = "Piti"
+    lockoutDeps.globals.realmID = 123
+    lockoutDeps.globals.realmName = "时光II"
+    local recovered = Runtime.collectAndStore(lockoutDeps)
+    test.eq(recovered ~= nil, true, "a later collect recovers once identity is available")
+    test.eq(recovered.player, "Piti", "recovered snapshot uses the current identity")
 end

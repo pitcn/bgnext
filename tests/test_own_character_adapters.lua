@@ -26,6 +26,46 @@ return function(test)
     test.eq(Adapters.safeCall(function(a, b) return a + b end, 2, 3), 5, "forwards arguments")
     test.eq(Adapters.safeCall(function() return nil end), nil, "nil result is preserved")
 
+    -- Init-time identity validation with secret-value guards. A protected value
+    -- must never be compared, concatenated or used as a SavedVariables key, so
+    -- wrong types and empty strings are rejected before the secret check.
+    local identity = Adapters.validatedIdentity({ playerName = "Piti", realmID = 123, realmName = "时光II" })
+    test.eq(identity ~= nil, true, "a valid init identity is accepted")
+    test.eq(identity.playerName, "Piti", "validated identity keeps the name")
+    test.eq(identity.realmId, 123, "validated identity keeps the realm id")
+    test.eq(identity.realmName, "时光II", "validated identity keeps the realm name")
+    test.eq(Adapters.validatedIdentity({ playerName = "Piti", realmID = 123 }) ~= nil, true,
+        "realm name is optional")
+    test.eq(Adapters.validatedIdentity({ playerName = "Piti" }), nil, "missing realm id rejects identity")
+    test.eq(Adapters.validatedIdentity({ realmID = 123 }), nil, "missing name rejects identity")
+    test.eq(Adapters.validatedIdentity({}), nil, "empty globals reject identity")
+    test.eq(Adapters.validatedIdentity(nil), nil, "nil globals are safe")
+    test.eq(Adapters.validatedIdentity({ playerName = "", realmID = 123 }), nil, "empty name rejects identity")
+    test.eq(Adapters.validatedIdentity({ playerName = 7, realmID = 123 }), nil, "non-string name rejects identity")
+    test.eq(Adapters.validatedIdentity({ playerName = "Piti", realmID = "123" }), nil,
+        "non-numeric realm id rejects identity")
+
+    -- Secret-value detection honours the BG.IsSecret wrapper and degrades to a
+    -- safe default when no guard is present.
+    test.eq(Adapters.isSecretValue({ IsSecret = function() return false end }, "Piti"), false,
+        "a non-secret value reads as readable")
+    test.eq(Adapters.isSecretValue({ IsSecret = function() return true end }, "Piti"), true,
+        "the BG.IsSecret wrapper is honoured")
+    test.eq(Adapters.isSecretValue({}, "Piti"), false, "absent guard assumes readable")
+    test.eq(Adapters.isSecretValue(nil, "Piti"), false, "nil globals are readable by default")
+
+    -- A secret realm name is dropped but does not reject an otherwise-valid identity.
+    local secretRealmName = {}
+    local secretName = {
+        playerName = "Piti", realmID = 123, realmName = secretRealmName,
+        IsSecret = function(v) return v == secretRealmName end,
+    }
+    local partial = Adapters.validatedIdentity(secretName)
+    test.eq(partial ~= nil, true, "a secret realm name does not reject the identity")
+    test.eq(partial.playerName, "Piti", "identity survives a secret realm name")
+    test.eq(partial.realmName, nil, "a secret realm name is dropped")
+
+
     -- Every declared family is covered.
     local families = Adapters.families
     test.eq(#families, 7, "seven client families are declared")

@@ -30,6 +30,38 @@ return function(test)
     test.eq(ui.isLooted(7001, { 7002, 7001 }), true, "recorded current-raid item shows looted marker")
     test.eq(ui.isLooted(7001, { 7002 }), false, "unrecorded item hides looted marker")
 
+    -- Three difficulties (retail N/H/M) stack vertically: no block opens a
+    -- second column, so Mythic no longer drifts off-screen to the right.
+    local d1 = ui.difficultyAnchor(1, 3)
+    test.eq(d1.relative, "main", "first difficulty anchors to the main frame")
+    test.eq(d1.point, "TOPLEFT", "first difficulty uses its top-left corner")
+    local d2 = ui.difficultyAnchor(2, 3)
+    test.eq(d2.point, "TOPRIGHT", "second difficulty hangs below the first block")
+    test.eq(d2.relative.anchor, "bottomFirst", "second difficulty anchors to the first block's bottom")
+    test.eq(d2.relative.index, 1, "second difficulty references the first block")
+    local d3 = ui.difficultyAnchor(3, 3)
+    test.eq(d3.relative.anchor, "bottomFirst", "third difficulty stays in the same column")
+    test.eq(d3.relative.index, 2, "third difficulty stacks below the second block")
+    test.eq(d3.point, "TOPRIGHT", "three difficulties never open a second column")
+
+    -- One and two difficulties keep their existing positions.
+    test.eq(ui.difficultyAnchor(1, 1).relative, "main", "single difficulty anchors to the main frame")
+    test.eq(ui.difficultyAnchor(1, 2).relative, "main", "first of two difficulties anchors to the main frame")
+    test.eq(ui.difficultyAnchor(2, 2).relative.anchor, "bottomFirst", "second of two difficulties stacks below")
+    test.eq(ui.difficultyAnchor(2, 2).relative.index, 1, "second of two references the first block")
+
+    -- Four difficulties keep the original 2x2 grid without overlap.
+    local f1, f2, f3, f4 = ui.difficultyAnchor(1, 4), ui.difficultyAnchor(2, 4),
+        ui.difficultyAnchor(3, 4), ui.difficultyAnchor(4, 4)
+    test.eq(f1.relative, "main", "first of four anchors to the main frame")
+    test.eq(f2.relative.anchor, "bottomFirst", "second of four stacks below the first")
+    test.eq(f2.relative.index, 1, "second of four references the first block")
+    test.eq(f3.relative.anchor, "headerLast", "third of four moves to the right of the second")
+    test.eq(f3.relative.index, 2, "third of four references the second block header")
+    test.eq(f4.relative.anchor, "bottomFirst", "fourth of four stacks below the third")
+    test.eq(f4.relative.index, 3, "fourth of four references the third block")
+    test.eq(ui.difficultyAnchor(5, 4), nil, "no block is placed beyond the declared difficulties")
+
     local file = assert(io.open("Core/BGNext/WishlistUI.lua", "rb"))
     local source = file:read("*a")
     file:close()
