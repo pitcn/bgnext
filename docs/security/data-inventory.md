@@ -21,6 +21,7 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 | `currentSettlement.trades` | Current-settlement trade events | Reconciliation | One settlement, maximum seven days | None | Manual clear | Medium |
 | `currentSettlement.mails` | Current-settlement mail events | Reconciliation | One settlement, maximum seven days | None | Manual clear | Medium |
 | Local addon conflict inventory | Addon folder name, enabled/loaded state, `X-Project`, `X-Upstream` | Prevent simultaneous local loading of known conflicting addons | Memory only; discarded after the login check | Current player UI only | Explicit confirmation before disabling; cancel leaves addon state unchanged | Low |
+| Current reconciliation capture | Equipment identifier/link, buyer and amount from one bill announced by the current raid after the user clicks “Start reconciliation” | Compare the current raid's visible bill with the user's local table | Memory only; cleared on the next start, manual stop, reload/logout or any roster change | Current player UI only | Explicit start/stop; no background capture | Medium |
 
 ## Allowed settlement record fields
 
@@ -51,6 +52,8 @@ No other-player, cross-account, historical, communication, or migration data is 
 Automatic-bidding state is memory-only. Its auction identity, item identity, current price, increment, cap, next bid, status, and stop reason must not be written to SavedVariables. Reloading the UI destroys the state.
 
 Auction protocol authorization and version-response limits are also memory-only. BGNext compares the current message sender with the live raid roster; it does not retain a sender history. Cooldown counters are discarded on reload and are never written to SavedVariables.
+
+Current reconciliation is disabled until the user explicitly starts it. The first recognized bill sender is bound to the capture and must remain in the current raid; later chat and addon-message fragments from any other identity are ignored. The capture keeps fixed counters and only the normalized equipment, buyer and amount needed for immediate comparison. It never stores raw chat, a copied raid roster or multiple historical bills. `BiaoGe.duizhang` is neither read nor written by the active BGNext reconciliation path; old values are left untouched on disk so an upgrade does not silently destroy user data.
 
 Local addon conflict detection reads only the current client’s addon metadata and enabled/loaded state. It sends no channel messages, writes no SavedVariables and does not inspect other players’ addon versions.
 

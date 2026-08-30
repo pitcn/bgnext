@@ -1114,9 +1114,6 @@ BG.Init(function()
     if not BiaoGe.point then
         BiaoGe.point = {}
     end
-    if not BiaoGe.duizhang then
-        BiaoGe.duizhang = {}
-    end
 
     for _, FB in ipairs(BG.FBtable) do
         if not BiaoGe[FB] then

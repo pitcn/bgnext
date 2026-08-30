@@ -338,7 +338,9 @@ BG.Init(function()
                 BG.NanDuDropDown.DropDown:Hide()
             end
 
-            BG.DuiZhangMainFrame.msgBg:UpdatePoint()
+            if BG.DuiZhangMainFrame.msgBg then
+                BG.DuiZhangMainFrame.msgBg:UpdatePoint()
+            end
             BG.UpdateBiaoGeAllIsHaved()
         end)
         -- 左下角文字介绍
@@ -746,7 +748,9 @@ BG.Init(function()
                     BG["DuiZhangFrame" .. FB]:Hide()
                 end
                 BG["DuiZhangFrame" .. FB]:Show()
-                BG.DuiZhangMainFrame.msgBg:UpdatePoint(FB)
+                if BG.DuiZhangMainFrame.msgBg then
+                    BG.DuiZhangMainFrame.msgBg:UpdatePoint(FB)
+                end
             end
 
             for i, FB in ipairs(BG.FBtable) do

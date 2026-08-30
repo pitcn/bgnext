@@ -7,6 +7,17 @@ BG.BGNext = BG.BGNext or {}
 local M = {}
 local PlayerIdentity = assert(BG.BGNext.PlayerIdentity, "BGNext PlayerIdentity must load before AuctionSender")
 
+M.MAX_ID = 2147483647
+M.MAX_MONEY = 10000000
+M.MAX_RATE_KEYS = 256
+
+local function boundedInteger(value, minimum, maximum)
+    local number = tonumber(value)
+    if not number or number ~= number or number == math.huge or number == -math.huge then return nil end
+    if number % 1 ~= 0 or number < minimum or number > maximum then return nil end
+    return number
+end
+
 -- Canonical full name ("Name-Realm"). A name that already carries a realm
 -- suffix is kept verbatim; a bare name gains `realm`. Empty/missing -> nil.
 function M.canonical(name, realm)
@@ -40,19 +51,18 @@ end
 -- Parse the two numeric fields used by SendMyMoney. Both are mandatory; a
 -- malformed compatible client must be ignored before live auction comparisons.
 function M.parseBid(auctionIDStr, moneyStr)
-    local auctionID = tonumber(auctionIDStr)
-    local money = tonumber(moneyStr)
-    if auctionID == nil or money == nil then return nil end
+    local auctionID = boundedInteger(auctionIDStr, 1, M.MAX_ID)
+    local money = boundedInteger(moneyStr, 0, M.MAX_MONEY)
+    if not auctionID or not money then return nil end
     return auctionID, money
 end
 
 function M.parseStart(auctionIDStr, itemIDStr, moneyStr, durationStr)
-    local auctionID = tonumber(auctionIDStr)
-    local itemID = tonumber(itemIDStr)
-    local money = tonumber(moneyStr)
-    local duration = tonumber(durationStr)
-    if not auctionID or auctionID <= 0 or not itemID or itemID <= 0 then return nil end
-    if not money or money < 0 or not duration or duration <= 0 or duration > 3600 then return nil end
+    local auctionID = boundedInteger(auctionIDStr, 1, M.MAX_ID)
+    local itemID = boundedInteger(itemIDStr, 1, M.MAX_ID)
+    local money = boundedInteger(moneyStr, 0, M.MAX_MONEY)
+    local duration = boundedInteger(durationStr, 1, 3600)
+    if not auctionID or not itemID or not money or not duration then return nil end
     return auctionID, itemID, money, duration
 end
 
@@ -77,6 +87,37 @@ function M.shouldRespondVersion(state, sender, realm, memberNames, now, options)
     state.bySender = state.bySender or {}
     state.bySender[senderKey] = now
     state.windowCount = (state.windowCount or 0) + 1
+    return true
+end
+
+function M.shouldAcceptAuctionMessage(state, sender, realm, memberNames, auctionID, now, interval)
+    if type(state) ~= "table" or type(now) ~= "number" or type(interval) ~= "number" or interval < 0 then
+        return false
+    end
+    if not M.isRaidSender(sender, realm, memberNames) then return false end
+    auctionID = boundedInteger(auctionID, 1, M.MAX_ID)
+    if not auctionID then return false end
+
+    local senderKey = PlayerIdentity.key(sender, realm)
+    local key = senderKey .. ":" .. auctionID
+    state.byKey = state.byKey or {}
+    local lastAccepted = state.byKey[key]
+    if lastAccepted then
+        if now < lastAccepted or now - lastAccepted < interval then return false end
+    elseif (state.keyCount or 0) >= M.MAX_RATE_KEYS then
+        for oldKey, timestamp in pairs(state.byKey) do
+            if type(timestamp) ~= "number" or now < timestamp or now - timestamp >= 60 then
+                state.byKey[oldKey] = nil
+                state.keyCount = math.max(0, (state.keyCount or 1) - 1)
+            end
+        end
+        if (state.keyCount or 0) >= M.MAX_RATE_KEYS then return false end
+    end
+
+    if not lastAccepted then
+        state.keyCount = (state.keyCount or 0) + 1
+    end
+    state.byKey[key] = now
     return true
 end
 

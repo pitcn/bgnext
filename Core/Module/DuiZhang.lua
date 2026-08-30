@@ -23,7 +23,60 @@ local pt = print
 local linshi_duizhang
 local h_item = "|c.-|Hitem.-|h|r"
 local bigfootyes
-local bigfoot
+local bigfootItem
+local Capture = assert(BG.BGNext and BG.BGNext.LedgerCapture, "BGNext LedgerCapture must load before DuiZhang")
+local captureState = Capture.new()
+BG.sessionDuizhang = {}
+
+local function GetRealm()
+    return (GetRealmName and GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+end
+
+local function GetRaidMemberNames()
+    local members = {}
+    for i = 1, GetNumGroupMembers() do
+        local name = GetRaidRosterInfo(i)
+        if name and name ~= "" then
+            members[#members + 1] = name
+        end
+    end
+    return members
+end
+
+local function ClearSessionResults()
+    wipe(BG.sessionDuizhang)
+    BG.lastduizhangNum = nil
+    if BG.DuiZhangDropDown and BG.DuiZhangDropDown.DropDown then
+        LibBG:UIDropDownMenu_SetText(BG.DuiZhangDropDown.DropDown, L["无"])
+    end
+    if BG.DuiZhang0 then BG.DuiZhang0() end
+    if BG.DuiZhangList and BG.DuiZhangDropDown and BG.DuiZhangDropDown.DropDown then BG.DuiZhangList() end
+    if BG.DuiZhangMainFrame and BG.DuiZhangMainFrame.ButtonCopy then
+        BG.DuiZhangMainFrame.ButtonCopy:Disable()
+    end
+end
+
+local function UpdateCaptureButton()
+    local button = BG.DuiZhangMainFrame and BG.DuiZhangMainFrame.CaptureButton
+    if button then
+        button:SetText(Capture.isActive(captureState, GetTime()) and L["停止对账"] or L["开始对账"])
+    end
+end
+
+local function StopCapture(clearResults)
+    Capture.stop(captureState)
+    linshi_duizhang = nil
+    bigfootyes = nil
+    bigfootItem = nil
+    BG.IsSavingLedger = nil
+    if clearResults then ClearSessionResults() end
+    UpdateCaptureButton()
+end
+
+local function AbortCapture()
+    StopCapture(true)
+    BG.SendSystemMessage(L["对账数据超出安全限制或等待超时，已停止本次对账。"])
+end
 
 local locales = {
     --金团账本
@@ -48,7 +101,6 @@ local function Default(player, time)
         class = select(2, UnitClass(player)),
         FB = nil,
         zhangdan = {},
-        msgTbl = {},
         yes = nil,
         sumjine = 0,
         time = date("%m-%d %H:%M:%S", GetServerTime()),
@@ -60,9 +112,7 @@ local function CheckTimeOut(time)
     BG.After(50, function()
         if linshi_duizhang and linshi_duizhang.t then
             if time == linshi_duizhang.t then
-                BG.IsSavingLedger = nil
-                linshi_duizhang = nil
-                BG.SendSystemMessage(L["账单识别错误或超时！"])
+                AbortCapture()
             end
         end
     end)
@@ -84,64 +134,56 @@ local function Send(num, sumMoney, FB)
     end)
 end
 
-local function SaveRaidMember()
-    local tbl = {}
-    local point = BG.GetRaidPoint()
-    for _, v in ipairs(BG.raidRosterInfo) do
-        local name = v.name
-        tbl[name] = BG.Copy(v)
-        tbl[name].point = point[name]
-    end
-    if next(tbl) then
-        return tbl
-    end
-end
-
 -- 已移除 SaveLeaderInfo：它从第三方付费模块 BiaoGeAI / BGAI 读取团长的
 -- 装等（GetPlayerItemsLevel）、天赋（talentInfo）与全套装备（itemInfo）。
 -- 该函数唯一的调用点原本就是注释掉的，属死代码；同时它也是本插件里
 -- 采集他人信息最重的一处，随付费模块挂载点一并移除。
 
--- 自动记录别人账单
+-- 用户主动开启后，临时识别当前团队账单。
 BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID" }, function(self, event, msg, sender, ...)
     if BG.IsSecret(msg) then return end
+    if not Capture.isActive(captureState, GetTime()) then return end
     local IsRaidLedger = BG.FindTableString(msg, locales["RaidLedger:.... 收入 ...."])
     local IsBiaoGe = BG.FindTableString(msg, locales["通报金团账单"])
     local IsBigFoot = BG.FindTableString(msg, locales["事件：.-|c.-|Hitem.-|h|r"])
     local _time = GetServerTime()
     sender = BG.GSN(sender)
+    local realm = GetRealm()
+    local members = GetRaidMemberNames()
     -- 判断是否一个账单
     if IsRaidLedger then -- 金团账本
+        if linshi_duizhang then return end
+        if not Capture.bindSource(captureState, sender, realm, members, GetTime()) then return end
         linshi_duizhang = Default(sender, _time)
         linshi_duizhang.yes = 1
         linshi_duizhang.addons = "raidledger"
-        tinsert(linshi_duizhang.msgTbl, msg)
+        if not Capture.appendLine(captureState, msg, GetTime()) then AbortCapture() return end
         CheckTimeOut(_time)
         return
     elseif IsBiaoGe then -- 金团表格
+        if linshi_duizhang then return end
+        if not Capture.bindSource(captureState, sender, realm, members, GetTime()) then return end
         linshi_duizhang = Default(sender, _time)
         linshi_duizhang.yes = 2
         linshi_duizhang.addons = "biaoge"
-        tinsert(linshi_duizhang.msgTbl, msg)
+        if not Capture.appendLine(captureState, msg, GetTime()) then AbortCapture() return end
         CheckTimeOut(_time)
         return
     elseif not bigfootyes and IsBigFoot then -- 大脚
+        if linshi_duizhang then return end
+        if not Capture.bindSource(captureState, sender, realm, members, GetTime()) then return end
         linshi_duizhang = Default(sender, _time)
         linshi_duizhang.addons = "bigfoot"
-        bigfoot = {}
         bigfootyes = true
-        tinsert(bigfoot, msg)
-        tinsert(linshi_duizhang.msgTbl, msg)
+        bigfootItem = strmatch(msg, h_item)
+        if not Capture.appendLine(captureState, msg, GetTime()) then AbortCapture() return end
         CheckTimeOut(_time)
         return
     end
 
     if not linshi_duizhang then return end
-
-    -- 保存聊天记录
-    if (linshi_duizhang.yes or bigfootyes) and sender == linshi_duizhang.player then
-        tinsert(linshi_duizhang.msgTbl, msg)
-    end
+    if not Capture.acceptSource(captureState, sender, realm, members, GetTime()) then return end
+    if not Capture.appendLine(captureState, msg, GetTime()) then AbortCapture() return end
 
     -- 识别表格
     local FB = BG.MatchTableString(msg, locales["表格：(.+)"])
@@ -156,11 +198,13 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
 
         if linshi_duizhang.yes == 1 then -- 金团账本
             jine = BG.MatchTableString(msg, locales["(%d+)金"])
-            if jine and tonumber(jine) ~= 0 then
+            jine = Capture.parseMoney(jine)
+            if jine and jine ~= 0 then
                 local aaa = {
                     zhuangbei = item,
                     jine = jine,
                 }
+                if not Capture.appendEntry(captureState, aaa, GetTime()) then AbortCapture() return end
                 tinsert(linshi_duizhang.zhangdan, aaa)
             end
         elseif linshi_duizhang.yes == 2 then -- 金团表格
@@ -181,8 +225,9 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
             end
             jine = strmatch(msg, " (%d+)$") or strmatch(msg, "：(%d+)$")
             local j
-            if jine and tonumber(jine) then
-                j = jine
+            if jine then
+                j = Capture.parseMoney(jine)
+                if not j then return end
             elseif BG.FindTableString(msg, locales["打包交易"]) then
                 j = L["打包交易"]
             else
@@ -196,38 +241,35 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
             for k, v in pairs(playerClass) do
                 a[k] = v
             end
+            if not Capture.appendEntry(captureState, a, GetTime()) then AbortCapture() return end
             tinsert(linshi_duizhang.zhangdan, a)
         end
         return
-    elseif bigfootyes and sender == linshi_duizhang.player and (BG.FindTableString(msg, locales["事件：.-|c.-|Hitem.-|h|r"]) or BG.FindTableString(msg, locales["^收入为："])) then -- 大脚
-        tinsert(bigfoot, msg)
+    elseif bigfootyes and sender == linshi_duizhang.player and BG.FindTableString(msg, locales["事件：.-|c.-|Hitem.-|h|r"]) then -- 大脚
+        bigfootItem = strmatch(msg, h_item)
+        return
+    elseif bigfootyes and sender == linshi_duizhang.player and BG.FindTableString(msg, locales["^收入为："]) then
+        local jine = Capture.parseMoney(strmatch(msg, "%d+"))
+        if bigfootItem and jine and jine ~= 0 then
+            local entry = {
+                zhuangbei = bigfootItem,
+                jine = jine,
+            }
+            if not Capture.appendEntry(captureState, entry, GetTime()) then AbortCapture() return end
+            tinsert(linshi_duizhang.zhangdan, entry)
+        end
+        bigfootItem = nil
         return
     end
 
-    -- 保存完整账单至数据库
+    -- 完成当前会话账单
     local yes
     if linshi_duizhang.yes and sender == linshi_duizhang.player and (BG.FindTableString(msg, locales["平均每人收入:"]) or BG.FindTableString(msg, locales["感谢使用金团表格"])) then
         yes = true
     elseif bigfootyes and sender == linshi_duizhang.player and BG.FindTableString(msg, locales["-感谢使用大脚金团辅助工具-"]) then -- 大脚
-        for i, value in ipairs(bigfoot) do
-            if strfind(bigfoot[i], h_item) then
-                if bigfoot[i + 1] and BG.FindTableString(bigfoot[i + 1], locales["^收入为：%d+。"]) then
-                    local item = strmatch(bigfoot[i], h_item)
-                    local jine = tonumber(strmatch(bigfoot[i + 1], "%d+"))
-
-                    if jine ~= "" and tonumber(jine) ~= 0 then
-                        local aaa = {
-                            zhuangbei = item,
-                            jine = jine,
-                        }
-                        tinsert(linshi_duizhang.zhangdan, aaa)
-                    end
-                end
-            end
-        end
         yes = true
         bigfootyes = nil
-        bigfoot = nil
+        bigfootItem = nil
     end
     if yes then
         linshi_duizhang.yes = nil
@@ -237,15 +279,16 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
             sumMoney = sumMoney + jine
         end
         linshi_duizhang.sumjine = sumMoney
-        linshi_duizhang.member = SaveRaidMember()
         local FB = linshi_duizhang.FB
-        tinsert(BiaoGe.duizhang, linshi_duizhang)
+        tinsert(BG.sessionDuizhang, linshi_duizhang)
         linshi_duizhang = nil
         BG.IsSavingLedger = nil
+        Capture.stop(captureState)
+        UpdateCaptureButton()
         BG.DuiZhangList()
         if FB then
             BG.After(0.1, function()
-                Send(#BiaoGe.duizhang, sumMoney, FB)
+                Send(#BG.sessionDuizhang, sumMoney, FB)
             end)
             if BG.ShowYYPJ then
                 BG.ShowYYPJ(sender)
@@ -256,9 +299,14 @@ BG.RegisterEvent({ "CHAT_MSG_RAID_WARNING", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RA
 end)
 
 BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
-    local prefix, msg, distType = ...
+    local prefix, msg, distType, sender = ...
     if not linshi_duizhang then return end
     if prefix == "BiaoGe" and distType == "RAID" and msg:match("^DuiZhang-") then
+        sender = BG.GSN(sender)
+        local realm = GetRealm()
+        local members = GetRaidMemberNames()
+        if not Capture.acceptSource(captureState, sender, realm, members, GetTime()) then return end
+        if not Capture.appendLine(captureState, msg, GetTime()) then AbortCapture() return end
         linshi_duizhang.tradeTbl = linshi_duizhang.tradeTbl or {}
         local a = {}
         local _, maijia, text = strsplit("-", msg)
@@ -266,16 +314,31 @@ BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
         for _, t in ipairs({ strsplit(",", text) }) do
             -- 24478 10000
             local itemID, jine = strsplit(" ", t)
-            if itemID and tonumber(itemID) then
-                tinsert(a, {
+            itemID = Capture.parseItemID(itemID)
+            if itemID then
+                if jine ~= "t" then
+                    jine = Capture.parseMoney(jine)
+                    if not jine then return end
+                end
+                local entry = {
                     maijia = maijia,
                     jine = jine,
-                    itemID = tonumber(itemID),
-                })
+                    itemID = itemID,
+                }
+                if not Capture.appendEntry(captureState, entry, GetTime()) then AbortCapture() return end
+                tinsert(a, entry)
             end
         end
         tinsert(linshi_duizhang.tradeTbl, a)
     end
+end)
+
+BG.RegisterEvent("PLAYER_LOGOUT", function()
+    StopCapture(true)
+end)
+
+BG.RegisterEvent("GROUP_ROSTER_UPDATE", function()
+    StopCapture(true)
 end)
 
 ------------------创建UI------------------
@@ -295,6 +358,32 @@ function BG.DuiZhangUI()
     text:SetText(BG.STC_g1(L["对比的账单："]))
     BG.DuiZhangDropDown.BiaoTi = text
 
+    local captureButton = BG.CreateButton(BG.DuiZhangMainFrame)
+    captureButton:SetSize(90, 25)
+    captureButton:SetPoint("RIGHT", text, "LEFT", -10, -3)
+    captureButton:SetText(L["开始对账"])
+    BG.DuiZhangMainFrame.CaptureButton = captureButton
+    captureButton:SetScript("OnClick", function()
+        BG.PlaySound(1)
+        if Capture.isActive(captureState, GetTime()) then
+            StopCapture(true)
+            BG.SendSystemMessage(L["已停止对账并清空本次临时数据。"])
+        else
+            ClearSessionResults()
+            Capture.start(captureState, GetTime())
+            UpdateCaptureButton()
+            BG.SendSystemMessage(L["已开始对账：仅临时读取当前团队接下来通报的一份账单。"])
+        end
+    end)
+    captureButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 0)
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine(L["当前团队临时对账"], 1, 1, 1, true)
+        GameTooltip:AddLine(L["只有点击开始后才会读取账单；数据不会写入插件保存文件，重载、离团或停止后立即清空。"], 1, .82, 0, true)
+        GameTooltip:Show()
+    end)
+    captureButton:SetScript("OnLeave", GameTooltip_Hide)
+
     -- 删除账单
     hooksecurefunc(LibBG, "ToggleDropDownMenu", function(_, _, _, dropDown)
         if dropDown == BG.DuiZhangDropDown.DropDown then
@@ -312,7 +401,7 @@ function BG.DuiZhangUI()
                     button.deleteZhangDan = bt
                     bt:SetScript("OnClick", function(self)
                         BG.PlaySound(1)
-                        tremove(BiaoGe.duizhang, self.num)
+                        tremove(BG.sessionDuizhang, self.num)
                         BG.lastduizhangNum = nil
                         BG.DuiZhang0()
                         LibBG:UIDropDownMenu_SetText(BG.DuiZhangDropDown.DropDown, L["无"])
@@ -347,22 +436,6 @@ function BG.DuiZhangUI()
         end
     end)
 
-    -- 一天后自动删掉相应账单
-    local name = "duiZhangTime"
-    BG.options[name .. "reset"] = 24 -- 对账单保存24小时
-    if not BiaoGe.options[name] then
-        BiaoGe.options[name] = BG.options[name .. "reset"]
-    end
-    local nowtime = GetServerTime()
-    for i = #BiaoGe.duizhang, 1, -1 do
-        if type(BiaoGe.duizhang[i]) == "table" and BiaoGe.duizhang[i].t then
-            local zhangdantime = BiaoGe.duizhang[i].t
-            if tonumber(nowtime) - tonumber(zhangdantime) >= (BiaoGe.options[name] * 60 * 60) then
-                tremove(BiaoGe.duizhang, i)
-            end
-        end
-    end
-
     -- 复制对方金额
     do
         local bt = BG.CreateButton(BG.DuiZhangMainFrame)
@@ -386,7 +459,7 @@ function BG.DuiZhangUI()
             BG.PlaySound(2)
         end)
         function bt:Copy()
-            local addons = BiaoGe.duizhang[BG.lastduizhangNum].addons
+            local addons = BG.sessionDuizhang[BG.lastduizhangNum].addons
             local FB = BG.FB1
             local tradeInfo = {}
             BiaoGe[FB].tradeTbl = {}
@@ -448,258 +521,11 @@ function BG.DuiZhangUI()
         end
     end
 
-    -- 成员名单
-    do
-        local bt = BG.CreateButton(BG.DuiZhangMainFrame)
-        bt:SetSize(80, 25)
-        bt:SetPoint("LEFT", BG.DuiZhangMainFrame.ButtonCopy, "RIGHT", 10, 0)
-        bt:SetText(L["团员名单"])
-        bt:Disable()
-        BG.DuiZhangMainFrame.ButtonRaidMember = bt
-        bt:SetScript("OnEnter", function(self)
-            self:ShowRaidMember()
-        end)
-        bt:SetScript("OnLeave", function(self)
-            BG.DuiZhangMainFrame.raidMemberFrame:Hide()
-            GameTooltip:Hide()
-        end)
-        bt:SetScript("OnClick", function(self)
-            BG.PlaySound(1)
-            local text = ""
-            local num = BG.lastduizhangNum
-            if not (BiaoGe.duizhang[num] and BiaoGe.duizhang[num].member) then return end
-            for name, v in pairs(BiaoGe.duizhang[num].member) do
-                local color = "ffFFFFFF"
-                if v.class then
-                    color = select(4, GetClassColor(v.class))
-                end
-                text = text .. "|c" .. color .. name .. "|r\n"
-            end
-            BG.CreateExportFrame(L["导出名单"], text)
-        end)
-        function bt:ShowRaidMember()
-            if not BG.DuiZhangMainFrame.raidMemberFrame then
-                local mainFrame = CreateFrame("Frame", nil, BG.DuiZhangMainFrame, "BackdropTemplate")
-                mainFrame:SetBackdrop({
-                    bgFile = "Interface/ChatFrame/ChatFrameBackground",
-                    edgeFile = "Interface/ChatFrame/ChatFrameBackground",
-                    edgeSize = 1,
-                })
-                mainFrame:SetBackdropColor(0, 0, 0, .9)
-                mainFrame:SetBackdropBorderColor(1, 1, 1, .5)
-                mainFrame:SetSize(405, 290)
-                mainFrame:SetPoint("BOTTOM", self, "TOP", 0, 5)
-                mainFrame:SetFrameLevel(200)
-                mainFrame:Hide()
-                mainFrame.buttons = {}
-                BG.DuiZhangMainFrame.raidMemberFrame = mainFrame
-
-                local t = mainFrame:CreateFontString()
-                t:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
-                t:SetPoint("BOTTOMLEFT", 15, 5)
-                t:SetTextColor(1, 0.82, 0)
-                t:SetText(AddTexture("LEFT") .. L["导出名单"])
-
-                local function CreateRaidButton(i)
-                    local bt = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
-                    bt:SetBackdrop({
-                        bgFile = "Interface/ChatFrame/ChatFrameBackground",
-                        edgeFile = "Interface/ChatFrame/ChatFrameBackground",
-                        edgeSize = 1,
-                    })
-                    bt:SetBackdropColor(0, 0, 0, .2)
-                    bt:SetBackdropBorderColor(1, 1, 1, .2)
-                    bt:SetSize(90, 20)
-                    if i == 1 then
-                        bt:SetPoint("TOPLEFT", 15, -25)
-
-                        local text = bt:CreateFontString()
-                        text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-                        text:SetPoint("BOTTOM", bt, "TOP", 0, 2)
-                        text:SetText(1)
-                        text:SetTextColor(.5, .5, .5)
-                    elseif i == 21 then
-                        bt:SetPoint("TOPLEFT", mainFrame.buttons[5], "BOTTOMLEFT", 0, -30)
-
-                        local text = bt:CreateFontString()
-                        text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-                        text:SetPoint("BOTTOM", bt, "TOP", 0, 2)
-                        text:SetText((i - 1) / 5 + 1)
-                        text:SetTextColor(.5, .5, .5)
-                    elseif (i - 1) % 5 == 0 then
-                        bt:SetPoint("TOPLEFT", mainFrame.buttons[i - 5], "TOPRIGHT", 5, 0)
-
-                        local text = bt:CreateFontString()
-                        text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-                        text:SetPoint("BOTTOM", bt, "TOP", 0, 2)
-                        text:SetText((i - 1) / 5 + 1)
-                        text:SetTextColor(.5, .5, .5)
-                    else
-                        bt:SetPoint("TOPLEFT", mainFrame.buttons[i - 1], "BOTTOMLEFT", 0, -1)
-                    end
-                    tinsert(mainFrame.buttons, bt)
-
-                    local text = bt:CreateFontString()
-                    text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-                    text:SetPoint("LEFT", 2, 0)
-                    text:SetWidth(bt:GetWidth() - 5)
-                    text:SetJustifyH("LEFT")
-                    text:SetWordWrap(false)
-                    bt.nameText = text
-
-                    local tex = bt:CreateTexture(nil, "OVERLAY")
-                    tex:SetPoint("CENTER", bt, "TOPLEFT", 2, -2)
-                    tex:SetSize(10, 10)
-                    bt.icon = tex
-
-                    local tex = bt:CreateTexture(nil, "OVERLAY")
-                    tex:SetSize(10, 10)
-                    bt.master = tex
-                end
-
-                for i = 1, 40 do
-                    CreateRaidButton(i)
-                end
-            end
-            local mainFrame = BG.DuiZhangMainFrame.raidMemberFrame
-            mainFrame:Show()
-            for i = 1, 40 do
-                local bt = mainFrame.buttons[i]
-                bt.nameText:SetText("")
-                bt.icon:SetTexture(nil)
-                bt.master:SetTexture(nil)
-            end
-            local num = BG.lastduizhangNum
-            if not (BiaoGe.duizhang[num] and BiaoGe.duizhang[num].member) then return end
-            for name, v in pairs(BiaoGe.duizhang[num].member) do
-                local team, n = strsplit("-", v.point)
-                team = tonumber(team)
-                n = tonumber(n)
-                local id = (team - 1) * 5 + n
-                local bt = mainFrame.buttons[id]
-                local color = "ffFFFFFF"
-                if v.class then
-                    color = select(4, GetClassColor(v.class))
-                end
-                bt.nameText:SetText("|c" .. color .. name)
-                if v.rank == 2 then
-                    bt.icon:SetTexture("interface/groupframe/ui-group-leadericon")
-                elseif v.role == "MAINTANK" then
-                    bt.icon:SetTexture(132064)
-                elseif v.role == "MAINASSIST" then
-                    bt.icon:SetTexture(132063)
-                elseif v.rank == 1 then
-                    bt.icon:SetTexture("interface/groupframe/ui-group-assistanticon")
-                end
-                if v.isML then
-                    bt.master:SetTexture("Interface/GroupFrame/UI-Group-MasterLooter")
-                    bt.master:ClearAllPoints()
-                    if bt.icon:GetTexture() then
-                        bt.master:SetPoint("LEFT", bt.icon, "RIGHT", 0, 0)
-                    else
-                        bt.master:SetPoint("CENTER", bt, "TOPLEFT", 2, -2)
-                    end
-                end
-            end
-        end
-    end
-
-    -- 聊天记录
-    do
-        local f = CreateFrame("Frame", nil, BG.DuiZhangMainFrame, "BackdropTemplate")
-        f:SetBackdrop({
-            bgFile = "Interface/ChatFrame/ChatFrameBackground",
-            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-            edgeSize = 16,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 }
-        })
-        f:SetBackdropColor(0, 0, 0, 0.6)
-        f:SetSize(335, 190)
-        f:EnableMouse(true)
-        f.offSetY1 = 90
-        f.offSetY2 = 65
-        BG.DuiZhangMainFrame.msgBg = f
-
-        local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate") -- 滚动
-        scroll:SetWidth(f:GetWidth() - 31)
-        scroll:SetHeight(f:GetHeight() - 9)
-        scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 5, -5)
-        scroll.ScrollBar.scrollStep = BG.scrollStep
-        BG.CreateSrollBarBackdrop(scroll.ScrollBar)
-        BG.HookScrollBarShowOrHide(scroll)
-
-        local child = CreateFrame("EditBox", nil, f) -- 子框架
-        child:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-        child:SetWidth(scroll:GetWidth())
-        child:SetAutoFocus(false)
-        child:EnableMouse(false)
-        child:SetTextInsets(3, 3, 3, 3)
-        child:SetMultiLine(true)
-        child:SetHyperlinksEnabled(true)
-        child:SetTextColor(RGB("FF7F50"))
-        child.scroll = scroll
-        scroll:SetScrollChild(child)
-        BG.DuiZhangMainFrame.msgFrame = child
-
-        child:SetScript("OnHyperlinkEnter", function(self, link, text, button)
-            GameTooltip:SetOwner(f, "ANCHOR_TOPRIGHT", 0, 0)
-            GameTooltip:ClearLines()
-            local itemID = GetItemInfoInstant(link)
-            if itemID then
-                GameTooltip:SetHyperlink(BG.SetSpecIDToLink(link))
-                BG.Show_AllHighlight(link)
-            end
-        end)
-        child:SetScript("OnHyperlinkLeave", function(self, link, text, button)
-            GameTooltip:Hide()
-            BG.Hide_AllHighlight()
-        end)
-        child:SetScript("OnHyperlinkClick", function(self, link, text, button)
-            if (strsub(link, 1, 6) == "player") then
-                local _, name, lineID, chatType = strsplit(":", link)
-                if button == "LeftButton" then
-                    ChatFrame_SendTell(name, ChatFrame1)
-                elseif button == "RightButton" then
-                    FriendsFrame_ShowDropdown(name, 1, nil, "RAID", nil)
-                end
-            elseif (strsub(link, 1, 4) == "item") then
-                local name, link, quality, level, _, _, _, _, _, Texture, _, typeID = GetItemInfo(link)
-                if IsShiftKeyDown() then
-                    BG.InsertLink(text)
-                elseif IsAltKeyDown() then
-                    if BG.IsML then -- 开始拍卖
-                        BG.StartAuction(link, nil, nil, nil, button == "RightButton")
-                    else
-                        if button ~= "RightButton" then
-                            BG.AddGuanZhu(link)
-                        end
-                    end
-                else
-                    ShowUIPanel(ItemRefTooltip)
-                    if (not ItemRefTooltip:IsShown()) then
-                        ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE")
-                    end
-                    ItemRefTooltip:SetHyperlink(link)
-                end
-            end
-        end)
-
-        local t = f:CreateFontString()
-        t:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
-        t:SetPoint("BOTTOM", f, "TOP", 0, 0)
-        t:SetText(L["账单聊天记录"])
-
-        function BG.DuiZhangMainFrame.msgBg:UpdatePoint(FB)
-            FB = FB or BG.FB1
-            self:ClearAllPoints()
-            self:SetPoint("BOTTOMRIGHT", BG.MainFrame, -40, FB == 'TOCtitan' and self.offSetY2 or self.offSetY1)
-        end
-    end
 end
 
 ------------------生成下拉列表可选账单------------------
 local function CreateZhangDanTitle(num)
-    local zhangdan = BiaoGe.duizhang[num]
+    local zhangdan = BG.sessionDuizhang[num]
     local FBtext = ""
     if zhangdan.FB then
         for i, v in ipairs(BG.FBtable2) do
@@ -718,33 +544,15 @@ local function CreateZhangDanTitle(num)
     return title
 end
 
-local function CreateZhangDanMsg(num)
-    BG.DuiZhangMainFrame.msgFrame.scroll.ScrollBar:Hide()
-    local zhangdan = BiaoGe.duizhang[num]
-    if zhangdan.msgTbl then
-        local classtext = "ffFFFFFF"
-        if zhangdan.class then
-            classtext = select(4, GetClassColor(zhangdan.class))
-        end
-        local nameLink = "|Hplayer:" .. zhangdan.player .. "|h[" .. "|c" .. classtext .. zhangdan.player .. RR .. "]|h"
-        BG.DuiZhangMainFrame.msgFrame:SetText("")
-        for i, msg in ipairs(zhangdan.msgTbl) do
-            msg = BG.GsubRaidTargetingIcons(msg)
-            local text = nameLink .. L["："] .. msg .. NN
-            BG.DuiZhangMainFrame.msgFrame:Insert(text)
-        end
-    end
-end
-
 function BG.DuiZhangList()
-    for i, v in ipairs(BiaoGe.duizhang) do
+    for i, v in ipairs(BG.sessionDuizhang) do
         v.sumjine = v.sunjine or v.sumjine or 0
         v.sunjine = nil
     end
 
     LibBG:UIDropDownMenu_Initialize(BG.DuiZhangDropDown.DropDown, function(self, level)
         BG.FrameHide(0)
-        for i, v in ipairs(BiaoGe.duizhang) do
+        for i, v in ipairs(BG.sessionDuizhang) do
             local title = CreateZhangDanTitle(i)
             local info = LibBG:UIDropDownMenu_CreateInfo()
             info.text = title
@@ -767,7 +575,6 @@ function BG.DuiZhangList()
             BG.DuiZhang0()
             LibBG:UIDropDownMenu_SetText(BG.DuiZhangDropDown.DropDown, L["无"])
             BG.DuiZhangMainFrame.ButtonCopy:Disable()
-            BG.DuiZhangMainFrame.ButtonRaidMember:Disable()
         end
         if not BG.lastduizhangNum then
             info.checked = true
@@ -778,18 +585,12 @@ end
 
 ------------------账单生成函数------------------
 function BG.DuiZhangSet(num)
-    local dz = BiaoGe.duizhang[num].zhangdan
+    local dz = BG.sessionDuizhang[num].zhangdan
     local FB = BG.FB1
     BG.lastduizhangNum = num
     BG.DuiZhangMainFrame.ButtonCopy:Enable()
-    if BiaoGe.duizhang[num].member then
-        BG.DuiZhangMainFrame.ButtonRaidMember:Enable()
-    else
-        BG.DuiZhangMainFrame.ButtonRaidMember:Disable()
-    end
 
     BG.DuiZhang0()
-    CreateZhangDanMsg(num)
     --[[
         ["tradeTbl"] = {
             {
@@ -867,10 +668,10 @@ function BG.DuiZhangSet(num)
         end
     end
 
-    if BiaoGe.duizhang[num].tradeTbl then
-        for ii in ipairs(BiaoGe.duizhang[num].tradeTbl) do
+    if BG.sessionDuizhang[num].tradeTbl then
+        for ii in ipairs(BG.sessionDuizhang[num].tradeTbl) do
             local tbl = {}
-            for _, v in ipairs(BiaoGe.duizhang[num].tradeTbl[ii]) do
+            for _, v in ipairs(BG.sessionDuizhang[num].tradeTbl[ii]) do
                 local yes
                 for b = 1, Maxb[FB] do
                     for i = 1, BG.GetMaxi(FB, b) do
@@ -968,7 +769,7 @@ function BG.DuiZhangSet(num)
 
 
         -- 打包交易的进行合并对账
-        --[[         if BiaoGe.duizhang[num].tradeTbl then
+        --[[         if BG.sessionDuizhang[num].tradeTbl then
             BG.After(0, function()
                 for b = 1, Maxb[FB] do
                     for i = 1, BG.GetMaxi(FB, b) do
@@ -1036,7 +837,6 @@ function BG.DuiZhang0()
             myjine:SetText("")
         end
     end
-    BG.DuiZhangMainFrame.msgFrame:SetText("")
 end
 
 local function CopyBill(num, FB)

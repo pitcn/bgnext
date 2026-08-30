@@ -17,6 +17,16 @@ if ver < 20000 or ver >= 100000 then
     ns.notShowAIText = true
 end
 
+do -- BGNext 当前团队临时对账
+    L["开始对账"] = true
+    L["停止对账"] = true
+    L["当前团队临时对账"] = true
+    L["只有点击开始后才会读取账单；数据不会写入插件保存文件，重载、离团或停止后立即清空。"] = true
+    L["已停止对账并清空本次临时数据。"] = true
+    L["已开始对账：仅临时读取当前团队接下来通报的一份账单。"] = true
+    L["对账数据超出安全限制或等待超时，已停止本次对账。"] = true
+end
+
 -- if true then return end
 -- ○
 local l = GetLocale()
