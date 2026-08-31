@@ -130,12 +130,11 @@ function M.getRuleCatalog(client)
     })
 end
 
-function M.getDefaults(client, classToken)
-    if not classNames[classToken] then return {} end
+local function baseProfile(classToken)
+    if not classNames[classToken] then return nil end
     local localized = _G and _G.LOCALIZED_CLASS_NAMES_MALE
     local name = localized and localized[classToken] or classNames[classToken]
-    return clone({ {
-        id = classToken,
+    return {
         name = name,
         icon = classIcons[classToken],
         weapon = complement(weaponRules, allowedWeapons[classToken]),
@@ -145,8 +144,35 @@ function M.getDefaults(client, classToken)
         ignoreBattleNetBound = false,
         tankOnly = false,
         primaryStat = primaryStats[classToken] or {},
-        builtInKey = classToken,
-    } })
+    }
+end
+
+function M.getClassIcon(classToken)
+    return classIcons[classToken]
+end
+
+function M.getClassBase(family, classToken)
+    local base = baseProfile(classToken)
+    if not base then return nil end
+    return clone(base)
+end
+
+function M.getClassFallback(family, classToken)
+    local base = baseProfile(classToken)
+    if not base then return nil end
+    local key = family .. ":" .. classToken .. ":class"
+    base.id = key
+    base.builtInKey = key
+    return clone(base)
+end
+
+function M.getDefaults(client, classToken)
+    local base = baseProfile(classToken)
+    if not base then return {} end
+    local profile = clone(base)
+    profile.id = classToken
+    profile.builtInKey = classToken
+    return { profile }
 end
 
 BG.BGNext.EquipmentFilterProfiles = M
