@@ -7,7 +7,7 @@ local M = {
     upstreamName = "BGLite",
     upstreamVersion = "2.4.0",
     protocolVersion = "2.4.0",
-    commands = { "/bgn", "/bgnext", "/bglite" },
+    commands = { "/bgn", "/bgnext", "/bglite", "/biaoge" },
 }
 
 local publicCommands = {
@@ -19,6 +19,7 @@ local registeredCommands = {
     ["/bgn"] = true,
     ["/bgnext"] = true,
     ["/bglite"] = true,
+    ["/biaoge"] = true,
 }
 
 function M.isPublicCommand(command)
