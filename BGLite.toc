@@ -42,6 +42,7 @@ Core\BGNext\OwnCharactersView.lua
 Core\BGNext\RoleOverviewSettings.lua
 Core\BGNext\OwnCharactersUI.lua
 Core\BGNext\EntryInteractions.lua
+Core\BGNext\EntryMenuLifecycle.lua
 Core\BGNext\RoleOverviewEntry.lua
 Core\BGNext\OwnCharactersRuntime.lua
 Core\BGNext\PlayerIdentity.lua
