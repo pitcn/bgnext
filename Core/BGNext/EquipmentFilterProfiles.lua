@@ -57,17 +57,34 @@ local classIcons = {
     WARRIOR = "Interface/Icons/classicon_warrior",
 }
 
-local allowedArmor = {
+-- Armor a class keeps in pre-Cataclysm families (vanilla/tbc/titan): lower armor
+-- tiers are still viable off-pieces because armor specialization does not exist.
+local allowedArmorClassic = {
     MAGE = { [0] = true, [1] = true }, PRIEST = { [0] = true, [1] = true },
     WARLOCK = { [0] = true, [1] = true },
-    DRUID = { [0] = true, [1] = true, [2] = true }, ROGUE = { [1] = true, [2] = true },
-    MONK = { [1] = true, [2] = true }, DEMONHUNTER = { [1] = true, [2] = true },
-    HUNTER = { [1] = true, [2] = true, [3] = true },
+    DRUID = { [0] = true, [1] = true, [2] = true }, ROGUE = { [2] = true },
+    MONK = { [0] = true, [2] = true }, DEMONHUNTER = { [2] = true },
+    HUNTER = { [2] = true, [3] = true },
     SHAMAN = { [0] = true, [1] = true, [2] = true, [3] = true, [6] = true },
-    EVOKER = { [0] = true, [1] = true, [2] = true, [3] = true },
-    DEATHKNIGHT = { [1] = true, [2] = true, [3] = true, [4] = true },
+    EVOKER = { [3] = true },
+    DEATHKNIGHT = { [2] = true, [3] = true, [4] = true },
     PALADIN = { [0] = true, [1] = true, [2] = true, [3] = true, [4] = true, [6] = true },
-    WARRIOR = { [1] = true, [2] = true, [3] = true, [4] = true, [6] = true },
+    WARRIOR = { [2] = true, [3] = true, [4] = true, [6] = true },
+}
+
+-- Armor a class keeps once armor specialization tightens it to the class's own
+-- armor type (Cataclysm and later: mop/retail).
+local allowedArmorModern = {
+    MAGE = { [0] = true, [1] = true }, PRIEST = { [0] = true, [1] = true },
+    WARLOCK = { [0] = true, [1] = true },
+    DRUID = { [0] = true, [2] = true }, ROGUE = { [2] = true },
+    MONK = { [0] = true, [2] = true }, DEMONHUNTER = { [2] = true },
+    HUNTER = { [3] = true },
+    SHAMAN = { [0] = true, [3] = true, [6] = true },
+    EVOKER = { [3] = true },
+    DEATHKNIGHT = { [4] = true },
+    PALADIN = { [0] = true, [4] = true, [6] = true },
+    WARRIOR = { [4] = true, [6] = true },
 }
 
 local primaryStats = {
@@ -92,8 +109,8 @@ local damageAffixes = {
 }
 
 local allowedWeapons = {
-    DEATHKNIGHT = { 0, 1, 4, 5, 6, 7, 8 }, DEMONHUNTER = { 0, 7, 9, 13, 15 },
-    DRUID = { 4, 5, 6, 10, 13, 15 }, EVOKER = { 0, 4, 7, 10, 15 },
+    DEATHKNIGHT = { 0, 1, 4, 5, 6, 7, 8 }, DEMONHUNTER = { 0, 7, 9, 13 },
+    DRUID = { 4, 5, 6, 10, 13, 15 }, EVOKER = { 0, 4, 7, 10, 13, 15 },
     HUNTER = { 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 18 },
     MAGE = { 7, 10, 15, 19 }, MONK = { 0, 4, 6, 7, 10, 13 },
     PALADIN = { 0, 1, 4, 5, 6, 7, 8 }, PRIEST = { 4, 10, 15, 19 },
@@ -111,14 +128,42 @@ local function complement(catalog, allowed)
     return filtered
 end
 
-local function armorFilter(classToken)
+local function isModernFamily(family)
+    return family == "mop" or family == "retail"
+end
+
+local function armorFilter(family, classToken)
     local filtered = {}
-    local allowed = allowedArmor[classToken] or {}
+    local allowed = (isModernFamily(family) and allowedArmorModern or allowedArmorClassic)[classToken] or {}
     for id in pairs(armorRules) do
         if not allowed[id] then filtered[id] = true end
     end
     return filtered
 end
+
+local function allowedWeaponsFor(family, classToken)
+    local allowed = allowedWeapons[classToken]
+    if not allowed then return nil end
+    if classToken == "ROGUE" and not isModernFamily(family) then
+        -- Pre-Cataclysm rogues carry a ranged stat-stick (bow/gun/crossbow/thrown).
+        local result = {}
+        for _, id in ipairs(allowed) do result[#result + 1] = id end
+        for _, id in ipairs({ 2, 3, 16, 18 }) do result[#result + 1] = id end
+        return result
+    end
+    return allowed
+end
+
+-- Affixes that exist (and are therefore selectable and filterable) in each
+-- client family. Strength/agility/intellect remain ordinary affixes in every
+-- pre-Retail family and move to the separate primary-stat choice on Retail.
+local affixVisibility = {
+    vanilla = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "SPELL_POWER" },
+    tbc = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "SPELL_POWER" },
+    titan = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "ARMOR_PEN", "SPELL_POWER" },
+    mop = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "DEFENSE", "PARRY", "DODGE", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "SPELL_POWER", "MASTERY", "RESILIENCE" },
+    retail = { "CRIT", "HASTE", "MASTERY", "VERSATILITY" },
+}
 
 function M.getRuleCatalog(client)
     local result = clone({
@@ -129,25 +174,27 @@ function M.getRuleCatalog(client)
         supportsTank = not client or client.supportsTank ~= false,
     })
     local family = client and client.family
-    if family and family ~= "retail" then
-        result.affix.VERSATILITY = nil
-    end
-    if family and family ~= "retail" and family ~= "mop" then
-        result.affix.MASTERY = nil
+    local visible = family and affixVisibility[family]
+    if visible then
+        local allowed = {}
+        for _, key in ipairs(visible) do allowed[key] = true end
+        for key in pairs(result.affix) do
+            if not allowed[key] then result.affix[key] = nil end
+        end
     end
     return result
 end
 
-local function baseProfile(classToken)
+local function baseProfile(family, classToken)
     if not classNames[classToken] then return nil end
     local localized = _G and _G.LOCALIZED_CLASS_NAMES_MALE
     local name = localized and localized[classToken] or classNames[classToken]
     return {
         name = name,
         icon = classIcons[classToken],
-        weapon = complement(weaponRules, allowedWeapons[classToken]),
-        armor = armorFilter(classToken),
-        affix = damageAffixes[classToken] or {},
+        weapon = complement(weaponRules, allowedWeaponsFor(family, classToken)),
+        armor = armorFilter(family, classToken),
+        affix = {},
         classRestriction = true,
         ignoreBattleNetBound = false,
         tankOnly = false,
@@ -160,13 +207,13 @@ function M.getClassIcon(classToken)
 end
 
 function M.getClassBase(family, classToken)
-    local base = baseProfile(classToken)
+    local base = baseProfile(family, classToken)
     if not base then return nil end
     return clone(base)
 end
 
 function M.getClassFallback(family, classToken)
-    local base = baseProfile(classToken)
+    local base = baseProfile(family, classToken)
     if not base then return nil end
     local key = family .. ":" .. classToken .. ":class"
     base.id = key
@@ -175,7 +222,9 @@ function M.getClassFallback(family, classToken)
 end
 
 function M.getDefaults(client, classToken)
-    local base = baseProfile(classToken)
+    -- The legacy fallback path is a conservative class profile that keeps the
+    -- loosest (classic) armor and weapon sets rather than over-filtering.
+    local base = baseProfile(nil, classToken)
     if not base then return {} end
     local profile = clone(base)
     profile.id = classToken

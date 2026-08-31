@@ -34,16 +34,12 @@ return function(test)
         "the built-in Warlock profile selects Intellect without manual setup")
     test.eq(warlock[1].primaryStat.STRENGTH, nil,
         "the built-in Warlock profile does not allow Strength")
-    test.eq(warlock[1].affix.ATTACK_POWER, true,
-        "a pure spellcaster filters attack-power gear by default")
-    test.eq(warlock[1].affix.SPELL_POWER, nil,
-        "a pure spellcaster retains spell-power gear by default")
+    test.eq(next(warlock[1].affix), nil,
+        "the conservative class fallback leaves damage-role affixes to the specialization profile")
 
     local warrior = catalog.getDefaults({ project = "classic" }, "WARRIOR")
-    test.eq(warrior[1].affix.SPELL_POWER, true,
-        "a pure physical class filters spell-power gear by default")
-    test.eq(warrior[1].affix.ATTACK_POWER, nil,
-        "a pure physical class retains attack-power gear by default")
+    test.eq(next(warrior[1].affix), nil,
+        "the conservative physical class fallback also defers affixes to specialization")
 
     local druid = catalog.getDefaults({ project = "classic" }, "DRUID")
     test.eq(next(druid[1].affix), nil,

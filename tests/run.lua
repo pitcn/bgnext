@@ -25,6 +25,7 @@ local suites = {
     "tests/test_equipment_filter.lua",
     "tests/test_current_purchases.lua",
     "tests/test_equipment_filter_ui.lua",
+    "tests/test_equipment_filter_all_spec_audit.lua",
     "tests/test_own_characters.lua",
     "tests/test_own_character_adapters.lua",
     "tests/test_own_character_collector.lua",

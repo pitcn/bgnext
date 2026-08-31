@@ -26,18 +26,19 @@ local function clone(value, seen)
     return copy
 end
 
--- Role rule families are authored independently and client-scoped. Physical
--- rules filter spell power; caster/healer rules filter attack power and the
--- physical-only affixes; healers keep mana regeneration; tanks set tankOnly.
+-- Role rule families are authored independently and client-scoped: primary
+-- stat and tank-only flag are fixed, while the wrong-role affix filter is
+-- derived per family (see defaultAffix) so a profile never references an
+-- affix that does not exist in that client.
 local ROLES = {
-    ["strength-melee"] = { primaryStat = { STRENGTH = true }, affix = { SPELL_POWER = true }, tankOnly = false },
-    ["agility-melee"] = { primaryStat = { AGILITY = true }, affix = { SPELL_POWER = true }, tankOnly = false },
-    ["agility-ranged"] = { primaryStat = { AGILITY = true }, affix = { SPELL_POWER = true }, tankOnly = false },
-    ["intellect-damage"] = { primaryStat = { INTELLECT = true }, affix = { ATTACK_POWER = true, ARMOR_PEN = true, EXPERTISE = true }, tankOnly = false },
-    ["intellect-healing"] = { primaryStat = { INTELLECT = true }, affix = { ATTACK_POWER = true, ARMOR_PEN = true, EXPERTISE = true }, tankOnly = false },
-    ["strength-tank"] = { primaryStat = { STRENGTH = true }, affix = { SPELL_POWER = true }, tankOnly = true },
-    ["agility-tank"] = { primaryStat = { AGILITY = true }, affix = { SPELL_POWER = true }, tankOnly = true },
-    ["feral-ambiguous"] = { primaryStat = { AGILITY = true }, affix = { SPELL_POWER = true }, tankOnly = false },
+    ["strength-melee"] = { primaryStat = { STRENGTH = true }, tankOnly = false },
+    ["agility-melee"] = { primaryStat = { AGILITY = true }, tankOnly = false },
+    ["agility-ranged"] = { primaryStat = { AGILITY = true }, tankOnly = false },
+    ["intellect-damage"] = { primaryStat = { INTELLECT = true }, tankOnly = false },
+    ["intellect-healing"] = { primaryStat = { INTELLECT = true }, tankOnly = false },
+    ["strength-tank"] = { primaryStat = { STRENGTH = true }, tankOnly = true },
+    ["agility-tank"] = { primaryStat = { AGILITY = true }, tankOnly = true },
+    ["feral-ambiguous"] = { primaryStat = { AGILITY = true }, tankOnly = false },
 }
 
 local TREE_CLASS_ORDER = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
@@ -132,7 +133,34 @@ local function addFilters(target, ids)
     for _, id in ipairs(ids or {}) do target[id] = true end
 end
 
+local function isModern(family)
+    return family == "mop" or family == "retail"
+end
+
+local function isClassic(family)
+    return family == "vanilla" or family == "tbc"
+end
+
+local function specNumber(spec)
+    return tonumber(spec.key and spec.key:match(":(%d+)$"))
+end
+
+-- Wrong-role affix filter, per client family. Physical rules drop spell power;
+-- caster/healer rules drop attack power plus the physical-only affixes that
+-- exist in that family. Retail has no wrong-role affixes (primary stat is the
+-- separate choice), so its affix filter is empty.
+local function defaultAffix(family, role)
+    local physical = role ~= "intellect-damage" and role ~= "intellect-healing"
+    if family == "retail" then return {} end
+    if physical then return { SPELL_POWER = true } end
+    if family == "vanilla" then return { ATTACK_POWER = true } end
+    if family == "tbc" then return { ATTACK_POWER = true, EXPERTISE = true } end
+    if family == "mop" then return { ATTACK_POWER = true, EXPERTISE = true } end
+    return { ATTACK_POWER = true, ARMOR_PEN = true, EXPERTISE = true }
+end
+
 local function applyEquipmentOverrides(family, classToken, spec, base)
+    local num = specNumber(spec)
     if classToken == "HUNTER" then
         if family == "mop" or family == "retail" then
             local ranged = spec.key ~= "spec:255" or family == "mop"
@@ -149,11 +177,82 @@ local function applyEquipmentOverrides(family, classToken, spec, base)
             addFilters(base.upgradeWeaponFrom, { 0, 1, 4, 5, 6, 7, 8, 10, 13, 15 })
         end
     elseif classToken == "PALADIN" then
-        if spec.role == "intellect-healing" or spec.role == "strength-tank" then
+        if spec.role == "intellect-healing" then
             addFilters(base.weapon, { 1, 5, 6, 8 })
+        elseif spec.role == "strength-tank" then
+            addFilters(base.weapon, { 1, 5, 6, 8 })
+            addFilters(base.armor, { 0, 1, 2, 3 })
         elseif spec.role == "strength-melee" then
             addFilters(base.weapon, { 0, 4, 7 })
+            addFilters(base.armor, { 0, 1, 6 })
+        end
+    elseif classToken == "WARRIOR" then
+        -- Tree indices 1/2/3 map to modern spec ids 71/72/73 (arms/fury/prot).
+        if num == 3 or num == 73 then
+            -- Protection: sword-and-board, filters two-handers and off-armor.
+            addFilters(base.weapon, { 1, 5, 6, 8, 10 })
+            if isModern(family) then addFilters(base.weapon, { 2, 3, 18 }) end
+            addFilters(base.armor, { 2, 3 })
+        elseif num == 2 or num == 72 then
+            -- Fury: dual-wields one-handers pre-WotLK, two-handers from Titan's
+            -- Grip (WotLK 3.0) onward.
+            if isClassic(family) then
+                addFilters(base.weapon, { 1, 5, 6, 8, 10 })
+            else
+                addFilters(base.weapon, { 15, 13, 0, 4, 7 })
+            end
+            if isModern(family) then
+                addFilters(base.armor, { 2, 3, 6 })
+            else
+                addFilters(base.armor, { 6 })
+            end
+        else
+            -- Arms: two-handers only.
+            addFilters(base.weapon, { 15, 13, 0, 4, 7 })
+            if isModern(family) then addFilters(base.weapon, { 2, 3, 18 }) end
+            if isModern(family) then
+                addFilters(base.armor, { 2, 3, 6 })
+            else
+                addFilters(base.armor, { 6 })
+            end
+        end
+    elseif classToken == "SHAMAN" then
+        if spec.role == "agility-melee" then
+            -- Enhancement is dual-wield: no shield or off-hand stat stick.
             addFilters(base.armor, { 0, 6 })
+        else
+            -- Elemental and Restoration use a main-hand and a shield/off-hand,
+            -- so two-handers are out.
+            addFilters(base.weapon, { 1, 5 })
+        end
+    elseif classToken == "DRUID" then
+        if spec.role == "intellect-damage" or spec.role == "intellect-healing" then
+            addFilters(base.weapon, { 5, 6 })
+        else
+            -- Feral / Guardian: claws and staves, no daggers/fists/maces/off-armor.
+            addFilters(base.weapon, { 15, 13, 4 })
+            addFilters(base.armor, { 1, 0 })
+        end
+    elseif classToken == "DEATHKNIGHT" then
+        -- Tree indices 1/2/3 map to modern spec ids 250/251/252 (blood/frost/unholy).
+        if num == 1 or num == 250 then
+            -- Blood tanks with a two-hander.
+            addFilters(base.weapon, { 0, 4, 7 })
+            addFilters(base.armor, { 2, 3 })
+        elseif num == 3 or num == 252 then
+            -- Unholy keeps dual-wield in the tree era; modern Unholy uses a two-hander.
+            if isModern(family) then
+                addFilters(base.weapon, { 0, 4, 7 })
+            end
+        end
+        -- Frost (2/251) keeps one-handers in every family: no override.
+    elseif classToken == "MONK" then
+        if spec.role == "intellect-healing" then
+            -- Mistweaver is a caster: no polearms.
+            addFilters(base.weapon, { 6 })
+        else
+            -- Brewmaster and Windwalker fight with both hands free.
+            addFilters(base.armor, { 0 })
         end
     end
 end
@@ -169,7 +268,7 @@ local function compose(family, classToken, spec)
     base.builtInKey = builtInKey
     base.name = spec.name
     base.primaryStat = clone(role.primaryStat)
-    base.affix = clone(role.affix)
+    base.affix = defaultAffix(family, spec.role)
     base.tankOnly = role.tankOnly and (family == "titan" or family == "mop")
     applyEquipmentOverrides(family, classToken, spec, base)
     return base
