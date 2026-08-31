@@ -16,8 +16,63 @@ local plugin = ldb:NewDataObject(AddonName, {
 -- module only adapts mouse input to their public entry points; it never
 -- creates or pins a role-overview window itself.
 local EntryInteractions = BG.BGNext.EntryInteractions
+local EntryMenuLifecycle = BG.BGNext.EntryMenuLifecycle
 local RoleOverviewEntry = BG.BGNext.RoleOverviewEntry
-local LibBG = LibStub:GetLibrary("BiaoGe-LibUIDropDownMenu-4.0")
+local ENTRY_MENU_DISMISS_DELAY = 0.25
+local entryMenuLifecycle = EntryMenuLifecycle.new(ENTRY_MENU_DISMISS_DELAY)
+local entryMenu
+local entryMenuWatcher
+local entryMenuButtons = {}
+local entryMenuButton
+local stopEntryMenuWatch
+
+-- BG.CreateButton uses the font chosen during ADDON_LOADED. Building these
+-- controls while this Lua file is loading can therefore pass a nil font to
+-- SetFont on clients where ADDON_LOADED has not run yet. The minimap broker
+-- cannot be clicked before PLAYER_LOGIN, so create its private menu there.
+local function ensureEntryMenu()
+    if entryMenu then return end
+    entryMenu = CreateFrame("Frame", nil, UIParent)
+    entryMenu:SetSize(190, 82)
+    entryMenu:SetFrameStrata("DIALOG")
+    entryMenu:SetClampedToScreen(true)
+    entryMenu:EnableMouse(true)
+    local background = entryMenu:CreateTexture(nil, "BACKGROUND")
+    background:SetAllPoints()
+    background:SetColorTexture(0.03, 0.03, 0.03, 0.95)
+    entryMenu:Hide()
+    entryMenuWatcher = CreateFrame("Frame")
+    for i = 1, 3 do
+        local button = BG.CreateButton(entryMenu)
+        button:SetSize(180, 22)
+        button:SetPoint("TOPLEFT", entryMenu, "TOPLEFT", 5, -5 - (i - 1) * 24)
+        button:Hide()
+        entryMenuButtons[i] = button
+    end
+    entryMenu:SetScript("OnHide", function() stopEntryMenuWatch() end)
+end
+
+stopEntryMenuWatch = function()
+    entryMenuLifecycle:close()
+    if entryMenuWatcher then entryMenuWatcher:SetScript("OnUpdate", nil) end
+end
+
+local function entryMenuPointerInside()
+    if entryMenuButton and entryMenuButton:IsMouseOver() then return true end
+    return entryMenu:IsMouseOver()
+end
+
+local function startEntryMenuWatch()
+    entryMenuLifecycle:open()
+    entryMenuWatcher:SetScript("OnUpdate", function(_, elapsed)
+        local ownerVisible = entryMenu:IsShown()
+        if entryMenuLifecycle:update(elapsed, ownerVisible, entryMenuPointerInside()) then
+            entryMenu:Hide()
+        elseif not ownerVisible then
+            stopEntryMenuWatch()
+        end
+    end)
+end
 
 local function toggleMain()
     if BG.MainFrame then
@@ -54,8 +109,9 @@ end
 -- labels and actions never go stale. The role item is present only when the
 -- current client can actually open the role overview.
 local function openEntryMenu()
-    if BG.DropDownListIsVisible(BG.dropDown) then
-        LibBG:CloseDropDownMenus()
+    ensureEntryMenu()
+    if entryMenu:IsShown() then
+        entryMenu:Hide()
         return
     end
     local state = {
@@ -63,15 +119,26 @@ local function openEntryMenu()
         roleShown = RoleOverviewEntry.isPinned(),
         roleAvailable = RoleOverviewEntry.canOpen(),
     }
-    local menu = {}
-    for _, item in ipairs(EntryInteractions.menuModel(state)) do
-        menu[#menu + 1] = {
-            text = menuText(item),
-            notCheckable = true,
-            func = menuAction(item),
-        }
+    local menu = EntryInteractions.menuModel(state)
+    for _, button in ipairs(entryMenuButtons) do button:Hide() end
+    for i, item in ipairs(menu) do
+        local menuItem = item
+        local button = entryMenuButtons[i]
+        button:SetText(menuText(menuItem))
+        button:SetScript("OnClick", function()
+            entryMenu:Hide()
+            local action = menuAction(menuItem)
+            if action then action() end
+        end)
+        button:Show()
     end
-    LibBG:EasyMenu(menu, BG.dropDown, "cursor", 0, 0, "MENU", 2)
+    entryMenu:SetHeight(#menu * 24 + 10)
+    local scale = UIParent:GetEffectiveScale()
+    local x, y = GetCursorPosition()
+    entryMenu:ClearAllPoints()
+    entryMenu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+    entryMenu:Show()
+    startEntryMenuWatch()
 end
 
 function plugin:OnClick(button)
@@ -95,9 +162,11 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:SetScript("OnEvent", function()
+    ensureEntryMenu()
     local icon = LibStub("LibDBIcon-1.0", true)
     if not icon then return end
     icon:Register(AddonName, plugin, BiaoGe)
+    entryMenuButton = icon:GetMinimapButton(AddonName)
 
     if BiaoGe.miniMoney then
         BiaoGe.miniMoney = nil

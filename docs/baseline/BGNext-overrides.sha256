@@ -1,6 +1,6 @@
 # Explicit BGNext changes to upstream BGLite 2.4.0 files.
 # Format: SHA-256, two spaces, repository-relative path.
-56195dd50d2836b80249a87df7ab6c05cb9421ec62fa65a708c5a401205dbd6e  BGLite.toc
+c596cedff2bacbb0271afa21a58f537898ec5bfee8c54a4b641dba2f01c9dbce  BGLite.toc
 6686c508bb020bdf0135c48d63b10287c844c635454e63d61dce77f24afcfa14  Bindings.xml
 088e598edd428eb5f2722d097c6343f07537b0ef586fe9c41820d947c1c1cf98  Locales/enUS.lua
 0f9298293a132e1ebba479f45717558dfd6ce052de1b50ac8d9c415bd662cf74  Locales/zhCN.lua
@@ -15,7 +15,7 @@ cc84f533e8be00dfb298a79c0101dd64aecc0efd34b7f5877a0fa98aa79fbf85  Core/DB/Init2.
 6fdd52ce605dd2d0e74308a30b5e873a745e2c9819e2c4cf606d86536bc1ad98  Core/FBUI/FBUIfunction.lua
 220f775bf42dc97f8e357d6d40127730d165b15b64a3d0bb0dbf94fcb7a66337  Core/FBUI/FBUI.xml
 068c9f3e2555c930d64041310b1269f96c60b5585161700bee9f1eb621aa3f67  Core/Module/hooks.lua
-0f4425b7f5936f190d2ca240eee85d3f55f6a42d476151f9762e0ef05263e2d2  Core/Module/minimap.lua
+a9a9e5453eee3b0e8fc63853a44463af01c105bfe29f21296c62584ceaa54f4a  Core/Module/minimap.lua
 f02cdb89a00505f1d20e7bca740e30f531dcdb5bc0db6c6f0fbca125213ddb18  Core/Module/Auction.lua
 2f8814179d1e692c3876aac79b75d60644331f404737869bb574ab78d889b6c7  Core/Module/AuctionLog.lua
 d03ae61a906f0042940212b04bc7ef23557025ef751f3aed5ffb775d199d1dab  Core/Module/AuctionMSG.lua
