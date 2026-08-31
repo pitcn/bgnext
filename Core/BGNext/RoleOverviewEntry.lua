@@ -104,8 +104,17 @@ function M.entryPresentation(classFile)
     }
 end
 
-function M.windowPresentation(mode)
+function M.windowPresentation(mode, source)
     if mode == "preview" then
+        if source == "minimap" then
+            return {
+                strata = "FULLSCREEN_DIALOG",
+                point = "TOPRIGHT",
+                relativePoint = "BOTTOMRIGHT",
+                x = 0,
+                y = 0,
+            }
+        end
         return {
             strata = "FULLSCREEN_DIALOG",
             point = "BOTTOMRIGHT",
@@ -245,6 +254,8 @@ local pinned = false
 local state = { pinned = pinned }
 local window
 local entryButton
+local hoverSource
+local hoverKind
 local hoverToken = 0
 
 -- Advances the hover token and returns the new value. Any timer that captured
@@ -258,14 +269,14 @@ local function placeWindow(mode)
     if not window then return end
     local ui = BG.BGNext.OwnCharactersUI
     if ui and type(ui.SetMode) == "function" then ui.SetMode(mode) end
-    local presentation = M.windowPresentation(mode)
+    local presentation = M.windowPresentation(mode, hoverKind)
     window:SetFrameStrata(presentation.strata)
     if window.SetFrameLevel then window:SetFrameLevel(100) end
     if window.SetToplevel then window:SetToplevel(true) end
     window:ClearAllPoints()
 
-    if mode == "preview" and entryButton then
-        window:SetPoint(presentation.point, entryButton, presentation.relativePoint,
+    if mode == "preview" and hoverSource then
+        window:SetPoint(presentation.point, hoverSource, presentation.relativePoint,
             presentation.x, presentation.y)
         return
     end
@@ -457,11 +468,34 @@ function M.togglePinned()
     M.setPinned(not pinned)
 end
 
+-- Shared hover enter/leave for both the bottom-right entry and the minimap
+-- button. Only one hover is active at a time: entering a source advances the
+-- shared token, so any pending reveal from a previous source is cancelled. The
+-- reveal fires through the one-shot delayed timer owned here, never a ticker.
+function M.hoverEnter(source, kind)
+    if not M.canOpen() then return end
+    hoverSource = source
+    hoverKind = kind
+    local token = advanceHoverToken()
+    C_Timer.After(M.previewDelay(), function()
+        if not M.hoverTokenCurrent(token, hoverToken) then return end
+        M.showPreview()
+    end)
+end
+
+function M.hoverLeave()
+    advanceHoverToken()
+    hoverSource = nil
+    hoverKind = nil
+    M.hidePreview()
+end
+
 function M.showPreview()
     if not M.canOpen() then return end
-    local entryVisible = entryButton and (type(entryButton.IsVisible) ~= "function" or entryButton:IsVisible())
-    local entryHovered = entryButton and (type(entryButton.IsMouseOver) ~= "function" or entryButton:IsMouseOver())
-    if not M.previewShouldRemain(pinned, entryVisible == true, entryHovered == true) then return end
+    local source = hoverSource
+    local sourceVisible = source and (type(source.IsVisible) ~= "function" or source:IsVisible())
+    local sourceHovered = source and (type(source.IsMouseOver) ~= "function" or source:IsMouseOver())
+    if not M.previewShouldRemain(pinned, sourceVisible == true, sourceHovered == true) then return end
     ensureWindow()
     if not pinned then
         state.previewVisible = true
@@ -474,10 +508,9 @@ function M.showPreview()
             elapsed = elapsed + (type(delta) == "number" and delta or 0)
             if elapsed < 0.1 then return end
             elapsed = 0
-            local visible = entryButton
-                and (type(entryButton.IsVisible) ~= "function" or entryButton:IsVisible())
-            local hovered = entryButton
-                and (type(entryButton.IsMouseOver) ~= "function" or entryButton:IsMouseOver())
+            local s = hoverSource
+            local visible = s and (type(s.IsVisible) ~= "function" or s:IsVisible())
+            local hovered = s and (type(s.IsMouseOver) ~= "function" or s:IsMouseOver())
             if not M.previewShouldRemain(pinned, visible == true, hovered == true) then
                 M.hidePreview()
             end
@@ -572,15 +605,10 @@ function M.installEntry(mainFrame)
     end
 
     button:SetScript("OnEnter", function()
-        local token = advanceHoverToken()
-        C_Timer.After(M.previewDelay(), function()
-            if not M.hoverTokenCurrent(token, hoverToken) then return end
-            M.showPreview()
-        end)
+        M.hoverEnter(button)
     end)
     button:SetScript("OnLeave", function()
-        advanceHoverToken()
-        M.hidePreview()
+        M.hoverLeave()
     end)
     button:SetScript("OnClick", function(_, mouseButton)
         local intent = M.buttonAction(mouseButton, IsControlKeyDown())

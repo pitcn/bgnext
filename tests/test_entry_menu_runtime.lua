@@ -15,10 +15,16 @@ return function(test)
     }
     dofile("Core/BGNext/EntryInteractions.lua")
     dofile("Core/BGNext/EntryMenuLifecycle.lua")
+    local hoverEnterCalls = {}
+    local hoverLeaveCalls = 0
     BG.BGNext.RoleOverviewEntry = {
         canOpen = function() return true end,
         isPinned = function() return false end,
         togglePinned = function() end,
+        hoverEnter = function(source, kind)
+            hoverEnterCalls[#hoverEnterCalls + 1] = { source = source, kind = kind }
+        end,
+        hoverLeave = function() hoverLeaveCalls = hoverLeaveCalls + 1 end,
     }
 
     UIParent = { GetEffectiveScale = function() return 1 end }
@@ -135,4 +141,14 @@ return function(test)
     test.eq(mainToggleCount, 1, "selecting an entry action executes it exactly once")
     test.eq(entryMenu:IsShown(), false, "selecting an entry action closes the private menu")
     test.eq(watcher.scripts.OnUpdate, nil, "a menu action leaves no background watcher")
+
+    -- Hovering the minimap button delegates to the shared role-overview entry
+    -- so the preview, timer and window stay in one place.
+    plugin:OnEnter(minimapButton)
+    test.eq(#hoverEnterCalls, 1, "hovering the minimap delegates to the shared entry")
+    test.eq(hoverEnterCalls[1].source, minimapButton, "the minimap button is the shared hover source")
+    test.eq(hoverEnterCalls[1].kind, "minimap", "the minimap passes its anchor kind")
+
+    plugin:OnLeave()
+    test.eq(hoverLeaveCalls, 1, "leaving the minimap delegates to the shared entry")
 end

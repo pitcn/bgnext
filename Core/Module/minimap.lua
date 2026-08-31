@@ -153,10 +153,16 @@ function plugin:OnClick(button)
     BG.PlaySound(1)
 end
 
+-- Hovering the minimap button previews the shared role overview through the
+-- entry's own delayed-enter/leave lifecycle, so the preview, timer, pin state
+-- and window stay in one place. Unavailable or disabled clients no-op inside
+-- the entry.
 function plugin:OnEnter(button)
+    RoleOverviewEntry.hoverEnter(button, "minimap")
 end
 
 function plugin:OnLeave(button)
+    RoleOverviewEntry.hoverLeave()
 end
 
 local frame = CreateFrame("Frame")
