@@ -11,6 +11,8 @@ local GetClassRGB = ns.GetClassRGB
 local SetClassCFF = ns.SetClassCFF
 local AddTexture = ns.AddTexture
 local GetItemID = ns.GetItemID
+local TradeAuctionState = assert(BG.BGNext.TradeAuctionState,
+    "BGNext TradeAuctionState must load before Trade")
 
 local Maxb = ns.Maxb
 local HopeMaxn = ns.HopeMaxn
@@ -2821,15 +2823,8 @@ BG.Init(function()
                     tradeName = BG.trade.player
                     tradeTbl = BG.trade.targetitems
                 end
-                for _, vv in ipairs(tradeTbl) do
-                    for _, v in ipairs(BiaoGe[FB].auctionLog) do
-                        if v.type == 1 and not v.trade and v.maijia == tradeName and
-                            GetItemID(v.zhuangbei) == GetItemID(vv.link) then
-                            v.trade = true
-                            break
-                        end
-                    end
-                end
+                TradeAuctionState.markDelivered(BiaoGe[FB].auctionLog, tradeName,
+                    BG.realmName, tradeTbl, GetItemID)
                 BG.UpdateAuctionLogFrame(true, true)
             end
         end
