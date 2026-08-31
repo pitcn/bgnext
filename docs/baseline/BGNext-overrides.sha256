@@ -1,6 +1,6 @@
 # Explicit BGNext changes to upstream BGLite 2.4.0 files.
 # Format: SHA-256, two spaces, repository-relative path.
-024908cab3873dcdc1e8ef2870bd2f4e94ca3f95e2bbaa040341ae82f52a4e5e  BGLite.toc
+56195dd50d2836b80249a87df7ab6c05cb9421ec62fa65a708c5a401205dbd6e  BGLite.toc
 6686c508bb020bdf0135c48d63b10287c844c635454e63d61dce77f24afcfa14  Bindings.xml
 088e598edd428eb5f2722d097c6343f07537b0ef586fe9c41820d947c1c1cf98  Locales/enUS.lua
 0f9298293a132e1ebba479f45717558dfd6ce052de1b50ac8d9c415bd662cf74  Locales/zhCN.lua
@@ -26,6 +26,6 @@ a833ebb1f60c8d32d6527b2dd7f8aa98fab19134af8c7b1d87367f0287036457  Core/Module/Du
 4f31157db09826b761a9bcd513bbfd2db01ecc78ea53c5342068c24a54041362  Core/Module/Loot.lua
 2255e2f6b4c5e820df3802c929ef6d0e71c26aff72555a0e8b77e2a3710649da  Core/Module/QuickAccounting.lua
 c08ae45e2a04c80b82c506c19d5aec1d0a7b7c753eb8eba3737590f0b4eb3916  Core/Module/SendMail.lua
-24c19a791588c4d96a03c90a9425530c9b7270dbb1bb0ca75750416e1c671a97  Core/Module/Trade.lua
+2d0e8b372a9e1459031b6cf1b22686602c9e520b29dd5a2cf312417b1d6cd58b  Core/Module/Trade.lua
 5925158910c68aef5a637b0e920deee56676a158a448af9fce74fe3c4aa7b8a8  Core/Module/TradeHistory.lua
 cc805549f61f1667a5859c112d26f9920d84e2bc2cdd80661f0188187c87cdc7  Media/icon/icon.tga
