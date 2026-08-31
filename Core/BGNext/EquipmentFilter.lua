@@ -255,16 +255,6 @@ end
 
 BG.BGNext.EquipmentFilter = M
 
-if BG.Init then
-    BG.Init(function()
-        local catalog = BG.BGNext.EquipmentFilterProfiles
-        if not BG.BGNext.DB or not catalog then return end
-        local _, classToken = UnitClass("player")
-        local defaults = catalog.getDefaults({ project = WOW_PROJECT_ID }, classToken)
-        M.ensureCharacter(BG.BGNext.DB, BG.realmID or GetRealmID(), BG.playerName, defaults)
-    end)
-end
-
 function BG.BGNext.GetActiveEquipmentFilterProfile()
     if not BG.BGNext.DB then return nil end
     return M.getActiveProfile(BG.BGNext.DB, BG.realmID or GetRealmID(), BG.playerName)

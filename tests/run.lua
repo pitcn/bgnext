@@ -20,6 +20,7 @@ local suites = {
     "tests/test_equipment_filter_profiles.lua",
     "tests/test_item_primary_stats.lua",
     "tests/test_equipment_filter_specializations.lua",
+    "tests/test_equipment_filter_runtime.lua",
     "tests/test_equipment_filter.lua",
     "tests/test_current_purchases.lua",
     "tests/test_equipment_filter_ui.lua",

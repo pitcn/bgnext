@@ -37,6 +37,7 @@ Core\BGNext\SpecializationAdapter.lua
 Core\BGNext\EquipmentFilterProfiles.lua
 Core\BGNext\EquipmentFilterSpecializations.lua
 Core\BGNext\EquipmentFilter.lua
+Core\BGNext\EquipmentFilterRuntime.lua
 Core\BGNext\OwnCharacters.lua
 Core\BGNext\OwnCharactersAdapters.lua
 Core\BGNext\OwnCharactersCatalog.lua
