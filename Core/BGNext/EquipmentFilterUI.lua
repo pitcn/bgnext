@@ -71,13 +71,11 @@ local function resolveFollowTarget()
     if not resolved or not resolved.specKey then return nil end
     local profile = catalog.getDefault(family, classToken, resolved.specKey)
     if not profile then return nil end
-    local name = profile.name
-    if _G.GetSpecialization and _G.GetSpecializationInfo then
-        local index = _G.GetSpecialization()
-        local id, specName = _G.GetSpecializationInfo(index)
-        if id and specName then name = specName end
-    end
-    return { builtInId = profile.builtInKey, name = name, icon = profile.icon }
+    return {
+        builtInId = profile.builtInKey,
+        name = resolved.name or profile.name,
+        icon = resolved.icon or profile.icon,
+    }
 end
 
 -- Rebuilds the specialization defaults for the current character and returns them
@@ -87,19 +85,13 @@ local function buildDefaults()
     local adapter = BG.BGNext.SpecializationAdapter
     local catalog = BG.BGNext.EquipmentFilterSpecializations
     local profiles = BG.BGNext.EquipmentFilterProfiles
+    local runtime = BG.BGNext.EquipmentFilterRuntime
     local family = adapter and adapter.detect()
     local _, classToken = UnitClass("player")
-    if not classToken then return {}, nil end
-    if family and catalog then
-        local defaults = catalog.list(family, classToken)
-        local fallback = catalog.getFallback(family, classToken)
-        if fallback then defaults[#defaults + 1] = fallback end
-        local target = resolveFollowTarget()
-        local builtInId = (target and target.builtInId) or (fallback and fallback.builtInKey) or nil
-        return defaults, builtInId
+    if runtime and runtime.buildDefaults then
+        return runtime.buildDefaults(adapter, catalog, profiles, family, classToken, _G)
     end
-    local defaults = (profiles and profiles.getDefaults({ project = WOW_PROJECT_ID }, classToken)) or {}
-    return defaults, nil
+    return {}, nil
 end
 
 local function createProfileButton(parent, index, onClick)
@@ -161,8 +153,13 @@ local function updateProfileRows()
             icon:SetAllPoints()
             followButton.icon = icon
             followButton:SetScript("OnClick", function()
-                local resolved = resolveFollowTarget()
-                BG.BGNext.EquipmentFilter.followSpecialization(state(), resolved and resolved.builtInId or nil)
+                local target = resolveFollowTarget()
+                if target then
+                    local defaults = buildDefaults()
+                    BG.BGNext.EquipmentFilter.followSpecialization(state(), target.builtInId, defaults)
+                else
+                    BG.BGNext.EquipmentFilter.followSpecialization(state(), nil)
+                end
                 updateProfileRows(); updateRuleButtons(); refreshItems(); play()
             end)
             followButton:SetScript("OnEnter", function(self)

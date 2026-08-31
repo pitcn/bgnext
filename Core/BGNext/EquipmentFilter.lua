@@ -160,8 +160,11 @@ end
 
 -- Enters follow-specialization mode and selects the resolved built-in when it
 -- is known. Only this entry point (or reset) enables automatic switching.
-function M.followSpecialization(state, builtInId)
+function M.followSpecialization(state, builtInId, defaults)
     if type(state) ~= "table" or type(state.profiles) ~= "table" then return false end
+    if builtInId and type(defaults) == "table" then
+        reconcileBuiltIns(state, defaults)
+    end
     state.selectionMode = "follow-spec"
     if builtInId and state.profiles[builtInId] then
         state.selectedId = builtInId

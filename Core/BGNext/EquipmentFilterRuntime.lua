@@ -23,8 +23,40 @@ function M.resolveBuiltIn(adapter, catalog, family, classToken, api)
     return nil
 end
 
+local function specKeyFromBuiltIn(family, classToken, builtInKey)
+    if type(builtInKey) ~= "string" then return nil end
+    local prefix = family .. ":" .. classToken .. ":"
+    if builtInKey:sub(1, #prefix) ~= prefix then return nil end
+    local key = builtInKey:sub(#prefix + 1)
+    return key ~= "class" and key or nil
+end
+
+function M.buildDefaults(adapter, catalog, profiles, family, classToken, api)
+    if not classToken then return {}, nil end
+    if family and catalog then
+        local defaults = catalog.list(family, classToken)
+        if adapter and adapter.getMetadata then
+            for _, profile in ipairs(defaults) do
+                local specKey = specKeyFromBuiltIn(family, classToken, profile.builtInKey)
+                local metadata = specKey and adapter.getMetadata(family, api, classToken, specKey) or nil
+                if metadata then
+                    if metadata.name then profile.name = metadata.name end
+                    if metadata.icon then profile.icon = metadata.icon end
+                end
+            end
+        end
+        local fallback = catalog.getFallback(family, classToken)
+        if fallback then defaults[#defaults + 1] = fallback end
+        local builtInId = M.resolveBuiltIn(adapter, catalog, family, classToken, api)
+        if not builtInId and fallback then builtInId = fallback.builtInKey end
+        return defaults, builtInId
+    end
+    local client = { project = api and api.WOW_PROJECT_ID }
+    return profiles and profiles.getDefaults(client, classToken) or {}, nil
+end
+
 -- Constructs a controller. deps.adapter, deps.catalog, deps.model,
--- deps.getClassToken, deps.getState and deps.refresh are injected for testing;
+-- deps.getClassToken, deps.getState, deps.getDefaults and deps.refresh are injected for testing;
 -- the live binding wires the real modules below.
 function M.new(deps)
     deps = deps or {}
@@ -33,7 +65,7 @@ function M.new(deps)
     local function resolveNow()
         local family = deps.adapter and deps.adapter.detect(deps.globals or BG)
         local classToken = deps.getClassToken and deps.getClassToken()
-        return M.resolveBuiltIn(deps.adapter, deps.catalog, family, classToken, deps.api)
+        return M.resolveBuiltIn(deps.adapter, deps.catalog, family, classToken, deps.api), family, classToken
     end
 
     function c:onEvent(event)
@@ -46,11 +78,17 @@ function M.new(deps)
     function c:flush()
         if not self.pending then return end
         self.pending = false
-        local builtInId = resolveNow()
+        local builtInId, family, classToken = resolveNow()
         if builtInId ~= self.lastBuiltInId then
             local model = self.deps.model
+            local state = self.deps.getState and self.deps.getState()
             if model and model.applyResolvedSpecialization then
-                model.applyResolvedSpecialization(self.deps.getState and self.deps.getState(), builtInId)
+                if builtInId and state and state.selectionMode == "follow-spec"
+                    and type(state.profiles) == "table" and not state.profiles[builtInId]
+                    and model.reconcileBuiltIns and self.deps.getDefaults then
+                    model.reconcileBuiltIns(state, self.deps.getDefaults(family, classToken))
+                end
+                model.applyResolvedSpecialization(state, builtInId)
             end
             if self.deps.refresh then self.deps.refresh() end
             self.lastBuiltInId = builtInId
@@ -77,18 +115,7 @@ if BG.Init then
         local classToken = currentClassToken()
         if classToken then
             local family = adapter.detect()
-            local defaults
-            local builtInId
-            if family then
-                defaults = catalog.list(family, classToken)
-                local fallback = catalog.getFallback(family, classToken)
-                if fallback then defaults[#defaults + 1] = fallback end
-                builtInId = M.resolveBuiltIn(adapter, catalog, family, classToken, _G)
-                if not builtInId and fallback then builtInId = fallback.builtInKey end
-            else
-                defaults = profiles and profiles.getDefaults({ project = WOW_PROJECT_ID }, classToken) or {}
-                builtInId = nil
-            end
+            local defaults, builtInId = M.buildDefaults(adapter, catalog, profiles, family, classToken, _G)
             model.ensureCharacter(BG.BGNext.DB, BG.realmID or GetRealmID(), BG.playerName, defaults,
                 { builtInId = builtInId })
 
@@ -101,6 +128,11 @@ if BG.Init then
                     local byRealm = BG.BGNext.DB and BG.BGNext.DB.equipmentFilters
                         and BG.BGNext.DB.equipmentFilters[BG.realmID or GetRealmID()]
                     return byRealm and byRealm[BG.playerName]
+                end,
+                getDefaults = function(currentFamily, currentClassToken)
+                    local defaults = M.buildDefaults(adapter, catalog, profiles,
+                        currentFamily, currentClassToken, _G)
+                    return defaults
                 end,
                 refresh = function()
                     if BG.UpdateAllFilter then BG.UpdateAllFilter() end

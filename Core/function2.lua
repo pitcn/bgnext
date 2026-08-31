@@ -164,6 +164,7 @@ do
     local tankPatterns = {
         STAT_CATEGORY_DEFENSE, STAT_PARRY, STAT_DODGE,
         ITEM_MOD_BLOCK_RATING_SHORT, ITEM_MOD_BLOCK_VALUE_SHORT,
+        ITEM_MOD_MASTERY_RATING_SHORT, STAT_MASTERY,
     }
     local db
     local function GetRuntimeDB()

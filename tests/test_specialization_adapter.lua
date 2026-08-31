@@ -20,35 +20,55 @@ return function(test)
     test.eq(modern.specKey, "spec:72", "modern client stores stable spec ID")
     test.eq(modern.reason, nil, "modern resolution is not a failure")
 
+    local namespaced = M.resolve("retail", {
+        C_SpecializationInfo = {
+            GetSpecialization = function() return 2 end,
+            GetSpecializationInfo = function(index)
+                if index == 2 then return 72, "Fury", nil, 132347 end
+            end,
+        },
+    }, "WARRIOR")
+    test.eq(namespaced.specKey, "spec:72", "modern namespace resolves the stable spec ID")
+    test.eq(namespaced.name, "Fury", "modern namespace returns Blizzard specialization name")
+    test.eq(namespaced.icon, 132347, "modern namespace returns Blizzard specialization icon")
+
     -- Missing modern API degrades safely.
     test.eq(M.resolve("retail", {}, "MAGE").reason, "api-unavailable", "missing API is safe")
     test.eq(M.resolve("retail", { GetSpecialization = function() return 1 end }, "MAGE").reason,
         "api-unavailable", "missing specialization info is safe")
 
-    -- Old clients resolve the single dominant tree among exactly three trees.
-    -- GetTalentTabInfo returns pointsSpent as its third value.
+    -- BGLite's supported old clients expose committed points in the fifth slot.
     local old = M.resolve("titan", {
         GetActiveTalentGroup = function() return 1 end,
-        GetTalentTabInfo = function(index) return nil, nil, ({ 8, 31, 2 })[index] end,
+        GetTalentTabInfo = function(index)
+            return ({ "Arms", "Fury", "Protection" })[index], 132347, nil, nil, ({ 8, 31, 2 })[index]
+        end,
     }, "WARRIOR")
     test.eq(old.specKey, "tree:WARRIOR:2", "old client resolves dominant tree")
+    test.eq(old.name, "Fury", "old client returns the talent-tree name")
+    test.eq(old.icon, 132347, "old client returns the talent-tree icon")
 
     local tied = M.resolve("titan", {
         GetActiveTalentGroup = function() return 1 end,
-        GetTalentTabInfo = function(index) return nil, nil, ({ 20, 20, 0 })[index] end,
+        GetTalentTabInfo = function(index) return nil, nil, nil, nil, ({ 20, 20, 0 })[index] end,
     }, "WARRIOR")
     test.eq(tied.specKey, nil, "tied trees are unknown")
     test.eq(tied.reason, "tie", "tie reason is explicit")
 
     local zero = M.resolve("tbc", {
         GetActiveTalentGroup = function() return 1 end,
-        GetTalentTabInfo = function() return nil, nil, 0 end,
+        GetTalentTabInfo = function() return nil, nil, nil, nil, 0 end,
     }, "MAGE")
     test.eq(zero.specKey, nil, "zero-point trees are unknown")
     test.eq(zero.reason, "zero", "zero reason is explicit")
 
     local missingTreeApi = M.resolve("titan", {}, "WARRIOR")
     test.eq(missingTreeApi.reason, "api-unavailable", "missing tree API is safe")
+
+    local thirdSlotFallback = M.resolve("tbc", {
+        GetTalentTabInfo = function(index) return nil, nil, ({ 3, 18, 0 })[index] end,
+    }, "MAGE")
+    test.eq(thirdSlotFallback.specKey, "tree:MAGE:2", "third-slot clients remain compatible")
 
     -- An unknown family is never guessed.
     local unknownFamily = M.resolve("sod", {}, "MAGE")

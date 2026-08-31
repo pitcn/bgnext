@@ -22,6 +22,10 @@ return function(test)
     -- Tank profiles enable the tank-only rule.
     local protection = catalog.getDefault("titan", "WARRIOR", "tree:WARRIOR:3")
     test.eq(protection.tankOnly, true, "tank profile enables tank-only rule")
+    test.eq(catalog.getDefault("retail", "WARRIOR", "spec:73").tankOnly, false,
+        "retail tank does not use legacy tank-stat filtering")
+    test.eq(catalog.getDefault("mop", "WARRIOR", "spec:73").tankOnly, true,
+        "MoP tank uses the mastery-aware tank filter")
 
     -- Feral is a three-tree client ambiguity, never guessed as tank or cat.
     local feral = catalog.getDefault("titan", "DRUID", "tree:DRUID:2")
@@ -36,6 +40,21 @@ return function(test)
         "unverified spec is absent")
     test.eq(catalog.getDefault("wrath", "MAGE", "tree:MAGE:1"), nil,
         "unverified family has no catalog")
+
+    local retailMarksman = catalog.getDefault("retail", "HUNTER", "spec:254")
+    local retailSurvival = catalog.getDefault("retail", "HUNTER", "spec:255")
+    test.eq(retailMarksman.weapon[6], true, "retail ranged hunter filters polearms")
+    test.eq(retailSurvival.weapon[2], true, "retail Survival filters bows")
+    test.eq(retailSurvival.weapon[6], nil, "retail Survival keeps polearms")
+    local mopSurvival = catalog.getDefault("mop", "HUNTER", "spec:255")
+    test.eq(mopSurvival.weapon[2], nil, "MoP Survival remains ranged")
+    test.eq(mopSurvival.weapon[6], true, "MoP Survival filters polearms")
+
+    local holyPaladin = catalog.getDefault("titan", "PALADIN", "tree:PALADIN:1")
+    local retPaladin = catalog.getDefault("titan", "PALADIN", "tree:PALADIN:3")
+    test.eq(holyPaladin.weapon[1], true, "Holy Paladin filters two-handed axes")
+    test.eq(retPaladin.weapon[4], true, "Retribution Paladin filters one-handed maces")
+    test.eq(retPaladin.armor[6], true, "Retribution Paladin filters shields")
 
     -- Iterate every declared profile and assert its shape.
     for _, family in ipairs(families) do

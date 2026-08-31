@@ -42,12 +42,14 @@ return function(test)
 
     test.eq(source:find("followSpecialization", 1, true) ~= nil, true,
         "a dedicated follow button calls the follow-specialization model function")
+    test.eq(source:find("followSpecialization(state(), target.builtInId, defaults)", 1, true) ~= nil, true,
+        "follow button installs specialization defaults for migrated characters")
     test.eq(source:find('L["跟随当前专精"]', 1, true) ~= nil, true,
         "follow button labels the follow-specialization action")
     test.eq(source:find('L["未识别当前专精，沿用当前方案"]', 1, true) ~= nil, true,
         "follow button shows an explicit unknown-specialization status")
-    test.eq(source:find("GetSpecializationInfo", 1, true) ~= nil, true,
-        "follow button resolves the live specialization name when available")
+    test.eq(source:find("_G.GetSpecialization", 1, true), nil,
+        "UI delegates specialization API compatibility to the adapter")
     test.eq(source:find('selectionMode = "', 1, true), nil,
         "UI writes selectionMode only through model functions")
     test.eq(source:find("buildDefaults", 1, true) ~= nil, true,

@@ -128,6 +128,28 @@ local function profilesModule()
     return BG.BGNext.EquipmentFilterProfiles
 end
 
+local function addFilters(target, ids)
+    for _, id in ipairs(ids or {}) do target[id] = true end
+end
+
+local function applyEquipmentOverrides(family, classToken, spec, base)
+    if classToken == "HUNTER" then
+        local ranged = spec.key ~= "spec:255" or family == "mop"
+        if ranged then
+            addFilters(base.weapon, { 0, 1, 4, 5, 6, 7, 8, 10, 13, 15 })
+        else
+            addFilters(base.weapon, { 2, 3, 18 })
+        end
+    elseif classToken == "PALADIN" then
+        if spec.role == "intellect-healing" or spec.role == "strength-tank" then
+            addFilters(base.weapon, { 1, 5, 6, 8 })
+        elseif spec.role == "strength-melee" then
+            addFilters(base.weapon, { 0, 4, 7 })
+            addFilters(base.armor, { 0, 6 })
+        end
+    end
+end
+
 local function compose(family, classToken, spec)
     local Profiles = profilesModule()
     local base = Profiles and Profiles.getClassBase(family, classToken)
@@ -140,7 +162,8 @@ local function compose(family, classToken, spec)
     base.name = spec.name
     base.primaryStat = clone(role.primaryStat)
     base.affix = clone(role.affix)
-    base.tankOnly = role.tankOnly
+    base.tankOnly = role.tankOnly and (family == "titan" or family == "mop")
+    applyEquipmentOverrides(family, classToken, spec, base)
     return base
 end
 

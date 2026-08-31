@@ -128,16 +128,21 @@ return function(test)
     test.eq(legacy.profiles["custom-1"].name, "自定义", "migration preserves custom profile")
     test.eq(legacy.order[2], "custom-1", "migration preserves profile order")
 
+    model.followSpecialization(legacy, "retail:MAGE:spec:63", specDefaults())
+    test.eq(legacy.selectionMode, "follow-spec", "legacy state can explicitly enable following")
+    test.eq(legacy.selectedId, "retail:MAGE:spec:63", "explicit follow installs and selects spec defaults")
+    test.eq(legacy.profiles["custom-1"].name, "自定义", "explicit follow preserves legacy custom profiles")
+
     -- Profile lifecycle: update, move, delete.
     local edited = model.updateProfile(legacy, "custom-1", { name = "修改", unknown = true })
     test.eq(edited, true, "profile updated")
     test.eq(legacy.profiles["custom-1"].name, "修改", "known field updated")
     test.eq(legacy.profiles["custom-1"].unknown, nil, "unknown patch ignored")
-    test.eq(model.moveProfile(legacy, "custom-1", -1), true, "profile moved")
+    test.eq(model.moveProfile(legacy, "custom-1", -#legacy.order), true, "profile moved")
     test.eq(legacy.order[1], "custom-1", "profile order changed")
     test.eq(model.deleteProfile(legacy, "custom-1"), true, "profile deleted")
     test.eq(legacy.profiles["custom-1"], nil, "deleted profile removed")
-    test.eq(legacy.selectedId, "MAGE", "deleting inactive profile preserves selection")
+    test.eq(legacy.selectedId, "retail:MAGE:spec:63", "deleting inactive profile preserves selection")
 
     -- Defensive copies and character isolation.
     local other = model.ensureCharacter(root, "realm", "Other", specDefaults(),
@@ -166,4 +171,8 @@ return function(test)
         true, "filter refresh accepts either the BGNext editor or the legacy placeholder")
     test.eq(source:find("C_ChatInfo.SendAddonMessage", 1, true), nil,
         "local equipment filtering adds no addon communication")
+    test.eq(source:find("ItemPrimaryStats.new", 1, true) ~= nil, true,
+        "all clients use the shared primary-stat detector for explicit profile rules")
+    test.eq(source:find("itemAttributeCache", 1, true), nil,
+        "specialization compatibility does not restore the legacy Retail-only attribute cache")
 end
