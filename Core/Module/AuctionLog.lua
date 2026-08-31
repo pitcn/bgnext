@@ -50,7 +50,7 @@ BG.Init(function()
             for i, v in ipairs(tbl) do
                 frame = BG.CreateHighlightFrame(self, nil, { 1, 0, 0, 0 }, 4)
             end
-            local t = frame:CreateFontString()
+            local t = BG.GetHighlightFrameLabel(frame)
             t:SetFont(BIAOGE_TEXT_FONT, 20, "OUTLINE")
             t:SetPoint("RIGHT", self, "RIGHT", -2, 0)
             t:SetTextColor(1, 0, 0)

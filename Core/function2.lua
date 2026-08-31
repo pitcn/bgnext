@@ -1810,6 +1810,48 @@ end
 
 ------------------表格/背包高亮对应装备------------------
 do
+    local HighlightManager = assert(BG.BGNext and BG.BGNext.HighlightManager,
+        "HighlightManager must load before function2")
+    local highlightPoolParent = CreateFrame("Frame", nil, UIParent)
+    highlightPoolParent:Hide()
+
+    local function CreatePooledHighlightFrame(flash)
+        local f = CreateFrame("Frame", nil, highlightPoolParent, "BackdropTemplate")
+        if flash then
+            local flashGroup = f:CreateAnimationGroup()
+            for i = 1, 3 do
+                local fadeIn = flashGroup:CreateAnimation('Alpha')
+                fadeIn:SetChildKey('flash')
+                fadeIn:SetOrder(i * 2)
+                fadeIn:SetDuration(.4)
+                fadeIn:SetFromAlpha(.1)
+                fadeIn:SetToAlpha(1)
+
+                local fadeOut = flashGroup:CreateAnimation('Alpha')
+                fadeOut:SetChildKey('flash')
+                fadeOut:SetOrder(i * 2 + 1)
+                fadeOut:SetDuration(.4)
+                fadeOut:SetFromAlpha(1)
+                fadeOut:SetToAlpha(.1)
+            end
+            flashGroup:SetLooping("REPEAT")
+            f.flashGroup = flashGroup
+        end
+        return f
+    end
+
+    local highlightManager = HighlightManager.new({
+        createFrame = CreatePooledHighlightFrame,
+        poolParent = highlightPoolParent,
+        active = BG.LastBagItemFrame,
+    })
+
+    function BG.GetHighlightFrameLabel(frame)
+        return highlightManager:getLabel(frame, function(owner)
+            return owner:CreateFontString()
+        end)
+    end
+
     function BG.CreateHighlightFrame(parent, flash, color, level, size)
         local r, g, b, a
         if color then
@@ -1818,7 +1860,7 @@ do
             r, g, b, a = 1, 0, 0, 1
         end
         local parent = parent or UIParent
-        local f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+        local f = highlightManager:acquire(parent, flash)
         f:SetBackdrop({
             edgeFile = "Interface/ChatFrame/ChatFrameBackground",
             edgeSize = size or (flash and 4 or 2),
@@ -1827,139 +1869,227 @@ do
         f:SetPoint("TOPLEFT")
         f:SetPoint("BOTTOMRIGHT")
         f:SetFrameLevel(parent:GetFrameLevel() + (level or 8))
-        tinsert(BG.LastBagItemFrame, f)
-
-        if flash then
-            local flashGroup = f:CreateAnimationGroup()
-            for i = 1, 3 do
-                local fade = flashGroup:CreateAnimation('Alpha')
-                fade:SetChildKey('flash')
-                fade:SetOrder(i * 2)
-                fade:SetDuration(.4)
-                fade:SetFromAlpha(.1)
-                fade:SetToAlpha(1)
-
-                local fade = flashGroup:CreateAnimation('Alpha')
-                fade:SetChildKey('flash')
-                fade:SetOrder(i * 2 + 1)
-                fade:SetDuration(.4)
-                fade:SetFromAlpha(1)
-                fade:SetToAlpha(.1)
-            end
-            flashGroup:Play()
-            flashGroup:SetLooping("REPEAT")
-        end
+        if f.flashGroup then f.flashGroup:Play() end
 
         return f
     end
 
-    function BG.HighlightBag(link)
-        if BiaoGe.options["HighOnterItem"] ~= 1 then return end
-        if not GetItemID(link) then return end
+    local function IsVisibleHighlightEntry(entry)
+        local target = entry and entry.target
+        return target and (not target.IsVisible or target:IsVisible())
+    end
+
+    function BG.InvalidateHighlightBagIndex()
+        highlightManager:invalidate("bag")
+    end
+
+    function BG.InvalidateHighlightTableIndex()
+        highlightManager:invalidate("table")
+    end
+
+    local function BagSurfaceKey()
+        local frame
         if _G["NDui_BackpackSlot1"] then
+            frame = _G["NDui_BackpackSlot1"]
+            return "ndui:" .. tostring(frame) .. ":" .. tostring(frame:IsVisible())
+        elseif _G["ElvUI_ContainerFrame"] then
+            frame = _G["ElvUI_ContainerFrame"]
+            return "elvui:" .. tostring(frame) .. ":" .. tostring(frame:IsVisible())
+        elseif _G["CombuctorFrame1"] then
+            frame = _G["CombuctorFrame1"]
+            return "combuctor:" .. tostring(frame) .. ":" .. tostring(frame:IsVisible())
+        elseif _G["BagnonContainerItem1"] then
+            frame = _G["BagnonContainerItem1"]
+            return "bagnon:" .. tostring(frame) .. ":" .. tostring(frame:IsVisible())
+        elseif ContainerFrameCombinedBags then
+            frame = ContainerFrameCombinedBags
+            return "combined:" .. tostring(frame) .. ":" .. tostring(frame:IsVisible())
+        end
+
+        local visibility = { "native" }
+        for i = 1, 13 do
+            frame = _G["ContainerFrame" .. i]
+            if frame then
+                visibility[#visibility + 1] = tostring(frame)
+                visibility[#visibility + 1] = frame:IsVisible() and "1" or "0"
+            end
+        end
+        return table.concat(visibility, ":")
+    end
+
+    local function CollectBagHighlightSurface(includeItems)
+        local entries = {}
+        local revision = {}
+        local function Add(button, bagID, slotID)
+            if not button then return end
+            revision[#revision + 1] = table.concat({ tostring(button), tostring(bagID), tostring(slotID) }, ":")
+            if includeItems then
+                local itemLink = C_Container.GetContainerItemLink(bagID, slotID)
+                local itemID = itemLink and GetItemID(itemLink)
+                if itemID then
+                    entries[#entries + 1] = { itemID = itemID, target = button }
+                end
+            end
+        end
+
+        if _G["NDui_BackpackSlot1"] then
+            revision[#revision + 1] = "ndui"
             local i = 1
             while _G["NDui_BackpackSlot" .. i] do
                 local bt = _G["NDui_BackpackSlot" .. i]
-                local _link = C_Container.GetContainerItemLink(bt.bagId, bt.slotId)
-                if _link and GetItemID(_link) == GetItemID(link) then
-                    BG.CreateHighlightFrame(bt, true)
-                end
+                Add(bt, bt.bagId, bt.slotId)
                 i = i + 1
             end
         elseif _G["ElvUI_ContainerFrame"] then
+            revision[#revision + 1] = "elvui"
             local b = -1
             local i = 1
             while _G["ElvUI_ContainerFrameBag" .. b .. "Slot" .. i] do
                 while _G["ElvUI_ContainerFrameBag" .. b .. "Slot" .. i] do
                     local bt = _G["ElvUI_ContainerFrameBag" .. b .. "Slot" .. i]
-                    local _link = C_Container.GetContainerItemLink(bt.BagID, bt.SlotID)
-                    if _link and GetItemID(_link) == GetItemID(link) then
-                        BG.CreateHighlightFrame(bt, true)
-                    end
+                    Add(bt, bt.BagID, bt.SlotID)
                     i = i + 1
                 end
                 b = b + 1
                 i = 1
             end
         elseif _G["CombuctorFrame1"] then
+            revision[#revision + 1] = "combuctor"
             local i = 1
             while _G["CombuctorItem" .. i] do
                 local bt = _G["CombuctorItem" .. i]
-                local _link = C_Container.GetContainerItemLink(bt:GetParent():GetID(), bt:GetID())
-                if _link and GetItemID(_link) == GetItemID(link) then
-                    BG.CreateHighlightFrame(bt, true)
-                end
+                Add(bt, bt:GetParent():GetID(), bt:GetID())
                 i = i + 1
             end
         elseif _G["BagnonContainerItem1"] then
+            revision[#revision + 1] = "bagnon"
             local i = 1
             while _G["BagnonContainerItem" .. i] do
                 local bt = _G["BagnonContainerItem" .. i]
-                local _link = C_Container.GetContainerItemLink(bt:GetParent():GetID(), bt:GetID())
-                if _link and GetItemID(_link) == GetItemID(link) then
-                    BG.CreateHighlightFrame(bt, true)
-                end
+                Add(bt, bt:GetParent():GetID(), bt:GetID())
                 i = i + 1
             end
         elseif ContainerFrameCombinedBags then
+            revision[#revision + 1] = "combined"
             local f = ContainerFrameCombinedBags
             if f.Items then
                 for i = 1, #f.Items do
                     local bt = f.Items[i]
-                    local _link = C_Container.GetContainerItemLink(bt:GetBagID(), bt:GetID())
-                    if _link and GetItemID(_link) == GetItemID(link) then
-                        BG.CreateHighlightFrame(bt, true)
-                    end
+                    Add(bt, bt:GetBagID(), bt:GetID())
                 end
             end
         else
+            revision[#revision + 1] = "native"
             local b = 1
             local i = 1
             while _G["ContainerFrame" .. b .. "Item" .. i] do
                 while _G["ContainerFrame" .. b .. "Item" .. i] do
                     local bt = _G["ContainerFrame" .. b .. "Item" .. i]
-                    local _link = C_Container.GetContainerItemLink(bt:GetParent():GetID(), bt:GetID())
-                    if _link and GetItemID(_link) == GetItemID(link) then
-                        BG.CreateHighlightFrame(bt, true)
-                    end
+                    Add(bt, bt:GetParent():GetID(), bt:GetID())
                     i = i + 1
                 end
                 b = b + 1
                 i = 1
             end
         end
+        return entries, table.concat(revision, "|")
+    end
+
+    local function BuildBagHighlightIndex()
+        return CollectBagHighlightSurface(true)
+    end
+
+    local function BagLayoutRevision()
+        local _, revision = CollectBagHighlightSurface(false)
+        return revision
+    end
+
+    function BG.HighlightBag(link)
+        if BiaoGe.options["HighOnterItem"] ~= 1 then return end
+        local itemID = GetItemID(link)
+        if not itemID then return end
+        local matches = highlightManager:getMatches("bag", BagSurfaceKey(), itemID,
+            BuildBagHighlightIndex, IsVisibleHighlightEntry, BagLayoutRevision)
+        for _, entry in ipairs(matches) do
+            BG.CreateHighlightFrame(entry.target, true)
+        end
+    end
+
+    local tableTextHooks = setmetatable({}, { __mode = "k" })
+    local function WatchTableText(button)
+        if not button or tableTextHooks[button] or not button.HookScript then return end
+        tableTextHooks[button] = true
+        button:HookScript("OnTextChanged", BG.InvalidateHighlightTableIndex)
+    end
+
+    local function CurrentTableSurface()
+        local viewType
+        if BG.FBMainFrame:IsVisible() then
+            viewType = "FB"
+        elseif BG.DuiZhangMainFrame:IsVisible() then
+            viewType = "DuiZhang"
+        end
+        if not viewType then return end
+        local FB = BG.FB1
+        local frames = viewType == "FB" and BG.Frame[FB] or BG.DuiZhangFrame[FB]
+        return viewType, FB, frames,
+            table.concat({ viewType, tostring(FB), tostring(frames) }, ":")
+    end
+
+    local function CollectTableHighlightSurface(includeItems)
+        local entries = {}
+        local revision = {}
+        local viewType, FB = CurrentTableSurface()
+        if not viewType then return entries, "hidden" end
+        revision[#revision + 1] = viewType
+        revision[#revision + 1] = tostring(FB)
+        for b = 1, Maxb[FB] do
+            for i = 1, BG.GetMaxi(FB, b) do
+                local zb, jine
+                if viewType == "FB" then
+                    zb = BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]
+                    jine = BG.Frame[FB]["boss" .. b]["jine" .. i]
+                elseif viewType == "DuiZhang" then
+                    zb = BG.DuiZhangFrame[FB]["boss" .. b]["zhuangbei" .. i]
+                    jine = BG.DuiZhangFrame[FB]["boss" .. b]["otherjine" .. i]
+                end
+                revision[#revision + 1] = table.concat({ tostring(b), tostring(i), tostring(zb), tostring(jine) }, ":")
+                if zb then
+                    if includeItems then
+                        WatchTableText(zb)
+                        local itemID = GetItemID(zb:GetText())
+                        if itemID then
+                            entries[#entries + 1] = { itemID = itemID, target = zb, endTarget = jine }
+                        end
+                    end
+                end
+            end
+        end
+        return entries, table.concat(revision, "|")
+    end
+
+    local function BuildTableHighlightIndex()
+        return CollectTableHighlightSurface(true)
+    end
+
+    local function TableLayoutRevision()
+        local _, revision = CollectTableHighlightSurface(false)
+        return revision
     end
 
     function BG.HighlightBiaoGe(link)
         if BiaoGe.options["HighOnterItem"] ~= 1 then return end
-        if not GetItemID(link) then return end
-        local type
-        if BG.FBMainFrame:IsVisible() then
-            type = "FB"
-        elseif BG.DuiZhangMainFrame:IsVisible() then
-            type = "DuiZhang"
-        end
-        if not type then return end
-        local FB = BG.FB1
-        for b = 1, Maxb[FB] do
-            for i = 1, BG.GetMaxi(FB, b) do
-                local zb, jine
-                if type == "FB" then
-                    zb = BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]
-                    jine = BG.Frame[FB]["boss" .. b]["jine" .. i]
-                elseif type == "DuiZhang" then
-                    zb = BG.DuiZhangFrame[FB]["boss" .. b]["zhuangbei" .. i]
-                    jine = BG.DuiZhangFrame[FB]["boss" .. b]["otherjine" .. i]
-                end
-                if zb then
-                    if GetItemID(link) == GetItemID(zb:GetText()) then
-                        local f = BG.CreateHighlightFrame(zb)
-                        f:ClearAllPoints()
-                        f:SetPoint("TOPLEFT", zb, "TOPLEFT", 0, 0)
-                        f:SetPoint("BOTTOMRIGHT", jine, "BOTTOMRIGHT", 0, 0)
-                    end
-                end
-            end
+        local itemID = GetItemID(link)
+        if not itemID then return end
+        local _, _, _, surfaceKey = CurrentTableSurface()
+        if not surfaceKey then return end
+        local matches = highlightManager:getMatches("table", surfaceKey, itemID,
+            BuildTableHighlightIndex, IsVisibleHighlightEntry, TableLayoutRevision)
+        for _, entry in ipairs(matches) do
+            local f = BG.CreateHighlightFrame(entry.target)
+            f:ClearAllPoints()
+            f:SetPoint("TOPLEFT", entry.target, "TOPLEFT", 0, 0)
+            f:SetPoint("BOTTOMRIGHT", entry.endTarget, "BOTTOMRIGHT", 0, 0)
         end
     end
 
@@ -1990,6 +2120,7 @@ do
 
     function BG.Show_AllHighlight(link, btType)
         BG.Hide_AllHighlight()
+        if BiaoGe.options["HighOnterItem"] ~= 1 then return end
         if not btType or btType ~= "bag" then
             BG.HighlightBag(link)
         end
@@ -2005,13 +2136,13 @@ do
     end
 
     function BG.Hide_AllHighlight()
-        for _, f in pairs(BG.LastBagItemFrame) do
-            f:Hide()
-            f:SetParent(nil)
-        end
-        wipe(BG.LastBagItemFrame)
+        highlightManager:releaseAll()
         BG.highlightChatFrameItemID = nil
     end
+
+    BG.RegisterEvent({ "BAG_UPDATE_DELAYED", "PLAYERBANKSLOTS_CHANGED" }, function()
+        BG.InvalidateHighlightBagIndex()
+    end)
 end
 
 ------------------创建按钮模板1------------------
