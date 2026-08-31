@@ -490,7 +490,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                     BiaoGe.options[name] = BG.options[name .. "reset"]
                 end
             end
-            BG.MainFrame:SetScale(BiaoGe.options[name])
+            BG.ApplyMainFrameScale()
 
             local ontext = {
                 L["表格UI缩放"] .. L["|cff808080（右键还原设置）|r"],
@@ -506,7 +506,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                 value = tonumber(string.format("%.2f", value))
                 BiaoGe.options[name] = value
                 f.edit:SetText(value)
-                BG.MainFrame:SetScale(value)
+                BG.ApplyMainFrameScale()
             end)
             f.button:SetScript("OnClick", function(self, enter)
                 if enter == "RightButton" then
@@ -515,7 +515,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                         BiaoGe.options[name] = value
                         f:SetValue(value)
                         f.edit:SetText(value)
-                        BG.MainFrame:SetScale(value)
+                        BG.ApplyMainFrameScale()
                         BG.PlaySound(1)
                     end
                 end
