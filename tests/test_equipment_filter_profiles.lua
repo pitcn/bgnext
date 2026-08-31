@@ -28,4 +28,24 @@ return function(test)
     test.eq(type(rules.armor), "table", "armor rules exposed")
     test.eq(type(rules.affix), "table", "affix rules exposed")
     test.eq(rules.primaryStat.INTELLECT ~= nil, true, "primary stat rules use stable IDs")
+
+    local warlock = catalog.getDefaults({ project = "classic" }, "WARLOCK")
+    test.eq(warlock[1].primaryStat.INTELLECT, true,
+        "the built-in Warlock profile selects Intellect without manual setup")
+    test.eq(warlock[1].primaryStat.STRENGTH, nil,
+        "the built-in Warlock profile does not allow Strength")
+    test.eq(warlock[1].affix.ATTACK_POWER, true,
+        "a pure spellcaster filters attack-power gear by default")
+    test.eq(warlock[1].affix.SPELL_POWER, nil,
+        "a pure spellcaster retains spell-power gear by default")
+
+    local warrior = catalog.getDefaults({ project = "classic" }, "WARRIOR")
+    test.eq(warrior[1].affix.SPELL_POWER, true,
+        "a pure physical class filters spell-power gear by default")
+    test.eq(warrior[1].affix.ATTACK_POWER, nil,
+        "a pure physical class retains attack-power gear by default")
+
+    local druid = catalog.getDefaults({ project = "classic" }, "DRUID")
+    test.eq(next(druid[1].affix), nil,
+        "a hybrid class does not guess one damage type for every specialization")
 end

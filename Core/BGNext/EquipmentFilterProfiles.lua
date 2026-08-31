@@ -80,6 +80,17 @@ local primaryStats = {
     WARRIOR = { STRENGTH = true },
 }
 
+-- These defaults describe only classes whose built-in profile has one
+-- unambiguous damage-stat family. Hybrid classes intentionally stay empty:
+-- their one class-wide profile cannot safely guess the player's spec.
+local damageAffixes = {
+    DEATHKNIGHT = { SPELL_POWER = true }, DEMONHUNTER = { SPELL_POWER = true },
+    HUNTER = { SPELL_POWER = true }, ROGUE = { SPELL_POWER = true },
+    WARRIOR = { SPELL_POWER = true },
+    EVOKER = { ATTACK_POWER = true }, MAGE = { ATTACK_POWER = true },
+    PRIEST = { ATTACK_POWER = true }, WARLOCK = { ATTACK_POWER = true },
+}
+
 local allowedWeapons = {
     DEATHKNIGHT = { 0, 1, 4, 5, 6, 7, 8 }, DEMONHUNTER = { 0, 7, 9, 13, 15 },
     DRUID = { 4, 5, 6, 10, 13, 15 }, EVOKER = { 0, 4, 7, 10, 15 },
@@ -129,7 +140,7 @@ function M.getDefaults(client, classToken)
         icon = classIcons[classToken],
         weapon = complement(weaponRules, allowedWeapons[classToken]),
         armor = armorFilter(classToken),
-        affix = {},
+        affix = damageAffixes[classToken] or {},
         classRestriction = true,
         ignoreBattleNetBound = false,
         tankOnly = false,
