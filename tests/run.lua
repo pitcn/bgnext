@@ -17,6 +17,7 @@ local suites = {
     "tests/test_wishlist_picker.lua",
     "tests/test_wishlist_reminder.lua",
     "tests/test_equipment_filter_profiles.lua",
+    "tests/test_item_primary_stats.lua",
     "tests/test_equipment_filter.lua",
     "tests/test_current_purchases.lua",
     "tests/test_equipment_filter_ui.lua",

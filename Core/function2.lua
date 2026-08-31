@@ -126,17 +126,20 @@ do
     local ITEM_SOCKET_BONUS = ITEM_SOCKET_BONUS:gsub("%%s", "(.+)")                     -- 镶孔奖励：%s
     local ITEM_MOD_FERAL_ATTACK_POWER = ITEM_MOD_FERAL_ATTACK_POWER:gsub("%%s", "(.+)") -- 在猎豹、熊等等攻击强度提高%s点
     local ITEM_LIMIT_CATEGORY_MULTIPLE = ITEM_LIMIT_CATEGORY_MULTIPLE:gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)")
-    local itemAttributeCache = {}
     local attribute = {
         ITEM_MOD_STRENGTH_SHORT = "^%+%C-" .. ITEM_MOD_STRENGTH_SHORT,
         ITEM_MOD_AGILITY_SHORT = "^%+%C-" .. ITEM_MOD_AGILITY_SHORT,
         ITEM_MOD_INTELLECT_SHORT = "^%+%C-" .. ITEM_MOD_INTELLECT_SHORT,
     }
-    local primaryStatKeys = {
-        STRENGTH = "ITEM_MOD_STRENGTH_SHORT",
-        AGILITY = "ITEM_MOD_AGILITY_SHORT",
-        INTELLECT = "ITEM_MOD_INTELLECT_SHORT",
-    }
+    local ItemPrimaryStats = assert(BG.BGNext and BG.BGNext.ItemPrimaryStats, "ItemPrimaryStats must load before function2")
+    local primaryStatDetector = ItemPrimaryStats.new({
+        getItemStats = C_Item and C_Item.GetItemStats or GetItemStats,
+        tooltipPatterns = {
+            STRENGTH = attribute.ITEM_MOD_STRENGTH_SHORT,
+            AGILITY = attribute.ITEM_MOD_AGILITY_SHORT,
+            INTELLECT = attribute.ITEM_MOD_INTELLECT_SHORT,
+        },
+    })
     local affixPatterns = {
         STRENGTH = { value = { attribute.ITEM_MOD_STRENGTH_SHORT } },
         AGILITY = { value = { attribute.ITEM_MOD_AGILITY_SHORT } },
@@ -195,20 +198,6 @@ do
         BG.Tooltip_SetItemByID(itemID)
         local tbl = {}
         local ii = 2
-        if BG.IsRetail and not itemAttributeCache[itemID] then
-            itemAttributeCache[itemID] = {}
-            for ii = 2, BiaoGeTooltip:NumLines() do
-                local leftText = _G["BiaoGeTooltipTextLeft" .. ii]
-                local text = leftText:GetText()
-                if text and text ~= "" then
-                    for name, ab in pairs(attribute) do
-                        if text:find(ab) then
-                            itemAttributeCache[itemID][name] = true
-                        end
-                    end
-                end
-            end
-        end
         while _G["BiaoGeTooltipTextLeft" .. ii] do
             local leftText = _G["BiaoGeTooltipTextLeft" .. ii]
             local text = leftText:GetText()
@@ -334,28 +323,17 @@ do
             end
         end
     end
-    local function FilterAttribute(itemID)
+    local function FilterAttribute(itemRef, TooltipText)
         local num = db.chooseID
         if not num then return end
-        if not next(db[num].MainAttribute) then
-            return false
-        end
-        local stats = itemAttributeCache[itemID]
-        if stats and next(stats) then
-            for id, v in pairs(db[num].MainAttribute) do
-                if stats[primaryStatKeys[id]] then
-                    return false
-                end
-            end
-            return true
-        end
+        return primaryStatDetector:isMismatch(db[num].MainAttribute, itemRef, TooltipText)
     end
     -- ITEM_BIND_TO_BNETACCOUNT
-    function BG.FilterAll(itemID, typeID, EquipLoc, subclassID, tooltipText)
+    function BG.FilterAll(itemRef, typeID, EquipLoc, subclassID, tooltipText)
         if typeID == 9 then return false end
         db = GetRuntimeDB()
         if not db then return false end
-        local TooltipText = tooltipText or BG.GetTooltipTextLeftAll(itemID)
+        local TooltipText = tooltipText or BG.GetTooltipTextLeftAll(itemRef)
         if FilterBnetAccount(TooltipText) then return false end
         if FilterArmor(typeID, EquipLoc, subclassID) then
             return true
@@ -372,7 +350,7 @@ do
         if FilterTANK(TooltipText, typeID, EquipLoc) then
             return true
         end
-        if FilterAttribute(itemID) then
+        if FilterAttribute(itemRef, TooltipText) then
             return true
         end
     end
@@ -384,7 +362,7 @@ do
         local num = db and db.chooseID
 
         if itemID and num then
-            if BG.FilterAll(itemID, typeID, EquipLoc, subclassID) then
+            if BG.FilterAll(text, typeID, EquipLoc, subclassID) then
                 bt:SetAlpha(alpha_ban)
                 return
             end
@@ -435,8 +413,9 @@ do
         end
 
         local function applyFilter()
-            local _, _, _, _, _, _, _, _, equipLoc, _, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
-            local filtered = typeID and BG.FilterAll(f.itemID, typeID, equipLoc, subclassID) or false
+            local _, itemLink, _, _, _, _, _, _, equipLoc, _, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
+            local itemRef = ItemPrimaryStats.selectItemRef(f.link, itemLink, f.itemID)
+            local filtered = typeID and BG.FilterAll(itemRef, typeID, equipLoc, subclassID) or false
             f.filter = filtered or nil
             BGA.aura_env.SetFrameColor(f, filtered and 2 or 0)
             if onUpdated then onUpdated(filtered, bindType) end
@@ -517,7 +496,7 @@ do
         local itemID, _, _, EquipLoc, _, typeID, subclassID = GetItemInfoInstant(link)
 
         if itemID then
-            if BG.FilterAll(itemID, typeID, EquipLoc, subclassID) then
+            if BG.FilterAll(link, typeID, EquipLoc, subclassID) then
                 return ""
             end
         end

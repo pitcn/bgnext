@@ -68,6 +68,24 @@ local function replaceWithDefaults(state, defaults)
     return state
 end
 
+local function backfillMissingBuiltInPrimaryStats(state, defaults)
+    if type(state) ~= "table" or type(state.profiles) ~= "table" then return end
+    local defaultByBuiltInKey = {}
+    for _, profile in ipairs(defaults or {}) do
+        if type(profile) == "table" and type(profile.builtInKey) == "string" then
+            defaultByBuiltInKey[profile.builtInKey] = profile
+        end
+    end
+    for _, profile in pairs(state.profiles) do
+        if type(profile) == "table" and profile.primaryStat == nil and type(profile.builtInKey) == "string" then
+            local default = defaultByBuiltInKey[profile.builtInKey]
+            if default and type(default.primaryStat) == "table" then
+                profile.primaryStat = clone(default.primaryStat)
+            end
+        end
+    end
+end
+
 function M.ensureCharacter(root, realmId, player, defaults)
     if type(root) ~= "table" or realmId == nil or player == nil then return nil end
     root.equipmentFilters = type(root.equipmentFilters) == "table" and root.equipmentFilters or {}
@@ -77,6 +95,8 @@ function M.ensureCharacter(root, realmId, player, defaults)
         state = {}
         root.equipmentFilters[realmId][player] = state
         replaceWithDefaults(state, defaults)
+    else
+        backfillMissingBuiltInPrimaryStats(state, defaults)
     end
     return state
 end

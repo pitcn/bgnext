@@ -55,6 +55,49 @@ return function(test)
     test.eq(state.profiles.MAGE.name, "法师", "character state is not aliased")
     test.eq(defaults[1].name, "法师", "source defaults are not mutated")
 
+    local missingPrimaryStat = {
+        equipmentFilters = {
+            realm = {
+                Warlock = {
+                    selectedId = "WARLOCK",
+                    order = { "WARLOCK", "custom-1" },
+                    profiles = {
+                        WARLOCK = {
+                            id = "WARLOCK", name = "术士", builtInKey = "WARLOCK",
+                            weapon = {}, armor = {}, affix = {},
+                        },
+                        ["custom-1"] = {
+                            id = "custom-1", name = "自定义", weapon = {}, armor = {}, affix = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local warlockDefaults = {
+        {
+            id = "WARLOCK", name = "术士", builtInKey = "WARLOCK", icon = 136145,
+            weapon = {}, armor = {}, affix = {}, primaryStat = { INTELLECT = true },
+        },
+    }
+    local migrated = model.ensureCharacter(missingPrimaryStat, "realm", "Warlock", warlockDefaults)
+    test.eq(migrated.profiles.WARLOCK.primaryStat.INTELLECT, true,
+        "a legacy built-in profile missing primaryStat receives its default")
+    test.eq(migrated.profiles["custom-1"].primaryStat, nil,
+        "a custom profile missing primaryStat is not changed")
+
+    migrated.profiles.WARLOCK.primaryStat = {}
+    model.ensureCharacter(missingPrimaryStat, "realm", "Warlock", warlockDefaults)
+    test.eq(next(migrated.profiles.WARLOCK.primaryStat), nil,
+        "an intentionally empty built-in primaryStat selection is preserved")
+
+    migrated.profiles.WARLOCK.primaryStat = { STRENGTH = true }
+    model.ensureCharacter(missingPrimaryStat, "realm", "Warlock", warlockDefaults)
+    test.eq(migrated.profiles.WARLOCK.primaryStat.STRENGTH, true,
+        "a customized built-in primaryStat selection is preserved")
+    test.eq(migrated.profiles.WARLOCK.primaryStat.INTELLECT, nil,
+        "defaults do not overwrite a customized built-in primaryStat selection")
+
     test.eq(model.isRuleSelected(state.profiles.MAGE, "classRestriction", nil, true), true,
         "enabled boolean rule is selected")
     test.eq(model.isRuleSelected(state.profiles.MAGE, "ignoreBattleNetBound", nil, true), false,
