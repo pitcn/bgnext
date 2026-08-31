@@ -13,6 +13,8 @@ local GetLootMethod = GetLootMethod or C_PartyInfo.GetLootMethod
 local Maxb = ns.Maxb
 
 local player = BG.playerName
+local TooltipDebtRuntime = assert(BG.BGNext.TooltipDebtRuntime,
+    "BGNext TooltipDebtRuntime must load before hooks")
 
 local r, g, b = GetClassRGB(nil, "player")
 
@@ -23,30 +25,35 @@ BG.Init2(function()
     do
         -- 鼠标提示玩家的欠款和罚款
         do
-            local fk = {}
-            local qk = {}
-            local function Get()
-                if not IsInRaid(1) then return end
-                local FB = BG.FB1
-                fk = {}
-                qk = {}
-                BG.PairFBItem(function(item, buyer, money, b, i)
-                    local name = buyer:GetText()
-                    if name ~= '' then
-                        fk[name] = fk[name] or 0
-                        qk[name] = qk[name] or 0
-                        if b == Maxb[FB] then
-                            fk[name] = fk[name] + (tonumber(money:GetText()) or 0)
-                        end
-                        qk[name] = qk[name] + (tonumber(BiaoGe[FB]["boss" .. b]["qiankuan" .. i]) or 0)
-                    end
-                end)
-            end
-            C_Timer.NewTicker(2, Get)
+            local debtRuntime = TooltipDebtRuntime.new({
+                isReady = function(FB)
+                    return FB and BG.Frame[FB] and BiaoGe[FB] and Maxb[FB]
+                end,
+                pairItems = function(FB, callback)
+                    BG.PairFBItem(callback, nil, nil, FB)
+                end,
+                maxBoss = function(FB) return Maxb[FB] end,
+                getDebt = function(FB, b, i)
+                    return BiaoGe[FB]["boss" .. b]["qiankuan" .. i]
+                end,
+                getDebtButton = function(FB, b, i)
+                    return BG.Frame[FB]["boss" .. b]["qiankuan" .. i]
+                end,
+                hookEdit = function(edit, callback)
+                    edit:HookScript("OnTextChanged", callback)
+                end,
+                hookMethod = hooksecurefunc,
+            })
 
             local function AddUnitInfo(self, unit, name)
-                if BiaoGe.options["mouseFK"] ~= 1 then return end
-                if not IsInRaid(1) then return end
+                local enabled = BiaoGe.options["mouseFK"] == 1
+                local inRaid = IsInRaid(1)
+                local fk, qk = debtRuntime:get({
+                    enabled = enabled,
+                    inRaid = inRaid,
+                    raidId = BG.FB1,
+                })
+                if not enabled or not inRaid then return end
                 local fkMoney = fk[name] or 0
                 local qkMoney = qk[name] or 0
                 if fkMoney ~= 0 then
