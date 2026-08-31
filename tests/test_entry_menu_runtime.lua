@@ -144,11 +144,14 @@ return function(test)
 
     -- Hovering the minimap button delegates to the shared role-overview entry
     -- so the preview, timer and window stay in one place.
-    plugin:OnEnter(minimapButton)
+    -- LibDBIcon calls data-object callbacks with a dot call:
+    -- obj.OnEnter(minimapButton). Match that exact contract so an accidental
+    -- extra method parameter cannot turn the real hover source into nil.
+    plugin.OnEnter(minimapButton)
     test.eq(#hoverEnterCalls, 1, "hovering the minimap delegates to the shared entry")
     test.eq(hoverEnterCalls[1].source, minimapButton, "the minimap button is the shared hover source")
     test.eq(hoverEnterCalls[1].kind, "minimap", "the minimap passes its anchor kind")
 
-    plugin:OnLeave()
+    plugin.OnLeave(minimapButton)
     test.eq(hoverLeaveCalls, 1, "leaving the minimap delegates to the shared entry")
 end

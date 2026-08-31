@@ -157,11 +157,11 @@ end
 -- entry's own delayed-enter/leave lifecycle, so the preview, timer, pin state
 -- and window stay in one place. Unavailable or disabled clients no-op inside
 -- the entry.
-function plugin:OnEnter(button)
-    RoleOverviewEntry.hoverEnter(button, "minimap")
+function plugin:OnEnter()
+    RoleOverviewEntry.hoverEnter(self, "minimap")
 end
 
-function plugin:OnLeave(button)
+function plugin:OnLeave()
     RoleOverviewEntry.hoverLeave()
 end
 
