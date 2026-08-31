@@ -972,7 +972,6 @@ do
             self.startScale = self:GetParent():GetScale()
         elseif btn == "RightButton" then
             local newScale = BG.options[self.optionName .. "reset"]
-            self:GetParent():SetScale(newScale)
             SetValue(self.optionName, newScale)
         end
     end
@@ -988,7 +987,6 @@ do
         local deltaX = (curX - self.startX) / uiScale
         local newScale = self.startScale + deltaX * ag
         newScale = format("%.3f", math.max(self.minValue, math.min(newScale, self.maxValue)))
-        self:GetParent():SetScale(newScale)
         SetValue(self.optionName, newScale)
     end
 
