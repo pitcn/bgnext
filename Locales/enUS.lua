@@ -10,7 +10,7 @@ local c1 = ns.c1
 do --英语说明书
     ns.instructionsText = {
         "|cff00BFFF<BGNext Guide>|r",
-        "BGNext v0.2.2 is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
+        "BGNext v0.2.3 is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
         "Core auctions continue to use BGLite's existing public protocol. Players using BGNext and BGLite may participate in the same basic auction; consult the release notes for the actual compatibility test status.",
         "Personal wishlists, own-character information, and personal helper data stay local and are not sent to the raid or outside the game. Current-raid trade and mail reconciliation keeps only the most recent raid for at most seven days and never stores mail bodies.",
         "If another BiaoGe/BGLite-family addon is enabled on this client, BGNext warns the player but never disables it without confirmation.",
