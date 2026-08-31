@@ -732,20 +732,14 @@ function BG.FBMaiJiaUI(FB, t, b, bb, i, ii)
     bt.type = "maijia"
     BG.SetMixin(bt, buyerMixin)
     local color = BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["color" .. i]
-    if color then
-        if not (color[1] == 1 and color[2] == 1 and color[3] == 1) then
-            bt:SetTextColor(unpack(color))
-        else
-            color = nil
-        end
+    if color and color[1] == 1 and color[2] == 1 and color[3] == 1 then
+        color = nil
     end
-    if BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i] then
-        if BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i] ~= "" then
-            bt:SetText(BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i])
-            bt:SetCursorPosition(0)
-        else
-            BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i] = nil
-        end
+    local maijia = BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i]
+    if maijia and maijia ~= "" then
+        BG.BGNext.BillBuyer.set(bt, maijia, unpack(color or { 1, 1, 1 }))
+    elseif maijia == "" then
+        BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i] = nil
     end
     if BossNum(FB, b, t) <= Maxb[FB] then
         preWidget = bt
@@ -756,7 +750,7 @@ function BG.FBMaiJiaUI(FB, t, b, bb, i, ii)
     -- 当内容改变时
     bt:SetScript("OnTextChanged", function(self)
         if bt:GetText() ~= "" then
-            BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i] = self:GetText()         -- 储存文本
+            BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i] = BG.BGNext.BillBuyer.canonical(self) -- 储存规范身份
             BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["color" .. i] = { self:GetTextColor() } -- 储存颜色
         else
             BiaoGe[FB]["boss" .. BossNum(FB, b, t)]["maijia" .. i] = nil

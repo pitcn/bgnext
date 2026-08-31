@@ -33,12 +33,16 @@ BG.Init2(function()
                 BG.PairFBItem(function(item, buyer, money, b, i)
                     local name = buyer:GetText()
                     if name ~= '' then
-                        fk[name] = fk[name] or 0
-                        qk[name] = qk[name] or 0
-                        if b == Maxb[FB] then
-                            fk[name] = fk[name] + (tonumber(money:GetText()) or 0)
+                        local key = name
+                        if BG.BGNext and BG.BGNext.PlayerIdentity then
+                            key = BG.BGNext.PlayerIdentity.key(name, BG.realmName) or name
                         end
-                        qk[name] = qk[name] + (tonumber(BiaoGe[FB]["boss" .. b]["qiankuan" .. i]) or 0)
+                        fk[key] = fk[key] or 0
+                        qk[key] = qk[key] or 0
+                        if b == Maxb[FB] then
+                            fk[key] = fk[key] + (tonumber(money:GetText()) or 0)
+                        end
+                        qk[key] = qk[key] + (tonumber(BiaoGe[FB]["boss" .. b]["qiankuan" .. i]) or 0)
                     end
                 end)
             end
@@ -47,8 +51,12 @@ BG.Init2(function()
             local function AddUnitInfo(self, unit, name)
                 if BiaoGe.options["mouseFK"] ~= 1 then return end
                 if not IsInRaid(1) then return end
-                local fkMoney = fk[name] or 0
-                local qkMoney = qk[name] or 0
+                local key = name
+                if BG.BGNext and BG.BGNext.PlayerIdentity then
+                    key = BG.BGNext.PlayerIdentity.key(name, BG.realmName) or name
+                end
+                local fkMoney = fk[key] or 0
+                local qkMoney = qk[key] or 0
                 if fkMoney ~= 0 then
                     self:AddLine(L["罚款："] .. BG.STC_w1(BG.FormatNumber(fkMoney, 2)), 1, .82, 0)
                 end

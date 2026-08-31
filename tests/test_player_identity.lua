@@ -18,4 +18,42 @@ return function(test)
     test.eq(Identity.same("", "Alice", "My Realm"), false, "an empty name fails closed")
     test.eq(Identity.same("Alice", "Alice", nil), false,
         "two bare names without a known realm do not create an ambiguous identity")
+
+    test.eq(Identity.shortName("Reader-时光"), "Reader", "short name drops the realm suffix")
+    test.eq(Identity.shortName("Reader"), "Reader", "a bare name is already short")
+    test.eq(Identity.shortName(nil), nil, "short name of a missing value fails closed")
+    test.eq(Identity.shortName(""), nil, "short name of an empty value fails closed")
+
+    test.eq(Identity.canonical("Reader", "时光"), "Reader-时光",
+        "canonical form adds the local realm to a bare name")
+    test.eq(Identity.canonical("Reader-时光", "时光"), "Reader-时光",
+        "canonical form keeps an existing local realm")
+    test.eq(Identity.canonical("Reader-OtherRealm", "时光"), "Reader-OtherRealm",
+        "canonical form preserves a cross-realm suffix")
+    test.eq(Identity.canonical(nil, "时光"), nil, "canonical form of a missing value fails closed")
+    test.eq(Identity.canonical("Reader", nil), nil,
+        "a bare name without a known realm has no canonical identity")
+
+    for _, family in ipairs({ "vanilla", "tbc", "wrath", "titan", "cata", "mop" }) do
+        test.eq(Identity.display("Reader-时光", "时光", family), "Reader",
+            family .. " displays the short name only")
+    end
+    test.eq(Identity.display("Reader", "时光", "retail"), "Reader",
+        "retail bare name stays short")
+    test.eq(Identity.display("Reader-时光", "时光", "retail"), "Reader",
+        "retail same-realm name is shortened")
+    test.eq(Identity.display("Reader-OtherRealm", "时光", "retail"), "Reader-OtherRealm",
+        "retail cross-realm name keeps its realm so it never merges")
+    test.eq(Identity.display("Reader-时光", "时光", nil), "Reader",
+        "an undetected family is treated as non-retail and shortened")
+    test.eq(Identity.display(nil, "时光", "retail"), nil, "missing display value passes through nil")
+
+    test.eq(Identity.display("Reader-OtherRealm", "时光", "retail"), "Reader-OtherRealm",
+        "same short name on another realm stays visually distinct")
+    test.eq(Identity.same("Reader-OtherRealm", "Reader-时光", "时光"), false,
+        "same-name/different-realm players never merge")
+
+    test.eq(Identity.familyFromGlobals({ IsRetail = true }), "retail", "retail flag resolves to retail")
+    test.eq(Identity.familyFromGlobals({ IsVanilla = true }), nil, "vanilla flag resolves to non-retail")
+    test.eq(Identity.familyFromGlobals(nil), nil, "missing globals resolve to non-retail")
 end

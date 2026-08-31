@@ -38,6 +38,7 @@ BG.Init(function()
  local font = BIAOGE_TEXT_FONT or STANDARD_TEXT_FONT
  local realmName = GetRealmName():gsub(" ", ""):gsub("%-", "")
  local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
+ local family = PlayerIdentity and PlayerIdentity.familyFromGlobals(BG) or nil
  do
   function wa.GN(unit)
    unit = unit or "player"
@@ -153,13 +154,14 @@ BG.Init(function()
    else
     k, classFile = UnitClass(wa.GSN(name))
    end
+   local displayName = PlayerIdentity and PlayerIdentity.display(name, realmName, family) or wa.GSN(name)
    local coloredName = ""
    if classFile then
     local colorHex = select(4, GetClassColor(classFile))
-    coloredName = "|c" .. colorHex .. name .. "|r"
+    coloredName = "|c" .. colorHex .. displayName .. "|r"
     return coloredName, colorHex
    else
-    return name, ""
+    return displayName, ""
    end
   end
   function wa.SetEditBg(edit)

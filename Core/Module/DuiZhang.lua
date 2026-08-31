@@ -484,7 +484,6 @@ function BG.DuiZhangUI()
                             local duizhangcolor = BG.DuiZhangFrame[FB]["boss" .. b]["color" .. i]
                             BG.BGNext.BillBuyer.set(maijia, duizhangmaijia,
                                 unpack(duizhangcolor or { 1, 1, 1 }))
-                            BiaoGe[FB]["boss" .. b]["maijia" .. i] = duizhangmaijia
                             for k in pairs(BG.playerClass) do
                                 BiaoGe[FB]["boss" .. b][k .. i] = BG.DuiZhangFrame[FB]["boss" .. b][k .. i]
                             end

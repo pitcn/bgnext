@@ -535,7 +535,11 @@ local function OnClick(self)
                         if i == 1 then
                             if BiaoGe[v.FB]["boss" .. v.b]["maijia" .. v.i] then
                                 -- DuiZhang-苍牧-
-                                text = text .. BiaoGe[v.FB]["boss" .. v.b]["maijia" .. v.i] .. "-"
+                                local maijia = BiaoGe[v.FB]["boss" .. v.b]["maijia" .. v.i]
+                                if BG.BGNext and BG.BGNext.PlayerIdentity then
+                                    maijia = BG.BGNext.PlayerIdentity.shortName(maijia)
+                                end
+                                text = text .. maijia .. "-"
                             else
                                 yes = nil
                                 break
