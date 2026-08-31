@@ -1492,6 +1492,8 @@ do
     L["勾选全部多选框"] = "Check all boxes"
     L["取消勾选全部多选框"] = "Uncheck all boxes"
     L["自定义装备过滤方案"] = "Custom Gear filtering scheme"
+    L["跟随当前专精"] = "Follow specialization"
+    L["未识别当前专精，沿用当前方案"] = "Specialization not recognized, keeping current scheme"
     L["装备属性中包含特定词缀时，就会被过滤。例如勾选了力量，如果装备中有力量属性，则该装备会被过滤"] = "Gear 'Lesser Stats' will be filtered if it contains certain words. For example, if 'Daunting Growl' is checked, if there are 'Daunting Growl' and 'Lesser Stats' in Gear, then the Gear will be filtered."
     L["装备词缀过滤"] = "Gear word filter"
     L["例如勾选了单手剑，如果装备是单手剑，则会被过滤"] = "For example, if 'One-Handed Swords' is checked, the Gear will be filtered if it is 'One-Handed Swords'."
