@@ -1946,6 +1946,7 @@ BG.Init2(function()
     SLASH_BGNEXT1 = "/bgn"
     SLASH_BGNEXT2 = "/bgnext"
     SLASH_BGNEXT3 = "/bglite"
+    SLASH_BGNEXT4 = "/biaoge"
 
     -- 解锁位置
     SlashCmdList["BIAOGEMOVE"] = function()
