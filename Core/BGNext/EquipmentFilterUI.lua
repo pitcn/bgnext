@@ -230,7 +230,9 @@ updateRuleButtons = function()
     local profile = activeProfile()
     for _, button in ipairs(ruleButtons) do button:Hide() end
     if not profile then return end
-    local catalog = BG.BGNext.EquipmentFilterProfiles.getRuleCatalog({ project = WOW_PROJECT_ID })
+    local adapter = BG.BGNext.SpecializationAdapter
+    local family = adapter and adapter.detect()
+    local catalog = BG.BGNext.EquipmentFilterProfiles.getRuleCatalog({ family = family })
     local parent = BG.FilterClassItemMainFrame.RuleFrame
     local y = -5
     local used = 0

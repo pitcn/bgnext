@@ -107,6 +107,30 @@ local function backfillMissingBuiltInPrimaryStats(state, defaults)
     end
 end
 
+-- The first specialization release persisted the class fallback icon on every
+-- built-in profile. Upgrade only that known stale value; a custom profile or a
+-- built-in whose icon the player changed to anything else remains untouched.
+local function upgradeStaleBuiltInIcons(state, defaults)
+    if type(state) ~= "table" or type(state.profiles) ~= "table" then return end
+    local fallbackIcon
+    for _, def in ipairs(defaults or {}) do
+        if type(def) == "table" and type(def.builtInKey) == "string"
+            and def.builtInKey:match(":class$") then
+            fallbackIcon = def.icon
+            break
+        end
+    end
+    if fallbackIcon == nil then return end
+    for _, def in ipairs(defaults or {}) do
+        local key = type(def) == "table" and def.builtInKey
+        local profile = key and state.profiles[key]
+        if profile and profile.builtInKey == key and not key:match(":class$")
+            and profile.icon == fallbackIcon and def.icon ~= nil and def.icon ~= fallbackIcon then
+            profile.icon = def.icon
+        end
+    end
+end
+
 function M.ensureCharacter(root, realmId, player, defaults, spec)
     if type(root) ~= "table" or realmId == nil or player == nil then return nil end
     root.equipmentFilters = type(root.equipmentFilters) == "table" and root.equipmentFilters or {}
@@ -128,6 +152,7 @@ function M.ensureCharacter(root, realmId, player, defaults, spec)
         -- migration only fills a field that is genuinely absent; an empty or
         -- customized primary-stat table remains authoritative.
         backfillMissingBuiltInPrimaryStats(state, defaults)
+        upgradeStaleBuiltInIcons(state, defaults)
         if state.selectionMode == nil then
             -- Pre-feature state: keep the saved selection and treat it as manual
             -- so following specialization is always an explicit user choice.

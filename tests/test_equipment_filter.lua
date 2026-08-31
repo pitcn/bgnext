@@ -25,6 +25,37 @@ return function(test)
     test.eq(model.getActiveProfile(root, "realm", "Mage").name, "火焰", "active profile returned")
     test.eq(model.getActiveProfile(root, "realm", "Other"), nil, "other character isolated")
 
+    -- Profiles created by the first specialization build used the class icon for
+    -- every built-in. A later load upgrades only those stale class icons to the
+    -- Blizzard specialization icons and leaves a custom icon untouched.
+    local classIcon = "Interface/Icons/classicon_hunter"
+    local iconDefaults = {
+        { id = "titan:HUNTER:tree:HUNTER:1", builtInKey = "titan:HUNTER:tree:HUNTER:1", name = "野兽控制", icon = 111 },
+        { id = "titan:HUNTER:tree:HUNTER:2", builtInKey = "titan:HUNTER:tree:HUNTER:2", name = "射击", icon = 222 },
+        { id = "titan:HUNTER:tree:HUNTER:3", builtInKey = "titan:HUNTER:tree:HUNTER:3", name = "生存", icon = 333 },
+        { id = "titan:HUNTER:class", builtInKey = "titan:HUNTER:class", name = "猎人", icon = classIcon },
+    }
+    local iconRoot = { equipmentFilters = { realm = { Hunter = {
+        selectionMode = "follow-spec",
+        selectedId = "titan:HUNTER:tree:HUNTER:1",
+        order = { "titan:HUNTER:tree:HUNTER:1", "titan:HUNTER:tree:HUNTER:2",
+            "titan:HUNTER:tree:HUNTER:3", "titan:HUNTER:class", "custom-1" },
+        profiles = {
+            ["titan:HUNTER:tree:HUNTER:1"] = { id = "titan:HUNTER:tree:HUNTER:1", name = "野兽控制", icon = classIcon, builtInKey = "titan:HUNTER:tree:HUNTER:1" },
+            ["titan:HUNTER:tree:HUNTER:2"] = { id = "titan:HUNTER:tree:HUNTER:2", name = "射击", icon = classIcon, builtInKey = "titan:HUNTER:tree:HUNTER:2" },
+            ["titan:HUNTER:tree:HUNTER:3"] = { id = "titan:HUNTER:tree:HUNTER:3", name = "生存", icon = classIcon, builtInKey = "titan:HUNTER:tree:HUNTER:3" },
+            ["titan:HUNTER:class"] = { id = "titan:HUNTER:class", name = "猎人", icon = classIcon, builtInKey = "titan:HUNTER:class" },
+            ["custom-1"] = { id = "custom-1", name = "自定义", icon = 999 },
+        },
+    } } } }
+    local iconState = model.ensureCharacter(iconRoot, "realm", "Hunter", iconDefaults,
+        { builtInId = "titan:HUNTER:tree:HUNTER:1" })
+    test.eq(iconState.profiles["titan:HUNTER:tree:HUNTER:1"].icon, 111,
+        "stale built-in class icon upgrades to the specialization icon")
+    test.eq(iconState.profiles["titan:HUNTER:tree:HUNTER:2"].icon, 222,
+        "every built-in specialization icon upgrades, not only the active one")
+    test.eq(iconState.profiles["custom-1"].icon, 999, "custom profile icon is preserved")
+
     -- Selecting a profile pauses following and enters manual mode.
     local _, customId = model.createProfile(fresh, {
         name = "  自定义  ", icon = 132089, weapon = {}, armor = {}, affix = {},

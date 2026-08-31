@@ -49,6 +49,16 @@ return function(test)
     test.eq(next(druid[1].affix), nil,
         "a hybrid class does not guess one damage type for every specialization")
 
+    local titanRules = catalog.getRuleCatalog({ family = "titan" })
+    test.eq(titanRules.affix.MASTERY, nil, "Titan UI hides unavailable mastery")
+    test.eq(titanRules.affix.VERSATILITY, nil, "Titan UI hides unavailable versatility")
+    local mopRules = catalog.getRuleCatalog({ family = "mop" })
+    test.eq(mopRules.affix.MASTERY ~= nil, true, "MoP UI exposes mastery")
+    test.eq(mopRules.affix.VERSATILITY, nil, "MoP UI hides unavailable versatility")
+    local retailRules = catalog.getRuleCatalog({ family = "retail" })
+    test.eq(retailRules.affix.MASTERY ~= nil, true, "Retail UI exposes mastery")
+    test.eq(retailRules.affix.VERSATILITY ~= nil, true, "Retail UI exposes versatility")
+
     -- Class capability base is a defensively copied, id-less profile.
     local base = catalog.getClassBase("titan", "SHAMAN")
     test.eq(base ~= nil, true, "class base exists")

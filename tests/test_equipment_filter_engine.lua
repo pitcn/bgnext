@@ -1,5 +1,6 @@
 return function(test)
     BG = { BGNext = {}, IsRetail = false }
+    dofile("Core/BGNext/ItemPrimaryStats.lua")
     dofile("Core/BGNext/EquipmentFilterProfiles.lua")
     local catalog = dofile("Core/BGNext/EquipmentFilterSpecializations.lua")
 

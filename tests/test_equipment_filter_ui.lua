@@ -54,6 +54,8 @@ return function(test)
         "UI writes selectionMode only through model functions")
     test.eq(source:find("buildDefaults", 1, true) ~= nil, true,
         "reset rebuilds specialization defaults")
+    test.eq(source:find("getRuleCatalog({ family = family })", 1, true) ~= nil, true,
+        "rule editor requests the current client family's available attributes")
     test.eq(source:find("resetDefaults(state(), defaults, builtInId)", 1, true) ~= nil, true,
         "reset passes the resolved built-in id")
     test.eq(source:find("selectProfile(current, id)", 1, true) ~= nil, true,

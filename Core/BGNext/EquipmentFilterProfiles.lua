@@ -121,13 +121,21 @@ local function armorFilter(classToken)
 end
 
 function M.getRuleCatalog(client)
-    return clone({
+    local result = clone({
         weapon = weaponRules,
         armor = armorRules,
         affix = affixRules,
         primaryStat = { STRENGTH = "力量", AGILITY = "敏捷", INTELLECT = "智力" },
         supportsTank = not client or client.supportsTank ~= false,
     })
+    local family = client and client.family
+    if family and family ~= "retail" then
+        result.affix.VERSATILITY = nil
+    end
+    if family and family ~= "retail" and family ~= "mop" then
+        result.affix.MASTERY = nil
+    end
+    return result
 end
 
 local function baseProfile(classToken)
