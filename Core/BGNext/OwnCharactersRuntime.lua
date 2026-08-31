@@ -149,6 +149,22 @@ function M.collectAndStore(deps)
     local env = adapters.readers(family, api, catalog.raidColumns, catalog.resourceColumns)
     env.now = function() return stamp end
 
+    -- On retail only, prefer the init-time identity over a live re-read. There
+    -- the live UnitName/GetRealmID calls can be secret-protected even though BG
+    -- already holds the validated current-character identity from load time.
+    -- Every other family keeps the original live readers; the identity is
+    -- re-read on every collect so a later event can succeed (no lockout).
+    if family == "retail" and type(adapters.validatedIdentity) == "function" then
+        local identity = adapters.validatedIdentity(deps.globals)
+        if identity then
+            env.playerName = function() return identity.playerName end
+            env.realmId = function() return identity.realmId end
+            if identity.realmName ~= nil then
+                env.realmName = function() return identity.realmName end
+            end
+        end
+    end
+
     local snapshot = collector.collect(env)
     if snapshot then
         model.upsert(root, family, snapshot)

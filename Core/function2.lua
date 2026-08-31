@@ -724,7 +724,13 @@ do
             text:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
             text:SetWidth(f:GetWidth() - 10)
             text:SetJustifyH("LEFT")
-            text:SetText(BG.STC_w1(L["|cff00BFFF由于该BOSS未有具体掉落列表，如果你想手动添加装备，可以使用以下方法：|r\n\n第一种：从背包把装备拖进表格\n\n第二种：先点击一个表格格子，然后SHIFT+点击聊天框/背包装备"]))
+            local pending = isHope and BG.BGNext and BG.BGNext.RetailLootStatus
+                and BG.BGNext.RetailLootStatus.isPending(FB)
+            if pending then
+                text:SetText(BG.STC_w1(L["|cff00BFFF该团本掉落资料尚在适配，可通过拖入装备或选中格子后 Shift 点击装备手动加入个人心愿。|r"]))
+            else
+                text:SetText(BG.STC_w1(L["|cff00BFFF由于该BOSS未有具体掉落列表，如果你想手动添加装备，可以使用以下方法：|r\n\n第一种：从背包把装备拖进表格\n\n第二种：先点击一个表格格子，然后SHIFT+点击聊天框/背包装备"]))
+            end
             f:SetHeight(text:GetHeight() + 20)
             return
         end

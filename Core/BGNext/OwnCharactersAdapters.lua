@@ -209,6 +209,51 @@ function M.readRealmName(api)
     return name:gsub(" ", ""):gsub("%-", "")
 end
 
+-- Reports whether a value is a protected (secret) value on this client.
+-- BG.IsSecret (function1.lua) wraps the retail issecretvalue() guard; when it
+-- is absent the raw global is the fallback, and otherwise a value is assumed
+-- readable. A secret value must never be compared, concatenated or used as a
+-- SavedVariables key.
+function M.isSecretValue(globals, value)
+    local isSecret = type(globals) == "table" and globals.IsSecret or nil
+    if type(isSecret) == "function" then
+        return isSecret(value) == true
+    end
+    local raw = type(globals) == "table" and globals.issecretvalue or nil
+    if type(raw) == "function" then
+        return value ~= nil and raw(value) == true
+    end
+    return false
+end
+
+-- Validates the init-time current-character identity captured by Core/DB/Init.lua
+-- (BG.playerName / BG.realmID / BG.realmName). Retail 12.x can keep the live
+-- UnitName/GetRealmID calls secret-protected even though these init globals
+-- already hold the real logged-in character. Returns nil unless both a readable
+-- player name and a numeric realm id are present, so an empty string, a secret
+-- value or a wrong-typed value can never become a snapshot key.
+function M.validatedIdentity(globals)
+    if type(globals) ~= "table" then return nil end
+
+    local name = globals.playerName
+    if type(name) ~= "string" or name == "" or M.isSecretValue(globals, name) then
+        name = nil
+    end
+
+    local realmId = globals.realmID
+    if type(realmId) ~= "number" or M.isSecretValue(globals, realmId) then
+        realmId = nil
+    end
+
+    local realmName = globals.realmName
+    if type(realmName) ~= "string" or realmName == "" or M.isSecretValue(globals, realmName) then
+        realmName = nil
+    end
+
+    if not name or not realmId then return nil end
+    return { playerName = name, realmId = realmId, realmName = realmName }
+end
+
 function M.readFaction(api)
     local faction = M.safeCall(api and api.UnitFactionGroup, "player")
     if type(faction) ~= "string" or faction == "" then return nil end

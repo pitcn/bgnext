@@ -143,6 +143,49 @@ function M.isLooted(wishItemId, recordedItemIds)
     return false
 end
 
+-- Computes where one difficulty header block sits in the wishlist grid. Pure
+-- data (no frames, no WoW calls) so the layout is testable in plain Lua.
+--
+-- Returns a descriptor with:
+--   .point         point on this difficulty's own header frame
+--   .relative      "main" for the first block, or { index, anchor } referencing
+--                  the previous block's bottomFirst boss slot or its headerLast
+--   .relativePoint point on the referenced frame
+--   .x, .y         offset
+--
+-- Layout contract:
+--   1 difficulty   -> single block top-left
+--   2 difficulties -> stacked vertically
+--   3 difficulties -> stacked vertically (retail N/H/M; never a second column)
+--   4 difficulties -> 2x2 grid (WLK 10/25 N/H; rightward only on index 3)
+function M.difficultyAnchor(difficultyIndex, difficultyCount)
+    if difficultyIndex == 1 then
+        return { point = "TOPLEFT", relative = "main", relativePoint = "TOPLEFT", x = 10, y = -60 }
+    end
+    if difficultyIndex == 2 or (difficultyCount == 4 and difficultyIndex == 4) then
+        return {
+            point = "TOPRIGHT",
+            relative = { index = difficultyIndex - 1, anchor = "bottomFirst" },
+            relativePoint = "TOPLEFT", x = -20, y = -30,
+        }
+    end
+    if difficultyIndex == 3 then
+        if difficultyCount == 3 then
+            return {
+                point = "TOPRIGHT",
+                relative = { index = difficultyIndex - 1, anchor = "bottomFirst" },
+                relativePoint = "TOPLEFT", x = -20, y = -30,
+            }
+        end
+        return {
+            point = "TOPLEFT",
+            relative = { index = difficultyIndex - 1, anchor = "headerLast" },
+            relativePoint = "TOPRIGHT", x = 20, y = 0,
+        }
+    end
+    return nil
+end
+
 local function runtimeReady()
     return ns and BG.Init and BG.BGNext.Wishlist
 end
@@ -419,16 +462,19 @@ if runtimeReady() then
         frame:SetAllPoints(parent)
         frame:Hide()
         BG.HopeFrame[raidId] = {}
-        local previousBottomFirst, previousHeaderLast
+        local bottomFirstByDifficulty, headerLastByDifficulty = {}, {}
 
         for difficultyIndex = 1, hopeMaxn[raidId] do
             local difficulty = frame:CreateFontString(nil, "OVERLAY")
-            if difficultyIndex == 1 then
-                difficulty:SetPoint("TOPLEFT", BG.MainFrame, "TOPLEFT", 10, -60)
-            elseif difficultyIndex == 2 or difficultyIndex == 4 then
-                difficulty:SetPoint("TOPRIGHT", previousBottomFirst, "TOPLEFT", -20, -30)
-            else
-                difficulty:SetPoint("TOPLEFT", previousHeaderLast, "TOPRIGHT", 20, 0)
+            local anchor = M.difficultyAnchor(difficultyIndex, hopeMaxn[raidId])
+            local relative = BG.MainFrame
+            if anchor and type(anchor.relative) == "table" then
+                relative = anchor.relative.anchor == "bottomFirst"
+                    and bottomFirstByDifficulty[anchor.relative.index]
+                    or headerLastByDifficulty[anchor.relative.index]
+            end
+            if anchor and relative then
+                difficulty:SetPoint(anchor.point, relative, anchor.relativePoint, anchor.x, anchor.y)
             end
             difficulty:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
             difficulty:SetTextColor(1, 0.82, 0)
@@ -447,7 +493,7 @@ if runtimeReady() then
                 header:SetText("心愿" .. slotIndex)
                 headers[slotIndex], priorHeader = header, header
             end
-            previousHeaderLast = headers[#headers]
+            headerLastByDifficulty[difficultyIndex] = headers[#headers]
 
             BG.HopeFrame[raidId]["nandu" .. difficultyIndex] = {}
             local priorFirstSlot
@@ -473,7 +519,7 @@ if runtimeReady() then
                 bossLabel:SetText(bossInfo and bossInfo.name2 or ("Boss " .. bossIndex))
                 boss.name = bossLabel
             end
-            previousBottomFirst = priorFirstSlot
+            bottomFirstByDifficulty[difficultyIndex] = priorFirstSlot
         end
 
         function frame:Refresh()
