@@ -198,6 +198,10 @@ BG.Init2(function()
                 self.t = self.t + t
                 if self.t >= .1 then
                     self:Hide()
+                    if BiaoGe.options["HighOnterItem"] ~= 1 then
+                        link = nil
+                        return
+                    end
                     if link then
                         BG.Show_AllHighlight(link, "bag")
                     end
@@ -205,11 +209,17 @@ BG.Init2(function()
             end
             local function OnHide()
                 dalayFrame:Hide()
+                link = nil
                 BG.Hide_AllHighlight()
             end
             dalayFrame:SetScript('OnUpdate', OnUpdate)
 
             local function OnEnter(self, button)
+                if BiaoGe.options["HighOnterItem"] ~= 1 then
+                    link = nil
+                    dalayFrame:Hide()
+                    return
+                end
                 local b = self:GetParent():GetID()
                 local i = self:GetID()
                 link = C_Container.GetContainerItemLink(b, i)

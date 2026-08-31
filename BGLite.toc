@@ -48,6 +48,7 @@ Core\BGNext\PlayerIdentity.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua
+Core\BGNext\HighlightManager.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
