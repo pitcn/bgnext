@@ -49,6 +49,15 @@ return function(test)
     local mopSurvival = catalog.getDefault("mop", "HUNTER", "spec:255")
     test.eq(mopSurvival.weapon[2], nil, "MoP Survival remains ranged")
     test.eq(mopSurvival.weapon[6], true, "MoP Survival filters polearms")
+    local titanBeastMastery = catalog.getDefault("titan", "HUNTER", "tree:HUNTER:1")
+    test.eq(titanBeastMastery.weapon[6], nil,
+        "Titan Beast Mastery keeps agility polearms used beside the ranged slot")
+    test.eq(titanBeastMastery.weapon[10], nil,
+        "Titan Beast Mastery keeps agility staves used beside the ranged slot")
+    test.eq(titanBeastMastery.weapon[13], nil,
+        "Titan Beast Mastery keeps agility fist weapons used beside the ranged slot")
+    test.eq(type(titanBeastMastery.upgradeWeaponFrom), "table",
+        "Titan Hunter default describes the exact prior bad weapon set for safe migration")
 
     local holyPaladin = catalog.getDefault("titan", "PALADIN", "tree:PALADIN:1")
     local retPaladin = catalog.getDefault("titan", "PALADIN", "tree:PALADIN:3")

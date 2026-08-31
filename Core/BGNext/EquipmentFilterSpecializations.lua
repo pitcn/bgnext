@@ -134,11 +134,19 @@ end
 
 local function applyEquipmentOverrides(family, classToken, spec, base)
     if classToken == "HUNTER" then
-        local ranged = spec.key ~= "spec:255" or family == "mop"
-        if ranged then
-            addFilters(base.weapon, { 0, 1, 4, 5, 6, 7, 8, 10, 13, 15 })
+        if family == "mop" or family == "retail" then
+            local ranged = spec.key ~= "spec:255" or family == "mop"
+            if ranged then
+                addFilters(base.weapon, { 0, 1, 4, 5, 6, 7, 8, 10, 13, 15 })
+            else
+                addFilters(base.weapon, { 2, 3, 18 })
+            end
         else
-            addFilters(base.weapon, { 2, 3, 18 })
+            -- The first specialization test package incorrectly applied the
+            -- post-MoP single-weapon-slot rule to classic-family Hunters. Keep
+            -- the exact generated set only as transient migration evidence.
+            base.upgradeWeaponFrom = clone(base.weapon)
+            addFilters(base.upgradeWeaponFrom, { 0, 1, 4, 5, 6, 7, 8, 10, 13, 15 })
         end
     elseif classToken == "PALADIN" then
         if spec.role == "intellect-healing" or spec.role == "strength-tank" then

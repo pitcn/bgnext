@@ -110,7 +110,18 @@ end
 -- The first specialization release persisted the class fallback icon on every
 -- built-in profile. Upgrade only that known stale value; a custom profile or a
 -- built-in whose icon the player changed to anything else remains untouched.
-local function upgradeStaleBuiltInIcons(state, defaults)
+local function sameTable(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then return false end
+    for key, value in pairs(left) do
+        if right[key] ~= value then return false end
+    end
+    for key, value in pairs(right) do
+        if left[key] ~= value then return false end
+    end
+    return true
+end
+
+local function upgradeStaleBuiltIns(state, defaults)
     if type(state) ~= "table" or type(state.profiles) ~= "table" then return end
     local fallbackIcon
     for _, def in ipairs(defaults or {}) do
@@ -127,6 +138,10 @@ local function upgradeStaleBuiltInIcons(state, defaults)
         if profile and profile.builtInKey == key and not key:match(":class$")
             and profile.icon == fallbackIcon and def.icon ~= nil and def.icon ~= fallbackIcon then
             profile.icon = def.icon
+        end
+        if profile and profile.builtInKey == key and type(def.upgradeWeaponFrom) == "table"
+            and sameTable(profile.weapon, def.upgradeWeaponFrom) then
+            profile.weapon = clone(type(def.weapon) == "table" and def.weapon or {})
         end
     end
 end
@@ -152,7 +167,7 @@ function M.ensureCharacter(root, realmId, player, defaults, spec)
         -- migration only fills a field that is genuinely absent; an empty or
         -- customized primary-stat table remains authoritative.
         backfillMissingBuiltInPrimaryStats(state, defaults)
-        upgradeStaleBuiltInIcons(state, defaults)
+        upgradeStaleBuiltIns(state, defaults)
         if state.selectionMode == nil then
             -- Pre-feature state: keep the saved selection and treat it as manual
             -- so following specialization is always an explicit user choice.
