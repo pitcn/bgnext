@@ -154,8 +154,8 @@ local function defaultAffix(family, role)
     if family == "retail" then return {} end
     if physical then return { SPELL_POWER = true } end
     if family == "vanilla" then return { ATTACK_POWER = true } end
-    if family == "tbc" then return { ATTACK_POWER = true, EXPERTISE = true } end
-    if family == "mop" then return { ATTACK_POWER = true, EXPERTISE = true } end
+    if family == "tbc" then return { ATTACK_POWER = true, ARMOR_PEN = true, EXPERTISE = true } end
+    if family == "cata" or family == "mop" then return { ATTACK_POWER = true, EXPERTISE = true } end
     return { ATTACK_POWER = true, ARMOR_PEN = true, EXPERTISE = true }
 end
 

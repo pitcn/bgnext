@@ -73,7 +73,7 @@ local allowedArmorClassic = {
 }
 
 -- Armor a class keeps once armor specialization tightens it to the class's own
--- armor type (Cataclysm and later: mop/retail).
+-- armor type (Cataclysm and later: cata/mop/retail).
 local allowedArmorModern = {
     MAGE = { [0] = true, [1] = true }, PRIEST = { [0] = true, [1] = true },
     WARLOCK = { [0] = true, [1] = true },
@@ -129,7 +129,7 @@ local function complement(catalog, allowed)
 end
 
 local function isModernFamily(family)
-    return family == "mop" or family == "retail"
+    return family == "cata" or family == "mop" or family == "retail"
 end
 
 local function armorFilter(family, classToken)
@@ -159,9 +159,11 @@ end
 -- pre-Retail family and move to the separate primary-stat choice on Retail.
 local affixVisibility = {
     vanilla = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "SPELL_POWER" },
-    tbc = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "SPELL_POWER" },
-    titan = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "ARMOR_PEN", "SPELL_POWER" },
-    mop = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "DEFENSE", "PARRY", "DODGE", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "SPELL_POWER", "MASTERY", "RESILIENCE" },
+    tbc = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "ARMOR_PEN", "SPELL_POWER", "RESILIENCE" },
+    wrath = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "ARMOR_PEN", "SPELL_POWER", "RESILIENCE" },
+    titan = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "MANA_REGEN", "DEFENSE", "PARRY", "DODGE", "BLOCK", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "ARMOR_PEN", "SPELL_POWER", "RESILIENCE" },
+    cata = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "PARRY", "DODGE", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "SPELL_POWER", "MASTERY", "RESILIENCE" },
+    mop = { "STRENGTH", "AGILITY", "INTELLECT", "SPIRIT", "PARRY", "DODGE", "ATTACK_POWER", "HIT", "CRIT", "HASTE", "EXPERTISE", "SPELL_POWER", "MASTERY", "RESILIENCE" },
     retail = { "CRIT", "HASTE", "MASTERY", "VERSATILITY" },
 }
 
