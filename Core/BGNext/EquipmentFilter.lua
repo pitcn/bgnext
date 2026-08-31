@@ -53,18 +53,39 @@ local function normalizeProfile(profile, fallbackId)
     return normalized
 end
 
-local function replaceWithDefaults(state, defaults)
-    state.selectedId = nil
-    state.order = {}
-    state.profiles = {}
-    for index, profile in ipairs(defaults or {}) do
-        local normalized = normalizeProfile(profile, "default-" .. index)
-        if normalized and not state.profiles[normalized.id] then
-            state.profiles[normalized.id] = normalized
-            state.order[#state.order + 1] = normalized.id
-            state.selectedId = state.selectedId or normalized.id
+-- Rebuilds every built-in profile from the supplied defaults and re-appends the
+-- existing custom profiles in their current order. Built-ins are identified only
+-- by their BGNext `builtInKey`, never by their id, so a stale built-in can be
+-- replaced without ever colliding with a `custom-*` profile. Custom profiles are
+-- kept by reference; their tables are never rewritten.
+local function reconcileBuiltIns(state, defaults)
+    state.profiles = type(state.profiles) == "table" and state.profiles or {}
+    state.order = type(state.order) == "table" and state.order or {}
+    local customIds = {}
+    for _, id in ipairs(state.order) do
+        local profile = state.profiles[id]
+        if profile and profile.builtInKey == nil then
+            customIds[#customIds + 1] = id
         end
     end
+    local profiles = {}
+    local order = {}
+    for index, def in ipairs(defaults or {}) do
+        local normalized = normalizeProfile(def, "default-" .. index)
+        if normalized and normalized.builtInKey and not profiles[normalized.builtInKey] then
+            profiles[normalized.builtInKey] = normalized
+            order[#order + 1] = normalized.builtInKey
+        end
+    end
+    for _, id in ipairs(customIds) do
+        local profile = state.profiles[id]
+        if profile then
+            profiles[id] = profile
+            order[#order + 1] = id
+        end
+    end
+    state.profiles = profiles
+    state.order = order
     return state
 end
 
@@ -86,7 +107,7 @@ local function backfillMissingBuiltInPrimaryStats(state, defaults)
     end
 end
 
-function M.ensureCharacter(root, realmId, player, defaults)
+function M.ensureCharacter(root, realmId, player, defaults, spec)
     if type(root) ~= "table" or realmId == nil or player == nil then return nil end
     root.equipmentFilters = type(root.equipmentFilters) == "table" and root.equipmentFilters or {}
     root.equipmentFilters[realmId] = root.equipmentFilters[realmId] or {}
@@ -94,9 +115,24 @@ function M.ensureCharacter(root, realmId, player, defaults)
     if type(state) ~= "table" or type(state.profiles) ~= "table" or type(state.order) ~= "table" then
         state = {}
         root.equipmentFilters[realmId][player] = state
-        replaceWithDefaults(state, defaults)
+        reconcileBuiltIns(state, defaults)
+        state.selectionMode = "follow-spec"
+        local builtInId = spec and spec.builtInId
+        if builtInId and state.profiles[builtInId] then
+            state.selectedId = builtInId
+        else
+            state.selectedId = state.order[1]
+        end
     else
+        -- Keep pre-existing content and explicit choices intact. The #22
+        -- migration only fills a field that is genuinely absent; an empty or
+        -- customized primary-stat table remains authoritative.
         backfillMissingBuiltInPrimaryStats(state, defaults)
+        if state.selectionMode == nil then
+            -- Pre-feature state: keep the saved selection and treat it as manual
+            -- so following specialization is always an explicit user choice.
+            state.selectionMode = "manual"
+        end
     end
     return state
 end
@@ -117,11 +153,29 @@ end
 
 function M.selectProfile(state, id)
     if type(state) ~= "table" or type(state.profiles) ~= "table" or not state.profiles[id] then return false end
-    if state.selectedId == id then
-        state.selectedId = nil
-    else
-        state.selectedId = id
+    state.selectedId = id
+    state.selectionMode = "manual"
+    return true
+end
+
+-- Enters follow-specialization mode and selects the resolved built-in when it
+-- is known. Only this entry point (or reset) enables automatic switching.
+function M.followSpecialization(state, builtInId)
+    if type(state) ~= "table" or type(state.profiles) ~= "table" then return false end
+    state.selectionMode = "follow-spec"
+    if builtInId and state.profiles[builtInId] then
+        state.selectedId = builtInId
     end
+    return true
+end
+
+-- Applies a freshly resolved specialization to a state that is already following.
+-- A nil or unrecognized built-in preserves the active selection rather than
+-- guessing; a manual selection is never changed.
+function M.applyResolvedSpecialization(state, builtInId)
+    if type(state) ~= "table" or state.selectionMode ~= "follow-spec" then return false end
+    if type(state.profiles) ~= "table" or not builtInId or not state.profiles[builtInId] then return false end
+    state.selectedId = builtInId
     return true
 end
 
@@ -181,9 +235,21 @@ function M.deleteProfile(state, id)
     return true
 end
 
-function M.resetDefaults(state, defaults)
+function M.resetDefaults(state, defaults, builtInId)
     if type(state) ~= "table" then return false end
-    replaceWithDefaults(state, defaults)
+    reconcileBuiltIns(state, defaults)
+    state.selectionMode = "follow-spec"
+    if builtInId and state.profiles[builtInId] then
+        state.selectedId = builtInId
+    else
+        state.selectedId = state.order[1]
+    end
+    return true
+end
+
+M.reconcileBuiltIns = function(state, defaults)
+    if type(state) ~= "table" then return false end
+    reconcileBuiltIns(state, defaults)
     return true
 end
 

@@ -1,59 +1,66 @@
 return function(test)
     BG = { BGNext = {} }
     local model = dofile("Core/BGNext/EquipmentFilter.lua")
-    local defaults = {
-        {
-            id = "MAGE",
-            name = "法师",
-            icon = 135846,
-            weapon = { [0] = true },
-            armor = { [2] = true, [3] = true, [4] = true },
-            affix = { STRENGTH = true },
-            classRestriction = true,
-            ignoreBattleNetBound = false,
-            tankOnly = false,
-            primaryStat = { INTELLECT = true },
-        },
-    }
-    local root = { equipmentFilters = {} }
-    local state = model.ensureCharacter(root, "realm", "Mage", defaults)
 
-    test.eq(state.selectedId, "MAGE", "first default selected")
-    test.eq(model.getActiveProfile(root, "realm", "Mage").name, "法师", "active profile returned")
+    local function specDefaults()
+        return {
+            { id = "retail:MAGE:spec:62", builtInKey = "retail:MAGE:spec:62", name = "奥术", icon = 135846,
+                weapon = { [0] = true }, armor = { [2] = true, [3] = true, [4] = true }, affix = { STRENGTH = true },
+                classRestriction = true, ignoreBattleNetBound = false, tankOnly = false, primaryStat = { INTELLECT = true } },
+            { id = "retail:MAGE:spec:63", builtInKey = "retail:MAGE:spec:63", name = "火焰", icon = 135846,
+                weapon = { [0] = true }, armor = { [2] = true, [3] = true, [4] = true }, affix = { STRENGTH = true },
+                classRestriction = true, ignoreBattleNetBound = false, tankOnly = false, primaryStat = { INTELLECT = true } },
+            { id = "retail:MAGE:spec:64", builtInKey = "retail:MAGE:spec:64", name = "冰霜", icon = 135846,
+                weapon = { [0] = true }, armor = { [2] = true, [3] = true, [4] = true }, affix = { STRENGTH = true },
+                classRestriction = true, ignoreBattleNetBound = false, tankOnly = false, primaryStat = { INTELLECT = true } },
+        }
+    end
+
+    -- A brand-new character follows the resolved specialization.
+    local root = { equipmentFilters = {} }
+    local fresh = model.ensureCharacter(root, "realm", "Mage", specDefaults(),
+        { specKey = "spec:63", builtInId = "retail:MAGE:spec:63" })
+    test.eq(fresh.selectionMode, "follow-spec", "new state follows specialization")
+    test.eq(fresh.selectedId, "retail:MAGE:spec:63", "new state selects resolved specialization")
+    test.eq(model.getActiveProfile(root, "realm", "Mage").name, "火焰", "active profile returned")
     test.eq(model.getActiveProfile(root, "realm", "Other"), nil, "other character isolated")
 
-    test.eq(model.selectProfile(state, "MAGE"), true, "selected profile toggles")
-    test.eq(state.selectedId, nil, "selected profile toggles off")
-    test.eq(model.selectProfile(state, "missing"), false, "unknown selection rejected")
-    model.selectProfile(state, "MAGE")
-
-    local created, id = model.createProfile(state, {
+    -- Selecting a profile pauses following and enters manual mode.
+    local _, customId = model.createProfile(fresh, {
         name = "  自定义  ", icon = 132089, weapon = {}, armor = {}, affix = {},
-        classRestriction = false, ignoreBattleNetBound = false, tankOnly = false,
-        primaryStat = {},
+        classRestriction = false, ignoreBattleNetBound = false, tankOnly = false, primaryStat = {},
     })
-    test.eq(created, true, "custom profile created")
-    test.eq(state.profiles[id].name, "自定义", "custom profile name trimmed")
-    test.eq(model.createProfile(state, { name = "   " }), false, "empty profile rejected")
+    test.eq(customId, "custom-1", "custom id assigned")
+    test.eq(fresh.profiles[customId].name, "自定义", "custom profile name trimmed")
+    test.eq(model.createProfile(fresh, { name = "   " }), false, "empty profile rejected")
 
-    test.eq(model.updateProfile(state, id, { name = "修改", unknown = true }), true, "profile updated")
-    test.eq(state.profiles[id].name, "修改", "known field updated")
-    test.eq(state.profiles[id].unknown, nil, "unknown patch ignored")
-    test.eq(model.moveProfile(state, id, -1), true, "profile moved")
-    test.eq(state.order[1], id, "profile order changed")
+    model.selectProfile(fresh, customId)
+    test.eq(fresh.selectionMode, "manual", "custom selection pauses following")
+    test.eq(fresh.selectedId, customId, "custom selection selects the custom profile")
+    test.eq(model.selectProfile(fresh, "missing"), false, "unknown selection rejected")
 
-    test.eq(model.deleteProfile(state, id), true, "profile deleted")
-    test.eq(state.profiles[id], nil, "deleted profile removed")
-    test.eq(state.selectedId, "MAGE", "deleting inactive profile preserves selection")
+    -- The dedicated follow entry resumes following and selects the new built-in.
+    model.followSpecialization(fresh, "retail:MAGE:spec:64")
+    test.eq(fresh.selectionMode, "follow-spec", "explicit follow resumes following")
+    test.eq(fresh.selectedId, "retail:MAGE:spec:64", "follow selects new built-in")
 
-    state.profiles.MAGE.name = "changed"
-    model.resetDefaults(state, defaults)
-    test.eq(state.profiles.MAGE.name, "法师", "reset restores defaults")
+    -- An unknown specialization preserves the active selection.
+    model.applyResolvedSpecialization(fresh, nil)
+    test.eq(fresh.selectedId, "retail:MAGE:spec:64", "unknown specialization preserves selection")
+    model.applyResolvedSpecialization(fresh, "retail:MAGE:spec:62")
+    test.eq(fresh.selectedId, "retail:MAGE:spec:62", "resolved specialization switches selection")
+    model.selectProfile(fresh, customId)
+    model.applyResolvedSpecialization(fresh, "retail:MAGE:spec:63")
+    test.eq(fresh.selectedId, customId, "manual selection is never switched by resolution")
 
-    local otherDefaults = model.ensureCharacter(root, "realm", "Other", defaults)
-    otherDefaults.profiles.MAGE.name = "other"
-    test.eq(state.profiles.MAGE.name, "法师", "character state is not aliased")
-    test.eq(defaults[1].name, "法师", "source defaults are not mutated")
+    -- Reset rebuilds built-ins, preserves customs, and returns to follow mode.
+    fresh.profiles[customId].name = "我的方案"
+    model.resetDefaults(fresh, specDefaults(), "retail:MAGE:spec:63")
+    test.eq(fresh.selectionMode, "follow-spec", "reset returns to follow mode")
+    test.eq(fresh.selectedId, "retail:MAGE:spec:63", "reset selects resolved built-in")
+    test.eq(fresh.profiles[customId] ~= nil, true, "reset preserves custom profile")
+    test.eq(fresh.profiles[customId].name, "我的方案", "reset preserves custom content")
+    test.eq(fresh.profiles["retail:MAGE:spec:63"].name, "火焰", "reset restores built-in defaults")
 
     local missingPrimaryStat = {
         equipmentFilters = {
@@ -98,13 +105,56 @@ return function(test)
     test.eq(migrated.profiles.WARLOCK.primaryStat.INTELLECT, nil,
         "defaults do not overwrite a customized built-in primaryStat selection")
 
-    test.eq(model.isRuleSelected(state.profiles.MAGE, "classRestriction", nil, true), true,
+    -- Reset with an unknown built-in selects the first built-in (conservative fallback).
+    model.resetDefaults(fresh, specDefaults(), nil)
+    test.eq(fresh.selectedId, "retail:MAGE:spec:62", "unknown reset selects first built-in")
+
+    -- A pre-feature state migrates without silently switching or losing content.
+    local legacyRoot = { equipmentFilters = { realm = { Mage = {
+        selectedId = "MAGE",
+        order = { "MAGE", "custom-1" },
+        profiles = {
+            MAGE = { id = "MAGE", name = "法师", icon = 135846, weapon = {}, armor = {}, affix = {},
+                classRestriction = true, ignoreBattleNetBound = false, tankOnly = false,
+                primaryStat = { INTELLECT = true }, builtInKey = "MAGE" },
+            ["custom-1"] = { id = "custom-1", name = "自定义", icon = 132089, weapon = {}, armor = {},
+                affix = {}, classRestriction = true, ignoreBattleNetBound = false, tankOnly = false,
+                primaryStat = {} },
+        },
+    } } } }
+    local legacy = model.ensureCharacter(legacyRoot, "realm", "Mage", specDefaults(), { specKey = "spec:63" })
+    test.eq(legacy.selectionMode, "manual", "existing state migrates without silent switching")
+    test.eq(legacy.selectedId, "MAGE", "migration preserves selection")
+    test.eq(legacy.profiles["custom-1"].name, "自定义", "migration preserves custom profile")
+    test.eq(legacy.order[2], "custom-1", "migration preserves profile order")
+
+    -- Profile lifecycle: update, move, delete.
+    local edited = model.updateProfile(legacy, "custom-1", { name = "修改", unknown = true })
+    test.eq(edited, true, "profile updated")
+    test.eq(legacy.profiles["custom-1"].name, "修改", "known field updated")
+    test.eq(legacy.profiles["custom-1"].unknown, nil, "unknown patch ignored")
+    test.eq(model.moveProfile(legacy, "custom-1", -1), true, "profile moved")
+    test.eq(legacy.order[1], "custom-1", "profile order changed")
+    test.eq(model.deleteProfile(legacy, "custom-1"), true, "profile deleted")
+    test.eq(legacy.profiles["custom-1"], nil, "deleted profile removed")
+    test.eq(legacy.selectedId, "MAGE", "deleting inactive profile preserves selection")
+
+    -- Defensive copies and character isolation.
+    local other = model.ensureCharacter(root, "realm", "Other", specDefaults(),
+        { specKey = "spec:62", builtInId = "retail:MAGE:spec:62" })
+    other.profiles["retail:MAGE:spec:62"].name = "other"
+    test.eq(fresh.profiles["retail:MAGE:spec:62"].name, "奥术", "character state is not aliased")
+    test.eq(specDefaults()[1].name, "奥术", "source defaults are not mutated")
+
+    -- Rule selection reads.
+    test.eq(model.isRuleSelected(fresh.profiles["retail:MAGE:spec:62"], "classRestriction", nil, true), true,
         "enabled boolean rule is selected")
-    test.eq(model.isRuleSelected(state.profiles.MAGE, "ignoreBattleNetBound", nil, true), false,
+    test.eq(model.isRuleSelected(fresh.profiles["retail:MAGE:spec:62"], "ignoreBattleNetBound", nil, true), false,
         "disabled boolean rule is read without indexing the boolean")
-    test.eq(model.isRuleSelected(state.profiles.MAGE, "armor", 4, false), true,
+    test.eq(model.isRuleSelected(fresh.profiles["retail:MAGE:spec:62"], "armor", 4, false), true,
         "table rule selection is read by id")
 
+    -- BGLite integration reads the active profile accessor and never the legacy DB.
     local file = assert(io.open("Core/function2.lua", "rb"))
     local source = file:read("*a")
     file:close()
