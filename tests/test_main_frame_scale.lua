@@ -54,6 +54,21 @@ return function(test)
         math.min(1, (1600 - Scale.MARGIN_X) / 1685, (900 - Scale.MARGIN_Y) / 810),
         "default margins are applied")
 
+    -- A frame can be clipped even while its centre remains on-screen. Boundary
+    -- checks therefore use all four scaled edges rather than only GetCenter().
+    test.eq(Scale.isOutsideScreen(-10, 100, 1190, 700, 1280, 800), true,
+        "a clipped left edge is outside even when the centre is visible")
+    test.eq(Scale.isOutsideScreen(100, -5, 1200, 700, 1280, 800), true,
+        "a clipped bottom edge is outside")
+    test.eq(Scale.isOutsideScreen(100, 100, 1290, 700, 1280, 800), true,
+        "a clipped right edge is outside")
+    test.eq(Scale.isOutsideScreen(100, 100, 1200, 810, 1280, 800), true,
+        "a clipped top edge is outside")
+    test.eq(Scale.isOutsideScreen(100, 100, 1200, 700, 1280, 800), false,
+        "a frame whose four edges fit is not outside")
+    test.eq(Scale.isOutsideScreen(nil, 100, 1200, 700, 1280, 800), false,
+        "unavailable geometry does not force a destructive recenter")
+
     -- Source assembly: the only place that scales the main frame is the unified
     -- adapter. The slider, its reset and the resize handle no longer set scale
     -- directly, so every user entry funnels through the same formula.
@@ -69,8 +84,10 @@ return function(test)
         "the unified adapter is defined")
     test.eq(biaoGe:find("BG.ApplyMainFrameScale()", 1, true) ~= nil, true,
         "the adapter is wired into OnShow")
-    test.eq(biaoGe:find('BG.RegisterEvent("UI_SCALE_CHANGED"', 1, true) ~= nil, true,
+    test.eq(biaoGe:find('"UI_SCALE_CHANGED"', 1, true) ~= nil, true,
         "the adapter reacts to UI scale changes")
+    test.eq(biaoGe:find('"DISPLAY_SIZE_CHANGED"', 1, true) ~= nil, true,
+        "the adapter reacts to display-size changes")
 
     local options = read("Core/Options.lua")
     test.eq(options:find("BG.MainFrame:SetScale", 1, true) == nil, true,

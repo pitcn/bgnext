@@ -21,7 +21,7 @@ local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
 local GetLootMethod = GetLootMethod or C_PartyInfo.GetLootMethod
 
 -- 统一缩放适配器：把用户偏好缩放约束到当前屏幕内，绝不把约束后的实际缩放写回偏好。
--- OnShow、缩放滑块/还原、右下角拖动缩放与 UI_SCALE_CHANGED 都经过这里。
+-- OnShow、缩放滑块/还原、右下角拖动缩放与屏幕尺寸变化都经过这里。
 function BG.ApplyMainFrameScale()
     local M = BG.BGNext and BG.BGNext.MainFrameScale
     local frame = BG.MainFrame
@@ -45,8 +45,9 @@ function BG.ApplyMainFrameScale()
     end
 
     -- 缩放后若窗口漂出屏幕，则恢复到屏幕中心（仅内存，不改锚点/偏好缩放）。
-    local cx, cy = frame:GetCenter()
-    if not cx or not cy or cx < 0 or cx > screenWidth or cy < 0 or cy > screenHeight then
+    local left, bottom, right, top = frame:GetLeft(), frame:GetBottom(), frame:GetRight(), frame:GetTop()
+    if type(M.isOutsideScreen) == "function"
+        and M.isOutsideScreen(left, bottom, right, top, screenWidth, screenHeight) then
         frame:ClearAllPoints()
         frame:SetPoint("CENTER")
     end
@@ -132,28 +133,13 @@ BG.Init(function()
 
             -- 「打开表格时自动获取在线人数」已随 Core/Module/InfoBar.lua 整模块删除而移除
             -- （原实现依赖 BG.ButtonOnLineCount 与 BG.GetChannelMemberCount，两者都定义在 InfoBar 内）。
-            -- 检查Frame中点是否超过屏幕边界
-            if not self.CheckOutSide then
-                self.CheckOutSide = true
-                local frameCenterX, frameCenterY = self:GetCenter()
-                local screenLeft = 0
-                local screenRight = UIParent:GetWidth()
-                local screenTop = UIParent:GetHeight()
-                local screenBottom = 0
-                if frameCenterX < screenLeft or frameCenterX > screenRight or
-                    frameCenterY < screenBottom or frameCenterY > screenTop then
-                    BG.MainFrame:ClearAllPoints()
-                    BG.MainFrame:SetPoint("CENTER")
-                end
-            end
-
             if not IsInRaid(1) then
                 local GuildRoster = GuildRoster or C_GuildInfo.GuildRoster
                 GuildRoster()
             end
         end)
 
-        BG.RegisterEvent("UI_SCALE_CHANGED", function()
+        BG.RegisterEvent({ "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }, function()
             BG.ApplyMainFrameScale()
         end)
 

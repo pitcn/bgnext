@@ -25,8 +25,12 @@ local M = {}
 M.MARGIN_X = 40
 M.MARGIN_Y = 60
 
+local function finite(n)
+    return type(n) == "number" and n > -math.huge and n < math.huge
+end
+
 local function positive(n)
-    return type(n) == "number" and n > 0 and n < math.huge
+    return finite(n) and n > 0
 end
 
 function M.compute(preferredScale, tableWidth, tableHeight, screenWidth, screenHeight, marginX, marginY)
@@ -48,6 +52,14 @@ function M.compute(preferredScale, tableWidth, tableHeight, screenWidth, screenH
         end
     end
     return actual
+end
+
+function M.isOutsideScreen(left, bottom, right, top, screenWidth, screenHeight)
+    if not finite(left) or not finite(bottom) or not finite(right) or not finite(top)
+        or not positive(screenWidth) or not positive(screenHeight) then
+        return false
+    end
+    return left < 0 or bottom < 0 or right > screenWidth or top > screenHeight
 end
 
 BG.BGNext.MainFrameScale = M
