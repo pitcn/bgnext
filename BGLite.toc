@@ -33,6 +33,7 @@ Core\BGNext\Wishlist.lua
 Core\BGNext\WishlistReminder.lua
 Core\BGNext\RetailLootStatus.lua
 Core\BGNext\ItemPrimaryStats.lua
+Core\BGNext\SpecializationAdapter.lua
 Core\BGNext\EquipmentFilterProfiles.lua
 Core\BGNext\EquipmentFilter.lua
 Core\BGNext\OwnCharacters.lua
