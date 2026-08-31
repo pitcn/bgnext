@@ -1,6 +1,6 @@
 # ADR-0002: Clean-room BGNext enhancements
 
-- Status: Accepted
+- Status: Superseded by ADR-0003
 - Date: 2026-08-29
 
 ## Context
