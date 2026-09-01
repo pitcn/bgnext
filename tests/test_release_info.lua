@@ -53,8 +53,10 @@ return function(test)
         "mixed-client version census is not mislabeled as BGLite-only")
     test.eq(auctionSource:find('L["BGLite版本"]', 1, true), nil,
         "all mixed-client census tooltip paths avoid the BGLite-only label")
-    test.eq(auctionSource:find('L["兼容插件版本"]', 1, true) ~= nil, true,
-        "mixed-client version census has a neutral compatibility label")
+    test.eq(auctionSource:find('L["兼容插件版本"]', 1, true), nil,
+        "the ambiguous compatibility-version census is removed")
+    test.eq(auctionSource:find('L["团队拍卖就绪检查"]', 1, true) ~= nil, true,
+        "the mixed-client check describes auction readiness")
 
     local tocFile = assert(io.open("BGLite.toc", "rb"))
     local toc = tocFile:read("*a")
