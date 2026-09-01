@@ -29,6 +29,12 @@ local function validKey(value)
     return type(value) == "string" and value ~= ""
 end
 
+function M.isValidRealmId(value)
+    if type(value) ~= "number" then return false end
+    if value ~= value or value == math.huge or value == -math.huge then return false end
+    return value % 1 == 0 and value > 0
+end
+
 local function validItemId(value)
     if type(value) ~= "number" then return false end
     if value ~= value or value == math.huge or value == -math.huge then return false end
@@ -272,7 +278,7 @@ function M.resolveLeaderPrice(root, clientFamily, raidId, itemId)
 end
 
 local function personalRaid(root, clientFamily, realmId, player, raidId, create)
-    if type(root) ~= "table" or not validKey(clientFamily) or not validKey(realmId)
+    if type(root) ~= "table" or not validKey(clientFamily) or not M.isValidRealmId(realmId)
         or not validKey(player) or not validKey(raidId) then
         return nil
     end

@@ -172,7 +172,7 @@ if runtimeReady() then
         local raidId = context.raidId
         if type(root) ~= "table" then return end
         if type(family) ~= "string" or family == "" then return end
-        if type(realm) ~= "string" or realm == "" then return end
+        if not Store.isValidRealmId(realm) then return end
         if type(player) ~= "string" or player == "" then return end
         if type(raidId) ~= "string" or raidId == "" then return end
         local savedMoney = Store.getPersonalPrice(root, family, realm, player, raidId, itemId)

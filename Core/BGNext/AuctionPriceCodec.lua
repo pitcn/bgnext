@@ -20,6 +20,12 @@ M.MAX_NAME_CHARS = 24
 local PREFIX_LEADER = "BGNP-L1"
 local PREFIX_PERSONAL = "BGNP-P1"
 
+local function validRealmId(value)
+    if type(value) ~= "number" then return false end
+    if value ~= value or value == math.huge or value == -math.huge then return false end
+    return value % 1 == 0 and value > 0
+end
+
 local function escape(value)
     value = tostring(value)
     return (value:gsub("%%", "%%25")
@@ -528,7 +534,7 @@ function M.applyPersonal(root, context, preview, options)
     local player = context.player
     local raidId = context.raidId
     if type(clientFamily) ~= "string" or clientFamily == "" then return false end
-    if type(realmId) ~= "string" or realmId == "" then return false end
+    if not validRealmId(realmId) then return false end
     if type(player) ~= "string" or player == "" then return false end
     if type(raidId) ~= "string" or raidId == "" then return false end
     if preview.clientFamily ~= clientFamily then return false end

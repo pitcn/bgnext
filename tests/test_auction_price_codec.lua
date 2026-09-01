@@ -50,23 +50,23 @@ return function(test)
     test.eq(ppreview.itemPrices[1001], 900, "personal item round trip")
 
     local pdst = freshRoot()
-    local pctx = { clientFamily = "titan", realmId = "r1", player = "Leader", raidId = "ULD" }
+    local pctx = { clientFamily = "titan", realmId = 123, player = "Leader", raidId = "ULD" }
     test.eq(codec.applyPersonal(pdst, pctx, ppreview, { mode = "merge" }), true, "apply personal merge")
-    test.eq(store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1001), 900, "personal applied")
+    test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1001), 900, "personal applied")
 
     -- Personal merge overwrites and replace clears.
-    test.eq(store.setPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1002, 10), true, "seed personal")
+    test.eq(store.setPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1002, 10), true, "seed personal")
     local ppreview2 = codec.parse(codec.exportPersonal("titan", "ULD", { [1002] = 20 }), "personal", knownItems)
     test.eq(codec.applyPersonal(pdst, pctx, ppreview2, { mode = "merge" }), true, "merge personal")
-    test.eq(store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1002), 20, "merge overwrites")
-    test.eq(store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1001), 900, "merge keeps other items")
+    test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1002), 20, "merge overwrites")
+    test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1001), 900, "merge keeps other items")
     test.eq(codec.applyPersonal(pdst, pctx, ppreview2, { mode = "replace" }), true, "replace personal")
-    test.eq(store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1001), nil, "replace clears old")
+    test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1001), nil, "replace clears old")
 
     -- Invalid input never mutates the root.
-    local before = store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1002)
+    local before = store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1002)
     test.eq(codec.parse("garbage", "leader", knownItems).ok, false, "garbage rejected")
-    test.eq(store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1002), before, "root unchanged on bad parse")
+    test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1002), before, "root unchanged on bad parse")
 
     -- 64 KB limit.
     local big = "BGNP-L1\nversion=1\nfamily=titan\nraid=ULD\npreset=p1\nname=x\nbase=100\n" .. string.rep("item=1001:100\n", 6000)
@@ -89,16 +89,18 @@ return function(test)
     test.eq(codec.parse(longName, "leader", knownItems).ok, false, "25-char name rejected")
 
     -- Client/raid mismatch at apply time.
-    local mctx = { clientFamily = "wrath", realmId = "r1", player = "Leader", raidId = "ULD" }
+    local mctx = { clientFamily = "wrath", realmId = 123, player = "Leader", raidId = "ULD" }
     test.eq(codec.applyPersonal(pdst, mctx, ppreview2, { mode = "merge" }), false, "client mismatch refused")
+    local badRealmCtx = { clientFamily = "titan", realmId = "123", player = "Leader", raidId = "ULD" }
+    test.eq(codec.applyPersonal(pdst, badRealmCtx, ppreview2, { mode = "merge" }), false, "string realm refused")
 
     -- Unknown items are skipped on apply.
     local unkPreview = codec.parse(codec.exportPersonal("titan", "ULD", { [1001] = 1, [9999] = 2 }), "personal", knownItems)
     test.eq(unkPreview.ok, true, "unknown items parse ok")
     test.eq(unkPreview.unknownItems[9999], true, "unknown item flagged")
     test.eq(codec.applyPersonal(pdst, pctx, unkPreview, { mode = "replace" }), true, "apply with unknown")
-    test.eq(store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 1001), 1, "known item applied")
-    test.eq(store.getPersonalPrice(pdst, "titan", "r1", "Leader", "ULD", 9999), nil, "unknown item skipped")
+    test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1001), 1, "known item applied")
+    test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 9999), nil, "unknown item skipped")
 
     -- Same-name suffix on leader import.
     local src2 = freshRoot()
