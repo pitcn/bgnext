@@ -16,7 +16,7 @@ BGNext derives only these observable requirements: reuse the existing mixed-clie
 
 ## Behavior
 
-- Outside a raid, the readiness footer is hidden and all response state is cleared.
+- Outside a raid, the readiness footer remains visible as `not in a raid` so the feature is discoverable, while all response state is cleared and no request is sent.
 - In a raid, one compact footer reports `ready/total` for the current roster.
 - Hovering shows every member with one of four evidence-based states: ready, main addon only, no response, or offline.
 - A response on the existing `BiaoGeAuction` prefix proves readiness for the currently retained first-generation normal auction protocol. A main-addon response alone is diagnostic and does not count as ready.

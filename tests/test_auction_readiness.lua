@@ -36,6 +36,13 @@ return function(test)
     test.eq(ready, 1, "only auction endpoint responses count as ready")
     test.eq(total, 4, "the summary includes every current raid member")
 
+    local soloView = Readiness.footerView(false, roster, addonVersions, auctionVersions)
+    test.eq(soloView.mode, "solo", "the readiness entry remains discoverable while solo")
+    local raidView = Readiness.footerView(true, roster, addonVersions, auctionVersions)
+    test.eq(raidView.mode, "raid", "the readiness entry switches to raid status in a raid")
+    test.eq(raidView.ready, 1, "raid footer view carries the ready count")
+    test.eq(raidView.total, 4, "raid footer view carries the roster total")
+
     Readiness.prune(addonVersions, auctionVersions, roster, compatibleAddonVersions)
     test.eq(addonVersions.StalePlayer, nil, "addon responses from departed members are discarded")
     test.eq(auctionVersions.StalePlayer, nil, "auction responses from departed members are discarded")
@@ -68,6 +75,8 @@ return function(test)
     local source = assert(io.open("Core/Module/Auction.lua", "rb")):read("*a")
     test.eq(source:find('L["团队拍卖：已就绪 %s"]', 1, true) ~= nil, true,
         "the raid footer uses one readiness summary")
+    test.eq(source:find('L["团队拍卖：未组团"]', 1, true) ~= nil, true,
+        "the solo footer explains why no readiness result is available")
     test.eq(source:find('L["兼容插件版本"]', 1, true), nil,
         "the ambiguous compatibility-version label is removed")
     test.eq(source:find("GetNumGuildMembers", 1, true), nil,

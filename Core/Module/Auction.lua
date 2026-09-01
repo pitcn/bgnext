@@ -66,24 +66,29 @@ BG.Init(function()
     local notShowSendingText = {}
 
     local function UpdateReadinessFrame(frame)
-        if IsInRaid(1) then
-            local ready, total = Readiness.summarize(BG.raidRosterInfo, BG.raidBiaoGeVersion,
-                BG.raidAuctionVersion)
-            frame.text:SetFormattedText(L["团队拍卖：已就绪 %s"], ready .. "/" .. total)
-            frame:SetWidth(frame.text:GetWidth() + 10)
-            frame:Show()
-        else
+        local view = Readiness.footerView(IsInRaid(1), BG.raidRosterInfo, BG.raidBiaoGeVersion,
+            BG.raidAuctionVersion)
+        if view.mode == "solo" then
             wipe(BG.raidBiaoGeVersion)
             wipe(BG.raidBiaoGeNewVersion)
             wipe(BG.raidAuctionVersion)
-            frame:Hide()
+            frame.text:SetText(L["团队拍卖：未组团"])
+        else
+            frame.text:SetFormattedText(L["团队拍卖：已就绪 %s"], view.ready .. "/" .. view.total)
         end
+        frame:SetWidth(frame.text:GetWidth() + 10)
+        frame:Show()
     end
     local function Readiness_OnEnter(self)
         self.isOnEnter = true
         GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 0)
         GameTooltip:ClearLines()
         GameTooltip:AddLine(L["团队拍卖就绪检查"], 0, 1, 0)
+        if not IsInRaid(1) then
+            GameTooltip:AddLine(L["进入团队后可检查团员的拍卖兼容状态。"], .6, .6, .6, true)
+            GameTooltip:Show()
+            return
+        end
         GameTooltip:AddLine(L["左键：重新检测（仅团长或拾取负责人）"], 1, 1, 1, true)
         GameTooltip:AddLine(L["未响应不代表未安装，可让团员重载界面后重新检测。"], .6, .6, .6, true)
         GameTooltip:AddLine(" ")
@@ -822,6 +827,7 @@ BG.Init(function()
             BG.ButtonGuildVer = nil
             BG.ButtonRaidVer = readiness
             BG.ButtonRaidAuction = readiness
+            UpdateReadinessFrame(readiness)
         end
 
         BG.RegisterEvent("GROUP_ROSTER_UPDATE", function(self, event, ...)
@@ -897,6 +903,7 @@ BG.Init(function()
                 if #raidMemberNames == 0 and IsInRaid(1) then
                     raidMemberNames = GetRaidMemberNames()
                 end
+                UpdateReadinessFrame(readiness)
                 RequestReadiness(false, false)
             end)
         end)

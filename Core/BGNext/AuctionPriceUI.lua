@@ -19,9 +19,23 @@ M.LABELS = {
 }
 
 M.DESCRIPTIONS = {
-    leader = "用于团长开团时自动填入自定义装备起拍价，最终仍由团长确认。",
+    leader = "用于团长开团时自动填入起拍价；单件价优先，修改基础价只影响未单独设置的装备。",
     personal = "用于参团时自动填入已保存的心理价，不会自动启用或发送。",
 }
+
+function M.buttonWidth(textWidth, padding, minimum, maximum)
+    textWidth = type(textWidth) == "number" and textWidth or 0
+    padding = type(padding) == "number" and padding or 0
+    local width = textWidth + padding
+    if type(minimum) == "number" and width < minimum then width = minimum end
+    if type(maximum) == "number" and width > maximum then width = maximum end
+    return width
+end
+
+function M.popupEditBox(popup)
+    if not popup then return nil end
+    return popup.EditBox or popup.editBox
+end
 
 local LEADER_ACTIONS = { "preset", "basePrice", "active", "new", "copy", "rename", "delete", "import", "export" }
 local PERSONAL_ACTIONS = { "itemCount", "import", "export", "clear" }
@@ -510,12 +524,15 @@ if runtimeReady() then
             local dialog = StaticPopupDialogs[popupName]
             dialog.text = title
             dialog.OnAccept = function(self)
-                local value = self.editBox and self.editBox:GetText() or ""
+                local editBox = M.popupEditBox(self)
+                local value = editBox and editBox:GetText() or ""
                 onAccept(value)
             end
             dialog.OnShow = function(self)
-                if defaultText then self.editBox:SetText(defaultText) end
-                self.editBox:SetFocus()
+                local editBox = M.popupEditBox(self)
+                if not editBox then return end
+                if defaultText then editBox:SetText(defaultText) end
+                editBox:SetFocus()
             end
             StaticPopup_Show(popupName)
         end
@@ -672,7 +689,7 @@ if runtimeReady() then
                         local preset = raid and raid.presets and raid.presets[presetId]
                         local override = preset and type(preset.itemPrices) == "table" and preset.itemPrices[item.itemId]
                         if type(override) == "number" then
-                            row.price:SetText(tostring(override) .. " G")
+                            row.price:SetText((L["单件"] or "单件") .. " " .. tostring(override) .. " G")
                             row.edit._refreshing = true
                             row.edit:SetText(tostring(override))
                             row.edit._refreshing = nil
@@ -739,7 +756,7 @@ if runtimeReady() then
                 local label = (BG.GetFBinfo and BG.GetFBinfo(raidId, "shortName")) or raidId
                 bt:SetText(label or raidId)
                 local f = bt:GetFontString()
-                if f then bt:SetSize(f:GetWidth() + 14, 22) end
+                if f then bt:SetSize(M.buttonWidth(f:GetStringWidth(), 14, 80, 145), 22) end
                 if idx == 1 then
                     bt:SetPoint("TOPLEFT", main.raidBar, "TOPLEFT", 0, 0)
                 else
@@ -768,7 +785,7 @@ if runtimeReady() then
                 local preset = raid and raid.presets and raid.presets[presetId]
                 local name = preset and preset.name or "默认方案"
                 presetButton:SetText((L["方案"] or "方案") .. "：" .. name)
-                activeLabel:SetText((L["当前使用"] or "当前使用") .. "：" .. name)
+                activeLabel:SetText(L["基础价"] or "基础价")
                 if preset and type(preset.basePrice) == "number" then
                     basePriceEdit:SetText(tostring(preset.basePrice))
                 else
@@ -817,8 +834,7 @@ if runtimeReady() then
                 end
                 bt.nodeId = node.id
                 bt:SetText(node.name .. " (" .. node.count .. ")")
-                local f = bt:GetFontString()
-                if f then bt:SetSize(f:GetWidth() + 12, 20) end
+                bt:SetSize(150, 20)
                 bt:SetPoint("TOPLEFT", main.bossScroll, "TOPLEFT", 0, -(idx - 1) * 22)
                 local selected = (pageState.bossId == node.id) or (pageState.bossId == nil and node.id == "all")
                 if selected then bt:Disable() else bt:Enable() end

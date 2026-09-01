@@ -40,6 +40,14 @@ function M.summarize(roster, addonVersions, auctionVersions)
     return ready, total
 end
 
+-- Keeps the readiness entry discoverable outside a raid without inventing a
+-- result. The runtime localizes the two modes and only sends checks in raid.
+function M.footerView(isInRaid, roster, addonVersions, auctionVersions)
+    if not isInRaid then return { mode = "solo" } end
+    local ready, total = M.summarize(roster, addonVersions, auctionVersions)
+    return { mode = "raid", ready = ready, total = total }
+end
+
 function M.prune(addonVersions, auctionVersions, roster, compatibleAddonVersions)
     local current = {}
     for _, member in ipairs(roster or {}) do

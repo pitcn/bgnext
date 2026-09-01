@@ -11,9 +11,22 @@ return function(test)
     test.eq(ui.LABELS.personal, "我的心理价", "personal label")
 
     -- Approved one-line descriptions.
-    test.eq(ui.description("leader"), "用于团长开团时自动填入自定义装备起拍价，最终仍由团长确认。", "leader description")
+    test.eq(ui.description("leader"), "用于团长开团时自动填入起拍价；单件价优先，修改基础价只影响未单独设置的装备。", "leader description")
     test.eq(ui.description("personal"), "用于参团时自动填入已保存的心理价，不会自动启用或发送。", "personal description")
     test.eq(ui.description("bogus"), nil, "unknown mode has no description")
+
+    -- Button widths are based on intrinsic text width, then clamped. Repeated
+    -- refreshes therefore cannot add padding to the previous button width.
+    test.eq(ui.buttonWidth(100, 14, 70, 150), 114, "button width adds padding once")
+    test.eq(ui.buttonWidth(20, 14, 70, 150), 70, "button width observes its minimum")
+    test.eq(ui.buttonWidth(300, 14, 70, 150), 150, "button width observes its maximum")
+
+    -- StaticPopup changed the edit-box field casing on newer clients.
+    local modernEdit = {}
+    local legacyEdit = {}
+    test.eq(ui.popupEditBox({ EditBox = modernEdit }), modernEdit, "modern popup EditBox is supported")
+    test.eq(ui.popupEditBox({ editBox = legacyEdit }), legacyEdit, "legacy popup editBox is supported")
+    test.eq(ui.popupEditBox({}), nil, "popup without an edit box fails safely")
 
     -- Fresh state defaults to leader.
     local state = ui.newState("ULD")
