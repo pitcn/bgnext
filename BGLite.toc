@@ -26,6 +26,7 @@ Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
 Core\BGNext\AuctionPriceStore.lua
 Core\BGNext\AuctionPriceCatalog.lua
+Core\BGNext\AuctionPriceCodec.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
 Core\BGNext\CurrentSettlementView.lua
