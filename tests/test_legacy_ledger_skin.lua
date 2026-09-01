@@ -33,7 +33,9 @@ return function(test)
         function tex:SetColorTexture(rr, gg, bb, aa)
             self.color = { rr, gg, bb, aa }
             self.alpha = aa
+            self.texture = nil
         end
+        function tex:SetTexture(path) self.texture = path end
         function tex:GetAlpha() return self.alpha end
         function tex:SetAlpha(aa) self.alpha = aa end
         return tex
@@ -94,7 +96,7 @@ return function(test)
 
     local function fakeRegistry()
         local main = { width = 900, height = 700, border = { 1, 0, 0, 1 } }
-        local background = fakeTexture(0.01, 0.01, 0.01, 0.8)
+        local background = fakeTexture(0.01, 0.01, 0.01, 1)
         background.alpha = 0.58
         background.mutateGeometryOnStyle = false
         local title = fakeGradientTexture(0.4, 0.4, 0.4, 0.2, 0.4, 0.4, 0.4, 0.0)
@@ -136,6 +138,14 @@ return function(test)
             title = title,
             moduleTabs = moduleTabs,
             raidTabs = raidTabs,
+            classic = {
+                main = { border = { 1, 0, 0, 1 } },
+                background = { color = { 0.01, 0.01, 0.01, 1 }, alpha = 0.58 },
+                title = {
+                    gradient = { 0.4, 0.4, 0.4, 0.2, 0.4, 0.4, 0.4, 0.0 },
+                    alpha = 1,
+                },
+            },
         }
 
         function registry.visualState()
@@ -163,12 +173,52 @@ return function(test)
     local registry = fakeRegistry()
     local before = registry.visualState()
 
+    -- Real WoW Texture regions expose setters for color textures and gradients,
+    -- but the corresponding getters are not portable across supported clients.
+    -- The runtime registry must therefore provide an explicit classic recipe.
+    registry.background.GetColorTexture = nil
+    registry.title.GetGradient = nil
+
     test.eq(Skin.apply("preview", registry, 0.58), true, "preview applies")
     local afterFirst = registry.visualState()
+    test.eq(afterFirst.background.color[1] < before.background.color[1], true,
+        "preview changes a background even without GetColorTexture")
+    test.eq(afterFirst.background.color[4], 1,
+        "preview color texture stays opaque before region alpha")
+    test.eq(afterFirst.background.alpha, 0.58,
+        "legacy alpha is applied once at the region level")
+    test.eq(afterFirst.moduleTabs[2].bg.color[4], 1,
+        "tab color texture stays opaque before region alpha")
+    test.eq(afterFirst.moduleTabs[2].bg.alpha, 0.58,
+        "tab legacy alpha is applied once")
+    test.eq(afterFirst.title.gradient[1] ~= before.title.gradient[1], true,
+        "preview changes a title even without GetGradient")
     test.eq(Skin.apply("preview", registry, 0.58), true, "repeat apply succeeds")
     eqTable(registry.visualState(), afterFirst, "repeat apply is idempotent")
     test.eq(Skin.apply("classic", registry, 0.58), true, "classic restores")
     eqTable(registry.visualState(), before, "classic is byte-for-byte visual restore")
+
+    -- A user may still have one of the legacy tiled image backgrounds selected.
+    -- Preview must replace it visually and classic must restore the saved path.
+    local TextureSkin = dofile("Core/BGNext/LegacyLedgerSkin.lua")
+    local textureRegistry = fakeRegistry()
+    textureRegistry.background.GetColorTexture = nil
+    textureRegistry.background.texture = "Interface/FrameGeneral/UI-Background-Marble"
+    textureRegistry.classic.background = {
+        texture = "Interface/FrameGeneral/UI-Background-Marble",
+        horizTile = true,
+        vertTile = true,
+        alpha = 0.58,
+    }
+    test.eq(TextureSkin.apply("preview", textureRegistry, 0.58), true,
+        "preview applies over a tiled image background")
+    test.eq(textureRegistry.background.texture, nil,
+        "preview replaces the tiled image with the brand color")
+    test.eq(TextureSkin.apply("classic", textureRegistry, 0.58), true,
+        "classic restores a tiled image background")
+    test.eq(textureRegistry.background.texture,
+        "Interface/FrameGeneral/UI-Background-Marble",
+        "classic restores the exact saved texture path")
 
     registry.background.mutateGeometryOnStyle = true
     test.eq(Skin.apply("preview", registry, 0.58), false, "geometry change rolls back")
@@ -229,7 +279,12 @@ return function(test)
     BG["ButtonULD"] = registry.raidTabs[2]
     BiaoGe = { BGNext = { settings = {} }, options = { alpha = 0.58 } }
 
-    warnCount = 0
+    callbacks[1]()
+    BG.MainFrame = nil
+    callbacks[1]()
+    test.eq(warnCount, 1, "warning remains once per session after a later success")
+    BG.MainFrame = registry.main
+
     test.eq(Skin.applySavedPreference(), true, "missing preference applies classic")
     test.eq(Skin.getRuntimeTheme(), "classic", "missing preference stays classic")
     BiaoGe.BGNext.settings.uiTheme = "future"

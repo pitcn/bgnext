@@ -85,16 +85,21 @@ local function readTextColor(font)
     return nil
 end
 
-local function snapshotTexture(tex)
+local function snapshotTexture(tex, fallback)
+    fallback = type(fallback) == "table" and fallback or {}
     return {
-        color = readColor(tex),
-        alpha = readAlpha(tex),
-        gradient = readGradient(tex),
+        color = readColor(tex) or fallback.color,
+        alpha = readAlpha(tex) or fallback.alpha,
+        gradient = readGradient(tex) or fallback.gradient,
+        texture = fallback.texture,
+        horizTile = fallback.horizTile,
+        vertTile = fallback.vertTile,
     }
 end
 
-local function snapshotMain(frame)
-    return { border = readBorder(frame) }
+local function snapshotMain(frame, fallback)
+    fallback = type(fallback) == "table" and fallback or {}
+    return { border = readBorder(frame) or fallback.border }
 end
 
 local function fontOf(tab)
@@ -123,10 +128,11 @@ local function mapTabs(tabs)
 end
 
 local function captureSnapshot(registry)
+    local classic = type(registry.classic) == "table" and registry.classic or {}
     return {
-        main = snapshotMain(registry.main),
-        background = snapshotTexture(registry.background),
-        title = snapshotTexture(registry.title),
+        main = snapshotMain(registry.main, classic.main),
+        background = snapshotTexture(registry.background, classic.background),
+        title = snapshotTexture(registry.title, classic.title),
         moduleTabs = mapTabs(registry.moduleTabs),
         raidTabs = mapTabs(registry.raidTabs),
     }
@@ -141,7 +147,15 @@ end
 
 local function restoreTexture(tex, state)
     if type(tex) ~= "table" or type(state) ~= "table" then return end
-    if state.gradient and type(tex.SetGradient) == "function" then
+    if state.texture and type(tex.SetTexture) == "function" then
+        pcall(tex.SetTexture, tex, state.texture, "REPEAT", "REPEAT")
+        if state.horizTile and type(tex.SetHorizTile) == "function" then
+            pcall(tex.SetHorizTile, tex, true)
+        end
+        if state.vertTile and type(tex.SetVertTile) == "function" then
+            pcall(tex.SetVertTile, tex, true)
+        end
+    elseif state.gradient and type(tex.SetGradient) == "function" then
         local g = state.gradient
         pcall(tex.SetGradient, tex, "VERTICAL",
             makeColor(g[1], g[2], g[3], g[4]), makeColor(g[5], g[6], g[7], g[8]))
@@ -204,7 +218,7 @@ local function styleTabs(tabs, alpha, tokens, snapTabs)
                 local snapBg = snapTab and snapTab.bg
                 if enabled and snapBg and snapBg.color and type(bg.SetColorTexture) == "function" then
                     local r, g, b = hexRGB(tokens.colors.raised)
-                    bg:SetColorTexture(r, g, b, alpha)
+                    bg:SetColorTexture(r, g, b, 1)
                 elseif snapBg and snapBg.color and type(bg.SetColorTexture) == "function" then
                     -- active tab keeps its background; only its text is restyled.
                 end
@@ -241,9 +255,10 @@ local function applyPreview(registry, alpha)
 
     local bg = registry.background
     if type(bg) == "table" and snapshot and snapshot.background then
-        if snapshot.background.color and type(bg.SetColorTexture) == "function" then
+        if (snapshot.background.color or snapshot.background.texture)
+            and type(bg.SetColorTexture) == "function" then
             local r, g, b = hexRGB(colors.window)
-            bg:SetColorTexture(r, g, b, alpha)
+            bg:SetColorTexture(r, g, b, 1)
         end
         if snapshot.background.alpha ~= nil and type(bg.SetAlpha) == "function" then
             bg:SetAlpha(alpha)
@@ -262,7 +277,10 @@ local function applyPreview(registry, alpha)
             end
         elseif snapshot.title.color and type(title.SetColorTexture) == "function" then
             local r, g, b = hexRGB(colors.raised)
-            title:SetColorTexture(r, g, b, titleAlpha)
+            title:SetColorTexture(r, g, b, 1)
+            if type(title.SetAlpha) == "function" then
+                title:SetAlpha(titleAlpha)
+            end
         end
     end
 
@@ -338,12 +356,55 @@ function M.buildRuntimeRegistry()
         end
     end
 
+    local classic = {}
+    local legacyAlpha = nil
+    local backgroundSetting = nil
+    if type(BiaoGe) == "table" and type(BiaoGe.options) == "table" then
+        legacyAlpha = UITheme.clampAlpha(BiaoGe.options.alpha)
+        backgroundSetting = BiaoGe.options.bg
+    end
+
+    if type(backgroundSetting) == "string" and backgroundSetting:find(",", 1, true) then
+        local values = {}
+        for value in backgroundSetting:gmatch("[^,]+") do
+            values[#values + 1] = tonumber(value)
+        end
+        if values[1] and values[2] and values[3] then
+            classic.background = {
+                color = { values[1], values[2], values[3], 1 },
+                alpha = legacyAlpha,
+            }
+        end
+    elseif type(backgroundSetting) == "string" and backgroundSetting ~= "" then
+        classic.background = {
+            texture = backgroundSetting,
+            horizTile = true,
+            vertTile = true,
+            alpha = legacyAlpha,
+        }
+    end
+
+    if type(UnitClass) == "function" and type(GetClassColor) == "function" then
+        local _, class = UnitClass("player")
+        if class then
+            local ok, r, g, b = pcall(GetClassColor, class)
+            if ok and r ~= nil then
+                classic.main = { border = { r, g, b, BG.borderAlpha or 0.5 } }
+                classic.title = {
+                    gradient = { r, g, b, 0.2, r, g, b, 0.0 },
+                    alpha = 1,
+                }
+            end
+        end
+    end
+
     return {
         main = main,
         background = background,
         title = title,
         moduleTabs = moduleTabs,
         raidTabs = raidTabs,
+        classic = classic,
     }, nil
 end
 
@@ -384,9 +445,7 @@ function M.installRuntime(init2, warn)
     runtimeInstalled = true
     init2(function()
         local ok = M.applySavedPreference()
-        if ok then
-            warned = false
-        elseif not warned and type(warn) == "function" then
+        if not ok and not warned and type(warn) == "function" then
             warned = true
             warn()
         end
