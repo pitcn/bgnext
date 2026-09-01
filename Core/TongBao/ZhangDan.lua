@@ -537,8 +537,11 @@ local function OnClick(self)
                                 -- DuiZhang-苍牧-
                                 local maijia = BiaoGe[v.FB]["boss" .. v.b]["maijia" .. v.i]
                                 if BG.BGNext and BG.BGNext.PlayerIdentity then
-                                    maijia = BG.BGNext.PlayerIdentity.shortName(maijia)
+                                    local identity = BG.BGNext.PlayerIdentity
+                                    maijia = identity.duiZhangName(maijia, BG.realmName,
+                                        identity.familyFromGlobals(BG))
                                 end
+                                if not maijia then yes = nil break end
                                 text = text .. maijia .. "-"
                             else
                                 yes = nil

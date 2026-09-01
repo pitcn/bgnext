@@ -56,4 +56,27 @@ return function(test)
     test.eq(Identity.familyFromGlobals({ IsRetail = true }), "retail", "retail flag resolves to retail")
     test.eq(Identity.familyFromGlobals({ IsVanilla = true }), nil, "vanilla flag resolves to non-retail")
     test.eq(Identity.familyFromGlobals(nil), nil, "missing globals resolve to non-retail")
+
+    -- The legacy DuiZhang message keeps its existing message type. Non-Retail
+    -- can use the unique local short name; Retail must retain a cross-realm
+    -- canonical identity, and the receiver parses the item payload from the
+    -- right so the buyer's own hyphen is not treated as a delimiter.
+    test.eq(Identity.duiZhangName("Reader-时光", "时光", "titan"), "Reader",
+        "non-retail DuiZhang keeps the legacy short-name field")
+    test.eq(Identity.duiZhangName("Reader-OtherRealm", "时光", "retail"), "Reader%2DOtherRealm",
+        "retail DuiZhang encodes the cross-realm separator for legacy parsing")
+    test.eq(Identity.duiZhangName("Reader", "时光", "retail"), "Reader",
+        "retail DuiZhang keeps an unambiguous same-realm name legacy-compatible")
+    local buyer, payload = Identity.parseDuiZhang("DuiZhang-Reader-24478 10000,27854 t,")
+    test.eq(buyer, "Reader", "legacy short-name DuiZhang messages still parse")
+    test.eq(payload, "24478 10000,27854 t,", "legacy item payload remains unchanged")
+    buyer, payload = Identity.parseDuiZhang("DuiZhang-Reader%2DOtherRealm-24478 10000,27854 t,")
+    test.eq(buyer, "Reader-OtherRealm", "retail cross-realm DuiZhang identity round-trips")
+    test.eq(payload, "24478 10000,27854 t,", "cross-realm item payload remains unchanged")
+
+    local trade = assert(io.open("Core/Module/Trade.lua", "rb"))
+    local tradeSource = trade:read("*a")
+    trade:close()
+    test.eq(tradeSource:find('maijia:GetText() == target', 1, true), nil,
+        "debt lookup and clear never compare display text to a canonical target")
 end

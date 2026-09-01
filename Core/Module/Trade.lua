@@ -921,7 +921,12 @@ BG.Init(function()
                         local zhuangbei = BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]
                         local maijia = BG.Frame[FB]["boss" .. b]["maijia" .. i]
                         if maijia then
-                            if maijia:GetText() == target and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
+                            local storedBuyer = BiaoGe[FB]["boss" .. b]["maijia" .. i] or maijia:GetText()
+                            local sameBuyer = storedBuyer == target
+                            if BG.BGNext and BG.BGNext.PlayerIdentity then
+                                sameBuyer = BG.BGNext.PlayerIdentity.same(storedBuyer, target, BG.realmName)
+                            end
+                            if sameBuyer and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
                                 yes = true
                                 local bts = {}
                                 sum = sum + tonumber(BiaoGe[FB]["boss" .. b]["qiankuan" .. i])
@@ -1156,7 +1161,12 @@ BG.Init(function()
                     for i = 1, BG.GetMaxi(FB, b) do
                         local maijia = BG.Frame[FB]["boss" .. b]["maijia" .. i]
                         if maijia then
-                            if maijia:GetText() == target and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
+                            local storedBuyer = BiaoGe[FB]["boss" .. b]["maijia" .. i] or maijia:GetText()
+                            local sameBuyer = storedBuyer == target
+                            if BG.BGNext and BG.BGNext.PlayerIdentity then
+                                sameBuyer = BG.BGNext.PlayerIdentity.same(storedBuyer, target, BG.realmName)
+                            end
+                            if sameBuyer and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
                                 BiaoGe[FB]["boss" .. b]["qiankuan" .. i] = nil
                                 BG.Frame[FB]["boss" .. b]["qiankuan" .. i]:Hide()
                             end

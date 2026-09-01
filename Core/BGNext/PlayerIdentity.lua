@@ -92,5 +92,34 @@ function M.familyFromGlobals(globals)
     return nil
 end
 
+-- Buyer identity carried by the existing DuiZhang message. Non-Retail raids
+-- have no cross-realm ambiguity and retain the legacy short field. Retail must
+-- carry the canonical realm so same-name players on different realms remain
+-- distinct. This changes neither the message type nor the item payload.
+function M.duiZhangName(value, localRealm, family)
+    if family == "retail" then
+        local display = M.display(value, localRealm, family)
+        if not display then return nil end
+        -- Keep same-realm names legacy-compatible. Cross-realm display retains
+        -- its realm, but the legacy protocol uses '-' as a field delimiter, so
+        -- encode '%' and '-' without adding another message field or type.
+        return display:gsub("%%", function() return "%25" end)
+            :gsub("%-", function() return "%2D" end)
+    end
+    return M.shortName(value)
+end
+
+-- Parses from the item payload boundary on the right. The old three-way
+-- strsplit treated the hyphen inside "Name-Realm" as a protocol delimiter.
+-- Item payloads begin with a numeric item id, which makes that boundary stable
+-- while preserving legacy short-name messages.
+function M.parseDuiZhang(message)
+    if type(message) ~= "string" then return nil end
+    local buyer, payload = message:match("^DuiZhang%-(.+)%-(%d+ .*)$")
+    if not buyer or buyer == "" or not payload or payload == "" then return nil end
+    buyer = buyer:gsub("%%2[dD]", "-"):gsub("%%25", function() return "%" end)
+    return buyer, payload
+end
+
 BG.BGNext.PlayerIdentity = M
 return M
