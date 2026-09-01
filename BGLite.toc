@@ -58,6 +58,7 @@ Core\BGNext\TradeAuctionState.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua
+Core\BGNext\AuctionReadiness.lua
 Core\BGNext\TooltipDebtCache.lua
 Core\BGNext\TooltipDebtRuntime.lua
 Core\BGNext\HighlightManager.lua
