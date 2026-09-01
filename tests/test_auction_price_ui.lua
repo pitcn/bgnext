@@ -66,6 +66,20 @@ return function(test)
     test.eq(ui.toolbarActions("bogus"), nil, "unknown mode has no toolbar")
     test.eq(ui.toolbarActions("leader") == ui.toolbarActions("personal"), false, "modes never share a toolbar")
 
+    -- Import/export choices per mode. Leader schemes export by current/all scope
+    -- and import as new/replace; personal expectations import as merge/replace.
+    -- Any mode that overwrites saved data ("replace") requires confirmation.
+    test.eq(ui.EXPORT_SCOPES.leader[1], "current", "leader export offers current scheme")
+    test.eq(ui.EXPORT_SCOPES.leader[2], "all", "leader export offers all schemes")
+    test.eq(ui.EXPORT_SCOPES.personal[1], nil, "personal export has no scope")
+    test.eq(ui.IMPORT_MODES.leader[1], "new", "leader import offers new schemes")
+    test.eq(ui.IMPORT_MODES.leader[2], "replace", "leader import offers replace")
+    test.eq(ui.IMPORT_MODES.personal[1], "merge", "personal import offers merge")
+    test.eq(ui.IMPORT_MODES.personal[2], "replace", "personal import offers replace")
+    test.eq(ui.importRequiresConfirmation("replace"), true, "replace requires confirmation")
+    test.eq(ui.importRequiresConfirmation("new"), false, "new needs no confirmation")
+    test.eq(ui.importRequiresConfirmation("merge"), false, "merge needs no confirmation")
+
     -- The runtime frame hierarchy is present in source and built from the same
     -- reusable-row contract, wired to the store modules rather than to raw
     -- SavedVariables.
@@ -100,8 +114,24 @@ return function(test)
     }) do
         test.eq(source:find(token, 1, true) ~= nil, true, "page shell wires " .. token)
     end
+    for _, token in ipairs({
+        "AuctionPriceCodec",
+        "Codec.parse",
+        "Codec.exportLeader",
+        "Codec.exportPersonal",
+        "Codec.applyLeader",
+        "Codec.applyPersonal",
+        "HighlightText",
+        "panel.preview",
+        "preview.unknownItems",
+        "panel.commit",
+    }) do
+        test.eq(source:find(token, 1, true) ~= nil, true, "import/export panel wires " .. token)
+    end
 
     for _, forbidden in ipairs({
+        "SetClipboard",
+        "SendChatMessage",
         "SendChatMessage",
         "SendAddonMessage",
         "C_ChatInfo.SendAddonMessage",
