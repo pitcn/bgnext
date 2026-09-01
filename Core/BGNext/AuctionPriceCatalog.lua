@@ -81,14 +81,16 @@ function M.build(options)
         local diffLoot = loot[difficulty]
         if type(diffLoot) == "table" then
             for bossKey, itemIds in pairs(diffLoot) do
-                -- Loot tables use `bossNother` for supplementary drops owned by
-                -- that same boss (most notably tier/exchange items). Treating
-                -- those keys as unknown made the misc bucket absorb hundreds of
-                -- otherwise boss-owned items.
-                local baseBossKey = type(bossKey) == "string" and bossKey:match("^(boss%d+)other$") or nil
-                local group = groupById[bossKey] or (baseBossKey and groupById[baseBossKey]) or miscGroup
-                for _, itemId in ipairs(itemIds) do
-                    addItem(group, itemId)
+                -- `bossNother` contains the products obtained after exchanging
+                -- a dropped token/quest item. The auction sells the source item,
+                -- which already lives in `bossN`; listing every possible reward
+                -- again inflates a single boss from ~20 drops to 90+ entries.
+                local isExchangeResult = type(bossKey) == "string" and bossKey:match("^boss%d+other$") ~= nil
+                if not isExchangeResult then
+                    local group = groupById[bossKey] or miscGroup
+                    for _, itemId in ipairs(itemIds) do
+                        addItem(group, itemId)
+                    end
                 end
             end
         end

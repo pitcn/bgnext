@@ -40,16 +40,23 @@ return function(test)
     local bosses = ui.bossDefinitions(registry)
     test.eq(#bosses, 15, "all actual bosses are retained")
     test.eq(bosses[15].id, "boss15", "last actual boss is retained")
+    test.eq(ui.bossCountLabel("艾瑞达双子", 27), "艾瑞达双子（27件）", "boss count is labelled as item count")
+    test.eq(ui.itemTooltipLink(34393), "item:34393", "tooltip uses a stable item hyperlink")
+    test.eq(ui.itemTooltipLink(nil), nil, "missing item has no tooltip link")
 
     -- Fresh state defaults to leader.
     local state = ui.newState("ULD")
     test.eq(state.mode, "leader", "new state defaults to leader")
     test.eq(state.raidId, "ULD", "new state records raid")
     test.eq(state.filters.text, "", "new state has empty text filter")
+    test.eq(state.itemOffset, 0, "new state starts at the first item")
 
     -- Mode switch preserves boss and search.
     ui.selectBoss(state, "boss4")
     ui.setFilter(state, "text", "饰品")
+    state.itemOffset = 7
+    ui.setFilter(state, "quality", 4)
+    test.eq(state.itemOffset, 0, "changing filters returns to the first item")
     ui.setMode(state, "personal")
     test.eq(state.mode, "personal", "mode switched")
     test.eq(state.bossId, "boss4", "mode switch preserves boss")
@@ -75,6 +82,19 @@ return function(test)
     test.eq(ui.visibleRowCount(100, 12), 12, "large list reuses fixed rows")
     test.eq(ui.visibleRowCount(5, 12), 5, "small list uses only what it needs")
     test.eq(ui.visibleRowCount(0, 12), 0, "empty list needs no rows")
+
+    -- A fixed twelve-row viewport must still expose every item through a
+    -- clamped zero-based scroll offset.
+    local many = {}
+    for i = 1, 20 do many[i] = "item" .. i end
+    local first, firstOffset, maxOffset = ui.visibleWindow(many, 0, 12)
+    test.eq(#first, 12, "first viewport has twelve rows")
+    test.eq(first[1], "item1", "first viewport starts at item one")
+    test.eq(maxOffset, 8, "twenty items have eight scroll steps")
+    local last, lastOffset = ui.visibleWindow(many, 99, 12)
+    test.eq(lastOffset, 8, "oversized scroll offset is clamped")
+    test.eq(last[1], "item9", "last viewport begins at item nine")
+    test.eq(last[12], "item20", "last item is reachable")
 
     -- Enter-next-visible behaviour.
     test.eq(ui.nextVisibleIndex({ "a", "b", "c" }, 1), 2, "enter moves to next")
@@ -127,11 +147,14 @@ return function(test)
         "main.bossScroll",
         "main.filterBar",
         "main.itemScroll",
+        "main.itemSlider",
         "main.rows",
     }) do
         test.eq(source:find(token, 1, true) ~= nil, true, "page shell declares " .. token)
     end
     test.eq(source:find("for i = 1, M.ROW_CAPACITY do", 1, true) ~= nil, true, "page shell reuses the fixed rows")
+    test.eq(source:find('main.itemScroll:SetScript("OnMouseWheel"', 1, true) ~= nil, true, "long item lists are mouse-wheel scrollable")
+    test.eq(source:find("GameTooltip:SetHyperlink(link)", 1, true) ~= nil, true, "item rows show the native item tooltip")
     test.eq(source:find("BG.TabButtonsFB:Hide()", 1, true) ~= nil, true, "price page hides the global raid navigation")
     test.eq(source:find("BG.TabButtonsFB:Show()", 1, true) ~= nil, true, "price page restores the global raid navigation")
     for _, token in ipairs({

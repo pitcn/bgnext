@@ -23,11 +23,11 @@ return function(test)
     test.eq(#model.groups, 2, "two groups")
     test.eq(model.groups[1].id, "boss1", "first group is boss1")
     test.eq(model.groups[1].name, "烈焰巨兽", "boss name kept")
-    test.eq(#model.groups[1].items, 4, "boss supplementary drops stay with their boss")
+    test.eq(#model.groups[1].items, 3, "only auctionable source drops stay with their boss")
     test.eq(model.groups[2].id, "misc", "second group is misc")
     test.eq(model.groups[2].name, "杂项", "misc name kept")
     test.eq(#model.groups[2].items, 0, "misc does not absorb boss supplementary drops")
-    test.eq(model.groups[1].items[3].itemId, 103, "boss supplementary item remains searchable under its boss")
+    test.eq(model.byItem[103], nil, "exchange-result items are excluded from auction presets")
 
     test.eq(catalog.resolveRaidForItem({ ULD = model }, 104), "ULD", "resolve item to raid")
     test.eq(catalog.resolveRaidForItem({ ULD = model }, 999), nil, "unknown item resolves nil")
@@ -49,7 +49,7 @@ return function(test)
     -- State filtering through a supplied hasPrice callback.
     local hasPrice = function(id) return id == 101 end
     test.eq(#catalog.filter(model, { state = "set", hasPrice = hasPrice }), 1, "state set")
-    test.eq(#catalog.filter(model, { state = "unset", hasPrice = hasPrice }), 3, "state unset")
+    test.eq(#catalog.filter(model, { state = "unset", hasPrice = hasPrice }), 2, "state unset")
 
     -- Keys that do not belong to a known boss (including the table's misc row)
     -- still fall back to the explicit misc group.

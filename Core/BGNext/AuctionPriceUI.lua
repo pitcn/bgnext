@@ -57,6 +57,15 @@ function M.bossDefinitions(registry)
     return bosses
 end
 
+function M.bossCountLabel(name, count)
+    return tostring(name or "") .. "（" .. tostring(math.max(math.floor(tonumber(count) or 0), 0)) .. "件）"
+end
+
+function M.itemTooltipLink(itemId)
+    if type(itemId) ~= "number" then return nil end
+    return "item:" .. tostring(itemId)
+end
+
 local LEADER_ACTIONS = { "preset", "basePrice", "active", "new", "copy", "rename", "delete", "import", "export" }
 local PERSONAL_ACTIONS = { "itemCount", "import", "export", "clear" }
 
@@ -76,6 +85,7 @@ function M.newState(raidId)
         mode = "leader",
         bossId = nil,
         savedBossId = nil,
+        itemOffset = 0,
         filters = emptyFilters(),
     }
 end
@@ -95,6 +105,7 @@ function M.selectRaid(state, raidId)
     state.raidId = raidId
     state.bossId = nil
     state.savedBossId = nil
+    state.itemOffset = 0
     state.filters = emptyFilters()
     return true
 end
@@ -105,6 +116,7 @@ function M.selectBoss(state, bossId)
     if type(state) ~= "table" then return false end
     state.bossId = bossId
     state.savedBossId = bossId
+    state.itemOffset = 0
     return true
 end
 
@@ -117,6 +129,7 @@ function M.setFilter(state, key, value)
         state.savedBossId = state.bossId
     end
     state.filters[key] = value
+    state.itemOffset = 0
     return true
 end
 
@@ -125,6 +138,7 @@ end
 function M.clearFilters(state)
     if type(state) ~= "table" then return false end
     state.filters = emptyFilters()
+    state.itemOffset = 0
     if state.savedBossId ~= nil then
         state.bossId = state.savedBossId
     end
@@ -151,6 +165,26 @@ function M.visibleRowCount(total, capacity)
     if total < 0 then total = 0 end
     if capacity < 0 then capacity = 0 end
     return total < capacity and total or capacity
+end
+
+-- Returns the slice rendered by the reusable-row viewport, together with the
+-- clamped zero-based offset and its maximum. Keeping this pure makes it
+-- impossible for a long loot list to silently strand items after row twelve.
+function M.visibleWindow(items, offset, capacity)
+    items = type(items) == "table" and items or {}
+    capacity = math.max(math.floor(tonumber(capacity) or 0), 0)
+    local maxOffset = math.max(#items - capacity, 0)
+    offset = math.floor(tonumber(offset) or 0)
+    if offset < 0 then offset = 0 end
+    if offset > maxOffset then offset = maxOffset end
+
+    local visible = {}
+    for i = 1, capacity do
+        local item = items[offset + i]
+        if item == nil then break end
+        visible[#visible + 1] = item
+    end
+    return visible, offset, maxOffset
 end
 
 -- Ordered toolbar action keys for a mode. Leader keeps the full scheme toolbar;
@@ -333,6 +367,15 @@ if runtimeReady() then
         main.itemScroll = CreateFrame("Frame", nil, main)
         main.itemScroll:SetPoint("TOPLEFT", main.filterBar, "BOTTOMLEFT", 0, -8)
         main.itemScroll:SetSize(420, 280)
+        main.itemScroll:EnableMouseWheel(true)
+
+        main.itemSlider = CreateFrame("Slider", nil, main, "UIPanelScrollBarTemplate")
+        main.itemSlider:SetPoint("TOPLEFT", main.itemScroll, "TOPRIGHT", 2, -16)
+        main.itemSlider:SetPoint("BOTTOMLEFT", main.itemScroll, "BOTTOMRIGHT", 2, 16)
+        main.itemSlider:SetWidth(18)
+        main.itemSlider:SetMinMaxValues(0, 0)
+        main.itemSlider:SetValueStep(1)
+        main.itemSlider:SetValue(0)
 
         -- Reusable rows: a fixed set of twelve, repopulated on refresh so a large
         -- raid never creates ~100 permanent row objects.
@@ -368,6 +411,22 @@ if runtimeReady() then
             cx:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
             cx:SetTextColor(1, 0.3, 0.3)
             cx:SetText("X")
+            row:EnableMouse(true)
+            row:EnableMouseWheel(true)
+            row:SetScript("OnMouseWheel", function(_, delta)
+                local offset = tonumber(pageState.itemOffset) or 0
+                main.itemSlider:SetValue(offset - (tonumber(delta) or 0) * 3)
+            end)
+            row:SetScript("OnEnter", function(self)
+                local link = M.itemTooltipLink(self.itemId)
+                if not link or not GameTooltip then return end
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetHyperlink(link)
+                GameTooltip:Show()
+            end)
+            row:SetScript("OnLeave", function()
+                if GameTooltip then GameTooltip:Hide() end
+            end)
             main.rows[i] = row
         end
 
@@ -675,13 +734,21 @@ if runtimeReady() then
 
         -- ---- Refresh functions ----
         function refreshRows()
-            local items = filteredItems()
+            local allItems = filteredItems()
+            local items, offset, maxOffset = M.visibleWindow(allItems, pageState.itemOffset, M.ROW_CAPACITY)
+            pageState.itemOffset = offset
+            main.itemSlider._refreshing = true
+            main.itemSlider:SetMinMaxValues(0, maxOffset)
+            main.itemSlider:SetValue(offset)
+            main.itemSlider._refreshing = nil
+            main.itemSlider:SetShown(maxOffset > 0)
             for i = 1, M.ROW_CAPACITY do
                 local row = main.rows[i]
                 local item = items[i]
                 if item then
                     row:Show()
                     row.itemId = item.itemId
+                    row.absoluteIndex = offset + i
                     local name, _, quality, _, _, _, _, _, _, texture = GetItemInfo(item.itemId)
                     if texture then row.icon:SetTexture(texture) else row.icon:SetTexture(nil) end
                     if name then item.name = name end
@@ -730,6 +797,7 @@ if runtimeReady() then
                 else
                     row:Hide()
                     row.itemId = nil
+                    row.absoluteIndex = nil
                 end
             end
         end
@@ -845,7 +913,7 @@ if runtimeReady() then
                     bossButtons[idx] = bt
                 end
                 bt.nodeId = node.id
-                bt:SetText(node.name .. " (" .. node.count .. ")")
+                bt:SetText(M.bossCountLabel(node.name, node.count))
                 bt:SetSize(150, 20)
                 bt:SetPoint("TOPLEFT", main.bossScroll, "TOPLEFT", 0, -(idx - 1) * 22)
                 local selected = (pageState.bossId == node.id) or (pageState.bossId == nil and node.id == "all")
@@ -1238,6 +1306,16 @@ if runtimeReady() then
             refreshRows()
         end)
 
+        main.itemSlider:SetScript("OnValueChanged", function(self, value)
+            if self._refreshing then return end
+            pageState.itemOffset = math.floor((tonumber(value) or 0) + 0.5)
+            refreshRows()
+        end)
+        main.itemScroll:SetScript("OnMouseWheel", function(_, delta)
+            local offset = tonumber(pageState.itemOffset) or 0
+            main.itemSlider:SetValue(offset - (tonumber(delta) or 0) * 3)
+        end)
+
         for i = 1, M.ROW_CAPACITY do
             local row = main.rows[i]
             row.edit:SetScript("OnTextChanged", function(self)
@@ -1247,11 +1325,20 @@ if runtimeReady() then
             row.edit:SetScript("OnEnterPressed", function(self)
                 local r = self:GetParent()
                 if validateEdit(r) and saveEdit(r) then
-                    refreshRows()
                     refreshToolbar()
                     local items = filteredItems()
-                    local next = M.nextVisibleIndex(items, r.index)
-                    if next then main.rows[next].edit:SetFocus() else self:ClearFocus() end
+                    local next = M.nextVisibleIndex(items, r.absoluteIndex)
+                    if next then
+                        local offset = tonumber(pageState.itemOffset) or 0
+                        if next <= offset or next > offset + M.ROW_CAPACITY then
+                            pageState.itemOffset = next - 1
+                        end
+                        refreshRows()
+                        local visibleIndex = next - pageState.itemOffset
+                        if main.rows[visibleIndex] then main.rows[visibleIndex].edit:SetFocus() end
+                    else
+                        self:ClearFocus()
+                    end
                 end
             end)
             row.edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
