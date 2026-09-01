@@ -24,6 +24,7 @@ Core\BGNext\ChatYYCopy.lua
 Core\BGNext\Identity.lua
 Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
+Core\BGNext\AuctionPriceStore.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
 Core\BGNext\CurrentSettlementView.lua

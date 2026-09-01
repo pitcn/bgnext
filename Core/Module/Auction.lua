@@ -33,14 +33,14 @@ end
 BG.Init(function()
     BiaoGe.Auction = BiaoGe.Auction or {}
     if BG.verLess2 then
-        BiaoGe.Auction.money = BiaoGe.Auction.money or 1
+        BiaoGe.Auction.money = BiaoGe.Auction.money or 100
         BiaoGe.Auction.fastMoney = BiaoGe.Auction.fastMoney or { 100, 300, 500, 1000, 2000 }
     elseif BG.IsTitan then
         BG.Once("fastMoney", 251201, function()
             BiaoGe.Auction.money = nil
             BiaoGe.Auction.fastMoney = nil
         end)
-        BiaoGe.Auction.money = BiaoGe.Auction.money or 1000
+        BiaoGe.Auction.money = BiaoGe.Auction.money or 100
         BiaoGe.Auction.fastMoney = BiaoGe.Auction.fastMoney or { 300, 500, 1000, 2000, 3000 }
         BG.Once('fastMoney', 250528, function()
             BiaoGe.Auction.fastMoney = { 100, 300, 500, 1000, 2000 }

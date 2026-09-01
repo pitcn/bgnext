@@ -4,6 +4,7 @@ local suites = {
     "tests/test_identity.lua",
     "tests/test_conflict_guard.lua",
     "tests/test_data_lifecycle.lua",
+    "tests/test_auction_price_store.lua",
     "tests/test_baseline_safety.lua",
     "tests/test_release_builder.lua",
     "tests/test_current_settlement.lua",
