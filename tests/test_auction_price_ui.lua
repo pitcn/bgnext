@@ -66,11 +66,41 @@ return function(test)
     test.eq(ui.toolbarActions("bogus"), nil, "unknown mode has no toolbar")
     test.eq(ui.toolbarActions("leader") == ui.toolbarActions("personal"), false, "modes never share a toolbar")
 
-    -- The pure shell makes no communicating, clipboard, HTTP, telemetry or
-    -- third-party calls, and reads no third-party SavedVariables.
+    -- The runtime frame hierarchy is present in source and built from the same
+    -- reusable-row contract, wired to the store modules rather than to raw
+    -- SavedVariables.
     local file = assert(io.open("Core/BGNext/AuctionPriceUI.lua", "rb"))
     local source = file:read("*a")
     file:close()
+    for _, token in ipairs({
+        "BG.PricePresetMainFrame",
+        "BG.Create_TabButton(M.tabNumber",
+        'L["价格预设"]',
+    }) do
+        test.eq(source:find(token, 1, true) ~= nil, true, "page shell builds " .. token)
+    end
+    for _, token in ipairs({
+        "main.raidBar",
+        "main.modeBar",
+        "main.description",
+        "main.toolbar",
+        "main.bossScroll",
+        "main.filterBar",
+        "main.itemScroll",
+        "main.rows",
+    }) do
+        test.eq(source:find(token, 1, true) ~= nil, true, "page shell declares " .. token)
+    end
+    test.eq(source:find("for i = 1, M.ROW_CAPACITY do", 1, true) ~= nil, true, "page shell reuses the fixed rows")
+    for _, token in ipairs({
+        "setLeaderItemPrice",
+        "setPersonalPrice",
+        "clearLeaderItemPrice",
+        "clearPersonalPrice",
+    }) do
+        test.eq(source:find(token, 1, true) ~= nil, true, "page shell wires " .. token)
+    end
+
     for _, forbidden in ipairs({
         "SendChatMessage",
         "SendAddonMessage",
