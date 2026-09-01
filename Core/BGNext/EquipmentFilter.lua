@@ -122,7 +122,7 @@ local function sameTable(left, right)
 end
 
 local function upgradeStaleBuiltIns(state, defaults)
-    if type(state) ~= "table" or type(state.profiles) ~= "table" then return end
+    if type(state) ~= "table" or type(state.profiles) ~= "table" then return false end
     local fallbackIcon
     for _, def in ipairs(defaults or {}) do
         if type(def) == "table" and type(def.builtInKey) == "string"
@@ -131,20 +131,26 @@ local function upgradeStaleBuiltIns(state, defaults)
             break
         end
     end
-    if fallbackIcon == nil then return end
+    if fallbackIcon == nil then return false end
+    local changed = false
     for _, def in ipairs(defaults or {}) do
         local key = type(def) == "table" and def.builtInKey
         local profile = key and state.profiles[key]
         if profile and profile.builtInKey == key and not key:match(":class$")
             and profile.icon == fallbackIcon and def.icon ~= nil and def.icon ~= fallbackIcon then
             profile.icon = def.icon
+            changed = true
         end
         if profile and profile.builtInKey == key and type(def.upgradeWeaponFrom) == "table"
             and sameTable(profile.weapon, def.upgradeWeaponFrom) then
             profile.weapon = clone(type(def.weapon) == "table" and def.weapon or {})
+            changed = true
         end
     end
+    return changed
 end
+
+M.upgradeStaleBuiltIns = upgradeStaleBuiltIns
 
 function M.ensureCharacter(root, realmId, player, defaults, spec)
     if type(root) ~= "table" or realmId == nil or player == nil then return nil end

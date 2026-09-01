@@ -159,6 +159,63 @@ return function(test)
     test.eq(migratedState.profiles["custom-1"].name, "自定义",
         "installing missing built-ins preserves custom profiles")
 
+    -- Tree APIs can be unavailable while BG.Init creates the saved profiles and
+    -- become ready only on PLAYER_ENTERING_WORLD. Hydrate the known stale class
+    -- icons at that later event without rebuilding or changing custom profiles.
+    local classIcon = "Interface/Icons/classicon_hunter"
+    local lateMetadataState = {
+        selectionMode = "follow-spec",
+        selectedId = "titan:HUNTER:tree:HUNTER:1",
+        order = { "titan:HUNTER:tree:HUNTER:1", "titan:HUNTER:tree:HUNTER:2", "custom-1" },
+        profiles = {
+            ["titan:HUNTER:tree:HUNTER:1"] = {
+                id = "titan:HUNTER:tree:HUNTER:1", builtInKey = "titan:HUNTER:tree:HUNTER:1",
+                name = "野兽控制", icon = classIcon,
+            },
+            ["titan:HUNTER:tree:HUNTER:2"] = {
+                id = "titan:HUNTER:tree:HUNTER:2", builtInKey = "titan:HUNTER:tree:HUNTER:2",
+                name = "射击", icon = classIcon,
+            },
+            ["custom-1"] = { id = "custom-1", name = "自定义", icon = classIcon },
+        },
+    }
+    local lateMetadataController = Runtime.new({
+        adapter = {
+            detect = function() return "titan" end,
+            resolve = function()
+                return { specKey = "tree:HUNTER:1" }
+            end,
+        },
+        catalog = {
+            getDefault = function()
+                return { builtInKey = "titan:HUNTER:tree:HUNTER:1" }
+            end,
+        },
+        model = model,
+        getClassToken = function() return "HUNTER" end,
+        getState = function() return lateMetadataState end,
+        getDefaults = function()
+            return {
+                { id = "titan:HUNTER:tree:HUNTER:1", builtInKey = "titan:HUNTER:tree:HUNTER:1",
+                    name = "野兽控制", icon = 111 },
+                { id = "titan:HUNTER:tree:HUNTER:2", builtInKey = "titan:HUNTER:tree:HUNTER:2",
+                    name = "射击", icon = 222 },
+                { id = "titan:HUNTER:class", builtInKey = "titan:HUNTER:class",
+                    name = "猎人", icon = classIcon },
+            }
+        end,
+        globals = { IsTitan = true },
+        api = {},
+    })
+    lateMetadataController:onEvent("PLAYER_ENTERING_WORLD")
+    lateMetadataController:flush()
+    test.eq(lateMetadataState.profiles["titan:HUNTER:tree:HUNTER:1"].icon, 111,
+        "late-ready metadata upgrades the active built-in specialization icon")
+    test.eq(lateMetadataState.profiles["titan:HUNTER:tree:HUNTER:2"].icon, 222,
+        "late-ready metadata upgrades every built-in specialization icon")
+    test.eq(lateMetadataState.profiles["custom-1"].icon, classIcon,
+        "late-ready metadata leaves a custom profile icon untouched")
+
     local defaults, builtInId = Runtime.buildDefaults(adapter, {
         list = function()
             return {

@@ -79,19 +79,31 @@ function M.new(deps)
         if not self.pending then return end
         self.pending = false
         local builtInId, family, classToken = resolveNow()
-        if builtInId ~= self.lastBuiltInId then
-            local model = self.deps.model
-            local state = self.deps.getState and self.deps.getState()
+        local model = self.deps.model
+        local state = self.deps.getState and self.deps.getState()
+        local defaults
+        local function currentDefaults()
+            if defaults == nil and self.deps.getDefaults then
+                defaults = self.deps.getDefaults(family, classToken)
+            end
+            return defaults
+        end
+        local upgraded = model and model.upgradeStaleBuiltIns
+            and model.upgradeStaleBuiltIns(state, currentDefaults()) or false
+        local selectionChanged = builtInId ~= self.lastBuiltInId
+        if selectionChanged then
             if model and model.applyResolvedSpecialization then
                 if builtInId and state and state.selectionMode == "follow-spec"
                     and type(state.profiles) == "table" and not state.profiles[builtInId]
                     and model.reconcileBuiltIns and self.deps.getDefaults then
-                    model.reconcileBuiltIns(state, self.deps.getDefaults(family, classToken))
+                    model.reconcileBuiltIns(state, currentDefaults())
                 end
                 model.applyResolvedSpecialization(state, builtInId)
             end
-            if self.deps.refresh then self.deps.refresh() end
             self.lastBuiltInId = builtInId
+        end
+        if (selectionChanged or upgraded) and self.deps.refresh then
+            self.deps.refresh()
         end
     end
 
