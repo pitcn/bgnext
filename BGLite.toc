@@ -6,7 +6,7 @@
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.0
-## X-BGNext-Version: 0.2.3
+## X-BGNext-Version: 0.3.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.0
@@ -32,8 +32,12 @@ Core\BGNext\ReleaseInfo.lua
 Core\BGNext\Wishlist.lua
 Core\BGNext\WishlistReminder.lua
 Core\BGNext\RetailLootStatus.lua
+Core\BGNext\ItemPrimaryStats.lua
+Core\BGNext\SpecializationAdapter.lua
 Core\BGNext\EquipmentFilterProfiles.lua
+Core\BGNext\EquipmentFilterSpecializations.lua
 Core\BGNext\EquipmentFilter.lua
+Core\BGNext\EquipmentFilterRuntime.lua
 Core\BGNext\OwnCharacters.lua
 Core\BGNext\OwnCharactersAdapters.lua
 Core\BGNext\OwnCharactersCatalog.lua
@@ -42,12 +46,17 @@ Core\BGNext\OwnCharactersView.lua
 Core\BGNext\RoleOverviewSettings.lua
 Core\BGNext\OwnCharactersUI.lua
 Core\BGNext\EntryInteractions.lua
+Core\BGNext\EntryMenuLifecycle.lua
 Core\BGNext\RoleOverviewEntry.lua
 Core\BGNext\OwnCharactersRuntime.lua
 Core\BGNext\PlayerIdentity.lua
+Core\BGNext\TradeAuctionState.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua
+Core\BGNext\TooltipDebtCache.lua
+Core\BGNext\TooltipDebtRuntime.lua
+Core\BGNext\HighlightManager.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml

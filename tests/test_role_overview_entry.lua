@@ -113,6 +113,15 @@ return function(test)
     test.eq(preview.x, 0, "hover preview has no horizontal gap")
     test.eq(preview.y, 0, "hover preview has no vertical gap")
 
+    -- The minimap button sits near the top, so its preview drops below the
+    -- button instead of opening upward off-screen.
+    local minimapPreview = Entry.windowPresentation("preview", "minimap")
+    test.eq(minimapPreview.strata, "FULLSCREEN_DIALOG", "minimap preview keeps the elevated strata")
+    test.eq(minimapPreview.point, "TOPRIGHT", "minimap preview anchors from its top-right corner")
+    test.eq(minimapPreview.relativePoint, "BOTTOMRIGHT", "minimap preview opens below the button")
+    test.eq(minimapPreview.x, 0, "minimap preview has no horizontal gap")
+    test.eq(minimapPreview.y, 0, "minimap preview has no vertical gap")
+
     local fixed = Entry.windowPresentation("pinned")
     test.eq(fixed.strata, "HIGH", "pinned window keeps the original high strata")
     test.eq(fixed.point, "CENTER", "an unsaved pinned window defaults to the screen center")
@@ -273,6 +282,13 @@ return function(test)
     test.eq(string.find(source, "C_Timer.NewTicker", 1, true), nil,
         "hover preview never spins a recurring ticker")
 
+    -- The minimap reuses the entry's hover enter/leave API instead of building
+    -- its own preview, timer or window.
+    test.eq(string.find(source, "function M.hoverEnter", 1, true) ~= nil, true,
+        "the entry exposes a shared hover enter API")
+    test.eq(string.find(source, "function M.hoverLeave", 1, true) ~= nil, true,
+        "the entry exposes a shared hover leave API")
+
     -- The role overview key binding is independent of the main-table binding.
     local bindings = io.open("Bindings.xml", "r")
     local bindingSource = bindings:read("*a")
@@ -293,4 +309,43 @@ return function(test)
     init:close()
     test.eq(string.find(initSource, "BINDING_NAME_BGNEXT_ROLE_OVERVIEW", 1, true) ~= nil, true,
         "the role binding display name is registered")
+
+    -- Shared hover enter/leave schedule one delayed reveal and cancel it on
+    -- leave. A controlled timer exposes the token semantics without the game.
+    local scheduled = {}
+    C_Timer = { After = function(_, callback) scheduled[#scheduled + 1] = callback end }
+    local previews = 0
+    local realShowPreview = Entry.showPreview
+    Entry.showPreview = function() previews = previews + 1 end
+
+    Entry.hoverEnter({}, "minimap")
+    test.eq(#scheduled, 1, "hover enter schedules a single reveal")
+    scheduled[1]()
+    test.eq(previews, 1, "a current token reveals the preview after the delay")
+
+    Entry.hoverEnter({}, "minimap")
+    local pending = scheduled[2]
+    Entry.hoverLeave()
+    test.eq(#scheduled, 2, "leaving before the delay still advances the token")
+    pending()
+    test.eq(previews, 1, "a stale token cancelled by leave never reveals the preview")
+
+    Entry.hoverEnter({}, "minimap")
+    local first = scheduled[3]
+    Entry.hoverEnter({}, "minimap")
+    local second = scheduled[4]
+    first()
+    test.eq(previews, 1, "entering a second source cancels the first reveal")
+    second()
+    test.eq(previews, 2, "only the most recent source reveals the preview")
+
+    -- A disabled or unavailable client never schedules a preview at all.
+    BG.BGNext.OwnCharactersRuntime = { isEnabled = function() return false end }
+    local scheduledBefore = #scheduled
+    Entry.hoverEnter({}, "minimap")
+    test.eq(#scheduled, scheduledBefore, "a disabled runtime never schedules a preview")
+    BG.BGNext.OwnCharactersRuntime = nil
+
+    Entry.showPreview = realShowPreview
+    C_Timer = nil
 end

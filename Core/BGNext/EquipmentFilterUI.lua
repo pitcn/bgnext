@@ -11,6 +11,7 @@ local chooserButtons = {}
 local ruleButtons = {}
 local sectionTitles = {}
 local openProfileMenu
+local updateRuleButtons
 
 local sectionOrder = {
     { key = "weapon", title = "武器类型过滤" },
@@ -55,11 +56,53 @@ local function setProfileButton(button, profile, selected)
     button:Show()
 end
 
+-- Resolves the current character's specialization to its built-in key plus a
+-- player-visible name and icon, or nil when the family/class is unknown or the
+-- specialization is unrecorded. Reads only the current character.
+local function resolveFollowTarget()
+    local adapter = BG.BGNext.SpecializationAdapter
+    local catalog = BG.BGNext.EquipmentFilterSpecializations
+    if not (adapter and catalog) then return nil end
+    local family = adapter.detect()
+    if not family then return nil end
+    local _, classToken = UnitClass("player")
+    if not classToken then return nil end
+    local resolved = adapter.resolve(family, _G, classToken)
+    if not resolved or not resolved.specKey then return nil end
+    local profile = catalog.getDefault(family, classToken, resolved.specKey)
+    if not profile then return nil end
+    return {
+        builtInId = profile.builtInKey,
+        name = resolved.name or profile.name,
+        icon = resolved.icon or profile.icon,
+    }
+end
+
+-- Rebuilds the specialization defaults for the current character and returns them
+-- with the resolved built-in id (or the class fallback when the specialization is
+-- unknown). Mirrors the runtime's initial setup for the reset button.
+local function buildDefaults()
+    local adapter = BG.BGNext.SpecializationAdapter
+    local catalog = BG.BGNext.EquipmentFilterSpecializations
+    local profiles = BG.BGNext.EquipmentFilterProfiles
+    local runtime = BG.BGNext.EquipmentFilterRuntime
+    local family = adapter and adapter.detect()
+    local _, classToken = UnitClass("player")
+    if runtime and runtime.buildDefaults then
+        return runtime.buildDefaults(adapter, catalog, profiles, family, classToken, _G)
+    end
+    return {}, nil
+end
+
 local function createProfileButton(parent, index, onClick)
     local button = CreateFrame("Button", nil, parent)
     button:SetSize(25, 25)
     if index == 1 then
-        button:SetPoint("LEFT", 0, 0)
+        if parent.followButton then
+            button:SetPoint("LEFT", parent.followButton, "RIGHT", 10, 0)
+        else
+            button:SetPoint("LEFT", 0, 0)
+        end
     else
         button:SetPoint("LEFT", parent.buttons[index - 1], "RIGHT", 10, 0)
     end
@@ -96,6 +139,46 @@ local function updateProfileRows()
     if not current then return end
     hideButtons(shortcutButtons)
     hideButtons(chooserButtons)
+    local target = resolveFollowTarget()
+    local following = current.selectionMode == "follow-spec"
+    local followTexture = (target and target.icon) or "Interface/Icons/INV_Misc_QuestionMark"
+    for _, rowFrame in ipairs({ BG.EquipmentFilterShortcutFrame, BG.FilterClassItemMainFrame.ProfileRow }) do
+        local followButton = rowFrame.followButton
+        if not followButton then
+            followButton = CreateFrame("Button", nil, rowFrame)
+            followButton:SetSize(25, 25)
+            followButton:SetPoint("LEFT", 0, 0)
+            followButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+            local icon = followButton:CreateTexture(nil, "ARTWORK")
+            icon:SetAllPoints()
+            followButton.icon = icon
+            followButton:SetScript("OnClick", function()
+                local target = resolveFollowTarget()
+                if target then
+                    local defaults = buildDefaults()
+                    BG.BGNext.EquipmentFilter.followSpecialization(state(), target.builtInId, defaults)
+                else
+                    BG.BGNext.EquipmentFilter.followSpecialization(state(), nil)
+                end
+                updateProfileRows(); updateRuleButtons(); refreshItems(); play()
+            end)
+            followButton:SetScript("OnEnter", function(self)
+                local resolved = resolveFollowTarget()
+                GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+                if resolved and resolved.name then
+                    GameTooltip:AddLine(L["跟随当前专精"] .. "：" .. resolved.name, 1, .82, 0)
+                else
+                    GameTooltip:AddLine(L["未识别当前专精，沿用当前方案"], 1, .82, 0)
+                end
+                GameTooltip:Show()
+            end)
+            followButton:SetScript("OnLeave", GameTooltip_Hide)
+            rowFrame.followButton = followButton
+        end
+        followButton.icon:SetTexture(followTexture)
+        followButton.icon:SetDesaturated(not following)
+        followButton:Show()
+    end
     for index, id in ipairs(current.order) do
         local profile = current.profiles[id]
         if profile then
@@ -131,7 +214,7 @@ local function updateProfileRows()
             setProfileButton(chooser, profile, current.selectedId == id)
         end
     end
-    local width = math.max(1, #current.order * 35)
+    local width = math.max(1, (#current.order + 1) * 35)
     BG.EquipmentFilterShortcutFrame:SetWidth(width)
     BG.FilterClassItemMainFrame.ProfileRow:SetWidth(width)
 end
@@ -143,11 +226,13 @@ local function sortedRules(values)
     return result
 end
 
-local function updateRuleButtons()
+updateRuleButtons = function()
     local profile = activeProfile()
     for _, button in ipairs(ruleButtons) do button:Hide() end
     if not profile then return end
-    local catalog = BG.BGNext.EquipmentFilterProfiles.getRuleCatalog({ project = WOW_PROJECT_ID })
+    local adapter = BG.BGNext.SpecializationAdapter
+    local family = adapter and adapter.detect()
+    local catalog = BG.BGNext.EquipmentFilterProfiles.getRuleCatalog({ family = family })
     local parent = BG.FilterClassItemMainFrame.RuleFrame
     local y = -5
     local used = 0
@@ -296,9 +381,8 @@ local function createUI()
     reset:SetPoint("TOPLEFT", 5, -40)
     reset:SetText(RESET)
     reset:SetScript("OnClick", function()
-        local _, classToken = UnitClass("player")
-        local defaults = BG.BGNext.EquipmentFilterProfiles.getDefaults({ project = WOW_PROJECT_ID }, classToken)
-        BG.BGNext.EquipmentFilter.resetDefaults(state(), defaults)
+        local defaults, builtInId = buildDefaults()
+        BG.BGNext.EquipmentFilter.resetDefaults(state(), defaults, builtInId)
         updateProfileRows(); updateRuleButtons(); refreshItems(); play()
     end)
 
@@ -380,8 +464,19 @@ local function createUI()
         if edit.profileId then
             BG.BGNext.EquipmentFilter.updateProfile(current, edit.profileId, { name = edit.NameEdit:GetText(), icon = edit.selectedIcon })
         else
-            local _, id = BG.BGNext.EquipmentFilter.createProfile(current, { name = edit.NameEdit:GetText(), icon = edit.selectedIcon or 134400, weapon = {}, armor = {}, affix = {}, classRestriction = true, ignoreBattleNetBound = false, tankOnly = false, primaryStat = {} })
-            if id then current.selectedId = id end
+            local active = activeProfile()
+            local _, id = BG.BGNext.EquipmentFilter.createProfile(current, {
+                name = edit.NameEdit:GetText(),
+                icon = edit.selectedIcon or 134400,
+                weapon = (active and active.weapon) or {},
+                armor = (active and active.armor) or {},
+                affix = (active and active.affix) or {},
+                classRestriction = (not active) or active.classRestriction ~= false,
+                ignoreBattleNetBound = active and active.ignoreBattleNetBound == true,
+                tankOnly = active and active.tankOnly == true,
+                primaryStat = (active and active.primaryStat) or {},
+            })
+            if id then BG.BGNext.EquipmentFilter.selectProfile(current, id) end
         end
         edit:Hide(); updateProfileRows(); updateRuleButtons(); refreshItems(); play()
     end)

@@ -15,7 +15,7 @@ BGNext is an independent community enhancement built on the verified BGLite 2.4.
 
 ## Invariants
 
-1. Historical BiaoGe source and assets are not implementation inputs. Publicly visible workflow may inform requirements; BGNext code, text, and assets are independently authored.
+1. Legally obtained BGLite, BiaoGe, and other addon versions may be studied under ADR-0003 to derive behavior and compatibility requirements. BGNext code, text, data structures, and assets remain independently authored; third-party implementation and assets are not copied, transformed, or repackaged.
 2. New BGNext data stays under `BiaoGe.BGNext` unless a reviewed ADR and data-inventory change explicitly say otherwise.
 3. Personal features remain local-only. Current-auction interoperability uses only the minimum existing BGLite protocol.
 4. Release packages exclude quarantined and unloaded source files.

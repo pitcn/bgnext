@@ -49,12 +49,21 @@ return function(test)
     handle:close()
     test.eq(string.find(minimapSource, "EntryInteractions.minimapAction", 1, true) ~= nil, true,
         "minimap dispatches through the shared action mapper")
-    test.eq(string.find(minimapSource, "EasyMenu", 1, true) ~= nil, true,
-        "minimap right click opens a dropdown menu")
-    test.eq(string.find(minimapSource, "BG.DropDownListIsVisible(BG.dropDown)", 1, true) ~= nil, true,
-        "a second right click detects the already-open entry menu")
-    test.eq(string.find(minimapSource, "LibBG:CloseDropDownMenus()", 1, true) ~= nil, true,
-        "a second right click closes the already-open entry menu")
+    test.eq(string.find(minimapSource, 'CreateFrame("Frame", nil, UIParent)', 1, true) ~= nil, true,
+        "minimap right click uses a private entry-menu frame")
+    test.eq(string.find(minimapSource, "if entryMenu:IsShown()", 1, true) ~= nil, true,
+        "a second right click detects the private entry menu")
+    test.eq(string.find(minimapSource, "entryMenu:Hide()", 1, true) ~= nil, true,
+        "a second right click closes only the private entry menu")
     test.eq(string.find(minimapSource, "BG.SetFBCD", 1, true), nil,
         "minimap no longer calls the legacy SetFBCD toggle")
+
+    -- Hover previews on the minimap reuse the shared role-overview entry API;
+    -- the minimap must not build its own preview, timer or window.
+    test.eq(string.find(minimapSource, "RoleOverviewEntry.hoverEnter", 1, true) ~= nil, true,
+        "minimap hover enters through the shared entry API")
+    test.eq(string.find(minimapSource, "RoleOverviewEntry.hoverLeave", 1, true) ~= nil, true,
+        "minimap hover leaves through the shared entry API")
+    test.eq(string.find(minimapSource, "BGNextRoleOverviewFrame", 1, true), nil,
+        "minimap never builds its own role overview window")
 end

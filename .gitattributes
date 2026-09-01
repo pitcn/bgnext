@@ -3,7 +3,7 @@
 /Bindings.xml -text
 /Templates.xml -text
 /addon_version.txt -text
-/Core/** -text
+/Core/** -text whitespace=cr-at-eol
 /Libs/** -text
 /Locales/** -text
 /Media/** -text

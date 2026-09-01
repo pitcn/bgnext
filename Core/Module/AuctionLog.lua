@@ -50,7 +50,7 @@ BG.Init(function()
             for i, v in ipairs(tbl) do
                 frame = BG.CreateHighlightFrame(self, nil, { 1, 0, 0, 0 }, 4)
             end
-            local t = frame:CreateFontString()
+            local t = BG.GetHighlightFrameLabel(frame)
             t:SetFont(BIAOGE_TEXT_FONT, 20, "OUTLINE")
             t:SetPoint("RIGHT", self, "RIGHT", -2, 0)
             t:SetTextColor(1, 0, 0)
@@ -556,7 +556,6 @@ BG.Init(function()
                                 then
                                     yes = true
                                     BG.BGNext.BillBuyer.set(maijia, v.maijia, unpack(v.color or { 1, 1, 1 }))
-                                    BiaoGe[FB]["boss" .. b]["maijia" .. i] = v.maijia
                                     for k in pairs(BG.playerClass) do
                                         BiaoGe[FB]["boss" .. b][k .. i] = v[k]
                                     end
@@ -838,7 +837,7 @@ BG.Init(function()
                         BG.FrameMaijiaList:Hide()
                     end
                 else
-                    BG.auctionLogFrame.changeFrame.info.maijia = self:GetText()
+                    BG.auctionLogFrame.changeFrame.info.maijia = BG.BGNext.BillBuyer.canonical(self)
                     BG.auctionLogFrame.changeFrame.info.color = { self:GetTextColor() }
                 end
                 if BG.auctionLogFrame.changeFrame.type == "set" then

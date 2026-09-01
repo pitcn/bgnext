@@ -309,7 +309,14 @@ BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
         if not Capture.appendLine(captureState, msg, GetTime()) then AbortCapture() return end
         linshi_duizhang.tradeTbl = linshi_duizhang.tradeTbl or {}
         local a = {}
-        local _, maijia, text = strsplit("-", msg)
+        local maijia, text
+        if BG.BGNext and BG.BGNext.PlayerIdentity then
+            maijia, text = BG.BGNext.PlayerIdentity.parseDuiZhang(msg)
+        else
+            local _, legacyBuyer, legacyText = strsplit("-", msg)
+            maijia, text = legacyBuyer, legacyText
+        end
+        if not maijia or not text then return end
         -- 24478 10000, 27854 t, 27503 t,
         for _, t in ipairs({ strsplit(",", text) }) do
             -- 24478 10000
@@ -484,7 +491,6 @@ function BG.DuiZhangUI()
                             local duizhangcolor = BG.DuiZhangFrame[FB]["boss" .. b]["color" .. i]
                             BG.BGNext.BillBuyer.set(maijia, duizhangmaijia,
                                 unpack(duizhangcolor or { 1, 1, 1 }))
-                            BiaoGe[FB]["boss" .. b]["maijia" .. i] = duizhangmaijia
                             for k in pairs(BG.playerClass) do
                                 BiaoGe[FB]["boss" .. b][k .. i] = BG.DuiZhangFrame[FB]["boss" .. b][k .. i]
                             end

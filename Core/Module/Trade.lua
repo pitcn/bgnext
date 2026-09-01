@@ -11,6 +11,8 @@ local GetClassRGB = ns.GetClassRGB
 local SetClassCFF = ns.SetClassCFF
 local AddTexture = ns.AddTexture
 local GetItemID = ns.GetItemID
+local TradeAuctionState = assert(BG.BGNext.TradeAuctionState,
+    "BGNext TradeAuctionState must load before Trade")
 
 local Maxb = ns.Maxb
 local HopeMaxn = ns.HopeMaxn
@@ -162,7 +164,6 @@ BG.Init(function()
                             BG.BGNext.BillBuyer.set(buyer, Player, _r, _g, _b)
                             money:SetText(Money + qiankuan)
                             BiaoGe[FB]["boss" .. b]["zhuangbei" .. i] = L["罚款"]
-                            BiaoGe[FB]["boss" .. b]["maijia" .. i] = Player
                             BiaoGe[FB]["boss" .. b]["jine" .. i] = Money + qiankuan
                             for k, v in pairs(BG.playerClass) do
                                 BiaoGe[FB]["boss" .. b][k .. i] = select(v.select, v.func(Player))
@@ -203,7 +204,11 @@ BG.Init(function()
                     local _item = item:GetText()
                     local _buyer = buyer:GetText()
                     local _money = money:GetText()
-                    if itemID == GetItemID(_item) and Player == _buyer then
+                    local sameBuyer = Player == _buyer
+                    if BG.BGNext and BG.BGNext.PlayerIdentity then
+                        sameBuyer = BG.BGNext.PlayerIdentity.same(Player, _buyer, BG.realmName)
+                    end
+                    if itemID == GetItemID(_item) and sameBuyer then
                         local QKmoney = tonumber(BiaoGe[FB]["boss" .. b]["qiankuan" .. i]) or 0
                         local __money = _money - QKmoney
                         local QKText = ""
@@ -219,7 +224,11 @@ BG.Init(function()
                             money:ClearQK()
                             if BiaoGe[FB].auctionLog then
                                 for i, v in ipairs(BiaoGe[FB].auctionLog) do
-                                    if v.type == 1 and v.maijia == _buyer and v.jine == _money
+                                    local sameMaijia = v.maijia == _buyer
+                                    if BG.BGNext and BG.BGNext.PlayerIdentity then
+                                        sameMaijia = BG.BGNext.PlayerIdentity.same(v.maijia, _buyer, BG.realmName)
+                                    end
+                                    if v.type == 1 and sameMaijia and v.jine == _money
                                         and v.trade and BG.IsSameItem(v.zhuangbei, _item) then
                                         BG.SendSystemMessage(L['%s的拍卖记录已被改为未拍。']:format(v.zhuangbei))
                                         if BG.ImML() and IsInRaid(1) then
@@ -297,7 +306,6 @@ BG.Init(function()
                         -- 保存买家信息
                         BG.BGNext.BillBuyer.set(BG.Frame[FB]["boss" .. b]["maijia" .. i], player,
                             GetClassRGB(player))
-                        BiaoGe[FB]["boss" .. b]["maijia" .. i] = player
                         for k in pairs(BG.playerClass) do
                             if player == BG.playerName then
                                 BiaoGe[FB]["boss" .. b][k .. i] = BG.trade.playerinfo[k]
@@ -365,7 +373,6 @@ BG.Init(function()
                                     if saved then
                                         BG.BGNext.BillBuyer.set(BG.Frame[FB]["boss" .. b]["maijia" .. i], Player,
                                             GetClassRGB(Player))
-                                        BiaoGe[FB]["boss" .. b]["maijia" .. i] = Player
                                         for k in pairs(BG.playerClass) do
                                             if Player == BG.playerName then
                                                 BiaoGe[FB]["boss" .. b][k .. i] = BG.trade.playerinfo[k]
@@ -914,7 +921,12 @@ BG.Init(function()
                         local zhuangbei = BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]
                         local maijia = BG.Frame[FB]["boss" .. b]["maijia" .. i]
                         if maijia then
-                            if maijia:GetText() == target and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
+                            local storedBuyer = BiaoGe[FB]["boss" .. b]["maijia" .. i] or maijia:GetText()
+                            local sameBuyer = storedBuyer == target
+                            if BG.BGNext and BG.BGNext.PlayerIdentity then
+                                sameBuyer = BG.BGNext.PlayerIdentity.same(storedBuyer, target, BG.realmName)
+                            end
+                            if sameBuyer and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
                                 yes = true
                                 local bts = {}
                                 sum = sum + tonumber(BiaoGe[FB]["boss" .. b]["qiankuan" .. i])
@@ -1149,7 +1161,12 @@ BG.Init(function()
                     for i = 1, BG.GetMaxi(FB, b) do
                         local maijia = BG.Frame[FB]["boss" .. b]["maijia" .. i]
                         if maijia then
-                            if maijia:GetText() == target and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
+                            local storedBuyer = BiaoGe[FB]["boss" .. b]["maijia" .. i] or maijia:GetText()
+                            local sameBuyer = storedBuyer == target
+                            if BG.BGNext and BG.BGNext.PlayerIdentity then
+                                sameBuyer = BG.BGNext.PlayerIdentity.same(storedBuyer, target, BG.realmName)
+                            end
+                            if sameBuyer and BiaoGe[FB]["boss" .. b]["qiankuan" .. i] then
                                 BiaoGe[FB]["boss" .. b]["qiankuan" .. i] = nil
                                 BG.Frame[FB]["boss" .. b]["qiankuan" .. i]:Hide()
                             end
@@ -2821,15 +2838,8 @@ BG.Init(function()
                     tradeName = BG.trade.player
                     tradeTbl = BG.trade.targetitems
                 end
-                for _, vv in ipairs(tradeTbl) do
-                    for _, v in ipairs(BiaoGe[FB].auctionLog) do
-                        if v.type == 1 and not v.trade and v.maijia == tradeName and
-                            GetItemID(v.zhuangbei) == GetItemID(vv.link) then
-                            v.trade = true
-                            break
-                        end
-                    end
-                end
+                TradeAuctionState.markDelivered(BiaoGe[FB].auctionLog, tradeName,
+                    BG.realmName, tradeTbl, GetItemID)
                 BG.UpdateAuctionLogFrame(true, true)
             end
         end

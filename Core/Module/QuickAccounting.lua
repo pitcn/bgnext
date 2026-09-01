@@ -463,7 +463,6 @@ BG.Init(function()
             if b then
                 BG.BGNext.BillBuyer.set(maijia, self.maijia, unpack(self.color or { 1, 1, 1 }))
                 jine:SetText(GetJinE(self.jine))
-                BiaoGe[FB]["boss" .. b]["maijia" .. i] = self.maijia
                 BiaoGe[FB]["boss" .. b]["jine" .. i] = GetJinE(self.jine)
                 for k, v in pairs(BG.playerClass) do
                     BiaoGe[FB]["boss" .. b][k .. i] = self[k]
