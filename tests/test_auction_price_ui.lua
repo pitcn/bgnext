@@ -28,6 +28,19 @@ return function(test)
     test.eq(ui.popupEditBox({ editBox = legacyEdit }), legacyEdit, "legacy popup editBox is supported")
     test.eq(ui.popupEditBox({}), nil, "popup without an edit box fails safely")
 
+    -- The boss picker is derived from the boss registry, not Maxb. Maxb is a
+    -- ledger-layout value and can be two rows shorter than the actual loot
+    -- catalog. The registry always ends with misc/fine/expense/overview.
+    local registry = {}
+    for i = 1, 15 do registry["boss" .. i] = { name2 = "首领" .. i } end
+    registry.boss16 = { name2 = "杂项" }
+    registry.boss17 = { name2 = "罚款" }
+    registry.boss18 = { name2 = "支出" }
+    registry.boss19 = { name2 = "总览" }
+    local bosses = ui.bossDefinitions(registry)
+    test.eq(#bosses, 15, "all actual bosses are retained")
+    test.eq(bosses[15].id, "boss15", "last actual boss is retained")
+
     -- Fresh state defaults to leader.
     local state = ui.newState("ULD")
     test.eq(state.mode, "leader", "new state defaults to leader")
@@ -119,6 +132,8 @@ return function(test)
         test.eq(source:find(token, 1, true) ~= nil, true, "page shell declares " .. token)
     end
     test.eq(source:find("for i = 1, M.ROW_CAPACITY do", 1, true) ~= nil, true, "page shell reuses the fixed rows")
+    test.eq(source:find("BG.TabButtonsFB:Hide()", 1, true) ~= nil, true, "price page hides the global raid navigation")
+    test.eq(source:find("BG.TabButtonsFB:Show()", 1, true) ~= nil, true, "price page restores the global raid navigation")
     for _, token in ipairs({
         "setLeaderItemPrice",
         "setPersonalPrice",

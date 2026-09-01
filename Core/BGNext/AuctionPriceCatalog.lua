@@ -81,7 +81,12 @@ function M.build(options)
         local diffLoot = loot[difficulty]
         if type(diffLoot) == "table" then
             for bossKey, itemIds in pairs(diffLoot) do
-                local group = groupById[bossKey] or miscGroup
+                -- Loot tables use `bossNother` for supplementary drops owned by
+                -- that same boss (most notably tier/exchange items). Treating
+                -- those keys as unknown made the misc bucket absorb hundreds of
+                -- otherwise boss-owned items.
+                local baseBossKey = type(bossKey) == "string" and bossKey:match("^(boss%d+)other$") or nil
+                local group = groupById[bossKey] or (baseBossKey and groupById[baseBossKey]) or miscGroup
                 for _, itemId in ipairs(itemIds) do
                     addItem(group, itemId)
                 end

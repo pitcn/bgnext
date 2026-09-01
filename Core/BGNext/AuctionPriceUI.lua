@@ -37,6 +37,26 @@ function M.popupEditBox(popup)
     return popup.EditBox or popup.editBox
 end
 
+-- BG.Boss is the canonical loot-owner registry. Its final four entries are the
+-- ledger-only misc/fine/expense/overview sections added by DB_BossName.lua.
+-- ns.Maxb cannot be used here: it describes the visual ledger layout and is
+-- intentionally smaller than the boss registry for several combined raids.
+function M.bossDefinitions(registry)
+    if type(registry) ~= "table" then return {} end
+    local count = 0
+    while type(registry["boss" .. (count + 1)]) == "table" do
+        count = count + 1
+    end
+    count = math.max(count - 4, 0)
+
+    local bosses = {}
+    for i = 1, count do
+        local info = registry["boss" .. i]
+        bosses[#bosses + 1] = { id = "boss" .. i, name = info and info.name2 or nil }
+    end
+    return bosses
+end
+
 local LEADER_ACTIONS = { "preset", "basePrice", "active", "new", "copy", "rename", "delete", "import", "export" }
 local PERSONAL_ACTIONS = { "itemCount", "import", "export", "clear" }
 
@@ -220,10 +240,6 @@ if runtimeReady() then
         if BG.SendSystemMessage then BG.SendSystemMessage(message) else print("<BGNext> " .. message) end
     end
 
-    local function bossLimit(raidId)
-        return math.max((ns.Maxb and ns.Maxb[raidId] or 0) - 4, 0)
-    end
-
     local function describeItem(itemId)
         if type(GetItemInfo) ~= "function" then return nil end
         local name, _, quality, _, _, _, _, _, equipLoc = GetItemInfo(itemId)
@@ -236,11 +252,7 @@ if runtimeReady() then
     local function buildCatalog()
         local models = {}
         for _, raidId in ipairs(BG.FBtable or {}) do
-            local bosses = {}
-            for i = 1, bossLimit(raidId) do
-                local info = BG.Boss and BG.Boss[raidId] and BG.Boss[raidId]["boss" .. i]
-                bosses[#bosses + 1] = { id = "boss" .. i, name = info and info.name2 or nil }
-            end
+            local bosses = M.bossDefinitions(BG.Boss and BG.Boss[raidId])
             local model = Catalog.build({
                 raidId = raidId,
                 difficulties = (BG.difficultyTable and BG.difficultyTable[raidId]) or nil,
@@ -1247,7 +1259,16 @@ if runtimeReady() then
         end
 
         BG.Create_TabButton(M.tabNumber, L["价格预设"], main)
-        main:SetScript("OnShow", refreshAll)
+        main:SetScript("OnShow", function()
+            -- This page owns a compact raid selector because changing raids
+            -- also resets its local boss/search state. Hide the global ledger
+            -- selector while the page is visible so the two bars never overlap.
+            if BG.TabButtonsFB then BG.TabButtonsFB:Hide() end
+            refreshAll()
+        end)
+        main:SetScript("OnHide", function()
+            if BG.TabButtonsFB then BG.TabButtonsFB:Show() end
+        end)
         refreshAll()
     end)
 end

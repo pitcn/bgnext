@@ -23,11 +23,11 @@ return function(test)
     test.eq(#model.groups, 2, "two groups")
     test.eq(model.groups[1].id, "boss1", "first group is boss1")
     test.eq(model.groups[1].name, "烈焰巨兽", "boss name kept")
-    test.eq(#model.groups[1].items, 3, "difficulty duplicates collapse by item id")
+    test.eq(#model.groups[1].items, 4, "boss supplementary drops stay with their boss")
     test.eq(model.groups[2].id, "misc", "second group is misc")
     test.eq(model.groups[2].name, "杂项", "misc name kept")
-    test.eq(#model.groups[2].items, 1, "misc holds boss1other drops")
-    test.eq(model.groups[2].items[1].itemId, 103, "misc item is the boss1other drop")
+    test.eq(#model.groups[2].items, 0, "misc does not absorb boss supplementary drops")
+    test.eq(model.groups[1].items[3].itemId, 103, "boss supplementary item remains searchable under its boss")
 
     test.eq(catalog.resolveRaidForItem({ ULD = model }, 104), "ULD", "resolve item to raid")
     test.eq(catalog.resolveRaidForItem({ ULD = model }, 999), nil, "unknown item resolves nil")
@@ -50,6 +50,18 @@ return function(test)
     local hasPrice = function(id) return id == 101 end
     test.eq(#catalog.filter(model, { state = "set", hasPrice = hasPrice }), 1, "state set")
     test.eq(#catalog.filter(model, { state = "unset", hasPrice = hasPrice }), 3, "state unset")
+
+    -- Keys that do not belong to a known boss (including the table's misc row)
+    -- still fall back to the explicit misc group.
+    local withMisc = catalog.build({
+        raidId = "R2",
+        difficulties = { "N" },
+        bosses = { { id = "boss1", name = "b" }, { id = "misc", name = "m" } },
+        loot = { N = { boss1 = { 401 }, boss2 = { 402 }, currency = { 403 } } },
+        describeItem = describe,
+    })
+    test.eq(#withMisc.groups[1].items, 1, "known boss drop stays under boss")
+    test.eq(#withMisc.groups[2].items, 2, "unknown table sections remain misc")
 
     -- Ambiguous cross-raid item resolution returns nil.
     local mk = function(raidId, itemId)
