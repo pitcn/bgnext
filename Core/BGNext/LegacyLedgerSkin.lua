@@ -9,6 +9,8 @@ local M = {}
 -- kept only in this run; it is never written to SavedVariables.
 local snapshot = nil
 local runtimeTheme = "classic"
+local runtimeInstalled = false
+local warned = false
 
 local function hexRGB(hex)
     local r = tonumber(hex:sub(1, 2), 16) / 255
@@ -365,6 +367,34 @@ end
 
 function M.getRuntimeTheme()
     return runtimeTheme
+end
+
+local function productionWarn()
+    if type(BG) == "table" and type(BG.SendSystemMessage) == "function" then
+        BG.SendSystemMessage("BGNext 预览外观加载失败，已安全恢复经典外观。")
+    end
+end
+
+-- installRuntime registers exactly one PLAYER_ENTERING_WORLD callback through
+-- the supplied init2 function and, on failure, warns at most once per login.
+function M.installRuntime(init2, warn)
+    if runtimeInstalled or type(init2) ~= "function" then
+        return
+    end
+    runtimeInstalled = true
+    init2(function()
+        local ok = M.applySavedPreference()
+        if ok then
+            warned = false
+        elseif not warned and type(warn) == "function" then
+            warned = true
+            warn()
+        end
+    end)
+end
+
+if type(BG) == "table" and type(BG.Init2) == "function" then
+    M.installRuntime(BG.Init2, productionWarn)
 end
 
 BG.BGNext.LegacyLedgerSkin = M

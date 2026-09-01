@@ -183,4 +183,61 @@ return function(test)
     }) do
         test.eq(source:find(token, 1, true), nil, "skin source forbids " .. token)
     end
+
+    -- Task 3: runtime wiring and one-time safe fallback.
+    local toc = read("BGLite.toc")
+    local function tocOffset(token)
+        return toc:find(token, 1, true)
+    end
+    local initPos = tocOffset("Core\\BGNext\\Init.lua")
+    local themePos = tocOffset("Core\\BGNext\\UITheme.lua")
+    local ledgerPos = tocOffset("Core\\BiaoGe.lua")
+    local skinPos = tocOffset("Core\\BGNext\\LegacyLedgerSkin.lua")
+    local optionsPos = tocOffset("Core\\Options.lua")
+    test.eq(themePos ~= nil, true, "TOC loads theme")
+    test.eq(initPos and themePos and initPos < themePos, true, "theme loads after init")
+    test.eq(themePos and ledgerPos and themePos < ledgerPos, true, "theme loads before ledger")
+    test.eq(ledgerPos and skinPos and ledgerPos < skinPos, true, "skin loads after ledger")
+    test.eq(skinPos and optionsPos and skinPos < optionsPos, true, "skin loads before options")
+
+    registry.background.mutateGeometryOnStyle = false
+
+    local callbacks = {}
+    local warnCount = 0
+    local function fakeInit2(fn) callbacks[#callbacks + 1] = fn end
+    local function fakeWarn() warnCount = warnCount + 1 end
+    Skin.installRuntime(fakeInit2, fakeWarn)
+    Skin.installRuntime(fakeInit2, fakeWarn)
+    test.eq(#callbacks, 1, "installRuntime registers exactly one callback")
+
+    -- Force failure: BG has no MainFrame, so applySavedPreference cannot build a registry.
+    BG.MainFrame = nil
+    callbacks[1]()
+    callbacks[1]()
+    test.eq(warnCount, 1, "warn fires once only after forced failure")
+
+    -- Missing/invalid saved preference applies classic without warning.
+    BG.MainFrame = registry.main
+    BG.MainFrame.Bg = registry.background
+    BG.MainFrame.titleBg = registry.title
+    BG.tabButtons = {
+        { button = registry.moduleTabs[1] },
+        { button = registry.moduleTabs[2] },
+    }
+    BG.FBtable2 = { { FB = "NAXX" }, { FB = "ULD" } }
+    BG["ButtonNAXX"] = registry.raidTabs[1]
+    BG["ButtonULD"] = registry.raidTabs[2]
+    BiaoGe = { BGNext = { settings = {} }, options = { alpha = 0.58 } }
+
+    warnCount = 0
+    test.eq(Skin.applySavedPreference(), true, "missing preference applies classic")
+    test.eq(Skin.getRuntimeTheme(), "classic", "missing preference stays classic")
+    BiaoGe.BGNext.settings.uiTheme = "future"
+    test.eq(Skin.applySavedPreference(), true, "invalid preference applies classic")
+    test.eq(Skin.getRuntimeTheme(), "classic", "invalid preference stays classic")
+
+    test.eq(BiaoGe.options.alpha, 0.58, "no runtime path writes legacy alpha")
+    test.eq(source:find("options%.alpha%s*="), nil, "skin source never assigns options.alpha")
+
+    BiaoGe = nil
 end
