@@ -117,4 +117,42 @@ return function(test)
     local before = capRaid.presets[pcap].basePrice
     test.eq(store.setBasePrice(familyRoot, "", "ICC", pcap, 5), false, "empty family refused")
     test.eq(capRaid.presets[pcap].basePrice, before, "root unchanged on bad family")
+
+    -- Per-character personal prices
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1001, 900), true, "set personal price")
+    test.eq(store.getPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1001), 900, "get personal price")
+    test.eq(store.getPersonalPrice(root, "titan", "realm1", "Alt", "ULD", 1001), nil, "alt isolated")
+    test.eq(store.getPersonalPrice(root, "wrath", "realm1", "Leader", "ULD", 1001), nil, "family isolated")
+    test.eq(store.getPersonalPrice(root, "titan", "realm2", "Leader", "ULD", 1001), nil, "realm isolated")
+    test.eq(store.clearPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1001), true, "clear personal price")
+    test.eq(store.getPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1001), nil, "cleared personal price")
+
+    -- Explicit zero is distinct from unset.
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1002, 0), true, "set zero personal price")
+    test.eq(store.getPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1002), 0, "zero personal price read back")
+    test.eq(store.getPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 9999), nil, "unset personal price is nil")
+
+    -- countPersonalPrices and clearPersonalRaid.
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1003, 10), true, "set second price")
+    test.eq(store.countPersonalPrices(root, "titan", "realm1", "Leader", "ULD"), 2, "count personal prices")
+    test.eq(store.clearPersonalRaid(root, "titan", "realm1", "Leader", "ULD"), true, "clear personal raid")
+    test.eq(store.countPersonalPrices(root, "titan", "realm1", "Leader", "ULD"), 0, "raid cleared")
+
+    -- Empty leaf tables are pruned after clearing.
+    test.eq(root.personalAuctionExpectations.titan, nil, "empty family pruned")
+
+    -- Invalid inputs leave the root unchanged.
+    local snapshot = root.personalAuctionExpectations
+    test.eq(store.setPersonalPrice(root, "titan", "", "Leader", "ULD", 1001, 5), false, "empty realm refused")
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 0, 5), false, "zero item refused")
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "ULD", 1001, -1), false, "negative price refused")
+    test.eq(root.personalAuctionExpectations, snapshot, "root unchanged on invalid personal input")
+
+    -- 500-item ceiling on personal prices.
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "Naxx", 1, 1), true, "seed personal ceiling")
+    for i = 2, store.MAX_ITEMS do
+        store.setPersonalPrice(root, "titan", "realm1", "Leader", "Naxx", i, i)
+    end
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "Naxx", 999999, 1), false, "501st personal item refused")
+    test.eq(store.setPersonalPrice(root, "titan", "realm1", "Leader", "Naxx", 1, 77), true, "overwrite personal item allowed")
 end

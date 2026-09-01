@@ -271,5 +271,108 @@ function M.resolveLeaderPrice(root, clientFamily, raidId, itemId)
     return nil
 end
 
+local function personalRaid(root, clientFamily, realmId, player, raidId, create)
+    if type(root) ~= "table" or not validKey(clientFamily) or not validKey(realmId)
+        or not validKey(player) or not validKey(raidId) then
+        return nil
+    end
+    local store = root.personalAuctionExpectations
+    if type(store) ~= "table" then
+        if not create then return nil end
+        store = {}
+        root.personalAuctionExpectations = store
+    end
+    local family = store[clientFamily]
+    if type(family) ~= "table" then
+        if not create then return nil end
+        family = {}
+        store[clientFamily] = family
+    end
+    local realm = family[realmId]
+    if type(realm) ~= "table" then
+        if not create then return nil end
+        realm = {}
+        family[realmId] = realm
+    end
+    local playerT = realm[player]
+    if type(playerT) ~= "table" then
+        if not create then return nil end
+        playerT = {}
+        realm[player] = playerT
+    end
+    local raid = playerT[raidId]
+    if type(raid) ~= "table" then
+        if not create then return nil end
+        raid = {}
+        playerT[raidId] = raid
+    end
+    return raid
+end
+
+-- Removes a personal raid record and prunes every ancestor that became empty, so
+-- cleared expectations do not leave empty leaf tables behind.
+local function dropRaidAndPrune(root, clientFamily, realmId, player, raidId)
+    local store = root and root.personalAuctionExpectations
+    if type(store) ~= "table" then return end
+    local family = store[clientFamily]
+    if type(family) ~= "table" then return end
+    local realm = family[realmId]
+    if type(realm) ~= "table" then return end
+    local playerT = realm[player]
+    if type(playerT) ~= "table" then return end
+    playerT[raidId] = nil
+    if next(playerT) == nil then realm[player] = nil end
+    if next(realm) == nil then family[realmId] = nil end
+    if next(family) == nil then store[clientFamily] = nil end
+end
+
+function M.setPersonalPrice(root, clientFamily, realmId, player, raidId, itemId, money)
+    if not validItemId(itemId) then return false end
+    local value = validMoney(money)
+    if value == nil then return false end
+    local raid = personalRaid(root, clientFamily, realmId, player, raidId, true)
+    if not raid then return false end
+    local itemPrices = raid.itemPrices
+    if type(itemPrices) ~= "table" then
+        itemPrices = {}
+        raid.itemPrices = itemPrices
+    end
+    if itemPrices[itemId] == nil and countKeys(itemPrices) >= M.MAX_ITEMS then
+        return false
+    end
+    itemPrices[itemId] = value
+    return true
+end
+
+function M.getPersonalPrice(root, clientFamily, realmId, player, raidId, itemId)
+    local raid = personalRaid(root, clientFamily, realmId, player, raidId, false)
+    if not raid or type(raid.itemPrices) ~= "table" then return nil end
+    return raid.itemPrices[itemId]
+end
+
+function M.clearPersonalPrice(root, clientFamily, realmId, player, raidId, itemId)
+    local raid = personalRaid(root, clientFamily, realmId, player, raidId, false)
+    if not raid or type(raid.itemPrices) ~= "table" then return false end
+    if raid.itemPrices[itemId] == nil then return false end
+    raid.itemPrices[itemId] = nil
+    if next(raid.itemPrices) == nil then
+        dropRaidAndPrune(root, clientFamily, realmId, player, raidId)
+    end
+    return true
+end
+
+function M.clearPersonalRaid(root, clientFamily, realmId, player, raidId)
+    local raid = personalRaid(root, clientFamily, realmId, player, raidId, false)
+    if not raid then return false end
+    dropRaidAndPrune(root, clientFamily, realmId, player, raidId)
+    return true
+end
+
+function M.countPersonalPrices(root, clientFamily, realmId, player, raidId)
+    local raid = personalRaid(root, clientFamily, realmId, player, raidId, false)
+    if not raid or type(raid.itemPrices) ~= "table" then return 0 end
+    return countKeys(raid.itemPrices)
+end
+
 BG.BGNext.AuctionPriceStore = M
 return M
