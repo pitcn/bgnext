@@ -7,6 +7,22 @@ local function identity()
     return BG.BGNext and BG.BGNext.PlayerIdentity or nil
 end
 
+function M.color(info, getClassColor)
+    if type(info) == "table" and type(info.class) == "string" and type(getClassColor) == "function" then
+        local ok, r, g, b = pcall(getClassColor, info.class)
+        if ok and type(r) == "number" and type(g) == "number" and type(b) == "number" then
+            return r, g, b
+        end
+    end
+    local color = type(info) == "table" and info.color or nil
+    if type(color) == "table" and type(color[1]) == "number"
+        and type(color[2]) == "number" and type(color[3]) == "number"
+    then
+        return color[1], color[2], color[3]
+    end
+    return 1, 1, 1
+end
+
 -- Writes a buyer cell. The visible text is the display name (short on non-retail
 -- and for same-realm retail players), while the canonical full identity is kept
 -- transiently on the edit box so the OnTextChanged handler can store it for

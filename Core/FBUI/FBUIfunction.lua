@@ -466,7 +466,7 @@ function BG.FBZhuangBeiUI(FB, t, b, bb, i, ii, scrollFrame)
                 if BG.lastfocus then
                     BG.lastfocus:ClearFocus()
                 end
-                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button)
+                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
                 if action == "auction" then
                     local link = self:GetText()
                     BG.StartAuction(link, self, nil, nil, button == "RightButton")

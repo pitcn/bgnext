@@ -37,6 +37,16 @@ function M.same(left, right, localRealm)
     return leftKey ~= nil and rightKey ~= nil and leftKey == rightKey
 end
 
+function M.find(records, target, localRealm)
+    if type(records) ~= "table" then return nil end
+    for _, record in ipairs(records) do
+        if type(record) == "table" and M.same(record.name, target, localRealm) then
+            return record
+        end
+    end
+    return nil
+end
+
 -- Splits a name into its character and realm components. The realm is nil for a
 -- bare name. Returns nothing for an unparseable value.
 local function splitIdentity(value)

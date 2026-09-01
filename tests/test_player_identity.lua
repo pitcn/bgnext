@@ -19,6 +19,17 @@ return function(test)
     test.eq(Identity.same("Alice", "Alice", nil), false,
         "two bare names without a known realm do not create an ambiguous identity")
 
+    local roster = {
+        { name = "Alice-MyRealm", class = "MAGE", color = { 0.25, 0.78, 0.92 } },
+        { name = "Alice-OtherRealm", class = "WARRIOR", color = { 0.78, 0.61, 0.43 } },
+    }
+    test.eq(Identity.find(roster, "Alice", "My Realm"), roster[1],
+        "a local short buyer resolves to the canonical raid-roster member")
+    test.eq(Identity.find(roster, "Alice-Other Realm", "My Realm"), roster[2],
+        "a remote buyer resolves without merging same-name realms")
+    test.eq(Identity.find(roster, "Missing", "My Realm"), nil,
+        "an unknown buyer does not inherit another roster member's class")
+
     test.eq(Identity.shortName("Reader-时光"), "Reader", "short name drops the realm suffix")
     test.eq(Identity.shortName("Reader"), "Reader", "a bare name is already short")
     test.eq(Identity.shortName(nil), nil, "short name of a missing value fails closed")

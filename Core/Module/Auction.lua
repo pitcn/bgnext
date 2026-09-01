@@ -18,8 +18,17 @@ local HopeMaxi      = ns.HopeMaxi
 
 local RealmId       = GetRealmID()
 local player        = BG.playerName
+local realmName     = (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName()
+local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
 local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
 local LoadAddOn     = LoadAddOn or C_AddOns.LoadAddOn
+
+local function SamePlayer(left, right)
+    if PlayerIdentity and PlayerIdentity.same then
+        return PlayerIdentity.same(left, right, realmName)
+    end
+    return left == right
+end
 
 BG.Init(function()
     BiaoGe.Auction = BiaoGe.Auction or {}
@@ -1405,7 +1414,7 @@ BG.Init(function()
         end
 
         function BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
-            if BG.ImMLorLeader() and zhuangbei and maijia and jine and maijia == player then
+            if BG.ImMLorLeader() and zhuangbei and maijia and jine and SamePlayer(maijia, player) then
                 for i = 1, 4 do
                     local _, dialog = StaticPopup_Visible(frameName .. i)
                     if not dialog then

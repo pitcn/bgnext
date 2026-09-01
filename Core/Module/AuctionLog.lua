@@ -18,6 +18,14 @@ local RealmID = GetRealmID()
 local player = BG.playerName
 local realmName = (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName()
 local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
+local BillBuyer = BG.BGNext and BG.BGNext.BillBuyer
+
+local function SamePlayer(left, right)
+    if PlayerIdentity and PlayerIdentity.same then
+        return PlayerIdentity.same(left, right, realmName)
+    end
+    return left == right
+end
 
 BG.Init(function()
     BiaoGe.options.showAuctionLogFrame = BiaoGe.options.showAuctionLogFrame or 1
@@ -555,7 +563,8 @@ BG.Init(function()
                                     maijia:GetText() == "" and jine:GetText() == ""
                                 then
                                     yes = true
-                                    BG.BGNext.BillBuyer.set(maijia, v.maijia, unpack(v.color or { 1, 1, 1 }))
+                                    local r, g, b = BillBuyer.color(v, GetClassColor)
+                                    BillBuyer.set(maijia, v.maijia, r, g, b)
                                     for k in pairs(BG.playerClass) do
                                         BiaoGe[FB]["boss" .. b][k .. i] = v[k]
                                     end
@@ -1759,11 +1768,8 @@ BG.Init(function()
                 text.LiuPaiText = BG.STC_r1(L["<流拍>"])
                 text.auctionText = BG.STC_y1(L["<正在拍卖>"])
                 if v.type == 1 then
-                    local color = "FFFFFF"
-                    if v.color then
-                        local r, g, b = unpack(v.color)
-                        color = RGB_16(nil, r, g, b)
-                    end
+                    local r, g, b = BillBuyer.color(v, GetClassColor)
+                    local color = RGB_16(nil, r, g, b)
                     text:SetText(format("%s |cff%s%s|r", BG.FormatNumber(v.jine, 2), color, v.maijia))
                 elseif notAuctioned then
                     text:SetText(text.notAuctionedText)
@@ -2070,8 +2076,10 @@ BG.Init(function()
                     end
 
                     local playerClass = {}
+                    local rosterMember = PlayerIdentity and PlayerIdentity.find
+                        and PlayerIdentity.find(BG.raidRosterInfo, maijia, realmName)
                     for k, v in pairs(BG.playerClass) do
-                        local value = select(v.select, v.func(maijia))
+                        local value = rosterMember and rosterMember[k] or select(v.select, v.func(maijia))
                         if value == 0 then value = nil end
                         playerClass[k] = value
                     end
@@ -2088,7 +2096,7 @@ BG.Init(function()
                         quality = quality,
                         bindType = bindType,
                         log = log,
-                        trade = BG.ImML() and maijia == BG.playerName or nil,
+                        trade = BG.ImML() and SamePlayer(maijia, BG.playerName) or nil,
                     }
                     for k, v in pairs(playerClass) do
                         a[k] = v
@@ -2098,7 +2106,7 @@ BG.Init(function()
                     BG.UpdateAuctionLogFrame(nil, true)
 
                     local tradeName = BG.GN("NPC")
-                    if BG.tradelastAuctionFrame.frame:IsVisible() and tradeName and maijia == tradeName then
+                    if BG.tradelastAuctionFrame.frame:IsVisible() and tradeName and SamePlayer(maijia, tradeName) then
                         BG.GetTargetAuctionTradeItems(maijia)
                         if BG.ImMLorLeader() then
                             BG.tradelastAuctionFrame.UpdateChooseType()

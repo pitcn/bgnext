@@ -25,6 +25,16 @@ return function()
     test.eq(editBox.text, "", "nil buyer clears the field")
     test.eq(savedColor[1], 1, "missing class color falls back to white")
 
+    local function classColor(class)
+        if class == "MAGE" then return 0.25, 0.78, 0.92 end
+    end
+    local r, g, b = BG.BGNext.BillBuyer.color({ class = "MAGE", color = { 1, 1, 1 } }, classColor)
+    test.eq(r, 0.25, "stored class metadata repairs a stale white auction color")
+    test.eq(g, 0.78, "class-derived green channel is used")
+    test.eq(b, 0.92, "class-derived blue channel is used")
+    r, g, b = BG.BGNext.BillBuyer.color({ color = { 0.2, 0.4, 0.8 } }, classColor)
+    test.eq(r, 0.2, "a valid stored color is retained when class metadata is unavailable")
+
     -- Display-only shortening with the canonical identity kept for comparison.
     BG.BGNext.PlayerIdentity = dofile("Core/BGNext/PlayerIdentity.lua")
     BG.realmName = "时光"

@@ -140,14 +140,52 @@ local function updateProfileRows()
     hideButtons(shortcutButtons)
     hideButtons(chooserButtons)
     local target = resolveFollowTarget()
-    local following = current.selectionMode == "follow-spec"
+    local enabled = current.enabled ~= false
+    local following = enabled and current.selectionMode == "follow-spec"
     local followTexture = (target and target.icon) or "Interface/Icons/INV_Misc_QuestionMark"
     for _, rowFrame in ipairs({ BG.EquipmentFilterShortcutFrame, BG.FilterClassItemMainFrame.ProfileRow }) do
+        local disableButton = rowFrame.disableButton
+        if not disableButton then
+            disableButton = CreateFrame("Button", nil, rowFrame)
+            disableButton:SetSize(25, 25)
+            disableButton:SetPoint("LEFT", 0, 0)
+            disableButton:RegisterForClicks("LeftButtonUp")
+            local selected = disableButton:CreateTexture(nil, "BACKGROUND")
+            selected:SetSize(40, 40)
+            selected:SetPoint("CENTER")
+            selected:SetTexture("Interface/ChatFrame/UI-ChatIcon-BlinkHilight")
+            disableButton.selected = selected
+            local background = disableButton:CreateTexture(nil, "ARTWORK")
+            background:SetAllPoints()
+            background:SetColorTexture(.08, .08, .08, .9)
+            local disableText = disableButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+            disableText:SetPoint("CENTER", 0, 1)
+            disableText:SetText("×")
+            disableText:SetTextColor(1, .12, .12)
+            disableButton:SetHighlightTexture("Interface/Buttons/ButtonHilight-Square", "ADD")
+            disableButton:SetScript("OnClick", function()
+                local current = state()
+                if not current then return end
+                BG.BGNext.EquipmentFilter.setEnabled(current, current.enabled == false)
+                updateProfileRows(); updateRuleButtons(); refreshItems(); play()
+            end)
+            disableButton:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+                GameTooltip:AddLine(L["不过滤装备"], 1, .25, .25)
+                GameTooltip:AddLine(L["显示全部装备；再次点击或选择其他方案可恢复过滤"], 1, 1, 1, true)
+                GameTooltip:Show()
+            end)
+            disableButton:SetScript("OnLeave", GameTooltip_Hide)
+            rowFrame.disableButton = disableButton
+        end
+        disableButton.selected:SetShown(not enabled)
+        disableButton:Show()
+
         local followButton = rowFrame.followButton
         if not followButton then
             followButton = CreateFrame("Button", nil, rowFrame)
             followButton:SetSize(25, 25)
-            followButton:SetPoint("LEFT", 0, 0)
+            followButton:SetPoint("LEFT", disableButton, "RIGHT", 10, 0)
             followButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             local icon = followButton:CreateTexture(nil, "ARTWORK")
             icon:SetAllPoints()
@@ -210,11 +248,11 @@ local function updateProfileRows()
                 end)
                 chooserButtons[index] = chooser
             end
-            setProfileButton(shortcut, profile, current.selectedId == id)
-            setProfileButton(chooser, profile, current.selectedId == id)
+            setProfileButton(shortcut, profile, enabled and current.selectedId == id)
+            setProfileButton(chooser, profile, enabled and current.selectedId == id)
         end
     end
-    local width = math.max(1, (#current.order + 1) * 35)
+    local width = math.max(1, (#current.order + 2) * 35)
     BG.EquipmentFilterShortcutFrame:SetWidth(width)
     BG.FilterClassItemMainFrame.ProfileRow:SetWidth(width)
 end
