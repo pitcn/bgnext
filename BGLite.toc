@@ -93,3 +93,4 @@ Core\Module\hooks.lua
 
 Core\Module\minimap.lua
 Core\Options.lua
+Core\BGNext\UIThemeSettings.lua

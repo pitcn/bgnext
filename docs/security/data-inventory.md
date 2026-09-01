@@ -6,6 +6,7 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 | --- | --- | --- | --- | --- | --- | --- |
 | `schemaVersion` | Plugin constant | Safe migrations | Local until BGNext data is cleared | None | Clear all BGNext data | Low |
 | `settings` | User choices | Module preferences | Local until changed or cleared | None | Settings/reset | Low |
+| `settings.uiTheme` | Explicit user choice (`classic` or `preview`) | Select the reversible ledger appearance; absence and invalid values behave as `classic` and are not migrated automatically | Local until changed or all BGNext data is cleared | None | Appearance settings buttons / existing full reset | Low |
 | `settings.roleOverviewEnabled` | User toggle | Enable/disable the own-character overview module; disables collection and refresh, deletes nothing | Local until changed or cleared | None | Settings checkbox | Low |
 | `settings.roleOverviewPoint` | Window anchor (point, relativePoint, x, y only) | Restore the overview window position; frame references are never written | Local until moved or cleared | None | Drag window | Low |
 | `roleOverviewColumns[clientFamily][section][columnId]` | User-hidden column choices, booleans only | Per-family column visibility | Local until reset or cleared | None | Settings checkboxes/reset | Low |
