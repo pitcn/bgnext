@@ -4,21 +4,21 @@ return function(test)
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
-    test.eq(info.version, "0.3.0", "BGNext version is independent")
+    test.eq(info.version, "0.3.1", "BGNext version is independent")
     test.eq(info.upstreamVersion, "2.4.0", "upstream version remains disclosed")
     test.eq(info.protocolVersion, "2.4.0", "mixed-group protocol version remains compatible")
     test.eq(info.author, "国服社区共创", "community author")
     test.eq(info.official, false, "independent project")
     test.eq(type(info.changelog), "table", "local changelog")
     local changelogItems = table.concat(info.changelog, "\n")
-    test.eq(changelogItems:find("专精", 1, true) ~= nil, true,
-        "in-game changelog includes specialization-aware filtering")
-    test.eq(changelogItems:find("已拍未交易", 1, true) ~= nil, true,
-        "in-game changelog includes delivered-auction reconciliation")
-    test.eq(changelogItems:find("小地图", 1, true) ~= nil, true,
-        "in-game changelog includes minimap interaction fixes")
-    test.eq(changelogItems:find("性能", 1, true) ~= nil, true,
-        "in-game changelog includes performance work")
+    test.eq(changelogItems:find("Alt 右键", 1, true) ~= nil, true,
+        "in-game changelog includes table auction shortcut fix")
+    test.eq(changelogItems:find("团长自己", 1, true) ~= nil, true,
+        "in-game changelog includes leader self-accounting fix")
+    test.eq(changelogItems:find("职业颜色", 1, true) ~= nil, true,
+        "in-game changelog includes auction class colors")
+    test.eq(changelogItems:find("红叉按钮", 1, true) ~= nil, true,
+        "in-game changelog includes global filter bypass")
     test.eq(type(info.credits.upstream), "table", "upstream credits")
 
     local about = dofile("Core/BGNext/About.lua")
