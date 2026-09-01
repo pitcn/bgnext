@@ -39,6 +39,27 @@ function M.resolveRaid(raidId, activeRaids, activeRaidOverride)
     return raidId
 end
 
+-- Returns the saved personal price only when it clears the current auction
+-- floor; a missing price, or one below the floor (an invalid bid), leaves the
+-- bid box untouched.
+function M.choosePersonalPrefill(savedMoney, floor)
+    if type(savedMoney) ~= "number" then return nil end
+    if type(floor) == "number" and savedMoney < floor then return nil end
+    return savedMoney
+end
+
+-- Fills the bidder's existing money EditBox with the resolved personal price.
+-- Touches only `myMoneyEdit:SetText`; it never clicks a send button, toggles
+-- auto-bid, starts a timer, or writes the value back to storage.
+function M.prefillPersonalText(frame, savedMoney, floor)
+    if type(frame) ~= "table" then return false end
+    if type(frame.myMoneyEdit) ~= "table" then return false end
+    local value = M.choosePersonalPrefill(savedMoney, floor)
+    if value == nil then return false end
+    frame.myMoneyEdit:SetText(tostring(value))
+    return true
+end
+
 local _, ns = ...
 
 local function runtimeReady()
@@ -135,6 +156,29 @@ if runtimeReady() then
         end
     end
 
+    -- Fills the bidder's existing money EditBox from the saved personal price
+    -- for the current character, realm, and raid. A missing price, or a price
+    -- below the current auction floor, leaves the box untouched. Only
+    -- `myMoneyEdit:SetText` is called; the value is never written back.
+    local function prefillPersonalFrame(frame, context)
+        if not frame then return end
+        local itemId = frame.itemID
+        if type(itemId) ~= "number" then return end
+        if type(context) ~= "table" then return end
+        local root = context.root
+        local family = context.clientFamily
+        local realm = context.realmId
+        local player = context.player
+        local raidId = context.raidId
+        if type(root) ~= "table" then return end
+        if type(family) ~= "string" or family == "" then return end
+        if type(realm) ~= "string" or realm == "" then return end
+        if type(player) ~= "string" or player == "" then return end
+        if type(raidId) ~= "string" or raidId == "" then return end
+        local savedMoney = Store.getPersonalPrice(root, family, realm, player, raidId, itemId)
+        M.prefillPersonalText(frame, savedMoney, frame.money)
+    end
+
     local installed = false
     BG.Init(function()
         if installed then return end
@@ -151,6 +195,18 @@ if runtimeReady() then
                 prefillLeaderFrame(BG.StartAucitonFrame, contextProvider())
             end
             return result
+        end
+    end)
+
+    local personalInstalled = false
+    BG.Init(function()
+        if personalInstalled then return end
+        if type(BG.HookCreateAuction) ~= "function" then return end
+        personalInstalled = true
+        local previous = BG.HookCreateAuction
+        BG.HookCreateAuction = function(frame)
+            if previous then previous(frame) end
+            prefillPersonalFrame(frame, contextProvider())
         end
     end)
 end

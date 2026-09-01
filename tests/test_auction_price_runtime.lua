@@ -17,6 +17,42 @@ return function(test)
     test.eq(runtime.resolveRaid("ULD", {}, nil), nil, "unrecognized raid is unresolved")
     test.eq(runtime.resolveRaid("ULD", { ULD = true, ICC = true }, "ICC"), nil, "cross-raid override blocks prefill")
 
+    -- choosePersonalPrefill: only a saved price at or above the current auction
+    -- floor is allowed to fill the bid box.
+    test.eq(runtime.choosePersonalPrefill(150, 100), 150, "saved price above floor prefills")
+    test.eq(runtime.choosePersonalPrefill(100, 100), 100, "saved price equal to floor prefills")
+    test.eq(runtime.choosePersonalPrefill(50, 100), nil, "saved price below floor does not prefill")
+    test.eq(runtime.choosePersonalPrefill(nil, 100), nil, "missing saved price does not prefill")
+    test.eq(runtime.choosePersonalPrefill(150, nil), 150, "missing floor does not restrict")
+
+    -- prefillPersonalText: touches only myMoneyEdit:SetText, never a send or
+    -- auto-bid control.
+    local function fakeFrame(initialText)
+        return {
+            myMoneyEdit = {
+                text = initialText,
+                SetText = function(self, t) self.text = t end,
+            },
+            sendClicks = 0,
+            autoToggles = 0,
+        }
+    end
+    local frame = fakeFrame("100")
+    test.eq(runtime.prefillPersonalText(frame, 150, 100), true, "prefill reports a write")
+    test.eq(frame.myMoneyEdit.text, "150", "exact saved value is set")
+    test.eq(frame.sendClicks, 0, "no send click")
+    test.eq(frame.autoToggles, 0, "no auto toggle")
+
+    local below = fakeFrame("100")
+    test.eq(runtime.prefillPersonalText(below, 50, 100), false, "below floor reports no write")
+    test.eq(below.myMoneyEdit.text, "100", "below floor leaves text untouched")
+
+    local missing = fakeFrame("100")
+    test.eq(runtime.prefillPersonalText(missing, nil, 100), false, "missing reports no write")
+    test.eq(missing.myMoneyEdit.text, "100", "missing leaves text untouched")
+
+    test.eq(runtime.prefillPersonalText({}, 150, 100), false, "frame without edit box reports no write")
+
     -- The runtime wraps the existing leader hook, calls it first, and only ever
     -- touches the existing price EditBox. It must never bypass the permission
     -- gates, toggle auto-bid, or send anything itself.
@@ -29,6 +65,11 @@ return function(test)
         "Edit2",
         "resolveLeaderPrice",
         "if price == nil then return",
+        "prefillPersonalFrame",
+        "HookCreateAuction",
+        "myMoneyEdit",
+        "getPersonalPrice",
+        "prefillPersonalText",
     }) do
         test.eq(source:find(token, 1, true) ~= nil, true, "leader prefill wires " .. token)
     end
