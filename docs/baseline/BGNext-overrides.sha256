@@ -1,6 +1,6 @@
 # Explicit BGNext changes to upstream BGLite 2.4.0 files.
 # Format: SHA-256, two spaces, repository-relative path.
-3c3220b830276ab0c2939f29d60ae79437ab43109ba708ea8d07c6c1342bb8a2  BGLite.toc
+37ac14ea83a998e984f4eaef438e12608b6f4edd7b861b89caea5954520e15e5  BGLite.toc
 6686c508bb020bdf0135c48d63b10287c844c635454e63d61dce77f24afcfa14  Bindings.xml
 ff6b351eaff33b3e9af81ce8b7a97c1a88153d4a8b8b002580d8706628e46d0a  Locales/enUS.lua
 1e5e066deacd896f64ed0d9782516ed9b39da129f39d4b2c8d7a25de4dc160b5  Locales/zhCN.lua

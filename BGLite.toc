@@ -86,6 +86,7 @@ Core\Module\Auction.lua
 Core\Module\AuctionLog.lua
 Core\Module\AuctionWA.lua
 Core\Module\AuctionWAEvent.lua
+Core\BGNext\AuctionPriceRuntime.lua
 Core\Module\Trade.lua
 Core\Module\SendMail.lua
 Core\Module\QuickAccounting.lua
