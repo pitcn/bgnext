@@ -136,8 +136,10 @@ local function upgradeStaleBuiltIns(state, defaults)
     for _, def in ipairs(defaults or {}) do
         local key = type(def) == "table" and def.builtInKey
         local profile = key and state.profiles[key]
+        local hasStaleIcon = profile and (profile.icon == fallbackIcon
+            or (def.upgradeIconFrom ~= nil and profile.icon == def.upgradeIconFrom))
         if profile and profile.builtInKey == key and not key:match(":class$")
-            and profile.icon == fallbackIcon and def.icon ~= nil and def.icon ~= fallbackIcon then
+            and hasStaleIcon and def.icon ~= nil and def.icon ~= profile.icon then
             profile.icon = def.icon
             changed = true
         end

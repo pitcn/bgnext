@@ -42,6 +42,7 @@ function M.buildDefaults(adapter, catalog, profiles, family, classToken, api)
                 if metadata then
                     if metadata.name then profile.name = metadata.name end
                     if metadata.icon then profile.icon = metadata.icon end
+                    if metadata.legacyIcon then profile.upgradeIconFrom = metadata.legacyIcon end
                 end
             end
         end

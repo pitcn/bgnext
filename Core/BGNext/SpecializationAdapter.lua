@@ -76,6 +76,47 @@ local function readModernInfo(getInfo, index)
     }
 end
 
+local function validTexture(texture)
+    return type(texture) == "number" or (type(texture) == "string" and texture ~= "")
+end
+
+-- Old talent clients expose a large talent-page background as the second value
+-- of GetTalentTabInfo. It is not a square specialization icon. Select the
+-- deepest talent's Blizzard icon instead: final-tier talents are stable,
+-- recognizable square textures and require no copied third-party icon table.
+local function readTreeMetadata(api, index)
+    local getTabInfo = api and api.GetTalentTabInfo
+    if type(getTabInfo) ~= "function" then return nil end
+    local activeGroup = safeCall(api and api.GetActiveTalentGroup)
+    local ok, name, tabTexture = pcall(getTabInfo, index, false, false, activeGroup)
+    if not ok then return nil end
+
+    local getTalentInfo = api and api.GetTalentInfo
+    local getNumTalents = api and api.GetNumTalents
+    local count = safeCall(getNumTalents, index, false, false)
+    if type(count) ~= "number" then
+        count = api and tonumber(api.MAX_NUM_TALENTS) or nil
+    end
+    local icon, bestTier, bestColumn
+    if type(getTalentInfo) == "function" and type(count) == "number" and count > 0 then
+        for talentIndex = 1, count do
+            local talentOk, _, talentIcon, tier, column = pcall(
+                getTalentInfo, index, talentIndex, false, false, activeGroup)
+            if talentOk and validTexture(talentIcon) and type(tier) == "number" then
+                column = type(column) == "number" and column or talentIndex
+                if bestTier == nil or tier > bestTier or (tier == bestTier and column < bestColumn) then
+                    icon, bestTier, bestColumn = talentIcon, tier, column
+                end
+            end
+        end
+    end
+    return {
+        name = type(name) == "string" and name ~= "" and name or nil,
+        icon = icon,
+        legacyIcon = validTexture(tabTexture) and tabTexture or nil,
+    }
+end
+
 local function resolveModern(family, api, classToken, result)
     local getSpec, getInfo = modernFunctions(api)
     if type(getSpec) ~= "function" then
@@ -138,6 +179,12 @@ local function resolveTrees(family, api, classToken, result)
         return result
     end
     result.specKey = "tree:" .. classToken .. ":" .. tostring(maxIndex)
+    local metadata = readTreeMetadata(api, maxIndex)
+    if metadata then
+        result.name = metadata.name or result.name
+        result.icon = metadata.icon
+        result.legacyIcon = metadata.legacyIcon
+    end
     return result
 end
 
@@ -159,14 +206,7 @@ function M.getMetadata(family, api, classToken, specKey)
         local token, indexText = specKey:match("^tree:([^:]+):(%d+)$")
         local index = tonumber(indexText)
         if token ~= classToken or not index then return nil end
-        local getInfo = api and api.GetTalentTabInfo
-        if type(getInfo) ~= "function" then return nil end
-        local ok, name, icon = pcall(getInfo, index, false, false, safeCall(api and api.GetActiveTalentGroup))
-        if not ok then return nil end
-        return {
-            name = type(name) == "string" and name ~= "" and name or nil,
-            icon = (type(icon) == "number" or (type(icon) == "string" and icon ~= "")) and icon or nil,
-        }
+        return readTreeMetadata(api, index)
     end
     return nil
 end

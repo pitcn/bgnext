@@ -35,7 +35,8 @@ return function(test)
             weapon = { [4] = true, [5] = true }, upgradeWeaponFrom = badHunterWeapons },
         { id = "titan:HUNTER:tree:HUNTER:2", builtInKey = "titan:HUNTER:tree:HUNTER:2", name = "射击", icon = 222,
             weapon = { [4] = true, [5] = true }, upgradeWeaponFrom = badHunterWeapons },
-        { id = "titan:HUNTER:tree:HUNTER:3", builtInKey = "titan:HUNTER:tree:HUNTER:3", name = "生存", icon = 333 },
+        { id = "titan:HUNTER:tree:HUNTER:3", builtInKey = "titan:HUNTER:tree:HUNTER:3", name = "生存",
+            icon = 333, upgradeIconFrom = 444 },
         { id = "titan:HUNTER:class", builtInKey = "titan:HUNTER:class", name = "猎人", icon = classIcon },
     }
     local iconRoot = { equipmentFilters = { realm = { Hunter = {
@@ -48,7 +49,7 @@ return function(test)
                 weapon = { [0] = true, [1] = true, [4] = true, [5] = true, [6] = true }, builtInKey = "titan:HUNTER:tree:HUNTER:1" },
             ["titan:HUNTER:tree:HUNTER:2"] = { id = "titan:HUNTER:tree:HUNTER:2", name = "射击", icon = classIcon,
                 weapon = { [0] = true, [4] = true, [5] = true, [6] = true }, builtInKey = "titan:HUNTER:tree:HUNTER:2" },
-            ["titan:HUNTER:tree:HUNTER:3"] = { id = "titan:HUNTER:tree:HUNTER:3", name = "生存", icon = classIcon, builtInKey = "titan:HUNTER:tree:HUNTER:3" },
+            ["titan:HUNTER:tree:HUNTER:3"] = { id = "titan:HUNTER:tree:HUNTER:3", name = "生存", icon = 444, builtInKey = "titan:HUNTER:tree:HUNTER:3" },
             ["titan:HUNTER:class"] = { id = "titan:HUNTER:class", name = "猎人", icon = classIcon, builtInKey = "titan:HUNTER:class" },
             ["custom-1"] = { id = "custom-1", name = "自定义", icon = 999 },
         },
@@ -59,6 +60,8 @@ return function(test)
         "stale built-in class icon upgrades to the specialization icon")
     test.eq(iconState.profiles["titan:HUNTER:tree:HUNTER:2"].icon, 222,
         "every built-in specialization icon upgrades, not only the active one")
+    test.eq(iconState.profiles["titan:HUNTER:tree:HUNTER:3"].icon, 333,
+        "a stored talent-tab background upgrades to the square specialization icon")
     test.eq(iconState.profiles["titan:HUNTER:tree:HUNTER:1"].weapon[6], nil,
         "known bad built-in hunter weapon defaults are upgraded")
     test.eq(iconState.profiles["titan:HUNTER:tree:HUNTER:2"].weapon[0], true,

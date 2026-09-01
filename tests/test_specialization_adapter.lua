@@ -41,12 +41,35 @@ return function(test)
     local old = M.resolve("titan", {
         GetActiveTalentGroup = function() return 1 end,
         GetTalentTabInfo = function(index)
-            return ({ "Arms", "Fury", "Protection" })[index], 132347, nil, nil, ({ 8, 31, 2 })[index]
+            return ({ "Arms", "Fury", "Protection" })[index], 900000 + index,
+                nil, nil, ({ 8, 31, 2 })[index]
+        end,
+        GetNumTalents = function() return 3 end,
+        GetTalentInfo = function(tabIndex, talentIndex)
+            local icons = {
+                [1] = { 111, 112, 113 },
+                [2] = { 221, 222, 223 },
+                [3] = { 331, 332, 333 },
+            }
+            local tiers = { 1, 7, 3 }
+            return "Talent", icons[tabIndex][talentIndex], tiers[talentIndex], talentIndex
         end,
     }, "WARRIOR")
     test.eq(old.specKey, "tree:WARRIOR:2", "old client resolves dominant tree")
     test.eq(old.name, "Fury", "old client returns the talent-tree name")
-    test.eq(old.icon, 132347, "old client returns the talent-tree icon")
+    test.eq(old.icon, 222, "old client uses a square signature-talent icon")
+    test.eq(old.legacyIcon, 900002, "old client exposes the former tab background only for migration")
+
+    local oldMetadata = M.getMetadata("titan", {
+        GetActiveTalentGroup = function() return 1 end,
+        GetTalentTabInfo = function(index) return "Tree " .. index, 800000 + index end,
+        GetNumTalents = function() return 2 end,
+        GetTalentInfo = function(_, talentIndex)
+            return "Talent", 700000 + talentIndex, talentIndex, 1
+        end,
+    }, "WARRIOR", "tree:WARRIOR:3")
+    test.eq(oldMetadata.icon, 700002, "tree metadata chooses the deepest square talent icon")
+    test.eq(oldMetadata.legacyIcon, 800003, "tree metadata retains the tab background migration marker")
 
     local tied = M.resolve("titan", {
         GetActiveTalentGroup = function() return 1 end,
