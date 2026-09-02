@@ -34,6 +34,18 @@ do --英语说明书
     }
 end
 
+do -- BGNext legacy history cleanup
+    L["存储与隐私"] = "Storage & Privacy"
+    L["旧历史数据清理"] = "Legacy History Cleanup"
+    L["BGNext 不会读取或迁移旧版历史表格、交易记录和邮件记录。若旧数据仍保存在本地，可在这里手动清理以减少常驻内存。"] = "BGNext does not read or migrate legacy table, trade, or mail history. If old data remains locally, you can remove it here to reduce memory use."
+    L["清理 BGNext 中的旧历史数据"] = "Remove Legacy BGNext History"
+    L["此操作不可恢复。建议先退出游戏并备份 WTF 文件夹；当前账单、设置、心愿清单、当前团结算和角色总览不会被删除。"] = "This cannot be undone. Exit the game and back up your WTF folder first. Current bills, settings, wishlists, current-raid settlement, and character overview are preserved."
+    L["检测到 %d 项旧历史数据。"] = "%d legacy history fields detected."
+    L["未检测到旧历史数据。"] = "No legacy history data detected."
+    L["确定清理 BGNext 中的旧历史数据吗？\n\n此操作不可恢复。建议先退出游戏并备份 WTF 文件夹。只会删除旧版历史表格、交易记录和邮件记录。"] = "Remove legacy BGNext history data?\n\nThis cannot be undone. Exit the game and back up your WTF folder first. Only legacy table, trade, and mail history will be removed."
+    L["确认清理"] = "Remove History"
+end
+
 do -- BGNext temporary current-raid reconciliation
     L["开始对账"] = "Start Reconciliation"
     L["停止对账"] = "Stop reconciliation"

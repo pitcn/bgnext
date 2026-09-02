@@ -9,6 +9,7 @@ local suites = {
     "tests/test_identity.lua",
     "tests/test_conflict_guard.lua",
     "tests/test_data_lifecycle.lua",
+    "tests/test_legacy_history_cleanup.lua",
     "tests/test_auction_price_store.lua",
     "tests/test_auction_price_catalog.lua",
     "tests/test_auction_price_codec.lua",
