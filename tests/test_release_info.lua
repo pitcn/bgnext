@@ -20,6 +20,8 @@ return function(test)
     test.eq(changelogItems:find("Boss 模型", 1, true) ~= nil, true,
         "in-game changelog includes boss model removal and readability")
     test.eq(type(info.credits.upstream), "table", "upstream credits")
+    test.eq(info.credits.contributors[1]:find("@pitcn", 1, true) ~= nil, true,
+        "named BGNext maintainer is included in in-game credits")
 
     local about = dofile("Core/BGNext/About.lua")
     local aboutText = about.buildText("about", info)
