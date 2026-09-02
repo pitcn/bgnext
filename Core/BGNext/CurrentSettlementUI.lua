@@ -569,9 +569,15 @@ end
 -- The debt amount is edited in a shared popup box that BGLite recreates each
 -- time the popup opens, so a debt indicator that stays visible while its
 -- amount changes emits no OnShow/OnHide. Hook whatever box is current; the
--- flag dies with the old box, so a freshly created one is hooked on the next
--- refresh.
+-- flag dies with the old box. Subscribe after the popup factory runs too:
+-- editing an already-visible debt need not produce any other refresh event.
+local debtFactoryHooked = false
 hookDebtEditBox = function()
+    if not debtFactoryHooked and type(BG.SetListjine) == "function"
+        and type(hooksecurefunc) == "function" then
+        debtFactoryHooked = true
+        hooksecurefunc(BG, "SetListjine", hookDebtEditBox)
+    end
     local edit = BG.FrameQianKuanEdit
     if type(edit) ~= "table" or edit.__bgnChecklistNotify
         or type(edit.HookScript) ~= "function" then

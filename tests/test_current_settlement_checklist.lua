@@ -197,7 +197,7 @@ return function(test)
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", targetmoney = 1000, targetitems = {},
-            playeritems = { { itemId = 7001 } },
+            playeritems = { { itemId = 7001, count = 1 } },
         }), mails = {} },
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
             { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
@@ -205,13 +205,25 @@ return function(test)
     test.eq(report.status, "ready", "a proven delivered sale reads as ready")
     test.eq(#entries(report, nil, "sold"), 0, "a proven sale needs no finding")
 
+    for _, count in ipairs({ 2, false }) do
+        report = checklist.evaluate({
+            settlement = { trades = tradesOf({
+                completed = true, target = "买家甲", targetmoney = 1000,
+                playeritems = { { itemId = 7001, count = count or nil } },
+            }), mails = {} },
+            bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+                { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
+        })
+        test.eq(report.status ~= "ready", true, "stacked or unknown quantity blocks readiness")
+    end
+
     -- 7b. an inbound purchase can never confirm a bill sale (review repro 1)
     root = newRoot()
     beginSettlement(root, "ICC")
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", playermoney = 100, targetmoney = 0,
-            targetitems = { { itemId = 7001 } }, playeritems = {},
+            targetitems = { { itemId = 7001, count = 1 } }, playeritems = {},
         }), mails = {} },
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
             { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
@@ -228,7 +240,7 @@ return function(test)
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", targetmoney = 1, targetitems = {},
-            playeritems = { { itemId = 7001 } },
+            playeritems = { { itemId = 7001, count = 1 } },
         }), mails = {} },
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
             { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
@@ -245,7 +257,7 @@ return function(test)
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", targetmoney = 2000, targetitems = {},
-            playeritems = { { itemId = 7001 }, { itemId = 7002 } },
+            playeritems = { { itemId = 7001, count = 1 }, { itemId = 7002, count = 1 } },
         }), mails = {} },
         bill = bill({
             saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000"),
@@ -280,7 +292,7 @@ return function(test)
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", targetmoney = 1000, targetitems = {},
-            playeritems = { { itemId = 7001 }, { itemId = 7001 } },
+            playeritems = { { itemId = 7001, count = 1 }, { itemId = 7001, count = 1 } },
         }), mails = {} },
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
             { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
@@ -299,7 +311,7 @@ return function(test)
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", targetmoney = 100, targetitems = {},
-            playeritems = { { itemId = 7001 } },
+            playeritems = { { itemId = 7001, count = 1 } },
         }), mails = {} },
         bill = bill({ saleRow(1, 1, nil, "[神秘物品]", "买家甲", "100") },
             { splitCount = "1", netIncome = "100", wage = "100.00" }),
@@ -317,7 +329,7 @@ return function(test)
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", targetmoney = 1000, playermoney = 500,
-            playeritems = { { itemId = 7001 } },
+            playeritems = { { itemId = 7001, count = 1 } },
         }), mails = {} },
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
             { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
@@ -352,7 +364,7 @@ return function(test)
     report = checklist.evaluate({
         settlement = { trades = tradesOf({
             completed = true, target = "买家甲", targetmoney = 100, targetitems = {},
-            playeritems = { { itemId = 7001 } },
+            playeritems = { { itemId = 7001, count = 1 } },
         }), mails = {} },
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "100") },
             { splitCount = "1", netIncome = "100", wage = "100.00" }),

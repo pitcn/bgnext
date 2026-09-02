@@ -136,6 +136,7 @@ end
 
 local function itemIds(value, itemIdOf)
     local ids = {}
+    local singleUnits = true
     if type(value) ~= "table" then
         return ids
     end
@@ -144,8 +145,11 @@ local function itemIds(value, itemIdOf)
         if id then
             ids[#ids + 1] = id
         end
+        if not id or type(item) ~= "table" or item.count ~= 1 then
+            singleUnits = false
+        end
     end
-    return ids
+    return ids, singleUnits
 end
 
 local function normalizedName(context, name)
@@ -204,8 +208,8 @@ function M.tradeRows(trade, itemIdOf)
 
     local theirs = tonumber(trade.targetmoney) or 0
     local mine = tonumber(trade.playermoney) or 0
-    local theirItems = itemIds(trade.targetitems, itemIdOf)
-    local myItems = itemIds(trade.playeritems, itemIdOf)
+    local theirItems, theirSingleUnits = itemIds(trade.targetitems, itemIdOf)
+    local myItems, mySingleUnits = itemIds(trade.playeritems, itemIdOf)
     local anyItems = #theirItems > 0 or #myItems > 0
 
     -- Only the gold one side actually put up counts as the settlement amount;
@@ -247,6 +251,14 @@ function M.tradeRows(trade, itemIdOf)
     end
 
     local status = amount ~= nil and "complete" or "pending"
+    -- The record has no quantity field: a stack, unknown quantity, or barter
+    -- must stay unconfirmed rather than masquerading as a single sold item.
+    -- Retain the observed gold/direction for manual reconciliation only.
+    if (direction == "outgoing" and not mySingleUnits)
+        or (direction == "incoming" and not theirSingleUnits)
+        or (#theirItems > 0 and #myItems > 0) then
+        status = "pending"
+    end
     local rows = {}
     if #items == 0 then
         rows[1] = { player = player, itemId = nil, amount = amount, status = status, direction = direction }

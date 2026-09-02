@@ -185,6 +185,13 @@ return function(test)
             function frame:SetWidth(width) self.width = width end
             function frame:SetHeight(height) self.height = height end
             function frame:SetScript(name, handler) self.scripts[name] = handler end
+            function frame:HookScript(name, handler)
+                local previous = self.scripts[name]
+                self.scripts[name] = function(...)
+                    if previous then previous(...) end
+                    handler(...)
+                end
+            end
             function frame:SetText(value) self.text = value end
             function frame:GetText() return self.text end
             function frame:SetTextColor() end
@@ -291,6 +298,13 @@ return function(test)
         BG.ClickFBbutton = function(fb) clickTargets[#clickTargets + 1] = fb end
         BG.RegisterEvent = function() end
         BG.ClearBiaoGe = function() end
+        BG.SetListjine = function()
+            local edit = makeFrame()
+            edit:SetScript("OnTextChanged", function(self)
+                BiaoGe.ICC.boss1.qiankuan2 = tonumber(self:GetText())
+            end)
+            BG.FrameQianKuanEdit = edit
+        end
         BG.Init = function(callback) callback() end
         setGlobal("BiaoGe", {
             options = {},
@@ -402,6 +416,18 @@ return function(test)
         end
 
         -- 10d. idle time alone rebuilds nothing
+        -- Opening a new popup after the checklist must subscribe immediately,
+        -- even when the existing debt indicator never hides or shows again.
+        for _, debt in ipairs({ 500, 300 }) do
+            local previousReport = state.report
+            BG.SetListjine()
+            local edit = BG.FrameQianKuanEdit
+            edit:SetText(tostring(debt))
+            edit.scripts.OnTextChanged(edit)
+            state = ui2.checklistState()
+            test.eq(state.report ~= previousReport, true, "new debt popup invalidates the checklist")
+            test.eq(BiaoGe.ICC.boss1.qiankuan2, debt, "original debt editor handler is preserved")
+        end
         local idleReport = state.report
         nowValue = nowValue + 30
         test.eq(ui2.checklistState().report, idleReport, "idle time causes zero report builds")

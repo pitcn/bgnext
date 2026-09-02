@@ -48,7 +48,7 @@ return function(test)
     --    (loot master hands over the item, the buyer puts up the gold)
     test.eq(runtime.recordTrade(root, context(5100, 5000), {
         completed = true, target = "甲", targetmoney = 100, playermoney = 0,
-        playeritems = { { itemId = 11 } },
+        playeritems = { { itemId = 11, count = 1 } },
     }), 1, "completed trade recorded")
     test.eq(root.currentSettlement.raidId, "ICC@5000", "settlement established from the raid roster")
     local first = root.currentSettlement.trades[1]
@@ -61,7 +61,7 @@ return function(test)
     -- 3. a repeated success event for the same trade writes nothing extra
     test.eq(runtime.recordTrade(root, context(5100, 5000), {
         completed = true, target = "甲", targetmoney = 100, playermoney = 0,
-        playeritems = { { itemId = 11 } },
+        playeritems = { { itemId = 11, count = 1 } },
     }), 0, "duplicate trade completion ignored")
     test.eq(#root.currentSettlement.trades, 1, "duplicate trade completion not stored")
 
@@ -109,6 +109,22 @@ return function(test)
     test.eq(ambiguousRecord.direction, nil, "stored both-gold direction stays nil")
     test.eq(ambiguousRecord.amount, nil, "stored both-gold amount stays nil")
     test.eq(ambiguousRecord.status, "pending", "stored both-gold status is pending")
+
+    -- 6c. quantity and barter ambiguity must not become a proven bill sale.
+    for _, count in ipairs({ 2, 0, -1, 0.5, false }) do
+        local rows = runtime.tradeRows({
+            completed = true, target = "甲", targetmoney = 100,
+            playeritems = { { itemId = 7001, count = count or nil } },
+        })
+        test.eq(rows[1].status, "pending", "stacked or unknown quantity cannot prove a single sale")
+        test.eq(rows[1].amount, 100, "observed gold is retained for manual reconciliation")
+    end
+    local mixed = runtime.tradeRows({
+        completed = true, target = "甲", targetmoney = 100,
+        playeritems = { { itemId = 7001, count = 1 } },
+        targetitems = { { itemId = 7002, count = 1 } },
+    })
+    test.eq(mixed[1].status, "pending", "barter plus gold cannot prove a single sale")
 
     -- 7. mail: only a plugin-executed send result, whitelisted fields only
     test.eq(runtime.recordMail(root, context(5500, 5000), {
