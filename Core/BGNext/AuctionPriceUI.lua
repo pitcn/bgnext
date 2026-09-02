@@ -11,7 +11,33 @@ BG.BGNext = BG.BGNext or {}
 local M = {}
 
 M.tabNumber = 2
-M.ROW_CAPACITY = 12
+M.COLUMN_COUNT = 2
+M.MIN_ROWS_PER_COLUMN = 12
+M.MAX_ROWS_PER_COLUMN = 30
+M.ROW_HEIGHT = 24
+M.ROW_CAPACITY = M.COLUMN_COUNT * M.MAX_ROWS_PER_COLUMN
+
+-- Computes the reusable viewport once from the existing main-frame size. The
+-- fixed deductions cover the left margin, 230px Boss picker, inter-panel gap,
+-- slim slider/right margin, and the controls above/below the item rows.
+function M.viewportLayout(width, height)
+    width = math.max(tonumber(width) or 0, 0)
+    height = math.max(tonumber(height) or 0, 0)
+    local availableWidth = math.max(width - 292, 652)
+    local columnWidth = math.max(math.floor((availableWidth - 12) / M.COLUMN_COUNT), 320)
+    local rows = math.floor((height - 190) / M.ROW_HEIGHT)
+    if rows < M.MIN_ROWS_PER_COLUMN then rows = M.MIN_ROWS_PER_COLUMN end
+    if rows > M.MAX_ROWS_PER_COLUMN then rows = M.MAX_ROWS_PER_COLUMN end
+    return {
+        columns = M.COLUMN_COUNT,
+        rowsPerColumn = rows,
+        capacity = rows * M.COLUMN_COUNT,
+        columnWidth = columnWidth,
+        columnGap = 12,
+        rowHeight = M.ROW_HEIGHT,
+        itemHeight = rows * M.ROW_HEIGHT,
+    }
+end
 
 M.LABELS = {
     leader = "团长起拍价",

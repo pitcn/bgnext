@@ -2,9 +2,27 @@ return function(test)
     BG = { BGNext = {} }
     local ui = dofile("Core/BGNext/AuctionPriceUI.lua")
 
-    -- Fixed layout constants.
+    -- Responsive two-column layout constants.
     test.eq(ui.tabNumber, 2, "price page is the second tab")
-    test.eq(ui.ROW_CAPACITY, 12, "fixed reusable row capacity")
+    test.eq(ui.COLUMN_COUNT, 2, "price items use two columns")
+    test.eq(ui.MIN_ROWS_PER_COLUMN, 12, "short windows retain twelve rows per column")
+    test.eq(ui.MAX_ROWS_PER_COLUMN, 30, "row objects stay capped per column")
+    test.eq(ui.ROW_CAPACITY, 60, "maximum reusable row capacity")
+
+    local largeLayout = ui.viewportLayout(1900, 1400)
+    test.eq(largeLayout.columns, 2, "large layout keeps two columns")
+    test.eq(largeLayout.rowsPerColumn, 30, "large layout observes row cap")
+    test.eq(largeLayout.capacity, 60, "large layout exposes sixty reusable rows")
+    test.eq(largeLayout.columnWidth > 500, true, "large layout fills horizontal space")
+
+    local standardLayout = ui.viewportLayout(1280, 800)
+    test.eq(standardLayout.rowsPerColumn, 25, "standard layout derives rows from height")
+    test.eq(standardLayout.capacity, 50, "standard layout exposes both columns")
+
+    local fallbackLayout = ui.viewportLayout(nil, nil)
+    test.eq(fallbackLayout.rowsPerColumn, 12, "invalid height uses safe minimum")
+    test.eq(fallbackLayout.capacity, 24, "fallback still uses two columns")
+    test.eq(fallbackLayout.columnWidth, 320, "invalid width uses safe column width")
 
     -- Exact product labels.
     test.eq(ui.LABELS.leader, "团长起拍价", "leader label")
