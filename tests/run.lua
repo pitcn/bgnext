@@ -5,6 +5,7 @@ local suites = {
     "tests/test_ui_style.lua",
     "tests/test_legacy_ledger_skin.lua",
     "tests/test_ui_theme_settings.lua",
+    "tests/test_english_locale.lua",
     "tests/test_identity.lua",
     "tests/test_conflict_guard.lua",
     "tests/test_data_lifecycle.lua",

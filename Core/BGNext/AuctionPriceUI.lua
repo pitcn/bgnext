@@ -588,6 +588,16 @@ if runtimeReady() then
             Style.setButtonState(bt, selected and "listSelected" or "listNormal", BiaoGe.options.alpha)
         end
 
+        -- Locale strings vary substantially in width. Measure the current label
+        -- instead of assuming Chinese-sized controls so English and fallback
+        -- locales remain readable without changing the surrounding layout model.
+        local function fitButtonToText(button, minimum, maximum, padding)
+            local fontString = button and button:GetFontString()
+            if fontString then
+                button:SetWidth(M.buttonWidth(fontString:GetStringWidth(), padding or 18, minimum, maximum))
+            end
+        end
+
         -- Filter bar: search box, set/unset/all state toggle, clear.
         local searchBox = CreateFrame("EditBox", nil, main.filterBar, BG.editTemplate or "InputBoxTemplate")
         searchBox:SetPoint("TOPLEFT", main.filterBar, "TOPLEFT", 0, 0)
@@ -973,6 +983,8 @@ if runtimeReady() then
         function refreshModeBar()
             leaderButton:SetText(L[M.LABELS.leader])
             personalButton:SetText(L[M.LABELS.personal])
+            fitButtonToText(leaderButton, 110, 165)
+            fitButtonToText(personalButton, 110, 165)
             if pageState.mode == "leader" then leaderButton:Disable() else leaderButton:Enable() end
             if pageState.mode == "personal" then personalButton:Disable() else personalButton:Enable() end
             applySelection(leaderButton, pageState.mode == "leader")
@@ -1002,6 +1014,12 @@ if runtimeReady() then
                 deleteButton:SetText(L["删除"] or "删除")
                 importButton:SetText(L["导入"] or "导入")
                 exportButton:SetText(L["导出"] or "导出")
+                fitButtonToText(newButton, 52, 82)
+                fitButtonToText(copyButton, 52, 82)
+                fitButtonToText(renameButton, 66, 98)
+                fitButtonToText(deleteButton, 52, 82)
+                fitButtonToText(importButton, 52, 82)
+                fitButtonToText(exportButton, 52, 82)
             else
                 for _, c in ipairs(leaderControls) do c:Hide() end
                 for _, c in ipairs(personalControls) do c:Show() end
@@ -1011,6 +1029,9 @@ if runtimeReady() then
                 clearPersonalButton:SetText(L["清除本团本心理价"] or "清除本团本心理价")
                 importPersonalButton:SetText(L["导入"] or "导入")
                 exportPersonalButton:SetText(L["导出"] or "导出")
+                fitButtonToText(clearPersonalButton, 120, 190)
+                fitButtonToText(importPersonalButton, 52, 82)
+                fitButtonToText(exportPersonalButton, 52, 82)
             end
         end
 
@@ -1399,6 +1420,7 @@ if runtimeReady() then
                 local button = importPanel.modeButtons[i]
                 button.modeKey = keys[i]
                 button:SetText(labels[i])
+                fitButtonToText(button, 70, 86, 14)
             end
             refreshImportPreview(importPanel)
             importPanel.edit:SetFocus()

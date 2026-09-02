@@ -30,12 +30,12 @@ end
 -- if true then return end
 -- ○
 local l = GetLocale()
-if (l == "zhTW" or l == "enUS") then return end
+if l ~= "zhCN" then return end
 
 do --简体说明书
     ns.instructionsText = {
         "|cff00BFFF<BGNext 说明书>|r",
-        "BGNext v0.2.3 是基于 BGLite 2.4.0 维护的独立、非官方社区共创项目。",
+        "BGNext 是基于 BGLite 2.4.0 维护的独立、非官方社区共创项目。",
         "基础拍卖继续使用 BGLite 现有公开协议；不同玩家分别使用 BGNext 与 BGLite 时可以共同参与基础拍卖，实际兼容状态以版本说明中的测试结果为准。",
         "个人心愿、自有角色和个人辅助数据仅保存在本地，不向团队或游戏外发送。当前团本交易与邮件核对只保留最近一团，最长七日，不保存邮件正文。",
         "检测到本机同时启用其他表格/BGLite 系列插件时，BGNext 会提示玩家处理，但不会在未经确认时自动禁用插件。",
@@ -3037,4 +3037,43 @@ do -- BGNext 当前团交易与邮件核对
     L["确定清除本团本心理价？"] = true
     L["最多"] = true
     L["套方案。"] = true
+    L["当前方案"] = true
+    L["当前没有可导出的价格。"] = true
+    L["导出范围"] = true
+    L["导出价格"] = true
+    L["导入"] = true
+    L["导入成功。"] = true
+    L["导入方式"] = true
+    L["导入价格"] = true
+    L["导入失败：角色信息不可用。"] = true
+    L["导入失败。"] = true
+    L["合并"] = true
+    L["价格无效。"] = true
+    L["旧版价格字符串"] = true
+    L["全部方案"] = true
+    L["替换"] = true
+    L["替换将覆盖当前已保存的价格，确定继续？"] = true
+    L["替换全部"] = true
+    L["未知装备将被跳过"] = true
+    L["无法导入："] = true
+    L["新建方案"] = true
+    L["修改预设起拍价"] = true
+    L["预设起拍价已保存。"] = true
+    L["重命名方案"] = true
+end
+
+do -- BGNext character overview
+    L["本周获得"] = true
+    L["不足1分钟"] = true
+    L["当前数量"] = true
+    L["总上限"] = true
+    L["每周上限"] = true
+    L["启用角色总览"] = true
+    L["清空"] = true
+    L["清空当前版本角色数据"] = true
+    L["清空全部角色数据"] = true
+    L["确认清空当前版本的角色数据？此操作不可撤销。"] = true
+    L["确认清空全部版本的角色数据？此操作不可撤销。"] = true
+    L["确认删除角色 %s（%s）的记录？此操作不可撤销。"] = true
+    L["该版本角色总览适配中。"] = true
 end

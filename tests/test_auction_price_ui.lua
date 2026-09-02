@@ -177,6 +177,8 @@ return function(test)
         "BG.PricePresetMainFrame",
         "BG.Create_TabButton(M.tabNumber",
         'L["价格预设"]',
+        "fitButtonToText(leaderButton",
+        "fitButtonToText(clearPersonalButton",
     }) do
         test.eq(source:find(token, 1, true) ~= nil, true, "page shell builds " .. token)
     end
