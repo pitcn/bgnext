@@ -18,6 +18,11 @@ return function(test)
         local spy = { upsert = 0, expire = 0, clearFamily = 0, clearAll = 0 }
         local model = {
             upsert = function(r, f, s) spy.upsert = spy.upsert + 1 return Model.upsert(r, f, s) end,
+            mergeSections = function(r, f, s, sections)
+                spy.upsert = spy.upsert + 1
+                return Model.mergeSections(r, f, s, sections)
+            end,
+            get = Model.get,
             expireRaidStates = function(r, n) spy.expire = spy.expire + 1 return Model.expireRaidStates(r, n) end,
             clearFamily = function(r, f) spy.clearFamily = spy.clearFamily + 1 return Model.clearFamily(r, f) end,
             clearAll = function(r) spy.clearAll = spy.clearAll + 1 return Model.clearAll(r) end,
@@ -70,6 +75,75 @@ return function(test)
     test.eq(Model.get(root, "titan", 123, "Piti") ~= nil, true, "the snapshot reached storage")
     test.eq(apiCalls.raidInfo, 0, "ordinary event collection never requests raid data")
 
+    local hiddenDeps, hiddenRoot, _, hiddenUi = build()
+    hiddenDeps.ui.IsVisible = function() return false end
+    Runtime.collectAndStore(hiddenDeps)
+    test.eq(Model.get(hiddenRoot, "titan", 123, "Piti") ~= nil, true,
+        "hidden overview still stores the latest snapshot")
+    test.eq(hiddenUi.refresh, 0, "hidden overview skips renderer work")
+
+    local visibleDeps, _, _, visibleUi = build()
+    visibleDeps.ui.IsVisible = function() return true end
+    Runtime.collectAndStore(visibleDeps)
+    test.eq(visibleUi.refresh, 1, "visible overview redraws after collection")
+
+    -- A scoped event refresh reads identity plus only the section made dirty.
+    local scopedDeps = build()
+    local readerCalls = {}
+    local function counted(key, value)
+        return function()
+            readerCalls[key] = (readerCalls[key] or 0) + 1
+            return value
+        end
+    end
+    scopedDeps.adapters = {
+        readers = function()
+            return {
+                playerName = counted("playerName", "Piti"),
+                realmId = counted("realmId", 123),
+                realmName = counted("realmName", "时光II"),
+                faction = counted("faction", "Alliance"),
+                class = counted("class", "HUNTER"),
+                level = counted("level", 80),
+                itemLevel = counted("itemLevel", 230),
+                money = counted("money", 60000),
+                equipment = counted("equipment", {}),
+                raidStates = counted("raidStates", {}),
+                professions = counted("professions", {}),
+                resources = counted("resources", {}),
+            }
+        end,
+    }
+    Model.upsert(scopedDeps.root, "titan", {
+        player = "Piti", realmId = 123, money = 50000, updatedAt = 4000,
+        equipment = { [1] = { itemId = 1234 } },
+        raidStates = { toc = { completed = true, resetsAt = 9000 } },
+    })
+    local moneySnapshot = Runtime.collectAndStore(scopedDeps, { money = true })
+    test.eq(moneySnapshot.money, 60000, "money refresh reads the new money value")
+    test.eq(readerCalls.playerName, 1, "scoped refresh still identifies the current character")
+    test.eq(readerCalls.realmId, 1, "scoped refresh still identifies the current realm")
+    test.eq(readerCalls.money, 1, "money refresh calls the money reader once")
+    for _, key in ipairs({ "realmName", "faction", "class", "level", "itemLevel", "equipment",
+        "raidStates", "professions", "resources" }) do
+        test.eq(readerCalls[key], nil, "money refresh skips unrelated reader " .. key)
+    end
+    Runtime.collectAndStore(scopedDeps, { money = true })
+    local merged = Model.get(scopedDeps.root, "titan", 123, "Piti")
+    test.eq(merged.money, 60000, "scoped refresh replaces the dirty field")
+    test.eq(merged.equipment[1].itemId, 1234, "scoped refresh preserves stored equipment")
+    test.eq(merged.raidStates.toc.completed, true, "scoped refresh preserves stored raid state")
+
+    local firstScopedDeps = build()
+    firstScopedDeps.adapters = scopedDeps.adapters
+    readerCalls = {}
+    Runtime.collectAndStore(firstScopedDeps, { money = true })
+    local firstStored = Model.get(firstScopedDeps.root, "titan", 123, "Piti")
+    test.eq(firstStored.realmName, "时光II", "first scoped event falls back to a complete identity snapshot")
+    test.eq(firstStored.class, "HUNTER", "first scoped event fills non-dirty character fields")
+    test.eq(type(firstStored.equipment), "table", "first scoped event fills equipment instead of persisting a partial record")
+    test.eq(readerCalls.equipment, 1, "first scoped event performs one full fallback collection")
+
     -- Refresh reuses the same safe collection path: it re-reads, not redraw-stale.
     Runtime.refresh(deps)
     test.eq(spy.upsert, 2, "refresh re-collects the current character")
@@ -100,6 +174,13 @@ return function(test)
     Runtime.clearAll(d3)
     test.eq(spy3.clearAll, 1, "clearAll forwards to the model")
 
+    local hiddenMutationDeps, _, _, hiddenMutationUi = build()
+    hiddenMutationDeps.ui.IsVisible = function() return false end
+    Runtime.setColumnVisible(hiddenMutationDeps, "resource", "titanShard", false)
+    Runtime.clearFamily(hiddenMutationDeps)
+    Runtime.clearAll(hiddenMutationDeps)
+    test.eq(hiddenMutationUi.refresh, 0, "settings and clears do not redraw a hidden overview")
+
     -- install registers only the reviewed events and collects once immediately.
     local d4, root4, spy4, ui4, api4 = build()
     d4.family = "retail"
@@ -107,6 +188,21 @@ return function(test)
     d4.globals = { IsRetail = true }
     local registered = {}
     local rejectedRetailEvent = false
+    local eventHandler, scheduledRefresh
+    local installedReaderCalls = {}
+    d4.adapters = {
+        readers = function(...)
+            local readers = Adapters.readers(...)
+            for key, reader in pairs(readers) do
+                readers[key] = function()
+                    installedReaderCalls[key] = (installedReaderCalls[key] or 0) + 1
+                    return reader()
+                end
+            end
+            return readers
+        end,
+        validatedIdentity = Adapters.validatedIdentity,
+    }
     local frame = {
         RegisterEvent = function(_, event)
             if event == "TRADE_SKILL_UPDATE" then
@@ -115,10 +211,10 @@ return function(test)
             end
             registered[#registered + 1] = event
         end,
-        SetScript = function() end,
+        SetScript = function(_, _, fn) eventHandler = fn end,
     }
     d4.frame = frame
-    d4.after = function(delay, fn) end
+    d4.after = function(_, fn) scheduledRefresh = fn end
     Runtime.install(d4)
     test.eq(rejectedRetailEvent, true, "install encounters the unsupported retail profession event")
     test.eq(#registered > 0, true, "install registers events")
@@ -128,6 +224,14 @@ return function(test)
     for _, event in ipairs(Collector.allowedEvents) do allowed[event] = true end
     for _, event in ipairs(registered) do
         test.eq(allowed[event], true, "install registered only allowlisted event " .. tostring(event))
+    end
+    installedReaderCalls = {}
+    eventHandler(frame, "PLAYER_MONEY")
+    scheduledRefresh()
+    test.eq(installedReaderCalls.money, 1, "installed money event reads money once")
+    for _, key in ipairs({ "realmName", "faction", "class", "level", "itemLevel", "equipment",
+        "raidStates", "professions", "resources" }) do
+        test.eq(installedReaderCalls[key], nil, "installed money event skips unrelated reader " .. key)
     end
 
     -- Countdown maintenance exists only while the overview is visible.

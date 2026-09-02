@@ -34,10 +34,23 @@ M.allowedEvents = {
 
 local DEBOUNCE_SECONDS = 1
 
-local function safeCall(fn)
+local EVENT_SECTIONS = {
+    PLAYER_LOGIN = { full = true },
+    PLAYER_ENTERING_WORLD = { full = true },
+    PLAYER_EQUIPMENT_CHANGED = { equipment = true },
+    PLAYER_LEVEL_UP = { identity = true },
+    PLAYER_MONEY = { money = true },
+    UPDATE_INSTANCE_INFO = { raid = true },
+    BAG_UPDATE_DELAYED = { items = true },
+    CURRENCY_DISPLAY_UPDATE = { currencies = true },
+    SKILL_LINES_CHANGED = { professions = true, professionCooldowns = true },
+    TRADE_SKILL_UPDATE = { professions = true, professionCooldowns = true },
+}
+
+local function safeCall(fn, ...)
     if type(fn) ~= "function" then return nil end
-    if Adapters and Adapters.safeCall then return Adapters.safeCall(fn) end
-    local ok, result = pcall(fn)
+    if Adapters and Adapters.safeCall then return Adapters.safeCall(fn, ...) end
+    local ok, result = pcall(fn, ...)
     if not ok then return nil end
     return result
 end
@@ -45,8 +58,8 @@ end
 -- Reads one optional value and keeps it only when it has the expected type.
 -- A missing API, a protected value and a wrong-typed value are all treated the
 -- same way: the field is simply absent.
-local function read(env, key, expectedType)
-    local value = safeCall(env[key])
+local function read(env, key, expectedType, ...)
+    local value = safeCall(env[key], ...)
     if value == nil then return nil end
     if type(value) ~= expectedType then return nil end
     return value
@@ -54,8 +67,13 @@ end
 
 -- Collects a snapshot of the character the user is currently logged into.
 -- Returns nil when the client cannot even identify that character.
-function M.collect(env)
+function M.collect(env, sections)
     if type(env) ~= "table" then return nil end
+
+    local full = type(sections) ~= "table" or sections.full == true
+    local function wants(section)
+        return full or sections[section] == true
+    end
 
     local player = read(env, "playerName", "string")
     if not player or player == "" then return nil end
@@ -66,26 +84,48 @@ function M.collect(env)
     local snapshot = {
         player = player,
         realmId = realmId,
-        realmName = read(env, "realmName", "string"),
-        faction = read(env, "faction", "string"),
-        class = read(env, "class", "string"),
-        level = read(env, "level", "number"),
-        itemLevel = read(env, "itemLevel", "number"),
-        money = read(env, "money", "number"),
         updatedAt = read(env, "now", "number"),
-        equipment = read(env, "equipment", "table"),
-        raidStates = read(env, "raidStates", "table"),
-        professions = read(env, "professions", "table"),
     }
+
+    if wants("identity") then
+        snapshot.realmName = read(env, "realmName", "string")
+        snapshot.faction = read(env, "faction", "string")
+        snapshot.class = read(env, "class", "string")
+        snapshot.level = read(env, "level", "number")
+    end
+    if wants("equipment") then
+        snapshot.itemLevel = read(env, "itemLevel", "number")
+        snapshot.equipment = read(env, "equipment", "table")
+    end
+    if wants("money") then snapshot.money = read(env, "money", "number") end
+    if wants("raid") then snapshot.raidStates = read(env, "raidStates", "table") end
+    if wants("professions") then snapshot.professions = read(env, "professions", "table") end
 
     -- Currencies and item counts share one reader so a client family that
     -- exposes neither simply contributes nothing.
-    local resources = read(env, "resources", "table")
+    local resourceSelection
+    if not full then
+        resourceSelection = {}
+        if sections.currencies == true or sections.resources == true then resourceSelection.currencies = true end
+        if sections.items == true or sections.resources == true then resourceSelection.items = true end
+        if sections.professionCooldowns == true or sections.resources == true then
+            resourceSelection.professionCooldowns = true
+        end
+    end
+    local resources = (full or resourceSelection.currencies or resourceSelection.items
+        or resourceSelection.professionCooldowns)
+        and read(env, "resources", "table", resourceSelection) or nil
     if resources then
-        snapshot.currencies = type(resources.currencies) == "table" and resources.currencies or nil
-        snapshot.items = type(resources.items) == "table" and resources.items or nil
-        snapshot.professionCooldowns = type(resources.professionCooldowns) == "table"
+        if full or resourceSelection.currencies then
+            snapshot.currencies = type(resources.currencies) == "table" and resources.currencies or nil
+        end
+        if full or resourceSelection.items then
+            snapshot.items = type(resources.items) == "table" and resources.items or nil
+        end
+        if full or resourceSelection.professionCooldowns then
+            snapshot.professionCooldowns = type(resources.professionCooldowns) == "table"
             and resources.professionCooldowns or nil
+        end
     end
 
     return snapshot
@@ -112,15 +152,21 @@ function M.installEvents(env, onSnapshot)
 
     local after = type(env.after) == "function" and env.after or nil
     local pending = false
+    local dirty = {}
 
     local function flush()
         pending = false
-        onSnapshot()
+        local sections = dirty
+        dirty = {}
+        onSnapshot(sections)
     end
 
     if type(frame.SetScript) == "function" then
         frame:SetScript("OnEvent", function(_, event)
             if not allowed[event] then return end
+            for section in pairs(EVENT_SECTIONS[event] or {}) do
+                dirty[section] = true
+            end
             if pending then return end
             pending = true
             if after then

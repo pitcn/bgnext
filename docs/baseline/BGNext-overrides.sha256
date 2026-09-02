@@ -1,6 +1,6 @@
 # Explicit BGNext changes to upstream BGLite 2.4.0 files.
 # Format: SHA-256, two spaces, repository-relative path.
-ebe71cca564697be253fd11a4f671c93082b45d033cedf03805200469a06e921  BGLite.toc
+1169385c9a74699d51064542a3484968517f9e26ee2a1d8ffc7d1111eb6c6851  BGLite.toc
 6686c508bb020bdf0135c48d63b10287c844c635454e63d61dce77f24afcfa14  Bindings.xml
 cb7ffe99ecc71d960e6c75d58f2e7eb0e6813198bb1a00628ea8fee9db3bab28  Locales/enUS.lua
 7d9f8b04a2a707ab950e5be2982b82d7632a0239a042dd805fc6dbec7637ea85  Locales/zhCN.lua
@@ -8,7 +8,7 @@ cb7ffe99ecc71d960e6c75d58f2e7eb0e6813198bb1a00628ea8fee9db3bab28  Locales/enUS.l
 046dda33f6b53a1ab7b44b4fd073c8525bf55903dc2319a8824f1fd99342816b  Core/function1.lua
 c54830c171cde12a81f5282dc1adade2ff8dda6d571be3b19e76dca820e13ad5  Core/function2.lua
 8dd19e4999ed978e8fe2aac94cb0f620ab538c96edbcdeaa2ad0827a396100ec  Core/Options.lua
-44057b7449c0aa6d6ffa65f9ad23bed3426f9a5187aff028718db8a17f970a31  Core/BiaoGe.lua
+80a2fae2b25cded5133e8e5118697a811631921d205d3c73c7c508a505b02deb  Core/BiaoGe.lua
 8fc7555fa145b2e3176bc8379a32dddeb300e52b3743d9cf27f3ee2ea009088e  Core/DB/DB.lua
 4e7b339d738ec0807b0e21f349badb4cae4318c5ce8fcc3a1a89a9866e20046b  Core/DB/Init.lua
 cc84f533e8be00dfb298a79c0101dd64aecc0efd34b7f5877a0fa98aa79fbf85  Core/DB/Init2.lua

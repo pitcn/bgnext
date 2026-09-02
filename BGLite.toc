@@ -64,6 +64,7 @@ Core\BGNext\AuctionReadiness.lua
 Core\BGNext\TooltipDebtCache.lua
 Core\BGNext\TooltipDebtRuntime.lua
 Core\BGNext\HighlightManager.lua
+Core\BGNext\EventRefresh.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
