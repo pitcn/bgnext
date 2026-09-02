@@ -3,14 +3,29 @@ return function(test)
     -- frames and asserts the runtime-applied anchors, insets and control
     -- bounds — including the upstream owned/dropped indicators — instead of
     -- estimating glyph widths.
-    local savedGlobals = {}
+    -- Every global this suite swaps out is listed explicitly and snapshotted
+    -- before any swap, so the original value — including nil — is restored
+    -- afterwards and verified, keeping later suites in tests/run.lua
+    -- unpolluted.
+    local watchedGlobals = {
+        "BG",
+        "CreateFrame",
+        "BIAOGE_TEXT_FONT",
+        "GetItemInfo",
+        "GetCursorInfo",
+        "SetCursor",
+        "GameTooltip",
+    }
+    local originalValues = {}
+    for _, name in ipairs(watchedGlobals) do
+        originalValues[name] = rawget(_G, name)
+    end
     local function setGlobal(name, value)
-        savedGlobals[name] = savedGlobals[name] or rawget(_G, name)
         rawset(_G, name, value)
     end
     local function restoreGlobals()
-        for name, value in pairs(savedGlobals) do
-            rawset(_G, name, value)
+        for _, name in ipairs(watchedGlobals) do
+            rawset(_G, name, originalValues[name])
         end
     end
 
@@ -86,7 +101,7 @@ return function(test)
     end
 
     local ok, err = pcall(function()
-        BG = { BGNext = {} }
+        setGlobal("BG", { BGNext = {} })
         local wish = dofile("Core/BGNext/Wishlist.lua")
 
         -- Upstream geometry mirrors: the dropped label anchors RIGHT, is
@@ -236,6 +251,11 @@ return function(test)
     end)
 
     restoreGlobals()
+    -- The harness itself must clean up: every swapped global — including ones
+    -- that were nil before this suite — is back to its original value.
+    for _, name in ipairs(watchedGlobals) do
+        test.eq(rawget(_G, name), originalValues[name], "runtime suite restores global: " .. name)
+    end
     if not ok then
         error(err, 0)
     end
