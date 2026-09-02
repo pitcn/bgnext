@@ -363,6 +363,8 @@ if runtimeReady() then
         main:SetAllPoints(BG.MainFrame)
         main:Hide()
         BG.PricePresetMainFrame = main
+        local layout = M.viewportLayout(BG.MainFrame:GetWidth(), BG.MainFrame:GetHeight())
+        local pageCapacity = layout.capacity
 
         main.raidBar = CreateFrame("Frame", nil, main)
         main.raidBar:SetPoint("TOPLEFT", 12, -30)
@@ -384,7 +386,7 @@ if runtimeReady() then
 
         main.bossScroll = CreateFrame("Frame", nil, main)
         main.bossScroll:SetPoint("TOPLEFT", main.toolbar, "BOTTOMLEFT", 0, -8)
-        main.bossScroll:SetSize(150, 280)
+        main.bossScroll:SetSize(230, layout.itemHeight + 32)
 
         main.filterBar = CreateFrame("Frame", nil, main)
         main.filterBar:SetPoint("TOPLEFT", main.bossScroll, "TOPRIGHT", 14, 0)
@@ -392,46 +394,69 @@ if runtimeReady() then
 
         main.itemScroll = CreateFrame("Frame", nil, main)
         main.itemScroll:SetPoint("TOPLEFT", main.filterBar, "BOTTOMLEFT", 0, -8)
-        main.itemScroll:SetSize(420, 280)
+        main.itemScroll:SetSize(
+            layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1),
+            layout.itemHeight
+        )
         main.itemScroll:EnableMouseWheel(true)
 
-        main.itemSlider = CreateFrame("Slider", nil, main, "UIPanelScrollBarTemplate")
-        main.itemSlider:SetPoint("TOPLEFT", main.itemScroll, "TOPRIGHT", 2, -16)
-        main.itemSlider:SetPoint("BOTTOMLEFT", main.itemScroll, "BOTTOMRIGHT", 2, 16)
-        main.itemSlider:SetWidth(18)
+        -- A plain slider is intentional here. Blizzard's framed scrollbar
+        -- assumes a compatible ScrollFrame parent and crashes when this page
+        -- sets the value on a normal Frame.
+        main.itemSlider = CreateFrame("Slider", nil, main)
+        main.itemSlider:SetOrientation("VERTICAL")
+        main.itemSlider:SetPoint("TOPLEFT", main.itemScroll, "TOPRIGHT", 4, 0)
+        main.itemSlider:SetPoint("BOTTOMLEFT", main.itemScroll, "BOTTOMRIGHT", 4, 0)
+        main.itemSlider:SetWidth(12)
         main.itemSlider:SetMinMaxValues(0, 0)
         main.itemSlider:SetValueStep(1)
-        main.itemSlider:SetValue(0)
+        local sliderTrack = main.itemSlider:CreateTexture(nil, "BACKGROUND")
+        sliderTrack:SetPoint("TOP", 0, 0)
+        sliderTrack:SetPoint("BOTTOM", 0, 0)
+        sliderTrack:SetWidth(3)
+        sliderTrack:SetColorTexture(0.2, 0.2, 0.2, 0.65)
+        main.itemSlider:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
+        local sliderThumb = main.itemSlider:GetThumbTexture()
+        sliderThumb:SetSize(10, 28)
+        sliderThumb:SetVertexColor(0.15, 0.75, 0.95, 0.9)
 
-        -- Reusable rows: a fixed set of twelve, repopulated on refresh so a large
-        -- raid never creates ~100 permanent row objects.
+        -- Reusable rows fill two columns and are calculated once when this page
+        -- is created. Even the largest layout is capped at sixty row objects.
         main.rows = {}
-        for i = 1, M.ROW_CAPACITY do
+        for i = 1, pageCapacity do
             local row = CreateFrame("Frame", nil, main.itemScroll)
-            row:SetPoint("TOPLEFT", main.itemScroll, "TOPLEFT", 0, -(i - 1) * 24)
-            row:SetSize(410, 22)
+            local column = math.floor((i - 1) / layout.rowsPerColumn)
+            local rowInColumn = (i - 1) % layout.rowsPerColumn
+            row:SetPoint(
+                "TOPLEFT",
+                main.itemScroll,
+                "TOPLEFT",
+                column * (layout.columnWidth + layout.columnGap),
+                -rowInColumn * layout.rowHeight
+            )
+            row:SetSize(layout.columnWidth, 22)
             row.index = i
             row.icon = row:CreateTexture(nil, "ARTWORK")
             row.icon:SetPoint("LEFT", 0, 0)
             row.icon:SetSize(18, 18)
             row.name = row:CreateFontString(nil, "OVERLAY")
-            row.name:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
             row.name:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
-            row.name:SetWidth(170)
             row.price = row:CreateFontString(nil, "OVERLAY")
-            row.price:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
             row.price:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
             row.price:SetTextColor(1, 0.82, 0)
             row.price:SetWidth(110)
             row.edit = CreateFrame("EditBox", nil, row, BG.editTemplate or "InputBoxTemplate")
-            row.edit:SetPoint("LEFT", row.price, "RIGHT", 6, 0)
             row.edit:SetSize(58, 20)
             row.edit:SetAutoFocus(false)
             row.edit:SetNumeric(true)
             row.edit:SetTextColor(1, 1, 1)
             row.clear = CreateFrame("Button", nil, row)
-            row.clear:SetPoint("LEFT", row.edit, "RIGHT", 4, 0)
             row.clear:SetSize(16, 16)
+            row.clear:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            row.edit:SetPoint("RIGHT", row.clear, "LEFT", -4, 0)
+            row.price:SetPoint("RIGHT", row.edit, "LEFT", -6, 0)
+            row.name:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+            row.name:SetPoint("RIGHT", row.price, "LEFT", -6, 0)
             local cx = row.clear:CreateFontString(nil, "OVERLAY")
             cx:SetAllPoints()
             cx:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
@@ -761,14 +786,14 @@ if runtimeReady() then
         -- ---- Refresh functions ----
         function refreshRows()
             local allItems = filteredItems()
-            local items, offset, maxOffset = M.visibleWindow(allItems, pageState.itemOffset, M.ROW_CAPACITY)
+            local items, offset, maxOffset = M.visibleWindow(allItems, pageState.itemOffset, pageCapacity)
             pageState.itemOffset = offset
             main.itemSlider._refreshing = true
             main.itemSlider:SetMinMaxValues(0, maxOffset)
             main.itemSlider:SetValue(offset)
             main.itemSlider._refreshing = nil
             main.itemSlider:SetShown(maxOffset > 0)
-            for i = 1, M.ROW_CAPACITY do
+            for i = 1, pageCapacity do
                 local row = main.rows[i]
                 local item = items[i]
                 if item then
@@ -1342,7 +1367,7 @@ if runtimeReady() then
             main.itemSlider:SetValue(offset - (tonumber(delta) or 0) * 3)
         end)
 
-        for i = 1, M.ROW_CAPACITY do
+        for i = 1, pageCapacity do
             local row = main.rows[i]
             row.edit:SetScript("OnTextChanged", function(self)
                 if self:GetParent().edit._refreshing then return end
@@ -1356,7 +1381,7 @@ if runtimeReady() then
                     local next = M.nextVisibleIndex(items, r.absoluteIndex)
                     if next then
                         local offset = tonumber(pageState.itemOffset) or 0
-                        if next <= offset or next > offset + M.ROW_CAPACITY then
+                        if next <= offset or next > offset + pageCapacity then
                             pageState.itemOffset = next - 1
                         end
                         refreshRows()

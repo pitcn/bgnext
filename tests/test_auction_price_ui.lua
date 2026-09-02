@@ -170,7 +170,16 @@ return function(test)
     }) do
         test.eq(source:find(token, 1, true) ~= nil, true, "page shell declares " .. token)
     end
-    test.eq(source:find("for i = 1, M.ROW_CAPACITY do", 1, true) ~= nil, true, "page shell reuses the fixed rows")
+    test.eq(source:find("UIPanelScrollBarTemplate", 1, true), nil,
+        "price page does not use the ScrollFrame-only scrollbar template")
+    test.eq(source:find('CreateFrame("Slider", nil, main)', 1, true) ~= nil, true,
+        "price page uses a plain compatible slider")
+    test.eq(source:find("local pageCapacity = layout.capacity", 1, true) ~= nil, true,
+        "runtime uses the responsive capacity")
+    test.eq(source:find("for i = 1, pageCapacity do", 1, true) ~= nil, true,
+        "page shell creates only the computed reusable rows")
+    test.eq(source:find("math.floor((i - 1) / layout.rowsPerColumn)", 1, true) ~= nil, true,
+        "rows flow into a second column")
     test.eq(source:find('main.itemScroll:SetScript("OnMouseWheel"', 1, true) ~= nil, true, "long item lists are mouse-wheel scrollable")
     test.eq(source:find("GameTooltip:SetHyperlink(link)", 1, true) ~= nil, true, "item rows show the native item tooltip")
     test.eq(source:find("BG.TabButtonsFB:Hide()", 1, true) ~= nil, true, "price page hides the global raid navigation")
