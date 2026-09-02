@@ -19,6 +19,7 @@ Templates.xml
 Libs\embeds.xml
 Core\DB\DB.xml
 Core\BGNext\Init.lua
+Core\BGNext\UITheme.lua
 Core\BGNext\MainFrameScale.lua
 Core\BGNext\ChatYYCopy.lua
 Core\BGNext\Identity.lua
@@ -75,6 +76,7 @@ Core\TongBao\QianKuan.lua
 Core\TongBao\Channel.lua
 
 Core\BiaoGe.lua
+Core\BGNext\LegacyLedgerSkin.lua
 Core\BGNext\EquipmentFilterUI.lua
 Core\BGNext\WishlistUI.lua
 Core\BGNext\CurrentSettlementUI.lua
@@ -97,3 +99,4 @@ Core\Module\hooks.lua
 
 Core\Module\minimap.lua
 Core\Options.lua
+Core\BGNext\UIThemeSettings.lua
