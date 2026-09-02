@@ -796,10 +796,19 @@ BG.Init(function()
                 BG["Button" .. FB]:SetEnabled(false)
             end
             C_Timer.After(0.5, function()
-                for i, FB in ipairs(BG.FBtable) do
-                    BG["Button" .. FB]:SetEnabled(true)
+                for _, raidID in ipairs(BG.FBtable) do
+                    local button = BG["Button" .. raidID]
+                    local selected = raidID == FB
+
+                    button:SetEnabled(not selected)
+
+                    -- 强制同步经典主题的标签文字颜色
+                    if selected then
+                        button:GetFontString():SetTextColor(1, 1, 1)
+                    else
+                        button:GetFontString():SetTextColor(RGB("00BFFF"))
+                    end
                 end
-                BG["Button" .. FB]:SetEnabled(false)
             end)
             BG.FB1 = FB
             BiaoGe.FB = FB
