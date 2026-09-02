@@ -1,6 +1,7 @@
 return function(test)
     BG = { BGNext = {} }
     BG.BGNext.UITheme = dofile("Core/BGNext/UITheme.lua")
+    BG.BGNext.UIStyle = dofile("Core/BGNext/UIStyle.lua")
     local Skin = dofile("Core/BGNext/LegacyLedgerSkin.lua")
 
     local function read(path)
@@ -196,14 +197,31 @@ return function(test)
         "legacy alpha is applied once at the region level")
     test.eq(afterFirst.moduleTabs[2].bg.color[4], 1,
         "tab color texture stays opaque before region alpha")
-    test.eq(afterFirst.moduleTabs[2].bg.alpha, 0.58,
-        "tab legacy alpha is applied once")
+    test.eq(afterFirst.moduleTabs[2].bg.alpha, 0.72,
+        "inactive tab receives one bounded local alpha lift")
     test.eq(afterFirst.moduleTabs[2].bg.color[1] ~= before.moduleTabs[2].bg.color[1], true,
         "preview changes an inactive tab even without GetColorTexture")
     test.eq(afterFirst.title.gradient[1] ~= before.title.gradient[1], true,
         "preview changes a title even without GetGradient")
+    test.eq(registry.moduleTabs[1]._BGNextVisualState, "selected",
+        "disabled module tab uses selected state")
+    test.eq(registry.moduleTabs[2]._BGNextVisualState, "normal",
+        "enabled module tab uses inactive state")
+    test.eq(registry.raidTabs[1]._BGNextVisualState, "selected",
+        "disabled raid tab uses selected state")
+    test.eq(registry.raidTabs[2]._BGNextVisualState, "normal",
+        "enabled raid tab uses inactive state")
     test.eq(Skin.apply("preview", registry, 0.58), true, "repeat apply succeeds")
     eqTable(registry.visualState(), afterFirst, "repeat apply is idempotent")
+
+    registry.moduleTabs[2].enabled = false
+    test.eq(Skin.refreshNavigation(registry, 0.58), true,
+        "navigation refresh succeeds after selection changes")
+    test.eq(registry.moduleTabs[2]._BGNextVisualState, "selected",
+        "navigation refresh promotes the new selected tab")
+    test.eq(registry.main.width, 900, "navigation refresh preserves width")
+    test.eq(registry.main.height, 700, "navigation refresh preserves height")
+    registry.moduleTabs[2].enabled = true
     test.eq(Skin.apply("classic", registry, 0.58), true, "classic restores")
     eqTable(registry.visualState(), before, "classic is byte-for-byte visual restore")
 

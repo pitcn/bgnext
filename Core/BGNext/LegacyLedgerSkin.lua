@@ -2,6 +2,7 @@ BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
 local UITheme = BG.BGNext.UITheme
+local UIStyle = BG.BGNext.UIStyle
 
 local M = {}
 
@@ -116,6 +117,7 @@ local function snapshotTab(tab, fallback)
     return {
         bg = snapshotTexture(bg, fallback.bg),
         text = readTextColor(fontOf(tab)) or fallback.text,
+        border = readBorder(tab) or fallback.border,
     }
 end
 
@@ -171,6 +173,7 @@ end
 
 local function restoreTab(tab, state)
     if type(tab) ~= "table" or type(state) ~= "table" then return end
+    restoreBorder(tab, state)
     restoreTexture(tab.bg, state.bg)
     if state.text then
         local font = fontOf(tab)
@@ -179,6 +182,7 @@ local function restoreTab(tab, state)
             pcall(font.SetTextColor, font, t[1], t[2], t[3], t[4])
         end
     end
+    tab._BGNextVisualState = nil
 end
 
 local function restoreSnapshot(registry, snap)
@@ -204,7 +208,7 @@ local function buildGeometryFrames(registry)
     return frames
 end
 
-local function styleTabs(tabs, alpha, tokens, snapTabs)
+local function styleTabs(tabs, alpha, snapTabs)
     if type(tabs) ~= "table" then return end
     for index, tab in ipairs(tabs) do
         if type(tab) == "table" then
@@ -214,30 +218,12 @@ local function styleTabs(tabs, alpha, tokens, snapTabs)
                 if ok then enabled = e end
             end
             local snapTab = snapTabs and snapTabs[index]
-            local bg = tab.bg
-            if type(bg) == "table" then
-                local snapBg = snapTab and snapTab.bg
-                if enabled and snapBg and snapBg.color and type(bg.SetColorTexture) == "function" then
-                    local r, g, b = hexRGB(tokens.colors.raised)
-                    bg:SetColorTexture(r, g, b, 1)
-                elseif snapBg and snapBg.color and type(bg.SetColorTexture) == "function" then
-                    -- active tab keeps its background; only its text is restyled.
-                end
-                if snapBg and snapBg.alpha ~= nil and type(bg.SetAlpha) == "function" then
-                    if enabled then
-                        bg:SetAlpha(alpha)
-                    end
-                end
-            end
-            local font = fontOf(tab)
-            if snapTab and snapTab.text and type(font) == "table" and type(font.SetTextColor) == "function" then
-                if enabled then
-                    local r, g, b = hexRGB(tokens.colors.gold)
-                    font:SetTextColor(r, g, b, 1)
-                else
-                    local r, g, b = hexRGB(tokens.colors.cyan)
-                    font:SetTextColor(r, g, b, 1)
-                end
+            local snapBg = snapTab and snapTab.bg
+            local hasRestorableBackground = snapBg and (snapBg.color or snapBg.texture or snapBg.gradient)
+            local hasRestorableBorder = type(tab.SetBackdropBorderColor) ~= "function"
+                or (snapTab and snapTab.border)
+            if UIStyle and snapTab and snapTab.text and hasRestorableBackground and hasRestorableBorder then
+                UIStyle.applyNavigationTab(tab, enabled and "normal" or "selected", alpha)
             end
         end
     end
@@ -285,8 +271,27 @@ local function applyPreview(registry, alpha)
         end
     end
 
-    styleTabs(registry.moduleTabs, alpha, tokens, snapshot and snapshot.moduleTabs)
-    styleTabs(registry.raidTabs, alpha, tokens, snapshot and snapshot.raidTabs)
+    styleTabs(registry.moduleTabs, alpha, snapshot and snapshot.moduleTabs)
+    styleTabs(registry.raidTabs, alpha, snapshot and snapshot.raidTabs)
+end
+
+function M.refreshNavigation(registry, legacyAlpha)
+    if runtimeTheme ~= "preview" or type(registry) ~= "table" or snapshot == nil then
+        return false, "ledger-not-ready"
+    end
+    local frames = buildGeometryFrames(registry)
+    local geometryBefore = UITheme.captureGeometry(frames)
+    local alpha = UITheme.clampAlpha(legacyAlpha)
+    local ok = pcall(function()
+        styleTabs(registry.moduleTabs, alpha, snapshot.moduleTabs)
+        styleTabs(registry.raidTabs, alpha, snapshot.raidTabs)
+    end)
+    if not ok or not UITheme.geometryMatches(geometryBefore, frames) then
+        restoreSnapshot(registry, snapshot)
+        runtimeTheme = "classic"
+        return false, ok and "geometry-mismatch" or "apply-error"
+    end
+    return true
 end
 
 function M.apply(themeId, registry, legacyAlpha)
