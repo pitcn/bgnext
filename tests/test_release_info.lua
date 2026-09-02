@@ -4,21 +4,21 @@ return function(test)
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
-    test.eq(info.version, "0.3.1", "BGNext version is independent")
+    test.eq(info.version, "0.4.0", "BGNext version is independent")
     test.eq(info.upstreamVersion, "2.4.0", "upstream version remains disclosed")
     test.eq(info.protocolVersion, "2.4.0", "mixed-group protocol version remains compatible")
     test.eq(info.author, "国服社区共创", "community author")
     test.eq(info.official, false, "independent project")
     test.eq(type(info.changelog), "table", "local changelog")
     local changelogItems = table.concat(info.changelog, "\n")
-    test.eq(changelogItems:find("Alt 右键", 1, true) ~= nil, true,
-        "in-game changelog includes table auction shortcut fix")
-    test.eq(changelogItems:find("团长自己", 1, true) ~= nil, true,
-        "in-game changelog includes leader self-accounting fix")
-    test.eq(changelogItems:find("职业颜色", 1, true) ~= nil, true,
-        "in-game changelog includes auction class colors")
-    test.eq(changelogItems:find("红叉按钮", 1, true) ~= nil, true,
-        "in-game changelog includes global filter bypass")
+    test.eq(changelogItems:find("价格预设", 1, true) ~= nil, true,
+        "in-game changelog includes price presets")
+    test.eq(changelogItems:find("已就绪", 1, true) ~= nil, true,
+        "in-game changelog includes team raid readiness check")
+    test.eq(changelogItems:find("预览外观", 1, true) ~= nil, true,
+        "in-game changelog includes opt-in preview theme")
+    test.eq(changelogItems:find("Boss 模型", 1, true) ~= nil, true,
+        "in-game changelog includes boss model removal and readability")
     test.eq(type(info.credits.upstream), "table", "upstream credits")
 
     local about = dofile("Core/BGNext/About.lua")
