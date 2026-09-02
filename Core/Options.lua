@@ -1878,39 +1878,6 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
         end
         h = h + 30
 
-        -- 显示模型
-        do
-            local name = "model"
-            BG.options[name .. "reset"] = 1
-            BiaoGe.options[name] = BiaoGe.options[name] or BG.options[name .. "reset"]
-            if BiaoGe.options["model"] ~= 1 then
-                for i, model in ipairs(BG.bossModels) do
-                    model:Hide()
-                end
-            end
-
-            local ontext = {
-                L["显示BOSS模型"],
-                L["在表格里显示BOSS的模型。"],
-                -- " ",
-                -- L[""],
-            }
-            local f = O.CreateCheckButton(name, L["显示BOSS模型"], biaoge, 15, height - h, ontext)
-            BG.options["button" .. name] = f
-            f:HookScript("OnClick", function()
-                if f:GetChecked() then
-                    for i, model in ipairs(BG.bossModels) do
-                        model:Show()
-                    end
-                else
-                    for i, model in ipairs(BG.bossModels) do
-                        model:Hide()
-                    end
-                end
-            end)
-        end
-        h = h + 30
-
         -- 自动删除屏蔽团员
         do
             local name = "ignore"

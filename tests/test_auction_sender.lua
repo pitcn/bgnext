@@ -167,6 +167,8 @@ return function(test)
     test.eq(auctionModuleSource:find(
         "Sender.shouldAcceptAuctionMessage(happyRateState, sender, realm, members, auctionID, GetTime(), 5)",
         1, true) ~= nil, true, "auction cheers have an independent five-second limit")
+    test.eq(auctionModuleSource:find("SamePlayer(maijia, player)", 1, true) ~= nil, true,
+        "the raid leader's own winning bid uses canonical player identity")
 
     local auctionSource = assert(io.open("Core/Module/AuctionWA.lua", "rb")):read("*a")
     test.eq(auctionSource:find("PlayerIdentity.same(bidFrame.player, wa.GN(), realmName)", 1, true) ~= nil,
@@ -189,6 +191,14 @@ return function(test)
         "auction-log restart paths do not select a protocol generation")
     test.eq(logSource:find("PlayerIdentity.same(v.maijia, tradeName, realmName)", 1, true) ~= nil,
         true, "trade-price lookup uses canonical player identity")
+    test.eq(logSource:find("trade = BG.ImML() and SamePlayer(maijia, BG.playerName) or nil", 1, true) ~= nil,
+        true, "the raid leader's own auction record uses canonical player identity")
+    test.eq(logSource:find("SamePlayer(maijia, tradeName)", 1, true) ~= nil, true,
+        "the last-auction trade prompt uses canonical player identity")
+    test.eq(logSource:find("PlayerIdentity.find(BG.raidRosterInfo, maijia, realmName)", 1, true) ~= nil, true,
+        "auction records resolve buyer class data from the canonical raid roster")
+    test.eq(logSource:find("BillBuyer.color(v, GetClassColor)", 1, true) ~= nil, true,
+        "auction-log rendering derives a reliable class color")
 
     local tradeSource = assert(io.open("Core/Module/Trade.lua", "rb")):read("*a")
     test.eq(tradeSource:find("BG.SendStartAuctionMsg(isGen2", 1, true), nil,

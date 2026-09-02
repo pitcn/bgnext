@@ -31,6 +31,8 @@ function M.ensureRoot(saved)
     root.wishlist = root.wishlist or {}
     root.equipmentFilters = root.equipmentFilters or {}
     root.ownCharacters = root.ownCharacters or {}
+    root.leaderAuctionPricePresets = root.leaderAuctionPricePresets or {}
+    root.personalAuctionExpectations = root.personalAuctionExpectations or {}
     root.currentRaid = root.currentRaid or {}
     root.currentSettlement = root.currentSettlement or emptySettlement()
     return root

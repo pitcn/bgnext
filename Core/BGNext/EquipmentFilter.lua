@@ -163,6 +163,7 @@ function M.ensureCharacter(root, realmId, player, defaults, spec)
         state = {}
         root.equipmentFilters[realmId][player] = state
         reconcileBuiltIns(state, defaults)
+        state.enabled = true
         state.selectionMode = "follow-spec"
         local builtInId = spec and spec.builtInId
         if builtInId and state.profiles[builtInId] then
@@ -181,6 +182,7 @@ function M.ensureCharacter(root, realmId, player, defaults, spec)
             -- so following specialization is always an explicit user choice.
             state.selectionMode = "manual"
         end
+        if state.enabled == nil then state.enabled = true end
     end
     return state
 end
@@ -189,7 +191,14 @@ function M.getActiveProfile(root, realmId, player)
     local byRealm = type(root) == "table" and type(root.equipmentFilters) == "table" and root.equipmentFilters[realmId]
     local state = type(byRealm) == "table" and byRealm[player]
     if type(state) ~= "table" or type(state.profiles) ~= "table" then return nil end
+    if state.enabled == false then return nil end
     return state.selectedId and state.profiles[state.selectedId] or nil
+end
+
+function M.setEnabled(state, enabled)
+    if type(state) ~= "table" or type(enabled) ~= "boolean" then return false end
+    state.enabled = enabled
+    return true
 end
 
 function M.isRuleSelected(profile, sectionKey, ruleId, isBoolean)
@@ -201,6 +210,7 @@ end
 
 function M.selectProfile(state, id)
     if type(state) ~= "table" or type(state.profiles) ~= "table" or not state.profiles[id] then return false end
+    state.enabled = true
     state.selectedId = id
     state.selectionMode = "manual"
     return true
@@ -213,6 +223,7 @@ function M.followSpecialization(state, builtInId, defaults)
     if builtInId and type(defaults) == "table" then
         reconcileBuiltIns(state, defaults)
     end
+    state.enabled = true
     state.selectionMode = "follow-spec"
     if builtInId and state.profiles[builtInId] then
         state.selectedId = builtInId
@@ -289,6 +300,7 @@ end
 function M.resetDefaults(state, defaults, builtInId)
     if type(state) ~= "table" then return false end
     reconcileBuiltIns(state, defaults)
+    state.enabled = true
     state.selectionMode = "follow-spec"
     if builtInId and state.profiles[builtInId] then
         state.selectedId = builtInId

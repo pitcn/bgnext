@@ -4,7 +4,6 @@ local AddonName, ns = ...
 local LibBG         = ns.LibBG
 local L             = ns.L
 
-local Size          = ns.Size
 local RGB           = ns.RGB
 local GetClassRGB   = ns.GetClassRGB
 local SetClassCFF   = ns.SetClassCFF
@@ -18,20 +17,30 @@ local HopeMaxi      = ns.HopeMaxi
 
 local RealmId       = GetRealmID()
 local player        = BG.playerName
+local realmName     = (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName()
+local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
+local Readiness = BG.BGNext and BG.BGNext.AuctionReadiness
 local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
 local LoadAddOn     = LoadAddOn or C_AddOns.LoadAddOn
+
+local function SamePlayer(left, right)
+    if PlayerIdentity and PlayerIdentity.same then
+        return PlayerIdentity.same(left, right, realmName)
+    end
+    return left == right
+end
 
 BG.Init(function()
     BiaoGe.Auction = BiaoGe.Auction or {}
     if BG.verLess2 then
-        BiaoGe.Auction.money = BiaoGe.Auction.money or 1
+        BiaoGe.Auction.money = BiaoGe.Auction.money or 100
         BiaoGe.Auction.fastMoney = BiaoGe.Auction.fastMoney or { 100, 300, 500, 1000, 2000 }
     elseif BG.IsTitan then
         BG.Once("fastMoney", 251201, function()
             BiaoGe.Auction.money = nil
             BiaoGe.Auction.fastMoney = nil
         end)
-        BiaoGe.Auction.money = BiaoGe.Auction.money or 1000
+        BiaoGe.Auction.money = BiaoGe.Auction.money or 100
         BiaoGe.Auction.fastMoney = BiaoGe.Auction.fastMoney or { 300, 500, 1000, 2000, 3000 }
         BG.Once('fastMoney', 250528, function()
             BiaoGe.Auction.fastMoney = { 100, 300, 500, 1000, 2000 }
@@ -56,133 +65,47 @@ BG.Init(function()
     local sendingCount = {}
     local notShowSendingText = {}
 
-    local function UpdateGuildFrame(frame)
-        if IsInRaid(1) then
-            frame:SetWidth(1)
-            frame:Hide()
-        elseif IsInGuild() then
-            local numTotal, numOnline, numOnlineAndMobile = GetNumGuildMembers()
-            frame.text:SetFormattedText(frame.title2, (Size(frame.table) .. "/" .. numOnline))
-            frame:SetWidth(frame.text:GetWidth() + 10)
-            frame:Show()
-        end
-    end
-
-    local function UpdateAddonFrame(frame)
-        if IsInRaid(1) then
-            local count = 0
-            for name in pairs(frame.table) do
-                name = BG.GSN(name)
-                if BG.raidRosterName[name] then
-                    count = count + 1
-                end
-            end
-            frame.text:SetFormattedText(frame.title2, (count .. "/" .. GetNumGroupMembers()))
-            frame:SetWidth(frame.text:GetWidth() + 10)
-            frame:Show()
+    local function UpdateReadinessFrame(frame)
+        local view = Readiness.footerView(IsInRaid(1), BG.raidRosterInfo, BG.raidBiaoGeVersion,
+            BG.raidAuctionVersion)
+        if view.mode == "solo" then
+            wipe(BG.raidBiaoGeVersion)
+            wipe(BG.raidBiaoGeNewVersion)
+            wipe(BG.raidAuctionVersion)
+            frame.text:SetText(L["团队拍卖：未组团"])
         else
-            wipe(frame.table)
-            frame:Hide()
+            frame.text:SetFormattedText(L["团队拍卖：已就绪 %s"], view.ready .. "/" .. view.total)
         end
+        frame:SetWidth(frame.text:GetWidth() + 10)
+        frame:Show()
     end
-    local function Guild_OnEnter(self)
+    local function Readiness_OnEnter(self)
+        self.isOnEnter = true
         GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 0)
         GameTooltip:ClearLines()
-        GameTooltip:AddLine(self.title, 0, 1, 0)
+        GameTooltip:AddLine(L["团队拍卖就绪检查"], 0, 1, 0)
+        if not IsInRaid(1) then
+            GameTooltip:AddLine(L["进入团队后可检查团员的拍卖兼容状态。"], .6, .6, .6, true)
+            GameTooltip:Show()
+            return
+        end
+        GameTooltip:AddLine(L["左键：重新检测（仅团长或拾取负责人）"], 1, 1, 1, true)
+        GameTooltip:AddLine(L["未响应不代表未安装，可让团员重载界面后重新检测。"], .6, .6, .6, true)
         GameTooltip:AddLine(" ")
-        local ii = 0
-        for i = 1, GetNumGuildMembers() do
-            local name, rankName, rankIndex, level, classDisplayName, zone,
-            publicNote, officerNote, isOnline, status, class, achievementPoints,
-            achievementRank, isMobile, canSoR, repStanding, guid = GetGuildRosterInfo(i)
-            if isOnline then
-                name = BG.GSN(name)
-                if ii > 40 then
-                    GameTooltip:AddLine("......")
-                    break
-                end
-                ii = ii + 1
-                local line = 2
-                local Ver = self.table[name] or L["无"]
-                local r, g, b = GetClassColor(class)
-                GameTooltip:AddDoubleLine(BG.GSN(name), Ver, r, g, b, 1, 1, 1)
-                if Ver == L["无"] then
-                    local alpha = 0.3
-                    if _G["GameTooltipTextLeft" .. (ii + line)] then
-                        _G["GameTooltipTextLeft" .. (ii + line)]:SetAlpha(alpha)
-                    end
-                    if _G["GameTooltipTextRight" .. (ii + line)] then
-                        _G["GameTooltipTextRight" .. (ii + line)]:SetAlpha(alpha)
-                    end
-                end
-            end
-        end
-        GameTooltip:Show()
-    end
-
-    local function Addon_OnEnter(self, _, tooltip)
-        if not self then return end
-        if tooltip then
-            self.title = L["兼容插件版本"] .. "(" .. RAID .. ")"
-            self.table = BG.raidBiaoGeVersion
-            tooltip:SetOwner(self, "ANCHOR_NONE", 0, 0)
-            tooltip:ClearLines()
-            if BG.ButtonIsInTop(self) then
-                tooltip:SetPoint('TOP', self, 'BOTTOM', 0, -0)
-            else
-                tooltip:SetPoint('BOTTOM', self, 'TOP', 0, 0)
-            end
-        else
-            tooltip = GameTooltip
-            self.isOnEnter = true
-            tooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 0)
-            tooltip:ClearLines()
-        end
-        local line = 2
-        tooltip:AddLine(self.title, 0, 1, 0)
-        --[[         if self.isAuciton then
-            tooltip:AddLine(L["需全团安装%s，没安装的人将会看不到拍卖窗口。"]:format(BG.IsRetail and "BGLite插件" or L["拍卖WA"]), 0.5, 0.5, 0.5, true)
-            if not BG.IsRetail then
-                local text = ""
-                if not WeakAurasOptions then
-                    text = BG.STC_r1(L["（WA面板尚未初始化）"])
-                elseif BG.ButtonRaidAuction.loadProgressNum and BG.ButtonRaidAuction.total then
-                    text = BG.STC_y1(format(L["（WA面板正在初始化：%s/%s）"],
-                        BG.ButtonRaidAuction.loadProgressNum, BG.ButtonRaidAuction.total))
-                else
-                    text = BG.STC_g1(L["（WA面板已初始化，可以发送了）"])
-                end
-                tooltip:AddLine(L["SHIFT+点击：把WA字符串通过密语发送给没有的团员。"] .. text, 1, 1, 1, true)
-                line = line + 2
-            else
-                line = line + 1
-            end
-        end ]]
-        tooltip:AddLine(" ")
         for i, v in ipairs(BG.SortRaidRosterInfo()) do
             local name = v.name
-            local Ver = self.table[name]
-            local r, g, b = 1, 1, 1
-            if not Ver then
-                if v.online then
-                    Ver = L["无"]
-                else
-                    Ver = L["未知(离线)"]
-                end
-                if self.isAuciton then
-                    if sendDone[name] then
-                        Ver = L["接收完毕，但未导入"]
-                    elseif sending[name] then
-                        Ver = L["正在接收拍卖WA"]
-                    end
-                end
-            elseif not self.isAuciton then
-                if BG.GetVerNum(BG.ver) > BG.GetVerNum(Ver) then
-                    r = .6
-                    g, b = r, r
-                elseif BG.GetVerNum(BG.ver) < BG.GetVerNum(Ver) then
-                    r, g, b = 0, 1, 0
-                end
+            local status = Readiness.status(v, BG.raidBiaoGeVersion, BG.raidAuctionVersion)
+            local statusText = L["未响应"]
+            local r, g, b = 1, .82, 0
+            if status == Readiness.READY then
+                statusText = L["已就绪"]
+                r, g, b = 0, 1, 0
+            elseif status == Readiness.ADDON_ONLY then
+                statusText = L["插件已响应，拍卖端未响应"]
+                r, g, b = 1, .5, 0
+            elseif status == Readiness.OFFLINE then
+                statusText = L["离线"]
+                r, g, b = .5, .5, .5
             end
             local role = ""
             local y
@@ -195,18 +118,9 @@ BG.Init(function()
                 role = role .. AddTexture("interface/groupframe/ui-group-masterlooter", y)
             end
             local c1, c2, c3 = GetClassRGB(name)
-            tooltip:AddDoubleLine(name .. role, Ver, c1, c2, c3, r, g, b)
-            if Ver == L["无"] or Ver == L["未知(离线)"] then
-                local alpha = 0.4
-                if _G[tooltip:GetName() .. "TextLeft" .. (i + line)] then
-                    _G[tooltip:GetName() .. "TextLeft" .. (i + line)]:SetAlpha(alpha)
-                end
-                if _G[tooltip:GetName() .. "TextRight" .. (i + line)] then
-                    _G[tooltip:GetName() .. "TextRight" .. (i + line)]:SetAlpha(alpha)
-                end
-            end
+            GameTooltip:AddDoubleLine(name .. role, statusText, c1, c2, c3, r, g, b)
         end
-        tooltip:Show()
+        GameTooltip:Show()
     end
 
     local function UpdateOnEnter(self)
@@ -826,13 +740,16 @@ BG.Init(function()
 
     -- 插件版本
     do
-        BG.guildBiaoGeVersion = {}
-        BG.guildClass = {}
         BG.raidBiaoGeVersion = {}
         BG.raidBiaoGeNewVersion = {}
         BG.raidAuctionVersion = {}
         local Sender = BG.BGNext and BG.BGNext.AuctionSender
         local versionResponseState = {}
+        local readinessRequestState = {}
+        local rosterGeneration = 0
+        local lastRosterKey = ""
+        local raidMemberNames = {}
+        local pendingRequestGeneration = 0
 
         local function GetRaidMemberNames()
             local members = {}
@@ -845,171 +762,131 @@ BG.Init(function()
             return members
         end
 
-        -- 会员插件
-        local guild = CreateFrame("Frame", nil, BG.MainFrame)
-        do
-            guild:SetSize(1, 20)
-            guild:SetPoint("BOTTOMLEFT", 10, 2)
-            guild:Hide()
-            guild.title = L["兼容插件版本"] .. "(" .. GUILD .. ")"
-            guild.title2 = GUILD .. L["插件：%s"]
-            guild.table = BG.guildBiaoGeVersion
-            guild.isGuild = true
-            guild:SetScript("OnEnter", Guild_OnEnter)
-            guild:SetScript("OnLeave", GameTooltip_Hide)
-            guild.text = guild:CreateFontString()
-            guild.text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-            guild.text:SetPoint("LEFT")
-            guild.text:SetTextColor(RGB(BG.g1))
-            BG.ButtonGuildVer = guild
-        end
-
-        -- 团员插件
-        local addon = CreateFrame("Frame", nil, BG.MainFrame)
-        do
-            addon:SetSize(1, 20)
-            addon:SetPoint("LEFT", BG.ButtonGuildVer, "RIGHT", 0, 0)
-            addon:Hide()
-            addon.title = L["兼容插件版本"] .. "(" .. RAID .. ")"
-            addon.title2 = L["插件：%s"]
-            addon.table = BG.raidBiaoGeVersion
-            addon.isAddon = true
-            addon:SetScript("OnEnter", Addon_OnEnter)
-            addon:SetScript("OnLeave", function(self)
-                GameTooltip:Hide()
-                self.isOnEnter = false
-            end)
-            addon.text = addon:CreateFontString()
-            addon.text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-            addon.text:SetPoint("LEFT")
-            addon.text:SetTextColor(RGB(BG.g1))
-            BG.ButtonRaidVer = addon
-        end
-
-        -- 拍卖WA
-        local auction = CreateFrame("Frame", nil, BG.MainFrame)
-        do
-            auction:SetSize(1, 20)
-            auction:SetPoint("LEFT", addon, "RIGHT", 0, 0)
-            auction:Hide()
-            auction.title = L["自动拍卖版本"]
-            auction.title2 = L["拍卖：%s"]
-            auction.table = BG.raidAuctionVersion
-            auction.isAuciton = true
-            auction:SetScript("OnEnter", Addon_OnEnter)
-            auction:SetScript("OnLeave", function(self)
-                GameTooltip:Hide()
-                self.isOnEnter = false
-            end)
-            -- if not BG.IsRetail then
-            --     auction:SetScript("OnMouseUp", function(self)
-            --         SendWACode()
-            --     end)
-            -- end
-            auction.text = auction:CreateFontString()
-            auction.text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
-            auction.text:SetPoint("LEFT")
-            auction.text:SetTextColor(RGB(BG.g1))
-            BG.ButtonRaidAuction = auction
-        end
-
-        local lastNum = 0
-        function BG.CanSend_BiaoGeVer()
-            local n
-            local canSend = true
-            if IsInRaid(1) then
-                n = GetNumGroupMembers(1)
-                if lastNum >= n then
-                    canSend = false
-                end
-            else
-                canSend = false
-                n = 0
+        local function RosterKey(members)
+            local names = {}
+            for i, name in ipairs(members) do
+                names[i] = (Sender and Sender.canonical(name, realmName)) or name
             end
-            lastNum = n
-            return canSend
+            table.sort(names)
+            return table.concat(names, "\031")
+        end
+
+        local function IsRaidController(manual)
+            if manual then
+                return BG.ImMLorLeader and BG.ImMLorLeader() and true or false
+            end
+            return BG.ImML and BG.ImML() and true or false
+        end
+
+        local function RequestReadiness(manual, scheduleIfLimited)
+            if not IsInRaid(1) then return false end
+            local now = GetTime()
+            local isController = IsRaidController(manual)
+            local delay = Readiness.requestDelay(readinessRequestState, now, isController)
+            if delay == nil then return false end
+            if delay > 0 then
+                if scheduleIfLimited then
+                    pendingRequestGeneration = pendingRequestGeneration + 1
+                    local generation = pendingRequestGeneration
+                    BG.After(delay, function()
+                        if generation ~= pendingRequestGeneration then return end
+                        RequestReadiness(false, false)
+                    end)
+                end
+                return false
+            end
+            if not Readiness.takeRequest(readinessRequestState, now, isController) then return false end
+            pendingRequestGeneration = pendingRequestGeneration + 1
+            C_ChatInfo.SendAddonMessage("BiaoGe", "VersionCheck", "RAID")
+            C_ChatInfo.SendAddonMessage("BiaoGeAuction", "VersionCheck", "RAID")
+            return true
+        end
+
+        -- 当前团队拍卖端是否已响应。状态只存在内存中，不做轮询。
+        local readiness = CreateFrame("Frame", nil, BG.MainFrame)
+        do
+            readiness:SetSize(1, 20)
+            readiness:SetPoint("BOTTOMLEFT", 10, 2)
+            readiness:EnableMouse(true)
+            readiness:Hide()
+            readiness.isAuciton = true
+            readiness:SetScript("OnEnter", Readiness_OnEnter)
+            readiness:SetScript("OnLeave", function(self)
+                GameTooltip:Hide()
+                self.isOnEnter = false
+            end)
+            readiness:SetScript("OnMouseUp", function(self, button)
+                if button ~= "LeftButton" then return end
+                RequestReadiness(true, false)
+                Readiness_OnEnter(self)
+            end)
+            readiness.text = readiness:CreateFontString()
+            readiness.text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
+            readiness.text:SetPoint("LEFT")
+            readiness.text:SetTextColor(RGB(BG.g1))
+            BG.ButtonGuildVer = nil
+            BG.ButtonRaidVer = readiness
+            BG.ButtonRaidAuction = readiness
+            UpdateReadinessFrame(readiness)
         end
 
         BG.RegisterEvent("GROUP_ROSTER_UPDATE", function(self, event, ...)
-            local canSend = BG.CanSend_BiaoGeVer()
+            rosterGeneration = rosterGeneration + 1
+            local generation = rosterGeneration
             BG.After(1, function()
-                if IsInRaid(1) then
-                    if canSend then
-                        C_ChatInfo.SendAddonMessage("BiaoGe", "MyVer-" .. BG.ver, "RAID")
-                    end
-                else
-                    UpdateAddonFrame(addon)
-                    UpdateAddonFrame(auction)
+                if generation ~= rosterGeneration then return end
+                if not IsInRaid(1) then
+                    lastRosterKey = ""
+                    raidMemberNames = {}
+                    readinessRequestState.lastRequestAt = nil
+                    pendingRequestGeneration = pendingRequestGeneration + 1
+                    UpdateReadinessFrame(readiness)
+                    return
                 end
+                raidMemberNames = GetRaidMemberNames()
+                local rosterKey = RosterKey(raidMemberNames)
+                local rosterChanged = rosterKey ~= lastRosterKey
+                lastRosterKey = rosterKey
+                Readiness.prune(BG.raidBiaoGeVersion, BG.raidAuctionVersion, BG.raidRosterInfo,
+                    BG.raidBiaoGeNewVersion)
+                if rosterChanged then
+                    C_ChatInfo.SendAddonMessage("BiaoGe", "MyVer-" .. BG.ver, "RAID")
+                    RequestReadiness(false, true)
+                end
+                UpdateReadinessFrame(readiness)
                 if BG.StartAucitonFrame then
                     BG.StartAucitonFrame:UpdateFrame()
                 end
-                UpdateGuildFrame(guild)
             end)
-        end)
-        BG.RegisterEvent("GUILD_ROSTER_UPDATE", function(self, event, ...)
-            BG.After(1, function()
-                for i = 1, GetNumGuildMembers() do
-                    local name, rankName, rankIndex, level, classDisplayName, zone,
-                    publicNote, officerNote, isOnline, status, class, achievementPoints,
-                    achievementRank, isMobile, canSoR, repStanding, guid = GetGuildRosterInfo(i)
-                    if name then
-                        name = BG.GSN(name)
-                        if not isOnline then
-                            BG.guildBiaoGeVersion[name] = nil
-                            BG.guildClass[name] = nil
-                        else
-                            BG.guildClass[name] = class
-                        end
-                    end
-                end
-                UpdateGuildFrame(guild)
-            end)
-        end)
-        BG.RegisterEvent("CHAT_MSG_SYSTEM", function(self, event, ...) -- 如果团队里有人退出，就删掉
-            local msg = ...
-            if BG.IsSecret(msg) then return end
-            local leave = ERR_RAID_MEMBER_REMOVED_S:gsub("%%s", "(.+)")
-            local name = strmatch(msg, leave)
-            if name then
-                BG.raidBiaoGeVersion[name] = nil
-                BG.raidAuctionVersion[name] = nil
-                UpdateAddonFrame(addon)
-                UpdateAddonFrame(auction)
-            end
         end)
         BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
             local prefix, msg, distType, rawSender = ...
             local sender = BG.GSN(rawSender)
-            if prefix == "BiaoGe" and distType == "GUILD" then
-                if strfind(msg, "MyVer") then
-                    local _, version = strsplit("-", msg)
-                    BG.guildBiaoGeVersion[sender] = version
-                    UpdateGuildFrame(guild)
-                end
-            elseif prefix == "BiaoGe" and distType == "RAID" then -- 插件版本
+            if prefix == "BiaoGe" and distType == "RAID" then -- 插件版本
+                local realm = (GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+                local members = raidMemberNames
                 if msg == "VersionCheck" then
-                    local realm = (GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
-                    local members = GetRaidMemberNames()
                     if Sender and Sender.shouldRespondVersion(versionResponseState, rawSender, realm, members, GetTime()) then
                         C_ChatInfo.SendAddonMessage("BiaoGe", "MyVer-" .. BG.ver, "RAID")
                     end
-                elseif strfind(msg, "MyVer") then
+                elseif strfind(msg, "MyVer") and Sender and Sender.isRaidSender(rawSender, realm, members) then
                     local _, version = strsplit("-", msg)
                     BG.raidBiaoGeVersion[sender] = version
                     if BG.GetVerNum(version) >= 20000 then
                         BG.raidBiaoGeNewVersion[sender] = true
                     end
-                    UpdateAddonFrame(addon)
+                    UpdateReadinessFrame(readiness)
                     if BG.StartAucitonFrame then
                         BG.StartAucitonFrame:UpdateFrame()
                     end
                 end
             elseif prefix == "BiaoGeAuction" and distType == "RAID" then -- 拍卖版本
                 local arg1, version = strsplit(",", msg)
-                if arg1 == "MyVer" then
+                local realm = (GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
+                local members = raidMemberNames
+                if arg1 == "MyVer" and Sender and Sender.isRaidSender(rawSender, realm, members) then
                     BG.raidAuctionVersion[sender] = version
-                    UpdateAddonFrame(auction)
+                    UpdateReadinessFrame(readiness)
                     if sendDone[sender] then
                         sendDone[sender] = nil
                         if not notShowSendingText[sender] and sendingCount[sender] <= 2 then
@@ -1023,10 +900,11 @@ BG.Init(function()
         end)
         BG.Init2(function()
             C_Timer.After(3, function()
-                if IsInRaid(1) then
-                    C_ChatInfo.SendAddonMessage("BiaoGe", "VersionCheck", "RAID")
-                    C_ChatInfo.SendAddonMessage("BiaoGeAuction", "VersionCheck", "RAID")
+                if #raidMemberNames == 0 and IsInRaid(1) then
+                    raidMemberNames = GetRaidMemberNames()
                 end
+                UpdateReadinessFrame(readiness)
+                RequestReadiness(false, false)
             end)
         end)
     end
@@ -1405,7 +1283,7 @@ BG.Init(function()
         end
 
         function BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
-            if BG.ImMLorLeader() and zhuangbei and maijia and jine and maijia == player then
+            if BG.ImMLorLeader() and zhuangbei and maijia and jine and SamePlayer(maijia, player) then
                 for i = 1, 4 do
                     local _, dialog = StaticPopup_Visible(frameName .. i)
                     if not dialog then

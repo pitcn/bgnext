@@ -38,15 +38,16 @@ M.metrics = View and View.metrics or {
 
 M.colors = {
     -- Alternating character rows.
-    stripeDark = { r = 0, g = 0, b = 0, a = 0.55 },
-    stripeLight = { r = 0.25, g = 0.25, b = 0.25, a = 0.55 },
-    -- Green section titles and green completion marker.
-    title = { r = 0, g = 1, b = 0, a = 1 },
+    stripeDark = { r = 0.02, g = 0.04, b = 0.07, a = 0.55 },
+    stripeLight = { r = 0.07, g = 0.10, b = 0.14, a = 0.55 },
+    -- Brand-cyan section titles and semantic green completion marker.
+    title = { r = 0, g = 0.90, b = 1, a = 1 },
     complete = { r = 0.1, g = 0.9, b = 0.1, a = 1 },
-    -- Grey hints and separators.
-    hint = { r = 0.5, g = 0.5, b = 0.5, a = 1 },
-    line = { r = 0.5, g = 0.5, b = 0.5, a = 0.5 },
-    text = { r = 1, g = 1, b = 1, a = 1 },
+    -- Neutral hierarchy; arbitrary catalog colours do not become chrome.
+    header = { r = 0.91, g = 0.91, b = 0.91, a = 1 },
+    hint = { r = 0.56, g = 0.65, b = 0.73, a = 1 },
+    line = { r = 0.14, g = 0.27, b = 0.37, a = 0.65 },
+    text = { r = 0.91, g = 0.95, b = 0.97, a = 1 },
 }
 
 M.controls = { "settings", "refresh", "close" }
@@ -647,8 +648,7 @@ function M.Draw(layout)
             header:SetPoint("TOPLEFT", frame, M.metrics.padding + column.x, section.headerY)
             header:SetSize(column.width, M.metrics.headerHeight)
             header:SetJustifyH("CENTER")
-            local headerColor = M.hexColor(column.color)
-            header:SetTextColor(headerColor.r, headerColor.g, headerColor.b)
+            header:SetTextColor(M.colors.header.r, M.colors.header.g, M.colors.header.b)
             header:SetText(descriptor.text)
 
             local hit = nextHeaderButton()

@@ -18,6 +18,7 @@ return function(test)
     local sendMail = readAll("Core/Module/SendMail.lua")
     local settlementRuntime = readAll("Core/BGNext/CurrentSettlementRuntime.lua")
     local fbui = readAll("Core/FBUI/FBUI.xml")
+    local options = readAll("Core/Options.lua")
 
     -- The current-raid settlement layers are loaded and wired to the confirmed
     -- BGLite success results, not to a new scan or poll.
@@ -44,6 +45,10 @@ return function(test)
     test.eq(toc:find("Core\\Module\\Receive.lua", 1, true), nil, "legacy whole-table receiver is not loaded")
     test.eq(main:find("BG.ReceiveUI", 1, true), nil, "startup cannot initialize the legacy receiver")
     test.eq(fbui:find("ReceiveUIfunction.lua", 1, true), nil, "legacy receiver UI is outside the load graph")
+    test.eq(fbui:find("Model.lua", 1, true), nil, "decorative boss models are outside the load graph")
+    test.eq(main:find("BG.CreateBossModel", 1, true), nil, "startup does not create decorative boss models")
+    test.eq(options:find('local name = "model"', 1, true), nil, "boss model setting is removed")
+    test.eq(options:find("显示BOSS模型", 1, true), nil, "boss model setting has no dead label")
     test.eq(database:find("BiaoGe.Hope", 1, true), nil, "legacy wishlist data is not initialized or migrated")
     test.eq(auction:find("BG.HopeFrame", 1, true), nil, "auction does not scan the removed legacy wishlist UI")
     test.eq(auction:find('WishlistReminder.notify("auction"', 1, true) ~= nil, true,

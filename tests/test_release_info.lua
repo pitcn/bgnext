@@ -4,21 +4,21 @@ return function(test)
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
-    test.eq(info.version, "0.3.0", "BGNext version is independent")
+    test.eq(info.version, "0.4.0", "BGNext version is independent")
     test.eq(info.upstreamVersion, "2.4.0", "upstream version remains disclosed")
     test.eq(info.protocolVersion, "2.4.0", "mixed-group protocol version remains compatible")
     test.eq(info.author, "国服社区共创", "community author")
     test.eq(info.official, false, "independent project")
     test.eq(type(info.changelog), "table", "local changelog")
     local changelogItems = table.concat(info.changelog, "\n")
-    test.eq(changelogItems:find("专精", 1, true) ~= nil, true,
-        "in-game changelog includes specialization-aware filtering")
-    test.eq(changelogItems:find("已拍未交易", 1, true) ~= nil, true,
-        "in-game changelog includes delivered-auction reconciliation")
-    test.eq(changelogItems:find("小地图", 1, true) ~= nil, true,
-        "in-game changelog includes minimap interaction fixes")
-    test.eq(changelogItems:find("性能", 1, true) ~= nil, true,
-        "in-game changelog includes performance work")
+    test.eq(changelogItems:find("价格预设", 1, true) ~= nil, true,
+        "in-game changelog includes price presets")
+    test.eq(changelogItems:find("已就绪", 1, true) ~= nil, true,
+        "in-game changelog includes team raid readiness check")
+    test.eq(changelogItems:find("预览外观", 1, true) ~= nil, true,
+        "in-game changelog includes opt-in preview theme")
+    test.eq(changelogItems:find("Boss 模型", 1, true) ~= nil, true,
+        "in-game changelog includes boss model removal and readability")
     test.eq(type(info.credits.upstream), "table", "upstream credits")
 
     local about = dofile("Core/BGNext/About.lua")
@@ -53,8 +53,10 @@ return function(test)
         "mixed-client version census is not mislabeled as BGLite-only")
     test.eq(auctionSource:find('L["BGLite版本"]', 1, true), nil,
         "all mixed-client census tooltip paths avoid the BGLite-only label")
-    test.eq(auctionSource:find('L["兼容插件版本"]', 1, true) ~= nil, true,
-        "mixed-client version census has a neutral compatibility label")
+    test.eq(auctionSource:find('L["兼容插件版本"]', 1, true), nil,
+        "the ambiguous compatibility-version census is removed")
+    test.eq(auctionSource:find('L["团队拍卖就绪检查"]', 1, true) ~= nil, true,
+        "the mixed-client check describes auction readiness")
 
     local tocFile = assert(io.open("BGLite.toc", "rb"))
     local toc = tocFile:read("*a")

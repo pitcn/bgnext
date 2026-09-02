@@ -405,10 +405,13 @@ local function ensureWindow()
         button:SetSize(16, 16)
         if id == "close" then
             button:SetNormalFontObject(BG.FontWhite15)
-            button:SetText("x")
+            button:SetText("X")
         else
             button:SetNormalTexture(textures[id])
         end
+        button:SetAlpha(0.72)
+        button:SetScript("OnEnter", function(self) self:SetAlpha(1) end)
+        button:SetScript("OnLeave", function(self) self:SetAlpha(0.72) end)
         if last then
             button:SetPoint("TOPRIGHT", last, "TOPLEFT", -3, 0)
         else

@@ -20,6 +20,17 @@ return function(test)
     local root = { equipmentFilters = {} }
     local fresh = model.ensureCharacter(root, "realm", "Mage", specDefaults(),
         { specKey = "spec:63", builtInId = "retail:MAGE:spec:63" })
+    test.eq(fresh.enabled, true, "equipment filtering starts enabled")
+    local selectedBeforeDisable = fresh.selectedId
+    local modeBeforeDisable = fresh.selectionMode
+    test.eq(model.setEnabled(fresh, false), true, "the global shortcut disables filtering")
+    test.eq(model.getActiveProfile(root, "realm", "Mage"), nil,
+        "disabled filtering exposes no active profile to the filter engine")
+    test.eq(fresh.selectedId, selectedBeforeDisable, "disabling preserves the selected profile")
+    test.eq(fresh.selectionMode, modeBeforeDisable, "disabling preserves follow or manual mode")
+    test.eq(model.setEnabled(fresh, true), true, "the same shortcut restores filtering")
+    test.eq(model.getActiveProfile(root, "realm", "Mage"), fresh.profiles[selectedBeforeDisable],
+        "restoring filtering reuses the previous profile")
     test.eq(fresh.selectionMode, "follow-spec", "new state follows specialization")
     test.eq(fresh.selectedId, "retail:MAGE:spec:63", "new state selects resolved specialization")
     test.eq(model.getActiveProfile(root, "realm", "Mage").name, "火焰", "active profile returned")
@@ -77,13 +88,17 @@ return function(test)
     test.eq(fresh.profiles[customId].name, "自定义", "custom profile name trimmed")
     test.eq(model.createProfile(fresh, { name = "   " }), false, "empty profile rejected")
 
+    model.setEnabled(fresh, false)
     model.selectProfile(fresh, customId)
+    test.eq(fresh.enabled, true, "choosing a profile re-enables filtering")
     test.eq(fresh.selectionMode, "manual", "custom selection pauses following")
     test.eq(fresh.selectedId, customId, "custom selection selects the custom profile")
     test.eq(model.selectProfile(fresh, "missing"), false, "unknown selection rejected")
 
     -- The dedicated follow entry resumes following and selects the new built-in.
+    model.setEnabled(fresh, false)
     model.followSpecialization(fresh, "retail:MAGE:spec:64")
+    test.eq(fresh.enabled, true, "choosing follow-specialization re-enables filtering")
     test.eq(fresh.selectionMode, "follow-spec", "explicit follow resumes following")
     test.eq(fresh.selectedId, "retail:MAGE:spec:64", "follow selects new built-in")
 
@@ -98,7 +113,9 @@ return function(test)
 
     -- Reset rebuilds built-ins, preserves customs, and returns to follow mode.
     fresh.profiles[customId].name = "我的方案"
+    model.setEnabled(fresh, false)
     model.resetDefaults(fresh, specDefaults(), "retail:MAGE:spec:63")
+    test.eq(fresh.enabled, true, "reset restores filtering")
     test.eq(fresh.selectionMode, "follow-spec", "reset returns to follow mode")
     test.eq(fresh.selectedId, "retail:MAGE:spec:63", "reset selects resolved built-in")
     test.eq(fresh.profiles[customId] ~= nil, true, "reset preserves custom profile")
@@ -166,6 +183,7 @@ return function(test)
         },
     } } } }
     local legacy = model.ensureCharacter(legacyRoot, "realm", "Mage", specDefaults(), { specKey = "spec:63" })
+    test.eq(legacy.enabled, true, "existing profiles migrate to enabled without changing their selection")
     test.eq(legacy.selectionMode, "manual", "existing state migrates without silent switching")
     test.eq(legacy.selectedId, "MAGE", "migration preserves selection")
     test.eq(legacy.profiles["custom-1"].name, "自定义", "migration preserves custom profile")

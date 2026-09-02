@@ -6,7 +6,7 @@
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.0
-## X-BGNext-Version: 0.3.0
+## X-BGNext-Version: 0.4.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.0
@@ -19,11 +19,17 @@ Templates.xml
 Libs\embeds.xml
 Core\DB\DB.xml
 Core\BGNext\Init.lua
+Core\BGNext\UITheme.lua
+Core\BGNext\UIStyle.lua
 Core\BGNext\MainFrameScale.lua
 Core\BGNext\ChatYYCopy.lua
 Core\BGNext\Identity.lua
 Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
+Core\BGNext\AuctionPriceStore.lua
+Core\BGNext\AuctionPriceCatalog.lua
+Core\BGNext\AuctionPriceCodec.lua
+Core\BGNext\AuctionPriceUI.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
 Core\BGNext\CurrentSettlementView.lua
@@ -54,6 +60,7 @@ Core\BGNext\TradeAuctionState.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua
+Core\BGNext\AuctionReadiness.lua
 Core\BGNext\TooltipDebtCache.lua
 Core\BGNext\TooltipDebtRuntime.lua
 Core\BGNext\HighlightManager.lua
@@ -70,6 +77,7 @@ Core\TongBao\QianKuan.lua
 Core\TongBao\Channel.lua
 
 Core\BiaoGe.lua
+Core\BGNext\LegacyLedgerSkin.lua
 Core\BGNext\EquipmentFilterUI.lua
 Core\BGNext\WishlistUI.lua
 Core\BGNext\CurrentSettlementUI.lua
@@ -82,6 +90,7 @@ Core\Module\Auction.lua
 Core\Module\AuctionLog.lua
 Core\Module\AuctionWA.lua
 Core\Module\AuctionWAEvent.lua
+Core\BGNext\AuctionPriceRuntime.lua
 Core\Module\Trade.lua
 Core\Module\SendMail.lua
 Core\Module\QuickAccounting.lua
@@ -91,3 +100,4 @@ Core\Module\hooks.lua
 
 Core\Module\minimap.lua
 Core\Options.lua
+Core\BGNext\UIThemeSettings.lua

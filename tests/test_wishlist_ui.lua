@@ -108,4 +108,10 @@ return function(test)
     mainFile:close()
     test.eq(mainSource:find("shortcutAction(BG.IsML, button, true)", 1, true) ~= nil, true,
         "alt-click call site passes the explicit modifier state")
+
+    local billFile = assert(io.open("Core/FBUI/FBUIfunction.lua", "rb"))
+    local billSource = billFile:read("*a")
+    billFile:close()
+    test.eq(billSource:find("shortcutAction(BG.IsML, button, true)", 1, true) ~= nil, true,
+        "bill-table alt-click call site passes the explicit modifier state")
 end

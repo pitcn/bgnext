@@ -60,6 +60,14 @@ return function(test)
         "reset passes the resolved built-in id")
     test.eq(source:find("selectProfile(current, id)", 1, true) ~= nil, true,
         "creating a profile selects it in manual mode")
+    test.eq(source:find("setEnabled(current, current.enabled == false)", 1, true) ~= nil, true,
+        "the no-filter shortcut toggles the global filter state without clearing a profile")
+    test.eq(source:find('L["不过滤装备"]', 1, true) ~= nil, true,
+        "the no-filter shortcut has an explicit tooltip label")
+    test.eq(source:find('disableText:SetText("×")', 1, true) ~= nil, true,
+        "the no-filter shortcut uses a visible red cross instead of a transparent icon")
+    test.eq(source:find("(#current.order + 2) * 35", 1, true) ~= nil, true,
+        "shortcut rows reserve space for the no-filter and follow-specialization entries")
 
     local auction = assert(io.open("Core/Module/Auction.lua", "rb"))
     local auctionSource = auction:read("*a")
