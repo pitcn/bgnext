@@ -124,9 +124,10 @@ return function(test)
         end
 
         local moduleTabs = {
-            fakeTab(false, 0, 0, 0, 0.58, 1, 0.82, 0, 1),
-            fakeTab(true, 0.4, 0.4, 0.4, 1, 1, 1, 1, 1),
+            fakeTab(false, 0.4, 0.4, 0.4, 1, 1, 1, 1, 1),
+            fakeTab(true, 0.01, 0.01, 0.01, 1, 1, 0.82, 0, 1),
         }
+        moduleTabs[2].bg.alpha = 0.58
         local raidTabs = {
             fakeTab(false, 0, 0, 0, 0.58, 1, 0.82, 0, 1),
             fakeTab(true, 0.4, 0.4, 0.4, 1, 1, 1, 1, 1),
@@ -144,6 +145,10 @@ return function(test)
                 title = {
                     gradient = { 0.4, 0.4, 0.4, 0.2, 0.4, 0.4, 0.4, 0.0 },
                     alpha = 1,
+                },
+                moduleTabs = {
+                    { bg = { color = { 0.4, 0.4, 0.4, 1 }, alpha = 1 } },
+                    { bg = { color = { 0.01, 0.01, 0.01, 1 }, alpha = 0.58 } },
                 },
             },
         }
@@ -178,6 +183,8 @@ return function(test)
     -- The runtime registry must therefore provide an explicit classic recipe.
     registry.background.GetColorTexture = nil
     registry.title.GetGradient = nil
+    registry.moduleTabs[1].bg.GetColorTexture = nil
+    registry.moduleTabs[2].bg.GetColorTexture = nil
 
     test.eq(Skin.apply("preview", registry, 0.58), true, "preview applies")
     local afterFirst = registry.visualState()
@@ -191,6 +198,8 @@ return function(test)
         "tab color texture stays opaque before region alpha")
     test.eq(afterFirst.moduleTabs[2].bg.alpha, 0.58,
         "tab legacy alpha is applied once")
+    test.eq(afterFirst.moduleTabs[2].bg.color[1] ~= before.moduleTabs[2].bg.color[1], true,
+        "preview changes an inactive tab even without GetColorTexture")
     test.eq(afterFirst.title.gradient[1] ~= before.title.gradient[1], true,
         "preview changes a title even without GetGradient")
     test.eq(Skin.apply("preview", registry, 0.58), true, "repeat apply succeeds")

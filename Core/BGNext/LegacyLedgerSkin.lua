@@ -110,19 +110,20 @@ local function fontOf(tab)
     return nil
 end
 
-local function snapshotTab(tab)
+local function snapshotTab(tab, fallback)
+    fallback = type(fallback) == "table" and fallback or {}
     local bg = type(tab) == "table" and tab.bg or nil
     return {
-        bg = snapshotTexture(bg),
-        text = readTextColor(fontOf(tab)),
+        bg = snapshotTexture(bg, fallback.bg),
+        text = readTextColor(fontOf(tab)) or fallback.text,
     }
 end
 
-local function mapTabs(tabs)
+local function mapTabs(tabs, fallbacks)
     if type(tabs) ~= "table" then return {} end
     local out = {}
     for index, tab in ipairs(tabs) do
-        out[index] = snapshotTab(tab)
+        out[index] = snapshotTab(tab, fallbacks and fallbacks[index])
     end
     return out
 end
@@ -133,8 +134,8 @@ local function captureSnapshot(registry)
         main = snapshotMain(registry.main, classic.main),
         background = snapshotTexture(registry.background, classic.background),
         title = snapshotTexture(registry.title, classic.title),
-        moduleTabs = mapTabs(registry.moduleTabs),
-        raidTabs = mapTabs(registry.raidTabs),
+        moduleTabs = mapTabs(registry.moduleTabs, classic.moduleTabs),
+        raidTabs = mapTabs(registry.raidTabs, classic.raidTabs),
     }
 end
 
@@ -394,6 +395,19 @@ function M.buildRuntimeRegistry()
                     gradient = { r, g, b, 0.2, r, g, b, 0.0 },
                     alpha = 1,
                 }
+                classic.moduleTabs = {}
+                for index, tab in ipairs(moduleTabs) do
+                    local enabled = true
+                    if type(tab.IsEnabled) == "function" then
+                        local stateOK, state = pcall(tab.IsEnabled, tab)
+                        if stateOK then enabled = state end
+                    end
+                    classic.moduleTabs[index] = {
+                        bg = enabled
+                            and { color = { 0.01, 0.01, 0.01, 1 }, alpha = legacyAlpha }
+                            or { color = { r, g, b, 1 }, alpha = 1 },
+                    }
+                end
             end
         end
     end
