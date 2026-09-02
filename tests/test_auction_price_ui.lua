@@ -1,5 +1,7 @@
 return function(test)
     BG = { BGNext = {} }
+    BG.BGNext.UITheme = dofile("Core/BGNext/UITheme.lua")
+    local Style = dofile("Core/BGNext/UIStyle.lua")
     local ui = dofile("Core/BGNext/AuctionPriceUI.lua")
 
     -- Responsive two-column layout constants.
@@ -8,6 +10,8 @@ return function(test)
     test.eq(ui.MIN_ROWS_PER_COLUMN, 12, "short windows retain twelve rows per column")
     test.eq(ui.MAX_ROWS_PER_COLUMN, 30, "row objects stay capped per column")
     test.eq(ui.ROW_CAPACITY, 60, "maximum reusable row capacity")
+    test.eq((tonumber(ui.DECORATIVE_REGION_COUNT) or math.huge) <= Style.objectBudget(), true,
+        "price decoration stays within the fixed object budget")
 
     local largeLayout = ui.viewportLayout(1900, 1400)
     test.eq(largeLayout.columns, 2, "large layout keeps two columns")
@@ -180,6 +184,14 @@ return function(test)
         "page shell creates only the computed reusable rows")
     test.eq(source:find("math.floor((i - 1) / layout.rowsPerColumn)", 1, true) ~= nil, true,
         "rows flow into a second column")
+    test.eq(source:find('main.bossScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")', 1, true) ~= nil, true,
+        "boss navigation uses a scoped surface")
+    test.eq(source:find('main.itemScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")', 1, true) ~= nil, true,
+        "item columns use a scoped surface")
+    test.eq(source:find("main.columnDivider", 1, true) ~= nil, true,
+        "price page has one column divider")
+    test.eq(source:find('Style.setButtonState(bt, "selected"', 1, true) ~= nil, true,
+        "selected price navigation uses the brand state")
     test.eq(source:find('main.itemScroll:SetScript("OnMouseWheel"', 1, true) ~= nil, true, "long item lists are mouse-wheel scrollable")
     test.eq(source:find("GameTooltip:SetHyperlink(link)", 1, true) ~= nil, true, "item rows show the native item tooltip")
     test.eq(source:find("BG.TabButtonsFB:Hide()", 1, true) ~= nil, true, "price page hides the global raid navigation")

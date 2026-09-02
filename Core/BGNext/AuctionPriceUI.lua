@@ -16,6 +16,7 @@ M.MIN_ROWS_PER_COLUMN = 12
 M.MAX_ROWS_PER_COLUMN = 30
 M.ROW_HEIGHT = 24
 M.ROW_CAPACITY = M.COLUMN_COUNT * M.MAX_ROWS_PER_COLUMN
+M.DECORATIVE_REGION_COUNT = 1
 
 -- Computes the reusable viewport once from the existing main-frame size. The
 -- fixed deductions cover the left margin, 230px Boss picker, inter-panel gap,
@@ -251,6 +252,7 @@ local function runtimeReady()
         and BG.BGNext.AuctionPriceStore ~= nil
         and BG.BGNext.AuctionPriceCatalog ~= nil
         and BG.BGNext.AuctionPriceCodec ~= nil
+        and BG.BGNext.UIStyle ~= nil
 end
 
 -- The frame tree is built once, late, inside BG.Init2 (PLAYER_ENTERING_WORLD).
@@ -261,6 +263,7 @@ if runtimeReady() then
     local Store = BG.BGNext.AuctionPriceStore
     local Catalog = BG.BGNext.AuctionPriceCatalog
     local Codec = BG.BGNext.AuctionPriceCodec
+    local Style = BG.BGNext.UIStyle
     local L = ns.L or setmetatable({}, { __index = function(_, k) return tostring(k) end })
 
     -- Canonical client families, ordered so that flags which imply a weaker one
@@ -384,21 +387,31 @@ if runtimeReady() then
         main.toolbar:SetPoint("TOPLEFT", main.description, "BOTTOMLEFT", 0, -6)
         main.toolbar:SetSize(1, 24)
 
-        main.bossScroll = CreateFrame("Frame", nil, main)
+        main.bossScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")
         main.bossScroll:SetPoint("TOPLEFT", main.toolbar, "BOTTOMLEFT", 0, -8)
         main.bossScroll:SetSize(230, layout.itemHeight + 32)
+        Style.applySurface(main.bossScroll, "surface", 0.44)
 
         main.filterBar = CreateFrame("Frame", nil, main)
         main.filterBar:SetPoint("TOPLEFT", main.bossScroll, "TOPRIGHT", 14, 0)
         main.filterBar:SetSize(1, 24)
 
-        main.itemScroll = CreateFrame("Frame", nil, main)
+        main.itemScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")
         main.itemScroll:SetPoint("TOPLEFT", main.filterBar, "BOTTOMLEFT", 0, -8)
         main.itemScroll:SetSize(
             layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1),
             layout.itemHeight
         )
         main.itemScroll:EnableMouseWheel(true)
+        Style.applySurface(main.itemScroll, "surface", 0.44)
+
+        main.columnDivider = main.itemScroll:CreateTexture(nil, "BORDER")
+        main.columnDivider:SetPoint("TOP", main.itemScroll, "TOPLEFT",
+            layout.columnWidth + layout.columnGap / 2, -4)
+        main.columnDivider:SetPoint("BOTTOM", main.itemScroll, "BOTTOMLEFT",
+            layout.columnWidth + layout.columnGap / 2, 4)
+        main.columnDivider:SetWidth(1)
+        main.columnDivider:SetColorTexture(0.141, 0.267, 0.369, 0.55)
 
         -- A plain slider is intentional here. Blizzard's framed scrollbar
         -- assumes a compatible ScrollFrame parent and crashes when this page
@@ -521,6 +534,9 @@ if runtimeReady() then
         local exportButton = BG.CreateButton(main.toolbar)
         exportButton:SetPoint("LEFT", importButton, "RIGHT", 4, 0)
         exportButton:SetSize(52, 22)
+        if Style.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+            Style.setButtonState(deleteButton, "danger", BiaoGe.options.alpha)
+        end
 
         -- Personal toolbar controls.
         local countLabel = main.toolbar:CreateFontString(nil, "OVERLAY")
@@ -536,9 +552,21 @@ if runtimeReady() then
         local exportPersonalButton = BG.CreateButton(main.toolbar)
         exportPersonalButton:SetPoint("LEFT", importPersonalButton, "RIGHT", 4, 0)
         exportPersonalButton:SetSize(52, 22)
+        if Style.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+            Style.setButtonState(clearPersonalButton, "danger", BiaoGe.options.alpha)
+        end
 
         local leaderControls = { presetButton, activeLabel, basePriceEdit, newButton, copyButton, renameButton, deleteButton, importButton, exportButton }
         local personalControls = { countLabel, clearPersonalButton, importPersonalButton, exportPersonalButton }
+
+        local function applySelection(bt, selected)
+            if not Style.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then return end
+            if selected then
+                Style.setButtonState(bt, "selected", BiaoGe.options.alpha)
+            else
+                Style.setButtonState(bt, "normal", BiaoGe.options.alpha)
+            end
+        end
 
         -- Filter bar: search box, set/unset/all state toggle, clear.
         local searchBox = CreateFrame("EditBox", nil, main.filterBar, BG.editTemplate or "InputBoxTemplate")
@@ -893,7 +921,9 @@ if runtimeReady() then
                 else
                     bt:SetPoint("LEFT", raidButtons[idx - 1], "RIGHT", 4, 0)
                 end
-                if raidId == pageState.raidId then bt:Disable() else bt:Enable() end
+                local selected = raidId == pageState.raidId
+                if selected then bt:Disable() else bt:Enable() end
+                applySelection(bt, selected)
                 bt:Show()
             end
         end
@@ -903,6 +933,8 @@ if runtimeReady() then
             personalButton:SetText(L[M.LABELS.personal])
             if pageState.mode == "leader" then leaderButton:Disable() else leaderButton:Enable() end
             if pageState.mode == "personal" then personalButton:Disable() else personalButton:Enable() end
+            applySelection(leaderButton, pageState.mode == "leader")
+            applySelection(personalButton, pageState.mode == "personal")
             main.description:SetText(L[M.description(pageState.mode)] or "")
         end
 
@@ -965,10 +997,11 @@ if runtimeReady() then
                 end
                 bt.nodeId = node.id
                 bt:SetText(M.bossCountLabel(node.name, node.count))
-                bt:SetSize(150, 20)
+                bt:SetSize(220, 20)
                 bt:SetPoint("TOPLEFT", main.bossScroll, "TOPLEFT", 0, -(idx - 1) * 22)
                 local selected = (pageState.bossId == node.id) or (pageState.bossId == nil and node.id == "all")
                 if selected then bt:Disable() else bt:Enable() end
+                applySelection(bt, selected)
                 bt:Show()
             end
         end
