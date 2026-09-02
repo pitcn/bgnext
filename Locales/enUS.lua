@@ -2990,6 +2990,32 @@ do -- BGNext current-raid trade and mail reconciliation
     L["当前团还没有邮件记录。"] = "No mails recorded for the current raid yet."
     L["已清空当前团的交易与邮件记录。"] = "Cleared the current raid's trade and mail records."
     L["只保留当前或最近一次未结算团本，最长七日。"] = "Keeps only the current or most recent unsettled raid, for at most seven days."
+do -- BGNext settlement checklist
+    L["结算前检查"] = "Settlement Check"
+    L["结算前检查（当前团）"] = "Settlement Check (Current Raid)"
+    L["定位"] = "Locate"
+    L["共 %s 项"] = "%s in total"
+    L["可以结算"] = "Ready to settle"
+    L["发现异常"] = "Issues found"
+    L["待确认"] = "Pending"
+    L["只读检查：不会自动修改账目、发送邮件或执行结算。"] = "Read-only checks: nothing is modified, mailed, traded or settled automatically."
+    L["当前没有进行中的团结算记录，无法核对交易与邮件"] = "No active raid settlement; trades and mails cannot be checked"
+    L["当前团还没有可核对的交易或邮件记录"] = "No trades or mails recorded for the current raid yet"
+    L["交易已记录，尚未核对完成：%s"] = "Trade recorded but not confirmed yet: %s"
+    L["邮件记录待核对：%s"] = "Mail record awaiting review: %s"
+    L["已完成交易给%s共%s笔，但没有其邮件记录（可能无需邮寄）"] = "Completed trades to %s (%s total), but no mail record (mailing may not be needed)"
+    L["当前表格数据不可用，无法核对账单"] = "The raid table is unavailable; the bill cannot be checked"
+    L["当前表格还没有账单数据"] = "The raid table has no bill data yet"
+    L["欠款未处理：%s金（第%s个Boss 第%s件）"] = "Unhandled debt: %s gold (boss %s, item %s)"
+    L["装备缺少买家（第%s个Boss 第%s件）"] = "Missing buyer (boss %s, item %s)"
+    L["装备缺少金额（第%s个Boss 第%s件）"] = "Missing amount (boss %s, item %s)"
+    L["装备缺少买家和金额（第%s个Boss 第%s件）"] = "Missing buyer and amount (boss %s, item %s)"
+    L["分金人数未设置或无效"] = "Split count missing or invalid"
+    L["净收入为负数（%s金）"] = "Negative net income (%s gold)"
+    L["净收入为 0，请确认收入与支出是否录入完整"] = "Net income is 0; check income and expenses"
+    L["净收入未录入，无法计算工资"] = "Net income missing; wages cannot be calculated"
+end
+
     L["确认清空当前团的交易与邮件记录吗？\n只清除当前团结算记录，不影响表格账单、心愿清单和角色总览。"] = "Clear the current raid's trade and mail records?\nOnly the current-raid settlement records are removed; the bill, wishlist and character overview are not affected."
 end
 

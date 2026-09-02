@@ -20,7 +20,10 @@ local HEADER_HEIGHT = 22
 local FILTER_HEIGHT = 24
 local COLUMN_GAP = 4
 local WINDOW_HEIGHT = 380
+local CHECKLIST_HEIGHT = 360
 local CLEAR_POPUP = "BGNextClearCurrentSettlement"
+local CHECKLIST_KIND = "checklist"
+local KNOWN_FILTERS = { all = true, pending = true, complete = true }
 
 local COLUMNS = {
     trade = {
@@ -71,6 +74,10 @@ local DIRECTION_LABELS = {
 
 local function view()
     return BG.BGNext and BG.BGNext.CurrentSettlementView
+end
+
+local function checklist()
+    return BG.BGNext and BG.BGNext.CurrentSettlementChecklist
 end
 
 local function lifecycle()
@@ -262,6 +269,181 @@ end
 local windows = {}
 local entryButtons
 
+function M.checklistTitle()
+    return L["结算前检查（当前团）"]
+end
+
+function M.checklistEntryLabel()
+    return L["结算前检查"]
+end
+
+local CHECKLIST_STATUS_LABELS = {
+    ready = "可以结算",
+    issues = "发现异常",
+    pending = "待确认",
+}
+
+function M.checklistStatusLabel(status)
+    return L[CHECKLIST_STATUS_LABELS[status] or CHECKLIST_STATUS_LABELS.pending]
+end
+
+-- Gathers the evaluate input from live data. Only this runtime section reads
+-- the addon globals; the checklist derivation itself stays injectable.
+local function checklistOptions(now)
+    local root = database()
+    local settlement = root and root.currentSettlement
+    local fb = settlement and settlement.sourceFb or BG.FB1
+    return {
+        db = root,
+        fb = fb,
+        now = now,
+        table = type(BiaoGe) == "table" and BiaoGe[fb] or nil,
+        bosses = ns and ns.Maxb and ns.Maxb[fb] or nil,
+        slotsOf = BG.GetMaxi,
+        normalizeName = BG.GSN,
+    }
+end
+
+local function acquireChecklistRow(win, index)
+    local row = win.rowPool[index]
+    if row then
+        return row
+    end
+    row = CreateFrame("Frame", nil, win.child)
+    row:SetSize(win.contentWidth, ROW_HEIGHT)
+    row:SetPoint("TOPLEFT", 0, -(index - 1) * (ROW_HEIGHT + ROW_GAP))
+    row.text = row:CreateFontString()
+    row.text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
+    row.text:SetPoint("LEFT", 2, 0)
+    row.text:SetWidth(win.contentWidth - 76)
+    row.text:SetJustifyH("LEFT")
+    row.text:SetWordWrap(false)
+    row.locateButton = BG.CreateButton(row)
+    row.locateButton:SetSize(64, 18)
+    row.locateButton:SetPoint("RIGHT", 0, 0)
+    row.locateButton:SetText(L["定位"])
+    win.rowPool[index] = row
+    return row
+end
+
+local function fillChecklistRow(win, row, entryData)
+    row.entry = entryData
+    local text = L[entryData.reasonKey]
+    if #(entryData.args or {}) > 0 then
+        text = string.format(text, unpack(entryData.args))
+    end
+    row.text:SetText(text)
+    if entryData.severity == "issue" then
+        row.text:SetTextColor(1, 0.35, 0.35)
+    else
+        row.text:SetTextColor(1, 0.82, 0)
+    end
+    local C = checklist()
+    local target = C and C.resolveLocate and C.resolveLocate(entryData.locate, BG.FB1) or nil
+    if target then
+        row.locateButton:SetScript("OnClick", function()
+            if BG.PlaySound then BG.PlaySound(1) end
+            if target.window then
+                M.Show(target.window, target.filter)
+            elseif target.table and type(BG.ClickFBbutton) == "function" then
+                BG.ClickFBbutton(target.table)
+            end
+        end)
+        row.locateButton:Show()
+    else
+        row.locateButton:Hide()
+    end
+    row:Show()
+end
+
+local function renderChecklist(win, report)
+    win.statusText:SetText(M.checklistStatusLabel(report.status))
+    local r, g, b = 0.5, 0.5, 0.5
+    local C = checklist()
+    if C and type(C.statusColor) == "function" then
+        r, g, b = C.statusColor(report.status)
+    end
+    win.statusText:SetTextColor(r, g, b)
+    win.totalText:SetText(string.format(L["共 %s 项"], tostring(report.total)))
+    for _, row in ipairs(win.rowPool) do
+        row:Hide()
+    end
+    win.checklistRows = {}
+    for index, entryData in ipairs(report.entries) do
+        local row = acquireChecklistRow(win, index)
+        fillChecklistRow(win, row, entryData)
+        win.checklistRows[index] = row
+    end
+    win.child:SetHeight(math.max(#report.entries * (ROW_HEIGHT + ROW_GAP), win.scrollHeight))
+end
+
+-- Recomputes only while the checklist window is visible; any record or window
+-- refresh funnels through here, so no timer or hidden-page scanning is needed.
+local function refreshChecklist()
+    local win = windows[CHECKLIST_KIND]
+    if not win or not win.frame:IsShown() then
+        return
+    end
+    local C = checklist()
+    if not C or type(C.report) ~= "function" then
+        return
+    end
+    local root = database()
+    local now = serverNow()
+    M.prepare(root, now)
+    local report = C.report(checklistOptions(now))
+    win.report = report
+    renderChecklist(win, report)
+end
+
+local function createChecklistWindow()
+    if type(CreateFrame) ~= "function" or type(BG.CreateMainFrame) ~= "function"
+        or type(BG.CreateScrollFrame) ~= "function" or type(BG.CreateButton) ~= "function" then
+        return nil
+    end
+    local width = 560
+    local frame = BG.CreateMainFrame()
+    frame:SetSize(width, CHECKLIST_HEIGHT)
+    frame:SetPoint("CENTER")
+    frame:Hide()
+    if frame.titleText then
+        frame.titleText:SetText(M.checklistTitle())
+    end
+    local win = {
+        kind = CHECKLIST_KIND,
+        frame = frame,
+        contentWidth = width - 32,
+        rowPool = {},
+    }
+
+    win.statusText = frame:CreateFontString()
+    win.statusText:SetFont(BIAOGE_TEXT_FONT, 16, "OUTLINE")
+    win.statusText:SetPoint("TOPLEFT", 16, -30)
+    win.totalText = frame:CreateFontString()
+    win.totalText:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
+    win.totalText:SetPoint("TOPRIGHT", -16, -32)
+    win.totalText:SetTextColor(0.7, 0.7, 0.7)
+
+    local scrollHeight = CHECKLIST_HEIGHT - 58 - 46
+    local scroll, child = BG.CreateScrollFrame(frame, width - 30, scrollHeight)
+    scroll:SetPoint("TOPLEFT", 15, -(30 + 28))
+    win.scroll, win.child, win.scrollHeight = scroll, child, scrollHeight
+
+    local hint = frame:CreateFontString()
+    hint:SetFont(BIAOGE_TEXT_FONT, 11, "OUTLINE")
+    hint:SetPoint("BOTTOMLEFT", 14, 14)
+    hint:SetTextColor(0.6, 0.6, 0.6)
+    hint:SetText(L["只读检查：不会自动修改账目、发送邮件或执行结算。"])
+
+    frame:SetScript("OnShow", function() M.Refresh(CHECKLIST_KIND) end)
+    -- The derived report is dropped with the window; nothing survives a close,
+    -- a manual clear or a settlement switch.
+    frame:SetScript("OnHide", function() win.report = nil end)
+
+    windows[CHECKLIST_KIND] = win
+    return win
+end
+
 local function newCell(row, column, offset)
     local cell = CreateFrame("Frame", nil, row)
     cell:SetSize(column.width, ROW_HEIGHT)
@@ -391,6 +573,12 @@ local function fillRow(win, row, data)
 end
 
 function M.Refresh(kind)
+    -- Any record or window refresh also updates a visible checklist, so a
+    -- single pipeline serves all refresh sources without extra timers.
+    refreshChecklist()
+    if kind == CHECKLIST_KIND then
+        return
+    end
     local win = windows[kind]
     if not win or not win.frame:IsShown() then
         return
@@ -562,13 +750,19 @@ local function ensureWindow(kind)
     if win then
         return win
     end
+    if kind == CHECKLIST_KIND then
+        return createChecklistWindow()
+    end
     return createWindow(kind)
 end
 
-function M.Show(kind)
+function M.Show(kind, filter)
     local win = ensureWindow(kind)
     if not win then
         return false
+    end
+    if filter ~= nil and win.filter ~= nil and KNOWN_FILTERS[filter] then
+        win.filter = filter
     end
     win.frame:Show()
     M.Refresh(kind)
@@ -588,6 +782,29 @@ function M.Toggle(kind)
     return true
 end
 
+-- Test/support accessors: the checklist window state and its rendered rows
+-- (with locate buttons) so harnesses can verify refresh, cleanup and locate
+-- wiring without reaching into file locals.
+function M.checklistState()
+    local win = windows[CHECKLIST_KIND]
+    if not win then
+        return { shown = false, report = nil, rows = {} }
+    end
+    return {
+        shown = win.frame:IsShown() and true or false,
+        report = win.report,
+        rows = win.checklistRows or {},
+    }
+end
+
+function M.windowState(kind)
+    local win = windows[kind]
+    if not win then
+        return { shown = false, filter = nil }
+    end
+    return { shown = win.frame:IsShown() and true or false, filter = win.filter }
+end
+
 -- Entry buttons on the main window, next to the character overview entry so the
 -- familiar bottom-right control row keeps its habit.
 function M.installEntry(mainFrame)
@@ -600,8 +817,8 @@ function M.installEntry(mainFrame)
 
     local created = {}
     local previous
-    -- Built right to left so the visible order is 交易记录, 邮件记录, 角色总览.
-    for _, kind in ipairs({ "mail", "trade" }) do
+    -- Built right to left so the visible order is 交易记录, 邮件记录, 结算前检查.
+    for _, kind in ipairs({ CHECKLIST_KIND, "mail", "trade" }) do
         local button = BG.CreateButton(mainFrame)
         button:SetSize(120, 20)
         if previous then
@@ -611,7 +828,7 @@ function M.installEntry(mainFrame)
         else
             button:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -10, 8)
         end
-        button:SetText(M.title(kind))
+        button:SetText(kind == CHECKLIST_KIND and M.checklistEntryLabel() or M.title(kind))
         local fontString = button.GetFontString and button:GetFontString()
         if fontString then
             button:SetWidth(math.max(100, fontString:GetStringWidth() + 16))
@@ -626,6 +843,7 @@ function M.installEntry(mainFrame)
 
     BG.ButtonCurrentTradeRecord = created.trade
     BG.ButtonCurrentMailRecord = created.mail
+    BG.ButtonSettlementChecklist = created.checklist
     entryButtons = created
     return created
 end

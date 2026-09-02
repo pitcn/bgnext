@@ -52,6 +52,8 @@ No other-player, cross-account, historical, communication, or migration data is 
 
 ## Runtime-only data
 
+The settlement readiness checklist is derived on demand from the already stored `currentSettlement` records and the current raid table's bill rows, and exists only in memory while the checklist window shows it. It adds no SavedVariables field, reads no mailbox, no history and no other player's data, never modifies records or sends anything, and is discarded when the window closes, the settlement is cleared or the raid scope changes.
+
 Automatic-bidding state is memory-only. Its auction identity, item identity, current price, increment, cap, next bid, status, and stop reason must not be written to SavedVariables. Reloading the UI destroys the state.
 
 Auction protocol authorization, version-response limits and team auction readiness are also memory-only. Readiness contains only the current raid roster names and the main-addon/auction-endpoint versions that reply during the current session. BGNext compares each message sender with the live raid roster; it does not retain a sender or readiness history. The cached roster, response tables and cooldown counters are cleared on raid leave, discarded on reload and never written to SavedVariables. Automatic readiness checks are event-driven and sent only by the active raid auction controller; leader/master-looter manual checks are locally rate-limited. Both paths reuse the existing RAID version messages and add no recipients or message fields.
