@@ -211,8 +211,20 @@ return function(test)
         "disabled raid tab uses selected state")
     test.eq(registry.raidTabs[2]._BGNextVisualState, "normal",
         "enabled raid tab uses inactive state")
+
+    registry.raidTabs[1].enabled = true
+    registry.raidTabs[2].enabled = false
+    test.eq(Skin.refreshRaidSelection(registry, 0.58), true,
+        "raid selection refresh succeeds in preview theme")
+    test.eq(registry.raidTabs[1]._BGNextVisualState, "normal",
+        "preview refresh demotes the previous raid tab")
+    test.eq(registry.raidTabs[2]._BGNextVisualState, "selected",
+        "preview refresh promotes the selected raid tab")
+
     test.eq(Skin.apply("preview", registry, 0.58), true, "repeat apply succeeds")
-    eqTable(registry.visualState(), afterFirst, "repeat apply is idempotent")
+    local afterSelection = registry.visualState()
+    test.eq(Skin.apply("preview", registry, 0.58), true, "repeat apply succeeds")
+    eqTable(registry.visualState(), afterSelection, "repeat apply is idempotent")
 
     registry.moduleTabs[2].enabled = false
     test.eq(Skin.refreshNavigation(registry, 0.58), true,
@@ -224,6 +236,19 @@ return function(test)
     registry.moduleTabs[2].enabled = true
     test.eq(Skin.apply("classic", registry, 0.58), true, "classic restores")
     eqTable(registry.visualState(), before, "classic is byte-for-byte visual restore")
+
+    registry.raidTabs[1].enabled = true
+    registry.raidTabs[2].enabled = false
+    test.eq(Skin.refreshRaidSelection(registry, 0.58), true,
+        "raid selection refresh succeeds in classic theme")
+    test.eq(registry.raidTabs[1].font.color[1], 0,
+        "classic inactive raid tab returns to cyan")
+    test.eq(registry.raidTabs[1].font.color[2], 0.75,
+        "classic inactive raid tab uses the established cyan channel")
+    test.eq(registry.raidTabs[2].font.color[1], 1,
+        "classic selected raid tab uses white")
+    test.eq(registry.raidTabs[2].font.color[2], 1,
+        "classic selected raid tab uses white across channels")
 
     -- A user may still have one of the legacy tiled image backgrounds selected.
     -- Preview must replace it visually and classic must restore the saved path.
@@ -252,6 +277,9 @@ return function(test)
     eqTable(registry.visualState(), before, "failed apply restores classic")
 
     local source = read("Core/BGNext/LegacyLedgerSkin.lua")
+    local ledgerSource = read("Core/BiaoGe.lua")
+    test.eq(ledgerSource:find("BG.BGNext.LegacyLedgerSkin.refreshRaidSelection()", 1, true) ~= nil,
+        true, "raid switches refresh theme-aware navigation state")
     for _, token in ipairs({
         "SetPoint", "ClearAllPoints", "SetSize", "SetWidth", "SetHeight",
         "SetParent", "SetFrameLevel", "SetFrameStrata", "SetScript",

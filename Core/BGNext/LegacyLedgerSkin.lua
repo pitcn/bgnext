@@ -294,6 +294,45 @@ function M.refreshNavigation(registry, legacyAlpha)
     return true
 end
 
+local function refreshClassicRaidTabs(tabs)
+    for _, tab in ipairs(tabs or {}) do
+        local enabled = true
+        if type(tab.IsEnabled) == "function" then
+            local ok, value = pcall(tab.IsEnabled, tab)
+            if ok then enabled = value end
+        end
+        local font = fontOf(tab)
+        if type(font) == "table" and type(font.SetTextColor) == "function" then
+            if enabled then
+                pcall(font.SetTextColor, font, 0, 0.75, 1, 1)
+            else
+                pcall(font.SetTextColor, font, 1, 1, 1, 1)
+            end
+        end
+        tab._BGNextVisualState = enabled and "normal" or "selected"
+    end
+end
+
+function M.refreshRaidSelection(registry, legacyAlpha)
+    if registry == nil then
+        registry = M.buildRuntimeRegistry()
+    end
+    if type(registry) ~= "table" then
+        return false, "ledger-not-ready"
+    end
+    if runtimeTheme == "preview" then
+        return M.refreshNavigation(registry, legacyAlpha)
+    end
+
+    local frames = buildGeometryFrames(registry)
+    local geometryBefore = UITheme.captureGeometry(frames)
+    local ok = pcall(refreshClassicRaidTabs, registry.raidTabs)
+    if not ok or not UITheme.geometryMatches(geometryBefore, frames) then
+        return false, ok and "geometry-mismatch" or "apply-error"
+    end
+    return true
+end
+
 function M.apply(themeId, registry, legacyAlpha)
     themeId = UITheme.normalize(themeId)
     if type(registry) ~= "table" or registry.main == nil
