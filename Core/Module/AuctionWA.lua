@@ -5,6 +5,7 @@ local L = ns.L
 local print = print
 local After = C_Timer.After
 local auctionID = "auctionID"
+local TimerSync = BG.BGNext and BG.BGNext.AuctionTimerSync
 local wa = {}
 wa.ver = "v4.0"
 function wa.GetVerNum(version)
@@ -828,13 +829,10 @@ BG.Init(function()
     wa.AutoSendEndPlaySound()
    end
    wa.Auto_OnTextChanged(bidFrame.autoMoneyEdit)
-   wa.RefreshTimer(bidFrame)
-   if bidFrame.isGen2 then
-    for k, otherFrame in pairs(BGA.Frames) do
-     if otherFrame ~= bidFrame and otherFrame.itemID == bidFrame.itemID then
-      wa.RefreshTimer(otherFrame)
-     end
-    end
+   if TimerSync then
+    TimerSync.refreshMatching(BGA.Frames, bidFrame, wa.RefreshTimer)
+   else
+    wa.RefreshTimer(bidFrame)
    end
    -- 新高价到达时取消旧计时器，避免延迟回调重复出价。
    -- 重投时机交给上方的 autoSendDelayFrame。

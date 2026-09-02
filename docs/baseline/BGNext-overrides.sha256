@@ -1,6 +1,6 @@
 # Explicit BGNext changes to upstream BGLite 2.4.0 files.
 # Format: SHA-256, two spaces, repository-relative path.
-ebe71cca564697be253fd11a4f671c93082b45d033cedf03805200469a06e921  BGLite.toc
+6e9f499cc38f916820932052bd82d73c174c422e17f8cc82d41f28275761a492  BGLite.toc
 6686c508bb020bdf0135c48d63b10287c844c635454e63d61dce77f24afcfa14  Bindings.xml
 cb7ffe99ecc71d960e6c75d58f2e7eb0e6813198bb1a00628ea8fee9db3bab28  Locales/enUS.lua
 7d9f8b04a2a707ab950e5be2982b82d7632a0239a042dd805fc6dbec7637ea85  Locales/zhCN.lua
@@ -19,7 +19,7 @@ bbd682d00755a889a5fbbc17adac6f8d0acf4bc2f49342f84069f82b8330bcac  Core/Module/ho
 e40f02dacfe0f0d43bf509e19378ca1cc22304871af7c0f0f0101d3cf001f4bc  Core/Module/Auction.lua
 9ff1361b0d65c2d199c2076bf2d92e11576c4dc4f694d880af274441f0654eef  Core/Module/AuctionLog.lua
 d03ae61a906f0042940212b04bc7ef23557025ef751f3aed5ffb775d199d1dab  Core/Module/AuctionMSG.lua
-b820f09670fe18ee922def0d83decda64de0332b31522d70806f05d797c80ee4  Core/Module/AuctionWA.lua
+6a636efc1824729aabc87069401e81d979dcb7d8b2602b0fe00056cc70f51f2f  Core/Module/AuctionWA.lua
 c3ddcf87e7e4eaab5a5590d90b1c221c3bd5d5def07a504b65aa1d4517e456c4  Core/Module/AuctionWAEvent.lua
 ed190826d96fc4d4cddfd403162e99026c415f647a0dc0f4b0d92d76dfa84bc3  Core/Module/ClearBiaoGe.lua
 ffd41b16bbc763da7538bdd0c118ebf5366d03dc55b21ebe89f478b5808cdf60  Core/Module/DuiZhang.lua
