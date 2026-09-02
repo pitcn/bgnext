@@ -341,6 +341,9 @@ return function(test)
         tickers[1].callback()
         state = ui2.checklistState()
         test.eq(state.report.issueCount, 4, "the new debt appears on the next scheduled validation")
+        for _, row in ipairs(state.rows) do
+            test.eq(row:IsShown(), true, "refreshed checklist entries and headers remain visible")
+        end
 
         -- 10d. expiry while visible is caught by the same scheduled update
         nowValue = 1000000 + 8 * 86400

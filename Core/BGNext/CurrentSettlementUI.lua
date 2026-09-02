@@ -442,6 +442,7 @@ local function renderChecklist(win, report)
         else
             configureEntryRow(row, item.entry)
         end
+        row:Show()
         win.checklistRows[#win.checklistRows + 1] = row
     end
     -- Surplus pooled rows lose their derived references immediately.
