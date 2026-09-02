@@ -20,6 +20,7 @@ Libs\embeds.xml
 Core\DB\DB.xml
 Core\BGNext\Init.lua
 Core\BGNext\UITheme.lua
+Core\BGNext\UIStyle.lua
 Core\BGNext\MainFrameScale.lua
 Core\BGNext\ChatYYCopy.lua
 Core\BGNext\Identity.lua
