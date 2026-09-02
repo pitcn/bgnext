@@ -184,84 +184,147 @@ return function(test)
     test.eq(entries(report, "pending", "bill")[1] ~= nil, true, "empty bill stays pending")
     test.eq(report.status, "pending", "empty bill never reads as ready")
 
-    -- 7. sold bill rows reconcile against trade evidence, one use each
-    -- 7a. the review reproduction: one unrelated trade must not clear a new sale
-    root = newRoot()
-    beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
-    addMail(root, "买家甲", 100, "sent")
-    input = checklist.collect({
-        db = root, fb = "ICC", now = NOW + 60,
-        table = { boss1 = {
-            zhuangbei1 = "[装备一]", maijia1 = "买家甲", jine1 = "100",
-            zhuangbei2 = "[装备二]", maijia2 = "买家乙", jine2 = "900",
-        } },
-        bosses = 1,
-        slotsOf = function() return 2 end,
-        itemIdOf = function(text) return text == "[装备一]" and 7001 or 9999 end,
-    })
-    report = checklist.evaluate(input)
-    test.eq(report.status ~= "ready", true, "an untraded sale blocks readiness")
-    local sold = entries(report, "pending", "sold")
-    test.eq(#sold, 1, "the sale without trade evidence is pending")
-    test.eq(sold[1].args[1], "1", "untraded sale names the boss")
-    test.eq(sold[1].args[2], "2", "untraded sale names the slot")
+    -- 7. sold bill rows need proven outgoing delivery, not just an
+    --    item/name match; fixtures use the real recorder projection
+    local runtime = dofile("Core/BGNext/CurrentSettlementRuntime.lua")
+    local function tradesOf(trade)
+        return runtime.tradeRows(trade)
+    end
 
-    -- 7b. one trade evidence can confirm only one identical sale
+    -- 7a. a correct sale with matching gold is proven and stays ready
     root = newRoot()
     beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
     report = checklist.evaluate({
-        settlement = root.currentSettlement,
-        bill = bill({
-            saleRow(1, 1, 7001, "[装备一]", "买家甲", "100"),
-            saleRow(1, 2, 7001, "[装备一]", "买家甲", "100"),
-        }, { splitCount = "40", netIncome = "200", wage = "5.00" }),
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", targetmoney = 1000, targetitems = {},
+            playeritems = { { itemId = 7001 } },
+        }), mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
     })
-    test.eq(#entries(report, "pending", "sold"), 1, "duplicate sales consume evidence once")
+    test.eq(report.status, "ready", "a proven delivered sale reads as ready")
+    test.eq(#entries(report, nil, "sold"), 0, "a proven sale needs no finding")
 
-    -- 7c. evidence follows the buyer, not just the item
+    -- 7b. an inbound purchase can never confirm a bill sale (review repro 1)
     root = newRoot()
     beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
     report = checklist.evaluate({
-        settlement = root.currentSettlement,
-        bill = bill({
-            saleRow(1, 1, 7001, "[装备一]", "买家甲", "100"),
-            saleRow(1, 2, 7001, "[装备一]", "买家乙", "100"),
-        }, { splitCount = "40", netIncome = "200", wage = "5.00" }),
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", playermoney = 100, targetmoney = 0,
+            targetitems = { { itemId = 7001 } }, playeritems = {},
+        }), mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
     })
+    test.eq(report.status ~= "ready", true, "an inbound purchase blocks readiness")
     sold = entries(report, "pending", "sold")
-    test.eq(#sold, 1, "the other buyer's identical sale stays pending")
-    test.eq(sold[1].args[2], "2", "the second sale is the unmatched one")
+    test.eq(#sold, 1, "the bill sale has no outgoing delivery evidence")
+    test.eq(sold[1].args[1], "1", "unproven sale names the boss")
+    test.eq(sold[1].args[2], "1", "unproven sale names the slot")
 
-    -- 7d. a packed trade delivers one evidence row per item, amounts stay shared
+    -- 7c. short payment: delivered but underpaid stays pending (review repro 2)
     root = newRoot()
     beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
-    addTrade(root, "买家甲", 7001, nil, "complete")
     report = checklist.evaluate({
-        settlement = root.currentSettlement,
-        bill = bill({
-            saleRow(1, 1, 7001, "[装备一]", "买家甲", "100"),
-            saleRow(1, 2, 7001, "[装备一]", "买家甲", "100"),
-        }, { splitCount = "40", netIncome = "200", wage = "5.00" }),
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", targetmoney = 1, targetitems = {},
+            playeritems = { { itemId = 7001 } },
+        }), mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
     })
-    test.eq(#entries(report, "pending", "sold"), 0, "both packed items reconcile")
-    test.eq(report.status, "ready", "packed delivery with matching rows is ready")
+    test.eq(report.status ~= "ready", true, "a short payment blocks readiness")
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 1, "the underpaid sale is flagged")
+    test.eq(sold[1].args[1], "1", "short payment names the received gold")
+    test.eq(sold[1].args[2], "1000", "short payment names the bill gold")
 
-    -- 7e. an unidentifiable bill item stays pending instead of guessing
+    -- 7d. packed trades share one amount: per-item proof stays pending
     root = newRoot()
     beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
     report = checklist.evaluate({
-        settlement = root.currentSettlement,
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", targetmoney = 2000, targetitems = {},
+            playeritems = { { itemId = 7001 }, { itemId = 7002 } },
+        }), mails = {} },
+        bill = bill({
+            saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000"),
+            saleRow(1, 2, 7002, "[装备二]", "买家甲", "1000"),
+        }, { splitCount = "1", netIncome = "2000", wage = "2000.00" }),
+    })
+    test.eq(report.status ~= "ready", true, "packed shared amounts cannot prove each item")
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 2, "both packed items stay pending")
+    test.eq(sold[1].args[1], "1", "shared-amount finding names the boss")
+    test.eq(sold[1].args[2], "1", "shared-amount finding names the first slot")
+    test.eq(sold[2].args[2], "2", "shared-amount finding names the second slot")
+
+    -- 7e. records without a direction (older shape) cannot prove delivery
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    report = checklist.evaluate({
+        settlement = { trades = { {
+            player = "买家甲", itemId = 7001, amount = 1000,
+            time = NOW, status = "complete",
+        } }, mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
+    })
+    test.eq(report.status ~= "ready", true, "a direction-less record blocks readiness")
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 1, "the direction-less sale is flagged for review")
+
+    -- 7f. surplus delivered sales beyond the bill stay pending
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    report = checklist.evaluate({
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", targetmoney = 1000, targetitems = {},
+            playeritems = { { itemId = 7001 }, { itemId = 7001 } },
+        }), mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
+    })
+    test.eq(report.status ~= "ready", true, "a delivered sale missing from the bill blocks readiness")
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 2, "the shared amount and the uncovered delivery are flagged")
+    test.eq(sold[1].reasonKey, "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）",
+        "the duplicate sale cannot be proven against the packed trade")
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记",
+        "the surplus finding names the uncovered delivery")
+
+    -- 7g. an unidentifiable bill item cannot use trade evidence
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    report = checklist.evaluate({
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", targetmoney = 100, targetitems = {},
+            playeritems = { { itemId = 7001 } },
+        }), mails = {} },
         bill = bill({ saleRow(1, 1, nil, "[神秘物品]", "买家甲", "100") },
-            { splitCount = "40", netIncome = "100", wage = "2.50" }),
+            { splitCount = "1", netIncome = "100", wage = "100.00" }),
     })
     sold = entries(report, "pending", "sold")
-    test.eq(#sold, 1, "an unidentifiable item cannot use trade evidence")
+    test.eq(#sold, 2, "an unidentifiable item and its uncovered delivery are flagged")
+    test.eq(sold[1].reasonKey, "账单装备无法识别，无法核对交易证据（第%s个Boss 第%s件）",
+        "the unidentifiable row is flagged")
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记",
+        "the delivered item cannot be matched to any bill row")
 
+    -- 7h. gold on both sides is ambiguous and can never prove a bill sale
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    report = checklist.evaluate({
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", targetmoney = 1000, playermoney = 500,
+            playeritems = { { itemId = 7001 } },
+        }), mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
+    })
+    test.eq(report.status ~= "ready", true, "a both-gold trade blocks readiness")
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 1, "the both-gold delivery has no sale evidence")
     -- 8. mail records are judged by status and direction, never by buyer身份
     root = newRoot()
     beginSettlement(root, "ICC")
@@ -286,15 +349,16 @@ return function(test)
     -- 9. everything checked and confirmed reads as ready
     root = newRoot()
     beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
     report = checklist.evaluate({
-        settlement = root.currentSettlement,
+        settlement = { trades = tradesOf({
+            completed = true, target = "买家甲", targetmoney = 100, targetitems = {},
+            playeritems = { { itemId = 7001 } },
+        }), mails = {} },
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "100") },
-            { splitCount = "40", netIncome = "100", wage = "2.50" }),
+            { splitCount = "1", netIncome = "100", wage = "100.00" }),
     })
     test.eq(report.status, "ready", "evidence-complete checklist is ready")
     test.eq(report.total, 0, "ready has no entries")
-
     -- 10. an anomaly wins over pending, both are counted
     root = newRoot()
     beginSettlement(root, "ICC")

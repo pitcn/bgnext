@@ -289,10 +289,15 @@ end
 
 -- Gathers the evaluate input from live data. Only this runtime section reads
 -- the addon globals; the checklist derivation itself stays injectable.
-local function checklistOptions(now)
+local function checklistFb()
     local root = database()
     local settlement = root and root.currentSettlement
-    local fb = settlement and settlement.sourceFb or BG.FB1
+    return settlement and settlement.sourceFb or BG.FB1
+end
+
+local function checklistOptions(now)
+    local root = database()
+    local fb = checklistFb()
     return {
         db = root,
         fb = fb,
@@ -461,9 +466,15 @@ local function renderChecklist(win, report)
     win.child:SetHeight(math.max(#display * (ROW_HEIGHT + ROW_GAP), win.scrollHeight))
 end
 
+-- Forward declarations: the refresh funnel and the hook/expiry maintenance
+-- helpers reference each other, so they are declared up front and assigned
+-- below.
+local refreshChecklist, requestChecklistRefresh
+local hookBillFrames, hookDebtEditBox, armExpiryInvalidation
+
 -- Recomputes only while the checklist window is visible; any record or window
 -- refresh funnels through here, so no timer or hidden-page scanning is needed.
-local function refreshChecklist()
+refreshChecklist = function()
     local win = windows[CHECKLIST_KIND]
     if not win or not win.frame:IsShown() then
         return
@@ -475,9 +486,17 @@ local function refreshChecklist()
     local root = database()
     local now = serverNow()
     M.prepare(root, now)
+    -- Hook the current scope's edit frames once; a scope change re-hooks.
+    local fb = checklistFb()
+    if fb ~= win.hookedFb then
+        hookBillFrames(fb)
+        win.hookedFb = fb
+    end
+    hookDebtEditBox()
     local report = C.report(checklistOptions(now))
     win.report = report
     renderChecklist(win, report)
+    armExpiryInvalidation(win, root, now)
 end
 
 -- Bursts of record updates coalesce into one recompute on the next frame.
@@ -487,7 +506,13 @@ local function processChecklistRefresh()
     refreshChecklist()
 end
 
-local function requestChecklistRefresh()
+-- The checklist is recomputed only while it is shown: hidden windows do no
+-- work, and bill-edit hooks that fire while it is closed are dropped here.
+requestChecklistRefresh = function()
+    local win = windows[CHECKLIST_KIND]
+    if not win or not win.frame:IsShown() then
+        return
+    end
     if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
         if checklistScheduled then
             return
@@ -499,32 +524,99 @@ local function requestChecklistRefresh()
     end
 end
 
--- While the window shows, a single low-frequency, scope-bound ticker revalidates
--- the data the checklist cannot subscribe to (bill, buyer, amount and debt edits
--- in the baseline table, and settlement expiry). It is cancelled on hide, so
--- nothing runs for a hidden or closed window.
-local function startChecklistTicker(win)
-    if win.updateTicker ~= nil then
+-- Bill edits (item, buyer, amount, debt, summary) live in baseline inline
+-- scripts that cannot be replaced, but every frame can be subscribed without
+-- touching its handler: one HookScript per edit frame, installed once per
+-- frame when the checklist window first reaches that scope. The hooks only
+-- fire a cheap, visibility-guarded refresh request -- no polling, no
+-- hidden-page work.
+hookBillFrames = function(fb)
+    if type(BG.Frame) ~= "table" or type(BG.Frame[fb]) ~= "table" then
         return
     end
-    if type(C_Timer) ~= "table" or type(C_Timer.NewTicker) ~= "function" then
+    local maxb = ns and ns.Maxb and ns.Maxb[fb] or 0
+    for boss = 1, maxb + 2 do
+        local bossData = BG.Frame[fb]["boss" .. boss]
+        if type(bossData) == "table" then
+            local slots = 0
+            if type(BG.GetMaxi) == "function" then
+                local ok, value = pcall(BG.GetMaxi, fb, boss)
+                if ok and type(value) == "number" then
+                    slots = value
+                end
+            end
+            for slot = 1, slots do
+                for _, field in ipairs({ "zhuangbei", "maijia", "jine" }) do
+                    local box = bossData[field .. slot]
+                    if type(box) == "table" and not box.__bgnChecklistNotify
+                        and type(box.HookScript) == "function" then
+                        box.__bgnChecklistNotify = true
+                        box:HookScript("OnTextChanged", requestChecklistRefresh)
+                    end
+                end
+                local debtButton = bossData["qiankuan" .. slot]
+                if type(debtButton) == "table" and not debtButton.__bgnChecklistNotify
+                    and type(debtButton.HookScript) == "function" then
+                    debtButton.__bgnChecklistNotify = true
+                    debtButton:HookScript("OnShow", requestChecklistRefresh)
+                    debtButton:HookScript("OnHide", requestChecklistRefresh)
+                end
+            end
+        end
+    end
+end
+
+-- The debt amount is edited in a shared popup box that BGLite recreates each
+-- time the popup opens, so a debt indicator that stays visible while its
+-- amount changes emits no OnShow/OnHide. Hook whatever box is current; the
+-- flag dies with the old box, so a freshly created one is hooked on the next
+-- refresh.
+hookDebtEditBox = function()
+    local edit = BG.FrameQianKuanEdit
+    if type(edit) ~= "table" or edit.__bgnChecklistNotify
+        or type(edit.HookScript) ~= "function" then
         return
     end
-    win.updateTicker = C_Timer.NewTicker(1, function()
+    edit.__bgnChecklistNotify = true
+    edit:HookScript("OnTextChanged", requestChecklistRefresh)
+end
+
+-- Expiry is handled by one cancellable, scope-bound one-shot timer armed for
+-- the current settlement's deadline; it re-arms for a replaced scope and is
+-- cancelled on hide. No repeating scan ever runs.
+armExpiryInvalidation = function(win, root, now)
+    local settlement = root and root.currentSettlement
+    local deadline = settlement and type(settlement.expiresAt) == "number"
+        and settlement.expiresAt or nil
+    -- Re-arming is idempotent per deadline: edits that keep the same scope do
+    -- not cancel and recreate the timer on every keystroke.
+    if deadline == win.expiryDeadline and win.expiryTimer then
+        return
+    end
+    if win.expiryTimer then
+        if type(win.expiryTimer.Cancel) == "function" then
+            win.expiryTimer:Cancel()
+        end
+        win.expiryTimer = nil
+    end
+    win.expiryDeadline = deadline
+    if not deadline or type(C_Timer) ~= "table" or type(C_Timer.NewTimer) ~= "function" then
+        return
+    end
+    local remaining = deadline - now
+    if remaining <= 0 then
+        return
+    end
+    win.expiryTimer = C_Timer.NewTimer(remaining + 1, function()
+        win.expiryTimer = nil
+        win.expiryDeadline = nil
         if not win.frame:IsShown() then
             return
         end
         M.prepare(database(), serverNow())
-        win.report = nil
         requestChecklistRefresh()
+        armExpiryInvalidation(win, database(), serverNow())
     end)
-end
-
-local function stopChecklistTicker(win)
-    if win.updateTicker and type(win.updateTicker.Cancel) == "function" then
-        win.updateTicker:Cancel()
-    end
-    win.updateTicker = nil
 end
 
 -- Frames stay pooled for reuse, but every derived reference (entry, reason
@@ -589,13 +681,19 @@ local function createChecklistWindow()
     hint:SetText(L["只读检查：不会自动修改账目、发送邮件或执行结算。"])
 
     frame:SetScript("OnShow", function()
-        startChecklistTicker(win)
         M.Refresh(CHECKLIST_KIND)
     end)
-    -- The derived report, rendered rows and locate closures are dropped with
-    -- the window; nothing survives a close, a manual clear or a scope switch.
+    -- The derived report, rendered rows, locate closures and the one-shot
+    -- expiry timer are dropped with the window; nothing survives a close, a
+    -- manual clear or a scope switch.
     frame:SetScript("OnHide", function()
-        stopChecklistTicker(win)
+        if win.expiryTimer then
+            if type(win.expiryTimer.Cancel) == "function" then
+                win.expiryTimer:Cancel()
+            end
+            win.expiryTimer = nil
+        end
+        win.expiryDeadline = nil
         releaseChecklistRows(win)
     end)
 

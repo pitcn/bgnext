@@ -3026,6 +3026,11 @@ do -- BGNext settlement checklist
     L["邮件发送失败：%s"] = "Mail failed to send: %s"
     L["人均工资（%s）与分金设置计算值（%s）不一致"] = "Displayed wage (%s) differs from the split setting (%s)"
     L["人均工资未录入，无法核对工资"] = "Displayed wage missing; wages cannot be verified"
+    L["对应交易的实收金额与账单不一致（%s金 / 账单%s金）（第%s个Boss 第%s件）"] = "The trade's received gold (%s) differs from the bill (%s) (boss %s, item %s)"
+    L["对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）"] = "The trade shares its gold across items or the association is ambiguous; this item's share cannot be confirmed (boss %s, item %s)"
+    L["已找到对应交易，但交易方向无法从记录确认，请人工核对（第%s个Boss 第%s件）"] = "A matching trade exists, but its direction cannot be proven from the record; please review (boss %s, item %s)"
+    L["该交易记录为买入方向，不能作为卖出交付证据（第%s个Boss 第%s件）"] = "The trade is an inbound purchase and cannot prove an outgoing delivery (boss %s, item %s)"
+    L["存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记"] = "%s completed delivery record(s) are not covered by the bill; please review for missing rows"
 end
 
     L["确认清空当前团的交易与邮件记录吗？\n只清除当前团结算记录，不影响表格账单、心愿清单和角色总览。"] = "Clear the current raid's trade and mail records?\nOnly the current-raid settlement records are removed; the bill, wishlist and character overview are not affected."

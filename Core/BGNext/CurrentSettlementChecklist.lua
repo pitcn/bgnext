@@ -64,20 +64,42 @@ local function evaluateTradesAndMails(input, addIssue, addPending)
     end
 end
 
--- Reconciles sold bill rows against confirmed trade deliveries. Each complete
--- trade row is one evidence unit (item id + counterparty) consumed at most
--- once, so duplicate sales, other buyers and unidentifiable items stay
--- conservative instead of being cleared by unrelated evidence. Amounts never
--- take part: one packed trade's gold is not apportioned to its items.
+-- Reconciles sold bill rows against confirmed trade deliveries. An item/name
+-- match alone is never proof: only an outgoing record (the runtime stamps the
+-- direction it observed) whose gold equals the bill amount proves the delivery
+-- and its payment. Direction-less legacy records, incoming purchases, short
+-- payments and packed shared amounts all stay pending, and each evidence row
+-- is consumed at most once. Amounts are never apportioned across items.
 local function evaluateSoldRows(input, addPending)
-    local evidence = {}
+    -- Group complete trade rows by trade (player + time) so a packed trade
+    -- (several delivered items sharing one gold amount) can be recognised:
+    -- its per-row amount is the trade total and can never prove a single
+    -- bill row's price.
+    local packedTrades, candidates = {}, {}
     for _, record in ipairs(input.settlement.trades or {}) do
         if record.status == "complete" and type(record.itemId) == "number" then
             local player = normalize(input, record.player)
             if player then
+                local tradeKey = player .. "|" .. tostring(record.time)
+                packedTrades[tradeKey] = (packedTrades[tradeKey] or 0) + 1
                 local key = tostring(record.itemId) .. "|" .. player
-                evidence[key] = (evidence[key] or 0) + 1
+                local list = candidates[key]
+                if not list then
+                    list = {}
+                    candidates[key] = list
+                end
+                list[#list + 1] = {
+                    amount = tonumber(record.amount),
+                    direction = record.direction,
+                    tradeKey = tradeKey,
+                    consumed = false,
+                }
             end
+        end
+    end
+    for _, list in pairs(candidates) do
+        for _, candidate in ipairs(list) do
+            candidate.packed = (packedTrades[candidate.tradeKey] or 0) > 1
         end
     end
     for _, row in ipairs(input.bill.rows) do
@@ -85,15 +107,87 @@ local function evaluateSoldRows(input, addPending)
         if row.item ~= "" and row.buyer ~= "" and amount ~= nil and amount > 0 then
             local buyer = normalize(input, row.buyer)
             local key = row.itemId and buyer and (tostring(row.itemId) .. "|" .. buyer) or nil
+            local location = { tostring(row.boss), tostring(row.slot) }
             if not key then
-                addPending("sold", "账单装备无法识别，无法核对交易证据（第%s个Boss 第%s件）",
-                    { tostring(row.boss), tostring(row.slot) })
-            elseif (evidence[key] or 0) > 0 then
-                evidence[key] = evidence[key] - 1
+                addPending("sold", "账单装备无法识别，无法核对交易证据（第%s个Boss 第%s件）", location)
             else
-                addPending("sold", "账单已售装备暂无对应交易证据（第%s个Boss 第%s件）",
-                    { tostring(row.boss), tostring(row.slot) })
+                local list = candidates[key]
+                local unconsumedOutgoing = {}
+                if list then
+                    for _, candidate in ipairs(list) do
+                        if not candidate.consumed and candidate.direction == "outgoing" then
+                            unconsumedOutgoing[#unconsumedOutgoing + 1] = candidate
+                        end
+                    end
+                end
+                local pick
+                if #unconsumedOutgoing >= 1 then
+                    -- Proven: one unpacked outgoing delivery for the exact
+                    -- billed gold.
+                    for _, candidate in ipairs(unconsumedOutgoing) do
+                        if not candidate.packed and candidate.amount == amount then
+                            pick = { candidate = candidate, reason = "proven" }
+                            break
+                        end
+                    end
+                    if not pick then
+                        if #unconsumedOutgoing == 1 and not unconsumedOutgoing[1].packed
+                            and unconsumedOutgoing[1].amount ~= nil then
+                            -- Short payment: delivered, but the gold differs.
+                            pick = { candidate = unconsumedOutgoing[1], reason = "short" }
+                        else
+                            -- Packed shared amounts or an ambiguous
+                            -- association can never prove a single row.
+                            pick = { candidate = #unconsumedOutgoing == 1
+                                and unconsumedOutgoing[1] or nil, reason = "packed" }
+                        end
+                    end
+                elseif list then
+                    -- Legacy records without a direction, or inbound-only
+                    -- purchases, can never prove a sale delivery.
+                    local hasIncoming
+                    for _, candidate in ipairs(list) do
+                        if candidate.direction == nil then
+                            pick = { reason = "unknown" }
+                            break
+                        end
+                        hasIncoming = true
+                    end
+                    if not pick and hasIncoming then
+                        pick = { reason = "incoming" }
+                    end
+                end
+                if not pick then
+                    addPending("sold", "账单已售装备暂无对应交易证据（第%s个Boss 第%s件）", location)
+                elseif pick.reason == "proven" then
+                    pick.candidate.consumed = true
+                elseif pick.reason == "short" then
+                    pick.candidate.consumed = true
+                    addPending("sold", "对应交易的实收金额与账单不一致（%s金 / 账单%s金）（第%s个Boss 第%s件）",
+                        { tostring(pick.candidate.amount), tostring(amount), location[1], location[2] })
+                elseif pick.reason == "packed" then
+                    if pick.candidate then
+                        pick.candidate.consumed = true
+                    end
+                    addPending("sold", "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）", location)
+                elseif pick.reason == "unknown" then
+                    addPending("sold", "已找到对应交易，但交易方向无法从记录确认，请人工核对（第%s个Boss 第%s件）", location)
+                elseif pick.reason == "incoming" then
+                    addPending("sold", "该交易记录为买入方向，不能作为卖出交付证据（第%s个Boss 第%s件）", location)
+                end
             end
+        end
+    end
+    -- Delivered sales the bill does not cover: the bill may be missing a row.
+    for _, list in pairs(candidates) do
+        local leftover = 0
+        for _, candidate in ipairs(list) do
+            if not candidate.consumed and candidate.direction == "outgoing" then
+                leftover = leftover + 1
+            end
+        end
+        if leftover > 0 then
+            addPending("sold", "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记", { tostring(leftover) })
         end
     end
 end

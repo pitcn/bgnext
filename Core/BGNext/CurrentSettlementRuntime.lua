@@ -187,24 +187,12 @@ local function isRosterMember(root, context, player)
     return false
 end
 
--- Only the gold one side actually put up counts as the settlement amount; it is
--- never derived from a bill row, a previous trade or a guess.
-local function settlementAmount(trade)
-    local theirs = tonumber(trade.targetmoney) or 0
-    local mine = tonumber(trade.playermoney) or 0
-    if theirs > 0 then
-        return theirs, mine
-    end
-    if mine > 0 then
-        return mine, mine
-    end
-    return nil, mine
-end
-
--- Turns one confirmed trade into the rows that describe it. When both sides put
--- up items and neither put up gold, BGLite itself cannot tell who the buyer is,
--- so a single row is produced for manual reconciliation instead of inventing an
--- item or an amount.
+-- Turns one confirmed trade into the rows that describe it. Direction records
+-- the item movement the runtime actually observed, never a guessed buyer: gold
+-- on exactly one side fixes the direction (the items travel the other way),
+-- while gold on both sides or neither side cannot name a buyer and stays
+-- direction-less with no amount. When both sides put up items and neither put
+-- up gold, a single row is produced for manual reconciliation.
 function M.tradeRows(trade, itemIdOf)
     if type(trade) ~= "table" or trade.completed ~= true then
         return {}
@@ -214,33 +202,54 @@ function M.tradeRows(trade, itemIdOf)
         return {}
     end
 
-    local amount, myMoney = settlementAmount(trade)
+    local theirs = tonumber(trade.targetmoney) or 0
+    local mine = tonumber(trade.playermoney) or 0
     local theirItems = itemIds(trade.targetitems, itemIdOf)
     local myItems = itemIds(trade.playeritems, itemIdOf)
+    local anyItems = #theirItems > 0 or #myItems > 0
 
-    local items
-    if amount == nil then
-        if #theirItems > 0 and #myItems > 0 then
-            items = {}
-        elseif #theirItems > 0 then
-            items = theirItems
-        elseif #myItems > 0 then
-            items = myItems
-        else
-            return {}
-        end
-    else
-        -- Gold moved: the settled items are the ones travelling the other way.
-        items = myMoney > 0 and theirItems or myItems
-        if #items == 0 then
-            items = #theirItems > 0 and theirItems or myItems
-        end
+    -- Only the gold one side actually put up counts as the settlement amount;
+    -- it is never derived from a bill row, a previous trade or a guess. Gold
+    -- on both sides cannot name the buyer, so no amount is asserted either.
+    local amount, direction
+    if theirs > 0 and mine > 0 then
+        amount, direction = nil, nil
+    elseif theirs > 0 then
+        amount, direction = theirs, "outgoing"
+    elseif mine > 0 then
+        amount, direction = mine, "incoming"
+    end
+
+    -- The settled items travel the other way from the gold; without a provable
+    -- direction, whatever item side exists is kept for manual reconciliation.
+    local items = {}
+    if direction == "outgoing" then
+        items = myItems
+    elseif direction == "incoming" then
+        items = theirItems
+    elseif #theirItems > 0 and #myItems > 0 then
+        items = {}
+    elseif #theirItems > 0 then
+        items = theirItems
+    elseif #myItems > 0 then
+        items = myItems
+    end
+
+    -- One-sided gold without an item on the other side cannot describe a
+    -- delivery; keep only the amount, direction-less, for manual review.
+    if amount ~= nil and #items == 0 then
+        direction = nil
+    end
+
+    -- Neither provable gold nor an identifiable item: no event at all.
+    if amount == nil and not anyItems then
+        return {}
     end
 
     local status = amount ~= nil and "complete" or "pending"
     local rows = {}
     if #items == 0 then
-        rows[1] = { player = player, itemId = nil, amount = amount, status = status }
+        rows[1] = { player = player, itemId = nil, amount = amount, status = status, direction = direction }
     else
         for index, itemId in ipairs(items) do
             rows[index] = {
@@ -249,6 +258,7 @@ function M.tradeRows(trade, itemIdOf)
                 -- The gold belongs to the trade, not to each packed item.
                 amount = index == 1 and amount or nil,
                 status = status,
+                direction = direction,
             }
         end
     end
@@ -271,6 +281,7 @@ function M.recordTrade(root, context, trade)
             amount = row.amount,
             time = now,
             status = row.status,
+            direction = row.direction,
         }) then
             written = written + 1
         end

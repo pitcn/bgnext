@@ -145,9 +145,11 @@ return function(test)
     test.eq(source:find("邮件记录（当前团）", 1, true) ~= nil, true, "mail window is explicitly labelled")
     test.eq(source:find("StaticPopup_Show", 1, true) ~= nil, true, "clearing goes through a confirmation popup")
     test.eq(source:find("OnUpdate", 1, true), nil, "settlement UI adds no per-frame handler")
-    test.eq(source:find("C_Timer.NewTicker", 1, true) ~= nil, true,
-        "the checklist uses one visibility-scoped scheduled update")
-    test.eq(source:find(":Cancel()", 1, true) ~= nil, true, "that scheduled update is cancelled on hide")
+    test.eq(source:find("C_Timer.NewTicker", 1, true), nil, "settlement UI adds no repeating ticker")
+    test.eq(source:find("C_Timer.NewTimer(remaining + 1", 1, true) ~= nil, true,
+        "expiry uses a cancellable one-shot timer just past the deadline")
+    test.eq(source:find(":Cancel()", 1, true) ~= nil, true, "the one-shot timer is cancelled on hide")
+    test.eq(source:find("HookScript", 1, true) ~= nil, true, "bill edit frames are subscribed by hooking")
 
     -- 10. the settlement checklist window: refresh, locate and cleanup run on
     --     real frames (mocked), and every swapped global comes back
@@ -241,9 +243,26 @@ return function(test)
             Hide = function() end,
         })
         local tickers = {}
+        local afters = {}
         setGlobal("C_Timer", {
-            After = function(_, callback) callback() end,
-            NewTicker = function(_, callback)
+            -- Burst coalescing uses After(0) and runs immediately in tests. The
+            -- one-shot expiry invalidation uses NewTimer, which returns a real
+            -- cancellable handle; those are recorded in `afters` for the
+            -- lifecycle assertions below. Both take the client's dot-notation
+            -- signature (no self argument), matching how production calls them.
+            After = function(delay, callback)
+                if delay == 0 then
+                    callback()
+                end
+            end,
+            NewTimer = function(delay, callback)
+                local timer = { delay = delay, callback = callback, cancelled = false }
+                function timer:Cancel() self.cancelled = true end
+                function timer:IsCancelled() return self.cancelled end
+                afters[#afters + 1] = timer
+                return timer
+            end,
+            NewTicker = function(_, _, callback)
                 local ticker = { callback = callback, cancelled = false }
                 function ticker:Cancel() self.cancelled = true end
                 tickers[#tickers + 1] = ticker
@@ -283,6 +302,29 @@ return function(test)
                 boss4 = { jine3 = "500", jine4 = "40", jine5 = "12.50" },
             },
         })
+        -- Real bill edit frames for the hook-based invalidation.
+        local hookCounts = {}
+        BG.Frame = { ICC = {} }
+        for boss = 1, 4 do
+            BG.Frame.ICC["boss" .. boss] = {}
+        end
+        BG.Frame.ICC.boss1.jine1 = makeFrame()
+        BG.Frame.ICC.boss1.zhuangbei1 = makeFrame()
+        BG.Frame.ICC.boss1.maijia1 = makeFrame()
+        BG.Frame.ICC.boss1.qiankuan1 = makeFrame()
+        for _, frame in ipairs({ BG.Frame.ICC.boss1.jine1, BG.Frame.ICC.boss1.zhuangbei1,
+            BG.Frame.ICC.boss1.maijia1, BG.Frame.ICC.boss1.qiankuan1 }) do
+            hookCounts[frame] = 0
+            local rawHook = frame.HookScript
+            frame.HookScript = function(self, name, handler)
+                hookCounts[frame] = hookCounts[frame] + 1
+                local previous = self.scripts[name]
+                self.scripts[name] = function(...)
+                    if previous then previous(...) end
+                    handler(...)
+                end
+            end
+        end
 
         -- The collector runtime wires the real clear-table notification and
         -- roots the SavedVariables on the mocked BiaoGe table.
@@ -345,21 +387,24 @@ return function(test)
         entryRow.scripts.OnEnter(entryRow)
         test.eq(tooltipLines[1], entryRow.fullReason, "the tooltip carries the untruncated reason")
 
-        -- 10c. a visible checklist revalidates bill edits through the
-        --      scope-bound scheduled update, without any manual Refresh call
+        -- 10c. bill edits reach the checklist through the real hooked frames,
+        --      with no repeating ticker and one one-shot expiry invalidation
+        test.eq(#tickers, 0, "no repeating ticker is created")
+        test.eq(#afters, 1, "one one-shot expiry invalidation is armed")
+        test.eq(afters[1].delay, 604801, "the one-shot fires just after the deadline")
+        test.eq(hookCounts[BG.Frame.ICC.boss1.jine1], 1, "the bill edit frame is subscribed once")
         BiaoGe.ICC.boss1.qiankuan1 = 999
-        tickers[1].callback()
+        BG.Frame.ICC.boss1.jine1.scripts.OnTextChanged(BG.Frame.ICC.boss1.jine1)
         state = ui2.checklistState()
-        test.eq(state.report.issueCount, 4, "the new debt appears on the next scheduled validation")
+        test.eq(state.report.issueCount, 4, "the new debt appears through the hooked frame")
         for _, row in ipairs(state.rows) do
             test.eq(row:IsShown(), true, "refreshed checklist entries and headers remain visible")
         end
 
-        -- 10d. expiry while visible is caught by the same scheduled update
-        nowValue = 1000000 + 8 * 86400
-        tickers[1].callback()
-        state = ui2.checklistState()
-        test.eq(state.report.status, "pending", "an expired settlement drops to pending while visible")
+        -- 10d. idle time alone rebuilds nothing
+        local idleReport = state.report
+        nowValue = nowValue + 30
+        test.eq(ui2.checklistState().report, idleReport, "idle time causes zero report builds")
 
         -- 10e. back to live data; the purged settlement is re-established and
         --      the findings return through the normal pipeline
@@ -387,11 +432,32 @@ return function(test)
             end
         end
         test.eq(retainedEntries, 0, "pooled rows retain no derived entries or text")
-        test.eq(tickers[1].cancelled, true, "the scheduled update is cancelled on hide")
+        test.eq(afters[1].cancelled, true, "the one-shot expiry timer is cancelled on hide")
+        test.eq(#tickers, 0, "still no repeating ticker after a full cycle")
 
-        -- 10g. clearing the active raid table invalidates the scope at once
+        -- 10g. reopening arms a fresh one-shot for the re-established scope
+        --      and does not accumulate frame hooks
         ui2.Show("checklist")
         test.eq(ui2.checklistState().report.status, "issues", "report is recomputed on reopen")
+        test.eq(#afters, 2, "reopening arms a fresh one-shot expiry timer")
+        test.eq(afters[2].delay, 604801, "the fresh timer matches the new deadline")
+        test.eq(hookCounts[BG.Frame.ICC.boss1.jine1], 1, "reopening does not accumulate frame hooks")
+
+        -- 10h. expiry fires once and drops the purged scope to pending
+        nowValue = 1000000 + 8 * 86400
+        afters[2].callback()
+        state = ui2.checklistState()
+        test.eq(state.report.status, "pending", "an expired re-established scope drops to pending")
+        test.eq(#afters, 2, "no re-arm without a live settlement")
+
+        -- 10i. clearing the active raid table invalidates the scope at once
+        checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
+        checklistTrade.append(BG.BGNext.DB, {
+            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
+            time = nowValue, status = "pending",
+        })
+        ui2.Refresh("checklist")
+        test.eq(ui2.checklistState().report.status, "issues", "the re-established scope is checked")
         BG.ClearBiaoGe("biaoge", "ICC")
         test.eq(BG.BGNext.DB.currentSettlement.raidId, nil, "clearing the raid table clears the settlement")
         state = ui2.checklistState()

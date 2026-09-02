@@ -88,6 +88,28 @@ return function(test)
         completed = true, target = "丁", targetmoney = 0, playermoney = 0,
     }), 0, "empty trade is not recorded")
 
+    -- 6b. gold on both sides cannot name the buyer or the direction: the
+    --     delivered item is kept as a pending record with no amount and no
+    --     direction, so the checklist can never read it as a proven sale.
+    local ambiguous = runtime.tradeRows({
+        completed = true, target = "甲", targetmoney = 100, playermoney = 50,
+        playeritems = { { itemId = 7001 } },
+    })
+    test.eq(#ambiguous, 1, "both-gold trade projects one pending row")
+    test.eq(ambiguous[1].itemId, 7001, "the delivered item is kept")
+    test.eq(ambiguous[1].amount, nil, "no amount is invented for a both-gold trade")
+    test.eq(ambiguous[1].direction, nil, "both-gold direction is not guessed")
+    test.eq(ambiguous[1].status, "pending", "both-gold trade stays pending")
+    local ambiguousRoot = life.ensureRoot({})
+    test.eq(runtime.recordTrade(ambiguousRoot, context(5450, 5000), {
+        completed = true, target = "甲", targetmoney = 100, playermoney = 50,
+        playeritems = { { itemId = 7001 } },
+    }), 1, "both-gold trade is recorded as pending")
+    local ambiguousRecord = ambiguousRoot.currentSettlement.trades[1]
+    test.eq(ambiguousRecord.direction, nil, "stored both-gold direction stays nil")
+    test.eq(ambiguousRecord.amount, nil, "stored both-gold amount stays nil")
+    test.eq(ambiguousRecord.status, "pending", "stored both-gold status is pending")
+
     -- 7. mail: only a plugin-executed send result, whitelisted fields only
     test.eq(runtime.recordMail(root, context(5500, 5000), {
         player = "甲", amount = 300,
