@@ -205,6 +205,40 @@ function M.upsert(root, clientFamily, snapshot)
     return clean
 end
 
+local SECTION_FIELDS = {
+    identity = { "realmName", "faction", "class", "level" },
+    equipment = { "itemLevel", "equipment" },
+    money = { "money" },
+    raid = { "raidStates" },
+    professions = { "professions" },
+    currencies = { "currencies" },
+    items = { "items" },
+    professionCooldowns = { "professionCooldowns" },
+    resources = { "currencies", "items", "professionCooldowns" },
+}
+
+-- Replaces only the fields belonging to dirty sections while preserving the
+-- rest of the last-seen snapshot. The merged value still passes through the
+-- same whitelist sanitizer as a full upsert.
+function M.mergeSections(root, clientFamily, snapshot, sections)
+    if type(snapshot) ~= "table" or type(sections) ~= "table" then return nil end
+    if not isKey(snapshot.realmId) or type(snapshot.player) ~= "string" or snapshot.player == "" then return nil end
+
+    local existing = M.get(root, clientFamily, snapshot.realmId, snapshot.player)
+    local merged = {}
+    for key, value in pairs(type(existing) == "table" and existing or {}) do merged[key] = value end
+    merged.player = snapshot.player
+    merged.realmId = snapshot.realmId
+    merged.updatedAt = snapshot.updatedAt
+
+    for section, fields in pairs(SECTION_FIELDS) do
+        if sections[section] == true then
+            for _, field in ipairs(fields) do merged[field] = snapshot[field] end
+        end
+    end
+    return M.upsert(root, clientFamily, merged)
+end
+
 function M.get(root, clientFamily, realmId, player)
     local realm = realmTable(root, clientFamily, realmId, false)
     if not realm or type(player) ~= "string" then return nil end

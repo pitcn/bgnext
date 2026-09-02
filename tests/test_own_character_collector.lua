@@ -111,6 +111,18 @@ return function(test)
         resources = function() return { currencies = {}, items = {} } end,
     })).professionCooldowns, nil, "a resources reader without cooldowns stores none")
 
+    local resourceSelection
+    local currencyPatch = Collector.collect(baseEnv({
+        resources = function(selection)
+            resourceSelection = selection
+            return { currencies = { honor = 25 }, items = { bagFree = 7 } }
+        end,
+    }), { currencies = true })
+    test.eq(resourceSelection.currencies, true, "currency refresh scopes the shared resource reader")
+    test.eq(resourceSelection.items, nil, "currency refresh does not request bag items")
+    test.eq(currencyPatch.currencies.honor, 25, "currency refresh returns currency values")
+    test.eq(currencyPatch.items, nil, "currency refresh omits unrequested item values")
+
     -- Event registration is restricted to a reviewed own-character allowlist.
     local registered = {}
     local frame = {
@@ -135,8 +147,10 @@ return function(test)
         test.eq(allowed[event], true, event .. " was registered from the allowlist")
     end
 
-    -- Debounce collapses bursts into a single snapshot write.
+    -- Debounce collapses bursts into a single snapshot write while preserving
+    -- the union of data sections made dirty by the contributing events.
     local writes = 0
+    local dirty
     local scheduled = {}
     local burstFrame = { RegisterEvent = function() end, SetScript = function(_, _, fn) scheduled.handler = fn end }
     local ticks = {}
@@ -144,7 +158,10 @@ return function(test)
         frame = burstFrame,
         family = "titan",
         after = function(delay, fn) ticks[#ticks + 1] = fn end,
-    }, function() writes = writes + 1 end)
+    }, function(sections)
+        writes = writes + 1
+        dirty = sections
+    end)
     if scheduled.handler then
         scheduled.handler(burstFrame, "PLAYER_EQUIPMENT_CHANGED")
         scheduled.handler(burstFrame, "PLAYER_EQUIPMENT_CHANGED")
@@ -152,5 +169,15 @@ return function(test)
         test.eq(#ticks, 1, "a burst schedules exactly one refresh")
         ticks[1]()
         test.eq(writes, 1, "a burst produces one snapshot write")
+        test.eq(dirty.equipment, true, "equipment events dirty only the equipment section")
+        test.eq(dirty.money, true, "money events join the pending dirty-section union")
+        test.eq(dirty.raid, nil, "unrelated raid data is not dirtied by the burst")
+
+        for _ = 1, 100 do scheduled.handler(burstFrame, "BAG_UPDATE_DELAYED") end
+        test.eq(#ticks, 2, "one hundred bag events schedule one additional refresh")
+        ticks[2]()
+        test.eq(writes, 2, "one hundred bag events produce one additional snapshot write")
+        test.eq(dirty.items, true, "bag bursts dirty only the bag-item section")
+        test.eq(dirty.equipment, nil, "a later bag burst does not retain old dirty sections")
     end
 end

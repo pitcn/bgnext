@@ -72,6 +72,17 @@ function M.isEnabled(deps)
     return settings.roleOverviewEnabled
 end
 
+local function refreshUIIfVisible(deps)
+    local ui = deps and deps.ui
+    if not ui or type(ui.Refresh) ~= "function" then return false end
+    if type(ui.IsVisible) == "function" then
+        local ok, visible = pcall(ui.IsVisible)
+        if not ok or visible ~= true then return false end
+    end
+    ui.Refresh()
+    return true
+end
+
 function M.setEnabled(deps, value)
     deps = deps or M.deps()
     local root = deps and deps.root
@@ -100,7 +111,7 @@ function M.refreshVisible(deps)
     if not M.isEnabled(deps) then return end
     local now = (type(deps.now) == "function" and deps.now) or defaultNow
     if deps.model and deps.root then deps.model.expireRaidStates(deps.root, now()) end
-    if deps.ui and type(deps.ui.Refresh) == "function" then deps.ui.Refresh() end
+    refreshUIIfVisible(deps)
 end
 
 function M.setVisible(deps, visible)
@@ -122,13 +133,13 @@ function M.setColumnVisible(deps, section, columnId, visible)
     if section ~= "raid" and section ~= "resource" then return false end
     if type(columnId) ~= "string" or columnId == "" then return false end
     settings.setVisible(deps.root, deps.family, section, columnId, visible == true)
-    if deps.ui and type(deps.ui.Refresh) == "function" then deps.ui.Refresh() end
+    refreshUIIfVisible(deps)
     return true
 end
 
 -- The one safe collection path. Returns the stored snapshot, or nil when the
 -- module is disabled or the client cannot identify the logged-in character.
-function M.collectAndStore(deps)
+function M.collectAndStore(deps, sections)
     deps = deps or M.deps()
     if not M.isEnabled(deps) or not M.isAvailable(deps) then return nil end
 
@@ -165,13 +176,26 @@ function M.collectAndStore(deps)
         end
     end
 
-    local snapshot = collector.collect(env)
+    local scoped = type(sections) == "table" and sections.full ~= true
+    local snapshot = collector.collect(env, sections)
+    if snapshot and scoped then
+        local existing = type(model.get) == "function"
+            and model.get(root, family, snapshot.realmId, snapshot.player) or nil
+        if not existing then
+            snapshot = collector.collect(env)
+            scoped = false
+        end
+    end
     if snapshot then
-        model.upsert(root, family, snapshot)
+        if scoped and type(model.mergeSections) == "function" then
+            model.mergeSections(root, family, snapshot, sections)
+        else
+            model.upsert(root, family, snapshot)
+        end
     end
     model.expireRaidStates(root, stamp)
 
-    if deps.ui and type(deps.ui.Refresh) == "function" then deps.ui.Refresh() end
+    refreshUIIfVisible(deps)
     return snapshot
 end
 
@@ -196,13 +220,13 @@ function M.clearFamily(deps, family)
     if deps.model and family then
         deps.model.clearFamily(deps.root, family)
     end
-    if deps.ui and type(deps.ui.Refresh) == "function" then deps.ui.Refresh() end
+    refreshUIIfVisible(deps)
 end
 
 function M.clearAll(deps)
     deps = deps or M.deps()
     if deps.model then deps.model.clearAll(deps.root) end
-    if deps.ui and type(deps.ui.Refresh) == "function" then deps.ui.Refresh() end
+    refreshUIIfVisible(deps)
 end
 
 -- Installs the reviewed event allowlist plus one immediate collection. Called
@@ -225,8 +249,8 @@ function M.install(deps)
             frame = frame,
             family = deps.family,
             after = deps.after,
-        }, function()
-            M.collectAndStore(deps)
+        }, function(sections)
+            M.collectAndStore(deps, sections)
         end)
     end
 
