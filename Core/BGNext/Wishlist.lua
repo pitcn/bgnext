@@ -42,14 +42,38 @@ end
 -- old SavedVariables stay byte-identical) or, only for core/backup, a record
 -- table. The priority therefore always dies with its slot: no parallel table,
 -- no orphan data.
-local function readRecord(value)
+-- Hot scan paths (contains / highestPriority / findItem over every boss and
+-- slot) decode through these scalar helpers; only callers that actually need a
+-- record object go through readRecord, so a full wish scan allocates nothing.
+local function slotItemId(value)
     if validItemId(value) then
-        return { itemId = value, priority = "normal" }
+        return value
     end
-    if type(value) == "table" and validItemId(value.item) then
-        return { itemId = value.item, priority = M.normalizePriority(value.priority) }
+    if type(value) == "table" then
+        local item = value.item
+        if validItemId(item) then
+            return item
+        end
     end
     return nil
+end
+
+local function slotPriority(value)
+    if validItemId(value) then
+        return "normal"
+    end
+    if type(value) == "table" and validItemId(value.item) then
+        return M.normalizePriority(value.priority)
+    end
+    return nil
+end
+
+local function readRecord(value)
+    local itemId = slotItemId(value)
+    if not itemId then
+        return nil
+    end
+    return { itemId = itemId, priority = slotPriority(value) }
 end
 
 local function encodeSlot(itemId, priority)
@@ -65,18 +89,6 @@ function M.cyclePriority(priority, direction)
     local step = (direction and direction > 0) and 1 or -1
     index = ((index - 1 + step) % #PRIORITY_CYCLE) + 1
     return PRIORITY_CYCLE[index]
-end
-
-function M.highestPriority(root, realmId, player, raidId, itemId)
-    local best = nil
-    for _, match in ipairs(M.findItem(root, realmId, player, raidId, itemId)) do
-        local priority = M.getSlotPriority(root, realmId, player, raidId,
-            match.difficultyIndex, match.bossIndex, match.slotIndex)
-        if priority and (not best or PRIORITY_RANK[priority] > PRIORITY_RANK[best]) then
-            best = priority
-        end
-    end
-    return best
 end
 
 function M.priorityTagKey(priority)
@@ -202,8 +214,8 @@ function M.getSlotRecord(root, realmId, player, raidId, difficultyIndex, bossInd
 end
 
 function M.getSlotPriority(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
-    local record = M.getSlotRecord(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
-    return record and record.priority or nil
+    local slots = getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
+    return slots and slotPriority(slots[slotIndex]) or nil
 end
 
 function M.setSlotPriority(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex, priority)
@@ -211,11 +223,11 @@ function M.setSlotPriority(root, realmId, player, raidId, difficultyIndex, bossI
     if not slots then
         return false
     end
-    local record = readRecord(slots[slotIndex])
-    if not record then
+    local itemId = slotItemId(slots[slotIndex])
+    if not itemId then
         return false
     end
-    slots[slotIndex] = encodeSlot(record.itemId, priority)
+    slots[slotIndex] = encodeSlot(itemId, priority)
     return true
 end
 
@@ -235,11 +247,7 @@ end
 
 function M.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
     local slots = getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
-    local value = slots and slots[slotIndex] or nil
-    if type(value) == "table" then
-        return validItemId(value.item) and value.item or nil
-    end
-    return value
+    return slots and slotItemId(slots[slotIndex]) or nil
 end
 
 function M.clearSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
@@ -263,8 +271,7 @@ function M.findItem(root, realmId, player, raidId, itemId)
                 for bossIndex, slots in pairs(bosses) do
                     if validPositiveIndex(bossIndex) and type(slots) == "table" then
                         for slotIndex, storedValue in pairs(slots) do
-                            local record = validPositiveIndex(slotIndex) and readRecord(storedValue) or nil
-                            if record and record.itemId == itemId then
+                            if validPositiveIndex(slotIndex) and slotItemId(storedValue) == itemId then
                                 result[#result + 1] = {
                                     difficultyIndex = difficultyIndex,
                                     bossIndex = bossIndex,
@@ -562,8 +569,64 @@ function M.applyImport(root, realmId, player, parsed)
     return true
 end
 
+function M.highestPriority(root, realmId, player, raidId, itemId)
+    if not validItemId(itemId) then
+        return nil
+    end
+    local raid = getRaid(root, realmId, player, raidId, false)
+    if not raid then
+        return nil
+    end
+    -- Single allocation-free scan; core is the ceiling, so stop as soon as it
+    -- is found.
+    local best, bestRank
+    for difficultyIndex, bosses in pairs(raid) do
+        if validPositiveIndex(difficultyIndex) and type(bosses) == "table" then
+            for bossIndex, slots in pairs(bosses) do
+                if validPositiveIndex(bossIndex) and type(slots) == "table" then
+                    for slotIndex, value in pairs(slots) do
+                        if validPositiveIndex(slotIndex) and slotItemId(value) == itemId then
+                            local priority = slotPriority(value)
+                            local rank = PRIORITY_RANK[priority]
+                            if not best or rank > bestRank then
+                                best, bestRank = priority, rank
+                                if rank == PRIORITY_RANK.core then
+                                    return best
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
 function M.contains(root, realmId, player, raidId, itemId)
-    return #M.findItem(root, realmId, player, raidId, itemId) > 0
+    if not validItemId(itemId) then
+        return false
+    end
+    local raid = getRaid(root, realmId, player, raidId, false)
+    if not raid then
+        return false
+    end
+    -- Allocation-free scan with an early return; loot and auction checks call
+    -- this per event, so misses must not build or sort a match list.
+    for difficultyIndex, bosses in pairs(raid) do
+        if validPositiveIndex(difficultyIndex) and type(bosses) == "table" then
+            for bossIndex, slots in pairs(bosses) do
+                if validPositiveIndex(bossIndex) and type(slots) == "table" then
+                    for slotIndex, value in pairs(slots) do
+                        if validPositiveIndex(slotIndex) and slotItemId(value) == itemId then
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
 end
 
 BG.BGNext.Wishlist = M

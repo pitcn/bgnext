@@ -8,12 +8,8 @@ local seen = {}
 
 -- Local-only display: the reminder names the priority of the hit wish slot.
 -- The suffix is never sent anywhere; it only decorates the local message.
-local function prioritySuffix(wishlist, root, itemId, raidId)
-    if not wishlist.highestPriority or not wishlist.priorityNameKey then
-        return ""
-    end
-    local priority = wishlist.highestPriority(root, BG.realmID, BG.playerName, raidId, itemId)
-    if not priority then
+local function prioritySuffix(wishlist, priority)
+    if not wishlist.priorityNameKey then
         return ""
     end
     local L = ns and ns.L
@@ -55,14 +51,19 @@ end
 function M.notify(kind, itemId, raidId, eventId, itemLink, level)
     local wishlist = BG.BGNext.Wishlist
     local root = BG.BGNext.DB
-    if not wishlist or not root or not wishlist.contains(root, BG.realmID, BG.playerName, raidId, itemId) then
+    -- One allocation-free scan decides both "is this a wish" and its priority.
+    if not wishlist or not root or not wishlist.highestPriority then
+        return false
+    end
+    local priority = wishlist.highestPriority(root, BG.realmID, BG.playerName, raidId, itemId)
+    if not priority then
         return false
     end
     local key = tostring(kind) .. ":" .. tostring(eventId) .. ":" .. tostring(itemId)
     if not M.shouldNotify(seen, key) then return false end
     M.markNotified(seen, key)
 
-    local suffix = prioritySuffix(wishlist, root, itemId, raidId)
+    local suffix = prioritySuffix(wishlist, priority)
     local display = itemLink or tostring(itemId)
     local message
     if kind == "loot" then

@@ -143,6 +143,29 @@ function M.isLooted(wishItemId, recordedItemIds)
     return false
 end
 
+-- Pure geometry contract for one wishlist slot row (default width 115). The
+-- priority tag owns a fixed strip at the left edge of the edit box and the
+-- item text starts after it, so the two never overlap. The upstream
+-- owned/dropped/level indicators keep their existing right-edge overlays,
+-- which the tag strip never reaches (the owned checkmark sits outside the
+-- box's left edge on wishlist slots). Plain integers so the contract is
+-- testable without real font metrics.
+local TAG_FONT_HEIGHT = 9
+function M.slotTagLayout(slotWidth)
+    local tagStrip = 40
+    local textLeftInset = tagStrip + 2
+    local textRightInset = 5
+    return {
+        slotWidth = slotWidth,
+        tagStrip = tagStrip,
+        tagFontHeight = TAG_FONT_HEIGHT,
+        tagMaxTextWidth = tagStrip - 4,
+        textLeftInset = textLeftInset,
+        textRightInset = textRightInset,
+        textWidth = slotWidth - textLeftInset - textRightInset,
+    }
+end
+
 -- Computes where one difficulty header block sits in the wishlist grid. Pure
 -- data (no frames, no WoW calls) so the layout is testable in plain Lua.
 --
@@ -197,6 +220,8 @@ if runtimeReady() then
     local hopeMaxi = ns.HopeMaxi
     local maxb = ns.Maxb
     local L = ns.L or setmetatable({}, { __index = function(_, key) return key end })
+
+    local tagLayout = M.slotTagLayout(115)
 
     -- Small low-saturation tags; the default priority stays muted so it never
     -- competes with the item text for attention.
@@ -391,15 +416,18 @@ if runtimeReady() then
         slot:SetFrameLevel(110)
         slot:SetPoint("TOPLEFT", anchor, slotIndex == 1 and "BOTTOMLEFT" or "TOPLEFT", xOffset or 0, slotIndex == 1 and -1 or 0)
         slot:SetAutoFocus(false)
+        -- The reserved left strip keeps the item text clear of the priority
+        -- tag; the upstream right-edge status overlays are untouched.
+        slot:SetTextInsets(tagLayout.textLeftInset, tagLayout.textRightInset, 0, 0)
         if BG.SetEditStickyFocus then BG.SetEditStickyFocus(slot) end
         slot.FB, slot.hopenandu, slot.bossnum, slot.i = raidId, difficultyIndex, bossIndex, slotIndex
         slot.icon = slot:CreateTexture(nil, "ARTWORK")
         slot.icon:SetPoint("LEFT", -22, 0)
         slot.icon:SetSize(16, 16)
         slot.priorityTag = slot:CreateFontString(nil, "OVERLAY")
-        slot.priorityTag:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", 1, 1)
-        slot.priorityTag:SetFont(BIAOGE_TEXT_FONT, 10, "OUTLINE")
-        slot.priorityTag:SetJustifyH("RIGHT")
+        slot.priorityTag:SetPoint("LEFT", slot, "LEFT", 2, 0)
+        slot.priorityTag:SetFont(BIAOGE_TEXT_FONT, tagLayout.tagFontHeight, "OUTLINE")
+        slot.priorityTag:SetJustifyH("LEFT")
         if BG.LootedText then BG.LootedText(slot) end
 
         slot.hover = slot:CreateTexture(nil, "BACKGROUND")

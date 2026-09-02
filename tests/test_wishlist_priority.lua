@@ -215,4 +215,77 @@ return function(test)
     for _, forbidden in ipairs({ "C_Timer", "OnUpdate" }) do
         test.eq(uiSource:find(forbidden, 1, true), nil, "wishlist UI stays event-free: " .. forbidden)
     end
+    for _, required in ipairs({
+        "M.slotTagLayout",
+        "SetTextInsets",
+        'SetPoint("LEFT", slot, "LEFT", 2, 0)',
+    }) do
+        test.eq(uiSource:find(required, 1, true) ~= nil, true, "wishlist UI keeps tag layout contract: " .. required)
+    end
+    test.eq(uiSource:find('priorityTag:SetPoint("BOTTOMRIGHT"', 1, true), nil,
+        "priority tag no longer overlays the status-marker corner")
+
+    -- 19) hot wish lookups must not allocate per scanned slot (GC paused, no
+    --     wall-time assertions)
+    local perfRoot = { wishlist = { realm = { A = { ICC = {} } } } }
+    for difficultyIndex = 1, 3 do
+        perfRoot.wishlist.realm.A.ICC[difficultyIndex] = {}
+        for bossIndex = 1, 5 do
+            perfRoot.wishlist.realm.A.ICC[difficultyIndex][bossIndex] = {}
+            for slotIndex = 1, 7 do
+                perfRoot.wishlist.realm.A.ICC[difficultyIndex][bossIndex][slotIndex] = 9000 + slotIndex
+            end
+        end
+    end
+    collectgarbage("stop")
+    local beforeKiB = collectgarbage("count")
+    for _ = 1, 5000 do
+        if wish.contains(perfRoot, "realm", "A", "ICC", 424242) then
+            collectgarbage("restart")
+            error("miss probe unexpectedly matched")
+        end
+    end
+    local containsGrownKiB = collectgarbage("count") - beforeKiB
+    for _ = 1, 5000 do
+        if wish.highestPriority(perfRoot, "realm", "A", "ICC", 424242) then
+            collectgarbage("restart")
+            error("miss probe unexpectedly matched")
+        end
+    end
+    local priorityGrownKiB = collectgarbage("count") - beforeKiB
+    collectgarbage("restart")
+    test.eq(containsGrownKiB < 2048, true,
+        "5000 miss contains scans allocate under 2 MiB, got " .. string.format("%.0f KiB", containsGrownKiB))
+    test.eq(priorityGrownKiB < 2048, true,
+        "5000 miss highestPriority scans allocate under 2 MiB, got " .. string.format("%.0f KiB", priorityGrownKiB))
+    test.eq(wish.contains(perfRoot, "realm", "A", "ICC", 9001), true, "hit lookup still works after the GC pause")
+    test.eq(wish.highestPriority(perfRoot, "realm", "A", "ICC", 9001), "normal", "hit priority still works")
+
+    -- 20) the priority tag owns a reserved left strip; item text and the
+    --     upstream owned/dropped/level markers keep disjoint regions
+    local ui = dofile("Core/BGNext/WishlistUI.lua")
+    local layout = ui.slotTagLayout(115)
+    test.eq(layout.textLeftInset, layout.tagStrip + 2, "item text starts after the tag strip")
+    test.eq(layout.textLeftInset + layout.textWidth + layout.textRightInset, layout.slotWidth,
+        "text and tag regions tile the slot width")
+    test.eq(layout.textWidth >= 65, true, "item text keeps a readable region")
+    test.eq(layout.tagStrip <= layout.textLeftInset, true, "tag strip never reaches the text region")
+    -- Glyph-width model for outline UI fonts: CJK/fullwidth glyphs render at
+    -- the font height, Latin letters/digits/space at roughly 0.55x.
+    local function estimatedTextWidth(text, fontHeight)
+        local width = 0
+        for index = 1, #text do
+            local byte = string.byte(text, index)
+            if byte >= 0xC0 then
+                width = width + fontHeight
+            elseif byte < 0x80 then
+                width = width + fontHeight * 0.55
+            end
+        end
+        return width
+    end
+    for _, label in ipairs({ "BIS", "次BIS", "备选", "備選", "BiS", "2nd BiS", "Backup" }) do
+        test.eq(estimatedTextWidth(label, layout.tagFontHeight) <= layout.tagMaxTextWidth, true,
+            "priority tag fits its reserved strip: " .. label)
+    end
 end
