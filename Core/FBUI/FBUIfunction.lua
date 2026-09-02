@@ -1236,7 +1236,8 @@ local function applyBossLabelColor(label, role, classicHex)
 end
 
 function BG.BossNameUI(FB, t, b, bb, i, ii, frameName)
-    local fontsize = 14
+    local UIStyle = BG.BGNext and BG.BGNext.UIStyle
+    local fontsize = (UIStyle and UIStyle.BOSS_LABEL_FONT_SIZE) or 15
     local boss = BossNum(FB, b, t)
     local f = CreateFrame("Frame", nil, BG[frameName .. FB])
     if frameName and BG[frameName .. FB]["scrollFrame" .. boss] then

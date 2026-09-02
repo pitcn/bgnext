@@ -3,6 +3,7 @@ BG.BGNext = BG.BGNext or {}
 
 local UITheme = BG.BGNext.UITheme
 local M = {}
+M.BOSS_LABEL_FONT_SIZE = 15
 local registeredButtons = setmetatable({}, { __mode = "k" })
 local registeredTexts = setmetatable({}, { __mode = "k" })
 local registeredUtilityButtons = setmetatable({}, { __mode = "k" })
@@ -34,7 +35,7 @@ local palettes = {
 local textColors = {
     brand = "00E6FF",
     primary = "E8F1F8",
-    secondary = "8EA6BA",
+    secondary = "A6B8C8",
     danger = "FF8098",
 }
 

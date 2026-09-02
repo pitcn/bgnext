@@ -7,6 +7,8 @@ return function(test)
     -- Responsive two-column layout constants.
     test.eq(ui.tabNumber, 2, "price page is the second tab")
     test.eq(ui.COLUMN_COUNT, 2, "price items use two columns")
+    test.eq(ui.ITEM_FONT_SIZE, 13, "price item names remain readable")
+    test.eq(ui.PRICE_FONT_SIZE, 13, "price values remain readable")
     test.eq(ui.MIN_ROWS_PER_COLUMN, 12, "short windows retain twelve rows per column")
     test.eq(ui.MAX_ROWS_PER_COLUMN, 30, "row objects stay capped per column")
     test.eq(ui.ROW_CAPACITY, 60, "maximum reusable row capacity")

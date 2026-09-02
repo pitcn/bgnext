@@ -18,7 +18,8 @@ return function(test)
     test.eq(Style.objectBudget(), 4, "price decoration budget is bounded")
     test.eq(Style.textColor("brand"), "00E6FF", "brand text is cyan")
     test.eq(Style.textColor("primary"), "E8F1F8", "primary text is neutral")
-    test.eq(Style.textColor("secondary"), "8EA6BA", "secondary text is blue grey")
+    test.eq(Style.textColor("secondary"), "A6B8C8", "secondary text stays readable over the game world")
+    test.eq(Style.BOSS_LABEL_FONT_SIZE, 15, "boss labels keep the readable baseline size")
     test.eq(Style.textColor("danger"), "FF8098", "danger text is restrained pink")
     test.eq(Style.textColor("unknown"), "E8F1F8", "unknown text role is primary")
     test.eq(Style.palette("listNormal").borderAlpha < Style.palette("normal").borderAlpha, true,
@@ -97,8 +98,8 @@ return function(test)
         "shared button leave restores its logical state")
     test.eq(helpers:find("bt.bg:SetGradient", 1, true) ~= nil, true,
         "shared button keeps classic gradient fallback")
-    test.eq(helpers:find('t:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")', 1, true) ~= nil, true,
-        "ordinary shared buttons use the compact 14px size")
+    test.eq(helpers:find('t:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")', 1, true) ~= nil, true,
+        "ordinary shared buttons use the readable 15px size")
     test.eq(main:find("UIStyle.applyNavigationTab", 1, true) ~= nil, true,
         "module navigation delegates preview colors")
     test.eq(main:find('"selected"', 1, true) ~= nil, true,
@@ -117,6 +118,8 @@ return function(test)
         "ledger boss labels delegate preview semantic colour")
     test.eq(ledger:find("bossLabelRole", 1, true) ~= nil, true,
         "ledger boss labels classify structural roles")
+    test.eq(ledger:find("UIStyle.BOSS_LABEL_FONT_SIZE", 1, true) ~= nil, true,
+        "ledger boss labels use the shared readable font size")
 
     BG = nil
 end

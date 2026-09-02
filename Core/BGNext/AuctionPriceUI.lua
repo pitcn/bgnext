@@ -17,6 +17,8 @@ M.MAX_ROWS_PER_COLUMN = 30
 M.ROW_HEIGHT = 24
 M.ROW_CAPACITY = M.COLUMN_COUNT * M.MAX_ROWS_PER_COLUMN
 M.DECORATIVE_REGION_COUNT = 1
+M.ITEM_FONT_SIZE = 13
+M.PRICE_FONT_SIZE = 13
 
 -- Computes the reusable viewport once from the existing main-frame size. The
 -- fixed deductions cover the left margin, 230px Boss picker, inter-panel gap,
@@ -466,9 +468,9 @@ if runtimeReady() then
             row.icon:SetPoint("LEFT", 0, 0)
             row.icon:SetSize(18, 18)
             row.name = row:CreateFontString(nil, "OVERLAY")
-            row.name:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
+            row.name:SetFont(BIAOGE_TEXT_FONT, M.ITEM_FONT_SIZE, "OUTLINE")
             row.price = row:CreateFontString(nil, "OVERLAY")
-            row.price:SetFont(BIAOGE_TEXT_FONT, 12, "OUTLINE")
+            row.price:SetFont(BIAOGE_TEXT_FONT, M.PRICE_FONT_SIZE, "OUTLINE")
             row.price:SetTextColor(1, 0.82, 0)
             row.price:SetWidth(110)
             row.edit = CreateFrame("EditBox", nil, row, BG.editTemplate or "InputBoxTemplate")
