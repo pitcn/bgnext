@@ -376,7 +376,6 @@ BG.Init(function()
         for k, FB in pairs(BG.FBtable) do
             BG.CreateFBUI(FB, "FB")
         end
-        securecall(BG.CreateBossModel)
 
         --通报UI
         BG.Init2(function()
