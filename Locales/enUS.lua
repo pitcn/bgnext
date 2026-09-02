@@ -43,6 +43,19 @@ do -- BGNext temporary current-raid reconciliation
     L["对账数据超出安全限制或等待超时，已停止本次对账。"] = "Reconciliation exceeded its safety limit or timed out and has been stopped."
 end
 
+do -- BGNext wish priorities
+    L["BIS"] = "BiS"
+    L["次BIS"] = "2nd BiS"
+    L["备选"] = "Backup"
+    L["核心提升"] = "Core upgrade"
+    L["普通需求"] = "Normal need"
+    L["BIS：核心提升，最高优先级的毕业装备。"] = "BiS: Core upgrade, the highest-priority item."
+    L["次BIS：普通需求，明确的提升或第二选择。"] = "2nd BiS: Normal need, a clear upgrade or second choice."
+    L["备选：过渡装备，或无人需求时才考虑。"] = "Backup: A transitional item, or one to consider only when nobody else needs it."
+    L["滚轮切换心愿优先级"] = "Mouse wheel changes the wish priority"
+    L["心愿：%s"] = "Wish: %s"
+end
+
 do
     L["战斗的奖励"] = "Rewards of Battle"
     L["删除该站位图"] = "Delete This Positioning Map"

@@ -198,6 +198,14 @@ if runtimeReady() then
     local maxb = ns.Maxb
     local L = ns.L or setmetatable({}, { __index = function(_, key) return key end })
 
+    -- Small low-saturation tags; the default priority stays muted so it never
+    -- competes with the item text for attention.
+    local priorityTagColors = {
+        core = { 1, 0.82, 0.35 },
+        normal = { 0.62, 0.62, 0.62 },
+        backup = { 0.55, 0.68, 0.78 },
+    }
+
     local function context(raidId)
         return BG.BGNext.DB, BG.realmID, BG.playerName, raidId or BG.FB1
     end
@@ -284,6 +292,23 @@ if runtimeReady() then
         return result
     end
 
+    local function slotPriority(slot)
+        local root, realmId, player, raidId = context(slot.FB)
+        local record = wishlist.getSlotRecord(root, realmId, player, raidId, slot.hopenandu, slot.bossnum, slot.i)
+        return record and record.priority or nil
+    end
+
+    local function updateSlotPriorityTag(slot)
+        local priority = slot.itemId and slotPriority(slot) or nil
+        if priority then
+            slot.priorityTag:SetText(L[wishlist.priorityTagKey(priority)])
+            local color = priorityTagColors[priority]
+            slot.priorityTag:SetTextColor(color[1], color[2], color[3])
+        else
+            slot.priorityTag:SetText("")
+        end
+    end
+
     local function updateSlotAppearance(slot)
         local text = slot:GetText()
         local itemId = wishlist.itemIdFromValue(text)
@@ -301,6 +326,7 @@ if runtimeReady() then
             if BG.LevelText then BG.LevelText(slot) end
             if BG.IsHave then BG.IsHave(slot) end
         end
+        updateSlotPriorityTag(slot)
         if BG.UpdateFilter then BG.UpdateFilter(slot) end
         if slot.looted then
             local canonicalItemId = itemId
@@ -309,6 +335,18 @@ if runtimeReady() then
             end
             slot.looted:SetShown(M.isLooted(canonicalItemId, recordedRaidItems(slot.FB)))
         end
+    end
+
+    local function showSlotTooltip(slot)
+        GameTooltip:SetOwner(slot, BG.ButtonIsInRight and BG.ButtonIsInRight(slot) and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
+        GameTooltip:SetItemByID(slot.itemId)
+        GameTooltip:AddLine("右键取消心愿装备", 0.5, 1, 0.5, true)
+        local priority = slotPriority(slot)
+        if priority then
+            GameTooltip:AddLine(L[wishlist.priorityTipKey(priority)], 0.7, 0.7, 0.7, true)
+            GameTooltip:AddLine(L["滚轮切换心愿优先级"], 0.5, 0.8, 1, true)
+        end
+        GameTooltip:Show()
     end
 
     local function persistSlot(slot)
@@ -328,7 +366,12 @@ if runtimeReady() then
         if not location or location.difficultyIndex ~= slot.hopenandu or location.bossIndex ~= slot.bossnum then
             return false
         end
-        wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId), slot.hopenandu, slot.bossnum, slot.i, itemId)
+        -- Re-confirming the same item keeps its priority; a genuinely new item
+        -- starts at the default.
+        local existing = wishlist.getSlotRecord(root, realmId, player, raidId, slot.hopenandu, slot.bossnum, slot.i)
+        local priority = existing and existing.itemId == itemId and existing.priority or nil
+        wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId), slot.hopenandu, slot.bossnum, slot.i,
+            itemId, priority)
         slot.itemId = itemId
         updateSlotAppearance(slot)
         return true
@@ -353,6 +396,10 @@ if runtimeReady() then
         slot.icon = slot:CreateTexture(nil, "ARTWORK")
         slot.icon:SetPoint("LEFT", -22, 0)
         slot.icon:SetSize(16, 16)
+        slot.priorityTag = slot:CreateFontString(nil, "OVERLAY")
+        slot.priorityTag:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", 1, 1)
+        slot.priorityTag:SetFont(BIAOGE_TEXT_FONT, 10, "OUTLINE")
+        slot.priorityTag:SetJustifyH("RIGHT")
         if BG.LootedText then BG.LootedText(slot) end
 
         slot.hover = slot:CreateTexture(nil, "BACKGROUND")
@@ -402,13 +449,19 @@ if runtimeReady() then
                 ClearCursor()
             end
         end)
+        slot:SetScript("OnMouseWheel", function(self, delta)
+            if not self.itemId then return end
+            local root, realmId, player, raidId = context(self.FB)
+            if wishlist.setSlotPriority(root, realmId, player, raidId, self.hopenandu, self.bossnum, self.i,
+                wishlist.cyclePriority(slotPriority(self), delta)) then
+                updateSlotPriorityTag(self)
+                if GameTooltip:IsOwned(self) then showSlotTooltip(self) end
+            end
+        end)
         slot:SetScript("OnEnter", function(self)
             self.hover:Show()
             if self.itemId then
-                GameTooltip:SetOwner(self, BG.ButtonIsInRight and BG.ButtonIsInRight(self) and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
-                GameTooltip:SetItemByID(self.itemId)
-                GameTooltip:AddLine("右键取消心愿装备", 0.5, 1, 0.5, true)
-                GameTooltip:Show()
+                showSlotTooltip(self)
             end
         end)
         slot:SetScript("OnLeave", function(self)
@@ -528,11 +581,13 @@ if runtimeReady() then
                 for bossIndex = 1, hopeMaxb[raidId] do
                     local writeIndex = 1
                     for slotIndex = 1, hopeMaxi do
-                        local itemId = wishlist.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+                        local record = wishlist.getSlotRecord(root, realmId, player, raidId,
+                            difficultyIndex, bossIndex, slotIndex)
+                        local itemId = record and record.itemId or nil
                         if itemId then
                             if writeIndex ~= slotIndex then
                                 wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId),
-                                    difficultyIndex, bossIndex, writeIndex, itemId)
+                                    difficultyIndex, bossIndex, writeIndex, itemId, record.priority)
                                 wishlist.clearSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
                             end
                             writeIndex = writeIndex + 1

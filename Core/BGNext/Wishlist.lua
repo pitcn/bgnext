@@ -19,6 +19,78 @@ local function validPositiveIndex(value)
     return type(value) == "number" and value > 0 and value == math.floor(value)
 end
 
+-- Local per-item wish priority. The three-value enum is stable because it is
+-- written into SavedVariables and export text; display names live in Locales.
+local PRIORITY_RANK = { backup = 1, normal = 2, core = 3 }
+local PRIORITY_CYCLE = { "backup", "normal", "core" }
+local PRIORITY_TAG_KEYS = { core = "BIS", normal = "次BIS", backup = "备选" }
+local PRIORITY_NAME_KEYS = { core = "核心提升", normal = "普通需求", backup = "备选" }
+local PRIORITY_TIP_KEYS = {
+    core = "BIS：核心提升，最高优先级的毕业装备。",
+    normal = "次BIS：普通需求，明确的提升或第二选择。",
+    backup = "备选：过渡装备，或无人需求时才考虑。",
+}
+
+function M.normalizePriority(value)
+    if type(value) == "string" and PRIORITY_RANK[value] then
+        return value
+    end
+    return "normal"
+end
+
+-- A slot stores either the historical plain itemId number (default priority, so
+-- old SavedVariables stay byte-identical) or, only for core/backup, a record
+-- table. The priority therefore always dies with its slot: no parallel table,
+-- no orphan data.
+local function readRecord(value)
+    if validItemId(value) then
+        return { itemId = value, priority = "normal" }
+    end
+    if type(value) == "table" and validItemId(value.item) then
+        return { itemId = value.item, priority = M.normalizePriority(value.priority) }
+    end
+    return nil
+end
+
+local function encodeSlot(itemId, priority)
+    priority = M.normalizePriority(priority)
+    if priority == "normal" then
+        return itemId
+    end
+    return { item = itemId, priority = priority }
+end
+
+function M.cyclePriority(priority, direction)
+    local index = PRIORITY_RANK[M.normalizePriority(priority)]
+    local step = (direction and direction > 0) and 1 or -1
+    index = ((index - 1 + step) % #PRIORITY_CYCLE) + 1
+    return PRIORITY_CYCLE[index]
+end
+
+function M.highestPriority(root, realmId, player, raidId, itemId)
+    local best = nil
+    for _, match in ipairs(M.findItem(root, realmId, player, raidId, itemId)) do
+        local priority = M.getSlotPriority(root, realmId, player, raidId,
+            match.difficultyIndex, match.bossIndex, match.slotIndex)
+        if priority and (not best or PRIORITY_RANK[priority] > PRIORITY_RANK[best]) then
+            best = priority
+        end
+    end
+    return best
+end
+
+function M.priorityTagKey(priority)
+    return PRIORITY_TAG_KEYS[M.normalizePriority(priority)]
+end
+
+function M.priorityNameKey(priority)
+    return PRIORITY_NAME_KEYS[M.normalizePriority(priority)]
+end
+
+function M.priorityTipKey(priority)
+    return PRIORITY_TIP_KEYS[M.normalizePriority(priority)]
+end
+
 local function validLimits(limits, difficultyIndex, bossIndex, slotIndex)
     return type(limits) == "table"
         and validPositiveIndex(limits.difficulties)
@@ -124,7 +196,30 @@ local function getBossSlots(root, realmId, player, raidId, difficultyIndex, boss
     return raid and raid[difficultyIndex] and raid[difficultyIndex][bossIndex] or nil
 end
 
-function M.setSlot(root, realmId, player, raidId, limits, difficultyIndex, bossIndex, slotIndex, itemId)
+function M.getSlotRecord(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+    local slots = getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
+    return slots and readRecord(slots[slotIndex]) or nil
+end
+
+function M.getSlotPriority(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+    local record = M.getSlotRecord(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+    return record and record.priority or nil
+end
+
+function M.setSlotPriority(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex, priority)
+    local slots = getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
+    if not slots then
+        return false
+    end
+    local record = readRecord(slots[slotIndex])
+    if not record then
+        return false
+    end
+    slots[slotIndex] = encodeSlot(record.itemId, priority)
+    return true
+end
+
+function M.setSlot(root, realmId, player, raidId, limits, difficultyIndex, bossIndex, slotIndex, itemId, priority)
     if not validItemId(itemId) or not validLimits(limits, difficultyIndex, bossIndex, slotIndex) then
         return false
     end
@@ -134,13 +229,17 @@ function M.setSlot(root, realmId, player, raidId, limits, difficultyIndex, bossI
     end
     raid[difficultyIndex] = raid[difficultyIndex] or {}
     raid[difficultyIndex][bossIndex] = raid[difficultyIndex][bossIndex] or {}
-    raid[difficultyIndex][bossIndex][slotIndex] = itemId
+    raid[difficultyIndex][bossIndex][slotIndex] = encodeSlot(itemId, priority)
     return true
 end
 
 function M.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
     local slots = getBossSlots(root, realmId, player, raidId, difficultyIndex, bossIndex)
-    return slots and slots[slotIndex] or nil
+    local value = slots and slots[slotIndex] or nil
+    if type(value) == "table" then
+        return validItemId(value.item) and value.item or nil
+    end
+    return value
 end
 
 function M.clearSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
@@ -163,8 +262,9 @@ function M.findItem(root, realmId, player, raidId, itemId)
             if validPositiveIndex(difficultyIndex) and type(bosses) == "table" then
                 for bossIndex, slots in pairs(bosses) do
                     if validPositiveIndex(bossIndex) and type(slots) == "table" then
-                        for slotIndex, storedItemId in pairs(slots) do
-                            if validPositiveIndex(slotIndex) and storedItemId == itemId then
+                        for slotIndex, storedValue in pairs(slots) do
+                            local record = validPositiveIndex(slotIndex) and readRecord(storedValue) or nil
+                            if record and record.itemId == itemId then
                                 result[#result + 1] = {
                                     difficultyIndex = difficultyIndex,
                                     bossIndex = bossIndex,
@@ -200,7 +300,7 @@ function M.clearRaid(root, realmId, player, raidId)
     return true
 end
 
-function M.placeItem(root, realmId, player, raidId, limits, itemId, resolver)
+function M.placeItem(root, realmId, player, raidId, limits, itemId, resolver, priority)
     if not validItemId(itemId) or type(resolver) ~= "function" then
         return { ok = false, reason = "unknown-drop" }
     end
@@ -212,7 +312,8 @@ function M.placeItem(root, realmId, player, raidId, limits, itemId, resolver)
     end
     for slotIndex = 1, limits.slots do
         if M.getSlot(root, realmId, player, raidId, location.difficultyIndex, location.bossIndex, slotIndex) == nil then
-            M.setSlot(root, realmId, player, raidId, limits, location.difficultyIndex, location.bossIndex, slotIndex, itemId)
+            M.setSlot(root, realmId, player, raidId, limits, location.difficultyIndex, location.bossIndex,
+                slotIndex, itemId, priority)
             return {
                 ok = true,
                 difficultyIndex = location.difficultyIndex,
@@ -307,9 +408,15 @@ function M.exportRaid(root, realmId, player, raidId, limits)
         for bossIndex = 1, limits.bosses do
             local itemIds = {}
             for slotIndex = 1, limits.slots do
-                local itemId = M.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
-                if validItemId(itemId) then
-                    itemIds[#itemIds + 1] = tostring(itemId)
+                local record = M.getSlotRecord(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+                if record then
+                    -- Normal stays the historical plain token so an unchanged
+                    -- wishlist exports the exact original text format.
+                    local token = tostring(record.itemId)
+                    if record.priority ~= "normal" then
+                        token = token .. "@" .. record.priority
+                    end
+                    itemIds[#itemIds + 1] = token
                 end
             end
             if #itemIds > 0 then
@@ -353,6 +460,7 @@ function M.parseImport(text, limitsByRaid)
     end
 
     local raids, itemCount = {}, 0
+    local priorities
     for _, raidSection in ipairs(splitPlain(text, ".")) do
         local raidId, payload = raidSection:match("^([^:]+):(.+)$")
         local limits = raidId and limitsByRaid[raidId] or nil
@@ -377,11 +485,20 @@ function M.parseImport(text, limitsByRaid)
                 return parseFailure("invalid-section")
             end
             local slots = {}
+            local bossPriorities
             for _, itemPart in ipairs(splitPlain(itemText, "-")) do
-                if not itemPart:match("^%d+$") then
-                    return parseFailure("invalid-item")
+                -- The historical token is a plain item id. The only extension is
+                -- an optional "@priority" suffix; missing, empty or unknown
+                -- values fall back to the default instead of rejecting the
+                -- still-valid wishlist data around them.
+                local itemIdText, priorityText = itemPart:match("^(%d+)@(.*)$")
+                if not itemIdText then
+                    if not itemPart:match("^%d+$") then
+                        return parseFailure("invalid-item")
+                    end
+                    itemIdText = itemPart
                 end
-                local itemId = tonumber(itemPart)
+                local itemId = tonumber(itemIdText)
                 if not validItemId(itemId) then
                     return parseFailure("invalid-item")
                 end
@@ -390,15 +507,26 @@ function M.parseImport(text, limitsByRaid)
                 end
                 slots[#slots + 1] = itemId
                 itemCount = itemCount + 1
+                local priority = M.normalizePriority(priorityText)
+                if priority ~= "normal" then
+                    bossPriorities = bossPriorities or {}
+                    bossPriorities[#slots] = priority
+                end
             end
             raid[difficultyIndex][bossIndex] = slots
+            if bossPriorities then
+                priorities = priorities or {}
+                priorities[raidId] = priorities[raidId] or {}
+                priorities[raidId][difficultyIndex] = priorities[raidId][difficultyIndex] or {}
+                priorities[raidId][difficultyIndex][bossIndex] = bossPriorities
+            end
         end
         raids[raidId] = raid
     end
     if itemCount == 0 then
         return parseFailure("empty")
     end
-    return { ok = true, raids = raids, itemCount = itemCount }
+    return { ok = true, raids = raids, priorities = priorities, itemCount = itemCount }
 end
 
 function M.applyImport(root, realmId, player, parsed)
@@ -415,14 +543,18 @@ function M.applyImport(root, realmId, player, parsed)
         for key in pairs(raid) do
             raid[key] = nil
         end
+        local raidPriorities = parsed.priorities and parsed.priorities[raidId] or nil
         for difficultyIndex, importedBosses in pairs(importedRaid) do
             local bosses = {}
             raid[difficultyIndex] = bosses
+            local difficultyPriorities = raidPriorities and raidPriorities[difficultyIndex] or nil
             for bossIndex, importedSlots in pairs(importedBosses) do
                 local slots = {}
                 bosses[bossIndex] = slots
+                local bossPriorities = difficultyPriorities and difficultyPriorities[bossIndex] or nil
                 for slotIndex, itemId in ipairs(importedSlots) do
-                    slots[slotIndex] = itemId
+                    local priority = bossPriorities and bossPriorities[slotIndex] or nil
+                    slots[slotIndex] = encodeSlot(itemId, priority)
                 end
             end
         end
