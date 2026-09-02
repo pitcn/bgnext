@@ -49,6 +49,7 @@ function M.buildPanel()
     end
 
     local Skin = BG.BGNext.LegacyLedgerSkin
+    local UIStyle = BG.BGNext.UIStyle
     local panel = BG.OptionsCreateTab("Options_appearance", "外观预览")
     if type(panel) ~= "table" then
         return
@@ -86,7 +87,9 @@ function M.buildPanel()
     classicButton:SetText("经典外观")
     classicButton:SetScript("OnClick", function()
         local ok = M.choose(BG.BGNext.DB, "classic", function(id)
-            return Skin.apply(id, Skin.buildRuntimeRegistry(), BiaoGe.options.alpha)
+            local applied, err = Skin.apply(id, Skin.buildRuntimeRegistry(), BiaoGe.options.alpha)
+            if applied and UIStyle then UIStyle.refreshButtons(id, BiaoGe.options.alpha) end
+            return applied, err
         end)
         if ok then
             refresh()
@@ -99,7 +102,9 @@ function M.buildPanel()
     previewButton:SetText("BGNext 预览")
     previewButton:SetScript("OnClick", function()
         local ok = M.choose(BG.BGNext.DB, "preview", function(id)
-            return Skin.apply(id, Skin.buildRuntimeRegistry(), BiaoGe.options.alpha)
+            local applied, err = Skin.apply(id, Skin.buildRuntimeRegistry(), BiaoGe.options.alpha)
+            if applied and UIStyle then UIStyle.refreshButtons(id, BiaoGe.options.alpha) end
+            return applied, err
         end)
         if ok then
             refresh()

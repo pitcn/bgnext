@@ -49,6 +49,10 @@ return function(test)
     local source = read("Core/BGNext/UIThemeSettings.lua")
     test.eq(source:find("options%.alpha%s*="), nil, "settings source never assigns options.alpha")
     test.eq(source:find("ReloadUI", 1, true), nil, "settings source has no ReloadUI")
+    test.eq(source:find("UIStyle.refreshButtons(id, BiaoGe.options.alpha)", 1, true) ~= nil, true,
+        "successful appearance callbacks refresh existing buttons")
+    test.eq(source:find("if ok then", 1, true) ~= nil, true,
+        "button refresh is guarded by successful skin apply")
     for _, token in ipairs({
         "ClearAllPoints", "SetWidth", "SetHeight", "SetParent",
         "SetFrameLevel", "SetFrameStrata",

@@ -60,5 +60,22 @@ return function(test)
         test.eq(source:find(token, 1, true), nil, "style source forbids " .. token)
     end
 
+    local helpers = read("Core/function2.lua")
+    local main = read("Core/BiaoGe.lua")
+    test.eq(helpers:find("UIStyle.registerButton(bt)", 1, true) ~= nil, true,
+        "shared button factory registers buttons")
+    test.eq(helpers:find('UIStyle.setButtonState(bt, "hover"', 1, true) ~= nil, true,
+        "shared button hover uses BGNext state")
+    test.eq(helpers:find("bt._BGNextVisualState", 1, true) ~= nil, true,
+        "shared button leave restores its logical state")
+    test.eq(helpers:find("bt.bg:SetGradient", 1, true) ~= nil, true,
+        "shared button keeps classic gradient fallback")
+    test.eq(main:find("UIStyle.applyNavigationTab", 1, true) ~= nil, true,
+        "module navigation delegates preview colors")
+    test.eq(main:find('"selected"', 1, true) ~= nil, true,
+        "module navigation declares selected state")
+    test.eq(main:find('"normal"', 1, true) ~= nil, true,
+        "module navigation declares inactive state")
+
     BG = nil
 end

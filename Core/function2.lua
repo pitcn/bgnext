@@ -2495,6 +2495,7 @@ local disColordown = CreateColor(0, 0, 0, .3)
 local borderAlpha = 1
 function BG.CreateButton(parent)
     local bt = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local UIStyle = BG.BGNext and BG.BGNext.UIStyle
     bt:SetBackdrop({
         edgeFile = "Interface/ChatFrame/ChatFrameBackground",
         edgeSize = 1,
@@ -2509,25 +2510,45 @@ function BG.CreateButton(parent)
     t:SetTextColor(1, .82, 0)
     t:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
     bt:SetFontString(t)
+    if UIStyle and type(UIStyle.registerButton) == "function" then
+        UIStyle.registerButton(bt)
+        if UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+            UIStyle.setButtonState(bt, "normal", BiaoGe.options.alpha)
+        end
+    end
 
     hooksecurefunc(bt, "SetScript", function(arg1, arg2, ...)
         if arg2 == "OnEnter" then
             bt:HookScript("OnEnter", function()
-                bt.bg:SetGradient("VERTICAL", classColordown, classColorup)
-                bt:SetBackdropBorderColor(r, g, b, borderAlpha)
-                bt:GetFontString():SetTextColor(1, 1, 1)
+                if UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                    bt._BGNextRestState = bt._BGNextVisualState or "normal"
+                    UIStyle.setButtonState(bt, "hover", BiaoGe.options.alpha)
+                else
+                    bt.bg:SetGradient("VERTICAL", classColordown, classColorup)
+                    bt:SetBackdropBorderColor(r, g, b, borderAlpha)
+                    bt:GetFontString():SetTextColor(1, 1, 1)
+                end
             end)
         elseif arg2 == "OnLeave" then
             bt:HookScript("OnLeave", function()
                 GameTooltip:Hide()
-                bt.bg:SetGradient("VERTICAL", blackdown, blackup)
-                bt:SetBackdropBorderColor(0, 0, 0, borderAlpha)
-                bt:GetFontString():SetTextColor(1, .82, 0)
+                if UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                    local state = bt._BGNextRestState or bt._BGNextVisualState or "normal"
+                    bt._BGNextRestState = nil
+                    UIStyle.setButtonState(bt, state, BiaoGe.options.alpha)
+                else
+                    bt.bg:SetGradient("VERTICAL", blackdown, blackup)
+                    bt:SetBackdropBorderColor(0, 0, 0, borderAlpha)
+                    bt:GetFontString():SetTextColor(1, .82, 0)
+                end
             end)
         end
     end)
     hooksecurefunc(bt, "SetEnabled", function(arg1, arg2, ...)
-        if arg2 == true then
+        if UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+            bt._BGNextRestState = nil
+            UIStyle.setButtonState(bt, arg2 and "normal" or "disabled", BiaoGe.options.alpha)
+        elseif arg2 == true then
             bt.bg:SetGradient("VERTICAL", blackdown, blackup)
             bt:GetFontString():SetTextColor(1, .82, 0)
         elseif arg2 == false then

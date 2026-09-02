@@ -907,8 +907,13 @@ BG.Init(function()
         local r, g, b = GetClassRGB(nil, "player")
         local onEnterDelay = .6
 
-        local function SetColor(bt, isOnEnter, alpha)
+        local function SetColor(bt, isOnEnter, alpha, visualState)
             alpha = alpha or BiaoGe.options.alpha
+            local UIStyle = BG.BGNext and BG.BGNext.UIStyle
+            if UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                UIStyle.applyNavigationTab(bt, visualState or (isOnEnter and "hover" or "normal"), alpha)
+                return
+            end
             local r, g, b
             if isOnEnter then
                 r, g, b = GetClassRGB(nil, "player")
@@ -923,12 +928,12 @@ BG.Init(function()
                 local bt = v.button
                 if v.num == num then
                     bt:Disable()
-                    SetColor(bt, true, 1)
+                    SetColor(bt, true, 1, "selected")
                     bt:GetFontString():SetTextColor(1, 1, 1)
                     v.frame:Show()
                 else
                     bt:Enable()
-                    SetColor(bt, false)
+                    SetColor(bt, false, nil, "normal")
                     bt:GetFontString():SetTextColor(1, .82, 0)
                     v.frame:Hide()
                 end
