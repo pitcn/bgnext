@@ -94,13 +94,16 @@ return function(test)
     test.eq(dark.r ~= light.r or dark.g ~= light.g or dark.b ~= light.b or dark.a ~= light.a, true,
         "the two stripes actually differ")
 
-    -- Green completion marker and green section titles, grey hints.
+    -- Completion stays semantic green; section titles use brand cyan and hints
+    -- use the same blue-grey hierarchy as the rest of the modern UI.
     local complete = UI.colors.complete
     test.eq(complete.g > complete.r and complete.g > complete.b, true, "completion marker is green")
     local title = UI.colors.title
-    test.eq(title.g > title.r and title.g > title.b, true, "section titles are green")
+    test.eq(title.g > title.r and title.b > title.r, true, "section titles are cyan")
     local hint = UI.colors.hint
-    test.eq(hint.r == hint.g and hint.g == hint.b, true, "hints are grey")
+    test.eq(hint.b > hint.r and hint.g > hint.r, true, "hints are blue grey")
+    local header = UI.colors.header
+    test.eq(header.r == header.g and header.g == header.b, true, "column headings are neutral")
 
     -- Equipment icons use the documented 19px content size.
     test.eq(UI.metrics.iconSize, 19, "item icons are 19px")
@@ -350,6 +353,8 @@ return function(test)
         "pooled regions clear stale anchors before reuse")
     test.eq(string.find(source, "SetFrameLevel", 1, true) ~= nil, true,
         "item buttons are raised above the row click surface")
+    test.eq(string.find(source, "M.colors.header", 1, true) ~= nil, true,
+        "renderer uses one neutral column-heading colour")
 
     -- Equipment icons use Blizzard's official tooltip, not a hand-built one.
     for _, required in ipairs({

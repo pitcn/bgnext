@@ -16,6 +16,14 @@ return function(test)
     test.eq(selected.text, "E8F1F8", "selected primary text")
     test.eq(Style.palette("future").id, "normal", "unknown state is normal")
     test.eq(Style.objectBudget(), 4, "price decoration budget is bounded")
+    test.eq(Style.textColor("brand"), "00E6FF", "brand text is cyan")
+    test.eq(Style.textColor("primary"), "E8F1F8", "primary text is neutral")
+    test.eq(Style.textColor("secondary"), "8EA6BA", "secondary text is blue grey")
+    test.eq(Style.textColor("danger"), "FF8098", "danger text is restrained pink")
+    test.eq(Style.textColor("unknown"), "E8F1F8", "unknown text role is primary")
+    test.eq(Style.palette("listNormal").borderAlpha < Style.palette("normal").borderAlpha, true,
+        "ordinary list rows have a quieter border")
+    test.eq(Style.palette("listSelected").border, "00E6FF", "selected list row keeps brand cyan")
 
     local function fakeButton(enabled)
         local font = { color = {} }
@@ -31,12 +39,12 @@ return function(test)
     end
 
     local button, bg, font = fakeButton(true)
-    for _, state in ipairs({ "normal", "hover", "selected", "disabled", "danger" }) do
+    for _, state in ipairs({ "normal", "hover", "selected", "disabled", "danger", "listNormal", "listSelected" }) do
         test.eq(Style.applyButton(button, state, 0.58), true, state .. " applies")
         local palette = Style.palette(state)
         test.eq(button._BGNextVisualState, state, state .. " records logical state")
         test.eq(bg.alpha, math.min(1, 0.58 + palette.alphaLift), state .. " applies bounded alpha")
-        test.eq(#button.border, 4, state .. " sets a border color")
+        test.eq(button.border[4], palette.borderAlpha, state .. " sets the intended border emphasis")
         test.eq(#font.color, 4, state .. " sets a text color")
     end
 
@@ -50,6 +58,25 @@ return function(test)
         "preview preference is recognized")
     test.eq(Style.isPreviewEnabled({ settings = { uiTheme = "classic" } }), false,
         "classic preference is recognized")
+
+    local label = { color = {} }
+    function label:SetTextColor(r, g, b, a) self.color = { r, g, b, a } end
+    Style.registerText(label, "secondary", "00FF00")
+    Style.refreshButtons("preview", 0.58)
+    test.eq(label.color[3] > label.color[1], true, "preview refresh applies semantic text")
+    Style.refreshButtons("classic", 0.58)
+    test.eq(label.color[1], 0, "classic refresh restores text red")
+    test.eq(label.color[2], 1, "classic refresh restores text green")
+    test.eq(label.color[3], 0, "classic refresh restores text blue")
+
+    local previewFont, classicFont = {}, {}
+    local utility = {}
+    function utility:SetNormalFontObject(value) self.normalFont = value end
+    Style.registerUtilityButton(utility, previewFont, classicFont)
+    Style.refreshButtons("preview", 0.58)
+    test.eq(utility.normalFont, previewFont, "preview refresh applies utility font")
+    Style.refreshButtons("classic", 0.58)
+    test.eq(utility.normalFont, classicFont, "classic refresh restores utility font")
 
     local source = read("Core/BGNext/UIStyle.lua")
     for _, token in ipairs({
@@ -70,12 +97,26 @@ return function(test)
         "shared button leave restores its logical state")
     test.eq(helpers:find("bt.bg:SetGradient", 1, true) ~= nil, true,
         "shared button keeps classic gradient fallback")
+    test.eq(helpers:find('t:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")', 1, true) ~= nil, true,
+        "ordinary shared buttons use the compact 14px size")
     test.eq(main:find("UIStyle.applyNavigationTab", 1, true) ~= nil, true,
         "module navigation delegates preview colors")
     test.eq(main:find('"selected"', 1, true) ~= nil, true,
         "module navigation declares selected state")
     test.eq(main:find('"normal"', 1, true) ~= nil, true,
         "module navigation declares inactive state")
+    test.eq(main:find('UIStyle.applyText(t, "secondary")', 1, true) ~= nil, true,
+        "top utility text uses the modern secondary hierarchy")
+    test.eq(main:find('UIStyle.applyText(t, "primary")', 1, true) ~= nil, true,
+        "top utility hover uses primary text")
+    test.eq(main:find("UIStyle.registerUtilityButton", 1, true) ~= nil, true,
+        "top utility buttons participate in live theme refresh")
+
+    local ledger = read("Core/FBUI/FBUIfunction.lua")
+    test.eq(ledger:find("UIStyle.applyText", 1, true) ~= nil, true,
+        "ledger boss labels delegate preview semantic colour")
+    test.eq(ledger:find("bossLabelRole", 1, true) ~= nil, true,
+        "ledger boss labels classify structural roles")
 
     BG = nil
 end

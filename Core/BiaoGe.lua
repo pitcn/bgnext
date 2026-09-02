@@ -170,6 +170,13 @@ BG.Init(function()
         t:SetJustifyH("LEFT")
         t:SetText(L["说明书"])
         t:SetTextColor(0, 1, 0)
+        local UIStyle = BG.BGNext and BG.BGNext.UIStyle
+        if UIStyle then
+            UIStyle.registerText(t, "secondary", "00FF00")
+            if UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                UIStyle.applyText(t, "secondary")
+            end
+        end
         f:SetSize(t:GetStringWidth(), 20)
         BG.ShuoMingShu = f
         BG.ShuoMingShuText = t
@@ -196,12 +203,20 @@ BG.Init(function()
                 AddLine(text)
             end
             GameTooltip:Show()
-            t:SetTextColor(1, 1, 1)
+            if UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                UIStyle.applyText(t, "primary")
+            else
+                t:SetTextColor(1, 1, 1)
+            end
         end)
         f:SetScript("OnLeave", function(self)
             self.OnEnter = false
             GameTooltip:Hide()
-            t:SetTextColor(0, 1, 0)
+            if UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                UIStyle.applyText(t, "secondary")
+            else
+                t:SetTextColor(0, 1, 0)
+            end
         end)
         --[[ BG.RegisterEvent("MODIFIER_STATE_CHANGED", function(self, event, enter)
             if (enter == "LALT" or enter == "RALT") and f.OnEnter then
@@ -414,7 +429,10 @@ BG.Init(function()
         do
             local bt = CreateFrame("Button", nil, BG.MainFrame)
             bt:SetPoint("TOPLEFT", BG.ShuoMingShu, "TOPRIGHT", BG.TopLeftButtonJianGe, 0)
-            bt:SetNormalFontObject(BG.FontGreen15)
+            local UIStyle = BG.BGNext and BG.BGNext.UIStyle
+            local preview = UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext)
+            bt:SetNormalFontObject(preview and BG.FontDis15 or BG.FontGreen15)
+            if UIStyle then UIStyle.registerUtilityButton(bt, BG.FontDis15, BG.FontGreen15) end
             bt:SetDisabledFontObject(BG.FontDis15)
             bt:SetHighlightFontObject(BG.FontWhite15)
             bt:SetText(L["设置"])
@@ -566,7 +584,10 @@ BG.Init(function()
 
             local bt = CreateFrame("Button", nil, BG.MainFrame)
             bt:SetPoint("TOPLEFT", BG.ButtonSheZhi, "TOPRIGHT", BG.TopLeftButtonJianGe, 0)
-            bt:SetNormalFontObject(BG.FontGreen15)
+            local UIStyle = BG.BGNext and BG.BGNext.UIStyle
+            local preview = UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext)
+            bt:SetNormalFontObject(preview and BG.FontDis15 or BG.FontGreen15)
+            if UIStyle then UIStyle.registerUtilityButton(bt, BG.FontDis15, BG.FontGreen15) end
             bt:SetDisabledFontObject(BG.FontDis15)
             bt:SetHighlightFontObject(BG.FontWhite15)
             bt:SetText(L["通知移动"])

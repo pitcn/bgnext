@@ -264,6 +264,10 @@ return function(test)
         "the role overview has a stable global frame name for UISpecialFrames")
     test.eq(string.find(source, 'UISpecialFrames', 1, true) ~= nil, true,
         "the fixed role overview participates in Blizzard escape handling")
+    test.eq(string.find(source, 'button:SetSize(16, 16)', 1, true) ~= nil, true,
+        "all role overview controls share a compact size")
+    test.eq(string.find(source, 'button:SetScript("OnEnter"', 1, true) ~= nil, true,
+        "role overview controls share hover feedback")
 
     -- The footer uses one OnClick path, never a split mouse-down/mouse-up that
     -- could let a single physical click toggle twice.

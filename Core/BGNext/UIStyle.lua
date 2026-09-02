@@ -4,23 +4,38 @@ BG.BGNext = BG.BGNext or {}
 local UITheme = BG.BGNext.UITheme
 local M = {}
 local registeredButtons = setmetatable({}, { __mode = "k" })
+local registeredTexts = setmetatable({}, { __mode = "k" })
+local registeredUtilityButtons = setmetatable({}, { __mode = "k" })
 
 local palettes = {
     normal = {
-        id = "normal", fill = "0C2033", border = "24445E", text = "F5B230", alphaLift = 0.14,
+        id = "normal", fill = "0C2033", border = "24445E", text = "F5B230", alphaLift = 0.14, borderAlpha = 0.95,
     },
     hover = {
-        id = "hover", fill = "10314A", border = "2A7896", text = "E8F1F8", alphaLift = 0.32,
+        id = "hover", fill = "10314A", border = "2A7896", text = "E8F1F8", alphaLift = 0.32, borderAlpha = 0.95,
     },
     selected = {
-        id = "selected", fill = "073044", border = "00E6FF", text = "E8F1F8", alphaLift = 0.30,
+        id = "selected", fill = "073044", border = "00E6FF", text = "E8F1F8", alphaLift = 0.30, borderAlpha = 0.95,
     },
     disabled = {
-        id = "disabled", fill = "07182A", border = "24445E", text = "8EA6BA", alphaLift = -0.16,
+        id = "disabled", fill = "07182A", border = "24445E", text = "8EA6BA", alphaLift = -0.16, borderAlpha = 0.72,
     },
     danger = {
-        id = "danger", fill = "2A1018", border = "8F3347", text = "FF8098", alphaLift = 0.20,
+        id = "danger", fill = "2A1018", border = "8F3347", text = "FF8098", alphaLift = 0.20, borderAlpha = 0.88,
     },
+    listNormal = {
+        id = "listNormal", fill = "07182A", border = "24445E", text = "8EA6BA", alphaLift = -0.08, borderAlpha = 0.28,
+    },
+    listSelected = {
+        id = "listSelected", fill = "073044", border = "00E6FF", text = "E8F1F8", alphaLift = 0.18, borderAlpha = 0.92,
+    },
+}
+
+local textColors = {
+    brand = "00E6FF",
+    primary = "E8F1F8",
+    secondary = "8EA6BA",
+    danger = "FF8098",
 }
 
 local function hexRGB(hex)
@@ -45,6 +60,32 @@ function M.palette(state)
     return palettes[state] or palettes.normal
 end
 
+function M.textColor(role)
+    return textColors[role] or textColors.primary
+end
+
+function M.applyText(region, role)
+    if not region or type(region.SetTextColor) ~= "function" then return false end
+    local r, g, b = hexRGB(M.textColor(role))
+    return pcall(region.SetTextColor, region, r, g, b, 1)
+end
+
+function M.registerText(region, role, classicHex)
+    if not region then return end
+    registeredTexts[region] = {
+        role = role or "primary",
+        classicHex = classicHex or "FFFFFF",
+    }
+end
+
+function M.registerUtilityButton(button, previewFont, classicFont)
+    if not button then return end
+    registeredUtilityButtons[button] = {
+        previewFont = previewFont,
+        classicFont = classicFont,
+    }
+end
+
 function M.isPreviewEnabled(root)
     return type(root) == "table" and type(root.settings) == "table"
         and root.settings.uiTheme == "preview"
@@ -64,7 +105,7 @@ function M.applyButton(button, state, alpha)
             button.bg:SetAlpha(boundedAlpha(alpha, palette.alphaLift))
         end
         if type(button.SetBackdropBorderColor) == "function" then
-            button:SetBackdropBorderColor(borderR, borderG, borderB, 0.95)
+            button:SetBackdropBorderColor(borderR, borderG, borderB, palette.borderAlpha)
         end
         local font = fontOf(button)
         if font and type(font.SetTextColor) == "function" then
@@ -122,6 +163,20 @@ function M.refreshButtons(themeId, alpha)
             M.applyButton(button, button._BGNextVisualState or "normal", alpha)
         else
             applyClassicButton(button, alpha)
+        end
+    end
+    for region, info in pairs(registeredTexts) do
+        if themeId == "preview" then
+            M.applyText(region, info.role)
+        else
+            local r, g, b = hexRGB(info.classicHex)
+            pcall(region.SetTextColor, region, r, g, b, 1)
+        end
+    end
+    for button, info in pairs(registeredUtilityButtons) do
+        local font = themeId == "preview" and info.previewFont or info.classicFont
+        if font and type(button.SetNormalFontObject) == "function" then
+            pcall(button.SetNormalFontObject, button, font)
         end
     end
 end

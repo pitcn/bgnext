@@ -66,6 +66,23 @@ return function(test)
     test.eq(ui.itemTooltipLink(34393), "item:34393", "tooltip uses a stable item hyperlink")
     test.eq(ui.itemTooltipLink(nil), nil, "missing item has no tooltip link")
 
+    local text, canClear, role = ui.priceDisplay("leader", nil, 2000)
+    test.eq(text, "2000 G", "inherited leader price is compact")
+    test.eq(canClear, false, "inherited leader price has nothing to clear")
+    test.eq(role, "secondary", "inherited leader price is visually secondary")
+    text, canClear, role = ui.priceDisplay("leader", 3500, 2000)
+    test.eq(text, "3500 G", "explicit leader price is compact")
+    test.eq(canClear, true, "explicit leader price can be cleared")
+    test.eq(role, "primary", "explicit leader price is visually primary")
+    text, canClear, role = ui.priceDisplay("personal", nil, 2000)
+    test.eq(text, "—", "unset personal price is a quiet placeholder")
+    test.eq(canClear, false, "unset personal price has nothing to clear")
+    test.eq(role, "secondary", "unset personal price is visually secondary")
+    text, canClear, role = ui.priceDisplay("personal", 800, 2000)
+    test.eq(text, "800 G", "explicit personal price is compact")
+    test.eq(canClear, true, "explicit personal price can be cleared")
+    test.eq(role, "primary", "explicit personal price is visually primary")
+
     -- Fresh state defaults to leader.
     local state = ui.newState("ULD")
     test.eq(state.mode, "leader", "new state defaults to leader")
@@ -192,6 +209,16 @@ return function(test)
         "price page has one column divider")
     test.eq(source:find('Style.setButtonState(bt, "selected"', 1, true) ~= nil, true,
         "selected price navigation uses the brand state")
+    test.eq(source:find('Style.setButtonState(bt, selected and "listSelected" or "listNormal"', 1, true) ~= nil, true,
+        "boss picker uses quiet semantic list states")
+    local raidRefresh = source:match("function refreshRaidBar%(%)%s*(.-)%s*function refreshModeBar") or ""
+    local bossRefresh = source:match("function refreshBossBar%(%)%s*(.-)%s*function refreshFilterBar") or ""
+    test.eq(raidRefresh:find("applySelection(bt, selected)", 1, true) ~= nil, true,
+        "raid navigation keeps the ordinary selected-tab treatment")
+    test.eq(bossRefresh:find("applyBossSelection(bt, selected)", 1, true) ~= nil, true,
+        "boss navigation alone uses the quiet list treatment")
+    test.eq(source:find("row.clear:SetShown(canClear)", 1, true) ~= nil, true,
+        "clear action appears only for explicit item prices")
     test.eq(source:find('main.itemScroll:SetScript("OnMouseWheel"', 1, true) ~= nil, true, "long item lists are mouse-wheel scrollable")
     test.eq(source:find("GameTooltip:SetHyperlink(link)", 1, true) ~= nil, true, "item rows show the native item tooltip")
     test.eq(source:find("BG.TabButtonsFB:Hide()", 1, true) ~= nil, true, "price page hides the global raid navigation")

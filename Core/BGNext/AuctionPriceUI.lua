@@ -93,6 +93,19 @@ function M.itemTooltipLink(itemId)
     return "item:" .. tostring(itemId)
 end
 
+-- Reduces each item row to one value and one semantic state. `explicitValue`
+-- is nil only when the row inherits the leader base price or has no personal
+-- expectation, which also means there is nothing for the clear action to do.
+function M.priceDisplay(mode, explicitValue, baseValue)
+    if type(explicitValue) == "number" then
+        return tostring(explicitValue) .. " G", true, "primary"
+    end
+    if mode == "leader" then
+        return tostring(type(baseValue) == "number" and baseValue or 0) .. " G", false, "secondary"
+    end
+    return "—", false, "secondary"
+end
+
 local LEADER_ACTIONS = { "preset", "basePrice", "active", "new", "copy", "rename", "delete", "import", "export" }
 local PERSONAL_ACTIONS = { "itemCount", "import", "export", "clear" }
 
@@ -568,6 +581,11 @@ if runtimeReady() then
             end
         end
 
+        local function applyBossSelection(bt, selected)
+            if not Style.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then return end
+            Style.setButtonState(bt, selected and "listSelected" or "listNormal", BiaoGe.options.alpha)
+        end
+
         -- Filter bar: search box, set/unset/all state toggle, clear.
         local searchBox = CreateFrame("EditBox", nil, main.filterBar, BG.editTemplate or "InputBoxTemplate")
         searchBox:SetPoint("TOPLEFT", main.filterBar, "TOPLEFT", 0, 0)
@@ -840,38 +858,30 @@ if runtimeReady() then
                         qr, qg, qb = 1, 1, 1
                     end
                     row.name:SetTextColor(qr, qg, qb)
+                    local displayText, canClear, textRole
                     if pageState.mode == "leader" then
                         local root, family = context(pageState.raidId)
                         local presetId = activePresetId(pageState.raidId)
                         local raid = root and root.leaderAuctionPricePresets and root.leaderAuctionPricePresets[family] and root.leaderAuctionPricePresets[family][pageState.raidId]
                         local preset = raid and raid.presets and raid.presets[presetId]
                         local override = preset and type(preset.itemPrices) == "table" and preset.itemPrices[item.itemId]
-                        if type(override) == "number" then
-                            row.price:SetText((L["单件"] or "单件") .. " " .. tostring(override) .. " G")
-                            row.edit._refreshing = true
-                            row.edit:SetText(tostring(override))
-                            row.edit._refreshing = nil
-                        else
-                            local base = preset and type(preset.basePrice) == "number" and preset.basePrice or 0
-                            row.price:SetText((L["基础"] or "基础") .. " " .. tostring(base) .. " G")
-                            row.edit._refreshing = true
-                            row.edit:SetText("")
-                            row.edit._refreshing = nil
-                        end
+                        local base = preset and type(preset.basePrice) == "number" and preset.basePrice or 0
+                        displayText, canClear, textRole = M.priceDisplay("leader", override, base)
+                        row.edit._refreshing = true
+                        row.edit:SetText(type(override) == "number" and tostring(override) or "")
+                        row.edit._refreshing = nil
                     else
                         local root, family, realmId, player = context(pageState.raidId)
                         local value = Store.getPersonalPrice(root, family, realmId, player, pageState.raidId, item.itemId)
-                        if type(value) == "number" then
-                            row.price:SetText(tostring(value) .. " G")
-                            row.edit._refreshing = true
-                            row.edit:SetText(tostring(value))
-                            row.edit._refreshing = nil
-                        else
-                            row.price:SetText(L["未设置"] or "未设置")
-                            row.edit._refreshing = true
-                            row.edit:SetText("")
-                            row.edit._refreshing = nil
-                        end
+                        displayText, canClear, textRole = M.priceDisplay("personal", value)
+                        row.edit._refreshing = true
+                        row.edit:SetText(type(value) == "number" and tostring(value) or "")
+                        row.edit._refreshing = nil
+                    end
+                    row.price:SetText(displayText)
+                    row.clear:SetShown(canClear)
+                    if Style.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                        Style.applyText(row.price, textRole)
                     end
                 else
                     row:Hide()
@@ -1001,7 +1011,7 @@ if runtimeReady() then
                 bt:SetPoint("TOPLEFT", main.bossScroll, "TOPLEFT", 0, -(idx - 1) * 22)
                 local selected = (pageState.bossId == node.id) or (pageState.bossId == nil and node.id == "all")
                 if selected then bt:Disable() else bt:Enable() end
-                applySelection(bt, selected)
+                applyBossSelection(bt, selected)
                 bt:Show()
             end
         end

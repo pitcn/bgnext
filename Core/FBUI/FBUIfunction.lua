@@ -1217,6 +1217,24 @@ function BG.SetBossNamePoint(FB, boss, f)
     end
 end
 
+local function bossLabelRole(frameName, boss, maxBoss)
+    if frameName == "DuiZhangFrame" and boss == maxBoss then return "danger" end
+    if boss > maxBoss or (frameName == "DuiZhangFrame" and boss == maxBoss + 1) then return "brand" end
+    return "secondary"
+end
+
+local function applyBossLabelColor(label, role, classicHex)
+    local UIStyle = BG.BGNext and BG.BGNext.UIStyle
+    if UIStyle then
+        UIStyle.registerText(label, role, classicHex)
+    end
+    if UIStyle and UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+        UIStyle.applyText(label, role)
+    else
+        label:SetTextColor(RGB(classicHex))
+    end
+end
+
 function BG.BossNameUI(FB, t, b, bb, i, ii, frameName)
     local fontsize = 14
     local boss = BossNum(FB, b, t)
@@ -1229,12 +1247,21 @@ function BG.BossNameUI(FB, t, b, bb, i, ii, frameName)
     f:SetSize(15, 40)
     f.text = f:CreateFontString()
     f.text:SetFont(BIAOGE_TEXT_FONT, fontsize, "OUTLINE")
-    f.text:SetTextColor(RGB(BG.Boss[FB]["boss" .. boss].color))
+    local role = bossLabelRole(frameName, boss, Maxb[FB])
+    applyBossLabelColor(f.text, role, BG.Boss[FB]["boss" .. boss].color)
     if frameName == "DuiZhangFrame" then
         if boss == Maxb[FB] then
-            f.text:SetText(BG.STC_r1(BG.FormatBossName(L["我漏记的装备"])))
+            if BG.BGNext.UIStyle and BG.BGNext.UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                f.text:SetText(BG.FormatBossName(L["我漏记的装备"]))
+            else
+                f.text:SetText(BG.STC_r1(BG.FormatBossName(L["我漏记的装备"])))
+            end
         elseif boss == Maxb[FB] + 1 then
-            f.text:SetText(BG.STC_g1(BG.FormatBossName(L["总结"])))
+            if BG.BGNext.UIStyle and BG.BGNext.UIStyle.isPreviewEnabled(BiaoGe and BiaoGe.BGNext) then
+                f.text:SetText(BG.FormatBossName(L["总结"]))
+            else
+                f.text:SetText(BG.STC_g1(BG.FormatBossName(L["总结"])))
+            end
         else
             f.text:SetText(BG.Boss[FB]["boss" .. boss].name)
         end
@@ -1259,7 +1286,7 @@ function BG.BossNameUI(FB, t, b, bb, i, ii, frameName)
         end)
         f:SetScript("OnLeave", function(self)
             GameTooltip:Hide()
-            f.text:SetTextColor(RGB(BG.Boss[FB]["boss" .. boss].color))
+            applyBossLabelColor(f.text, role, BG.Boss[FB]["boss" .. boss].color)
         end)
     end
 
@@ -1268,7 +1295,7 @@ function BG.BossNameUI(FB, t, b, bb, i, ii, frameName)
         f:SetPoint("BOTTOM", BG[frameName][FB]["boss" .. Maxb[FB] + 2].zhuangbei5, "BOTTOMLEFT", -45, 7)
         f.text = f:CreateFontString()
         f.text:SetFont(BIAOGE_TEXT_FONT, fontsize, "OUTLINE")
-        f.text:SetTextColor(RGB("00BFFF"))
+        applyBossLabelColor(f.text, "brand", "00BFFF")
         f.text:SetText(L["工\n资"])
         BG.SetBossNamePoint(FB, boss, f)
     end

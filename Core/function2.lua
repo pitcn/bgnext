@@ -2508,7 +2508,7 @@ function BG.CreateButton(parent)
     local t = bt:CreateFontString()
     t:SetAllPoints()
     t:SetTextColor(1, .82, 0)
-    t:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+    t:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
     bt:SetFontString(t)
     if UIStyle and type(UIStyle.registerButton) == "function" then
         UIStyle.registerButton(bt)
