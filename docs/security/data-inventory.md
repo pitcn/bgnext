@@ -52,7 +52,7 @@ No other-player, cross-account, historical, communication, or migration data is 
 
 ## Runtime-only data
 
-The settlement readiness checklist is derived on demand from the already stored `currentSettlement` records and the current raid table's bill rows, and exists only in memory while the checklist window shows it. It adds no SavedVariables field, reads no mailbox, no history and no other player's data, never modifies records or sends anything, and is discarded when the window closes, the settlement is cleared or the raid scope changes.
+The settlement readiness checklist is derived on demand from the already stored `currentSettlement` records and the current raid table's bill rows, and exists only in memory while the checklist window shows it. While visible, one low-frequency (1 s) scope-bound timer revalidates bill edits and settlement expiry; it is cancelled on hide. The checklist adds no SavedVariables field, reads no mailbox, no history and no other player's data, never modifies records or sends anything, and its derived report, rendered rows and locate closures are discarded when the window closes, the settlement is cleared or the raid scope changes.
 
 Automatic-bidding state is memory-only. Its auction identity, item identity, current price, increment, cap, next bid, status, and stop reason must not be written to SavedVariables. Reloading the UI destroys the state.
 

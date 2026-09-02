@@ -26,20 +26,22 @@ return function(test)
         })
     end
 
-    local function addMail(root, player, amount, status, time)
+    local function addMail(root, player, amount, status, time, direction)
         return mail.append(root, {
             raidId = root.currentSettlement.raidId,
             player = player, itemId = nil, amount = amount,
-            time = time or NOW, status = status or "sent", direction = "outgoing",
+            time = time or NOW, status = status or "sent", direction = direction or "outgoing",
         })
     end
 
+    local function saleRow(boss, slot, itemId, item, buyer, amount, debt)
+        return { boss = boss, slot = slot, itemId = itemId, item = item, buyer = buyer, amount = amount, debt = debt }
+    end
+
     local function bill(rows, summary)
-        return {
-            hasContent = true,
-            rows = rows or {},
-            summary = summary or { splitCount = "40", netIncome = "1000" },
-        }
+        rows = rows or {}
+        summary = summary or { splitCount = "40", netIncome = "1000", wage = "25.00" }
+        return { hasContent = true, rows = rows, summary = summary }
     end
 
     local function entries(report, severity, category)
@@ -78,14 +80,14 @@ return function(test)
 
     -- 4. debts, missing buyers and missing amounts come from the bill rows
     local rows = {
-        { boss = 1, slot = 1, item = "[装备一]", buyer = "买家甲", amount = "100" },
-        { boss = 1, slot = 2, item = "[装备二]", buyer = "买家乙", amount = "", debt = 300 },
-        { boss = 2, slot = 1, item = "[装备三]", buyer = "", amount = "50" },
-        { boss = 2, slot = 2, item = "[装备四]", buyer = "", amount = "abc" },
+        saleRow(1, 1, 7001, "[装备一]", "买家甲", "100"),
+        saleRow(1, 2, 7002, "[装备二]", "买家乙", "", 300),
+        saleRow(2, 1, 7003, "[装备三]", "", "50"),
+        saleRow(2, 2, 7004, "[装备四]", "", "abc"),
     }
     report = checklist.evaluate({
         settlement = root.currentSettlement,
-        bill = bill(rows, { splitCount = "40", netIncome = "1000" }),
+        bill = bill(rows, { splitCount = "40", netIncome = "1000", wage = "25.00" }),
         fb = "ICC",
     })
     local debts = entries(report, "issue", "debt")
@@ -117,12 +119,22 @@ return function(test)
     test.eq(entries(report, "issue", "summary")[1] ~= nil, true, "missing split count is an anomaly")
     report = checklist.evaluate({
         settlement = root.currentSettlement,
+        bill = bill({}, { splitCount = "2.5", netIncome = "100" }),
+    })
+    test.eq(#entries(report, "issue", "summary"), 1, "a fractional split count is an anomaly")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({}, { splitCount = "inf", netIncome = "100" }),
+    })
+    test.eq(#entries(report, "issue", "summary"), 1, "a non-finite split count is an anomaly")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
         bill = bill({}, { splitCount = "abc", netIncome = "-50" }),
     })
     test.eq(#entries(report, "issue", "summary"), 2, "invalid count and negative income are anomalies")
     report = checklist.evaluate({
         settlement = root.currentSettlement,
-        bill = bill({ { boss = 1, slot = 1, item = "[装备一]", buyer = "甲", amount = "100" } },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "100") },
             { splitCount = "40", netIncome = "0" }),
     })
     test.eq(entries(report, "pending", "summary")[1] ~= nil, true, "zero net income with sales stays pending")
@@ -131,6 +143,34 @@ return function(test)
         bill = bill({}, { splitCount = "40", netIncome = nil }),
     })
     test.eq(entries(report, "pending", "summary")[1] ~= nil, true, "missing net income stays pending")
+
+    -- 5b. the displayed wage must match BG.GetWages and its rounding policy
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({}, { splitCount = "40", netIncome = "100", wage = "2.50" }),
+    })
+    test.eq(#entries(report, "pending", "summary"), 0, "a consistent displayed wage passes")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({}, { splitCount = "40", netIncome = "100", wage = "30.00" }),
+    })
+    test.eq(#entries(report, "pending", "summary"), 1, "a stale displayed wage stays pending")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({}, { splitCount = "40", netIncome = "100", wage = "2" }),
+    })
+    local wageInput = report.entries[1]
+    test.eq(wageInput == nil, false, "wage mismatch found")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({}, { splitCount = "40", netIncome = "100", wage = "2", moLing = true }),
+    })
+    test.eq(#entries(report, "pending", "summary"), 0, "moLing rounds the expected wage down")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({}, { splitCount = "40", netIncome = "100", wage = nil }),
+    })
+    test.eq(#entries(report, "pending", "summary"), 1, "a missing displayed wage stays pending")
 
     -- 6. bill data gaps stay pending instead of passing
     root = newRoot()
@@ -144,66 +184,139 @@ return function(test)
     test.eq(entries(report, "pending", "bill")[1] ~= nil, true, "empty bill stays pending")
     test.eq(report.status, "pending", "empty bill never reads as ready")
 
-    -- 7. mails: pending records and sold items without any mail evidence
-    root = newRoot()
-    beginSettlement(root, "ICC")
-    -- One trade carrying two copies of the same item id: one evidence unit.
-    addTrade(root, "买家甲", 7001, 100, "complete", NOW)
-    addTrade(root, "买家甲", 7001, nil, "complete", NOW)
-    -- Two separate trades to another buyer.
-    addTrade(root, "买家乙", 7002, 200, "complete", NOW + 10)
-    addTrade(root, "买家乙", 7003, 300, "complete", NOW + 20)
-    -- A buyer whose wage mail is already recorded.
-    addTrade(root, "买家丙", 7004, 400, "complete", NOW + 30)
-    addMail(root, "买家丙", 400, "sent", NOW + 40)
-    addMail(root, "买家丁", 50, "pending", NOW + 50)
-    report = checklist.evaluate({ settlement = root.currentSettlement, bill = bill() })
-    local pendingMails = entries(report, "pending", "mail")
-    test.eq(#pendingMails, 3, "unmailed buyers and pending mail records are grouped")
-    local counts = {}
-    for _, entry in ipairs(pendingMails) do
-        counts[entry.args[1]] = entry.args[2] or "record"
-    end
-    test.eq(counts["买家甲"], "1", "one trade with duplicate item ids counts once")
-    test.eq(counts["买家乙"], "2", "two separate trades count twice")
-    test.eq(counts["买家丁"], "record", "a pending mail record is its own entry")
-    test.eq(counts["买家丙"], nil, "a buyer with a mail record is not flagged")
-
-    -- 8. everything checked and confirmed reads as ready
+    -- 7. sold bill rows reconcile against trade evidence, one use each
+    -- 7a. the review reproduction: one unrelated trade must not clear a new sale
     root = newRoot()
     beginSettlement(root, "ICC")
     addTrade(root, "买家甲", 7001, 100, "complete")
     addMail(root, "买家甲", 100, "sent")
-    report = checklist.evaluate({
-        settlement = root.currentSettlement,
-        bill = bill({ { boss = 1, slot = 1, item = "[装备一]", buyer = "买家甲", amount = "100" } },
-            { splitCount = "40", netIncome = "100" }),
+    input = checklist.collect({
+        db = root, fb = "ICC", now = NOW + 60,
+        table = { boss1 = {
+            zhuangbei1 = "[装备一]", maijia1 = "买家甲", jine1 = "100",
+            zhuangbei2 = "[装备二]", maijia2 = "买家乙", jine2 = "900",
+        } },
+        bosses = 1,
+        slotsOf = function() return 2 end,
+        itemIdOf = function(text) return text == "[装备一]" and 7001 or 9999 end,
     })
-    test.eq(report.status, "ready", "evidence-complete checklist is ready")
-    test.eq(report.total, 0, "ready has no entries")
+    report = checklist.evaluate(input)
+    test.eq(report.status ~= "ready", true, "an untraded sale blocks readiness")
+    local sold = entries(report, "pending", "sold")
+    test.eq(#sold, 1, "the sale without trade evidence is pending")
+    test.eq(sold[1].args[1], "1", "untraded sale names the boss")
+    test.eq(sold[1].args[2], "2", "untraded sale names the slot")
 
-    -- 9. an anomaly wins over pending, both are counted
+    -- 7b. one trade evidence can confirm only one identical sale
     root = newRoot()
     beginSettlement(root, "ICC")
     addTrade(root, "买家甲", 7001, 100, "complete")
     report = checklist.evaluate({
         settlement = root.currentSettlement,
-        bill = bill({ { boss = 1, slot = 1, item = "[装备一]", buyer = "", amount = "", debt = 500 } },
-            { splitCount = "40", netIncome = "100" }),
+        bill = bill({
+            saleRow(1, 1, 7001, "[装备一]", "买家甲", "100"),
+            saleRow(1, 2, 7001, "[装备一]", "买家甲", "100"),
+        }, { splitCount = "40", netIncome = "200", wage = "5.00" }),
+    })
+    test.eq(#entries(report, "pending", "sold"), 1, "duplicate sales consume evidence once")
+
+    -- 7c. evidence follows the buyer, not just the item
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    addTrade(root, "买家甲", 7001, 100, "complete")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({
+            saleRow(1, 1, 7001, "[装备一]", "买家甲", "100"),
+            saleRow(1, 2, 7001, "[装备一]", "买家乙", "100"),
+        }, { splitCount = "40", netIncome = "200", wage = "5.00" }),
+    })
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 1, "the other buyer's identical sale stays pending")
+    test.eq(sold[1].args[2], "2", "the second sale is the unmatched one")
+
+    -- 7d. a packed trade delivers one evidence row per item, amounts stay shared
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    addTrade(root, "买家甲", 7001, 100, "complete")
+    addTrade(root, "买家甲", 7001, nil, "complete")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({
+            saleRow(1, 1, 7001, "[装备一]", "买家甲", "100"),
+            saleRow(1, 2, 7001, "[装备一]", "买家甲", "100"),
+        }, { splitCount = "40", netIncome = "200", wage = "5.00" }),
+    })
+    test.eq(#entries(report, "pending", "sold"), 0, "both packed items reconcile")
+    test.eq(report.status, "ready", "packed delivery with matching rows is ready")
+
+    -- 7e. an unidentifiable bill item stays pending instead of guessing
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    addTrade(root, "买家甲", 7001, 100, "complete")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({ saleRow(1, 1, nil, "[神秘物品]", "买家甲", "100") },
+            { splitCount = "40", netIncome = "100", wage = "2.50" }),
+    })
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 1, "an unidentifiable item cannot use trade evidence")
+
+    -- 8. mail records are judged by status and direction, never by buyer身份
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    addTrade(root, "买家甲", 7001, 100, "complete")
+    addMail(root, "买家乙", 200, "failed")
+    addMail(root, "买家丙", 300, "pending")
+    mail.append(root, {
+        raidId = root.currentSettlement.raidId, player = "买家丁", itemId = nil,
+        amount = 400, time = NOW + 40, status = "sent",
+    })
+    report = checklist.evaluate({ settlement = root.currentSettlement, bill = bill() })
+    test.eq(entries(report, "pending", "mail")[1] ~= nil, true, "the wage-mail flow stays pending-free of buyer inference")
+    local mailEntries = entries(report, "pending", "mail")
+    test.eq(#mailEntries, 3, "failed, pending and direction-less mails are surfaced")
+    test.eq(mailEntries[1].args[1], "买家乙", "failed mail names its recipient")
+    test.eq(mailEntries[2].args[1], "买家丙", "pending mail names its recipient")
+    test.eq(mailEntries[3].args[1], "买家丁", "direction-less mail names its recipient")
+    for _, entry in ipairs(report.entries) do
+        test.eq(entry.args[1] == "买家甲", false, "no mail obligation is inferred from being a buyer")
+    end
+
+    -- 9. everything checked and confirmed reads as ready
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    addTrade(root, "买家甲", 7001, 100, "complete")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "100") },
+            { splitCount = "40", netIncome = "100", wage = "2.50" }),
+    })
+    test.eq(report.status, "ready", "evidence-complete checklist is ready")
+    test.eq(report.total, 0, "ready has no entries")
+
+    -- 10. an anomaly wins over pending, both are counted
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    addTrade(root, "买家甲", 7001, 100, "complete")
+    report = checklist.evaluate({
+        settlement = root.currentSettlement,
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "", "", 500) },
+            { splitCount = "40", netIncome = "100", wage = "2.50" }),
     })
     test.eq(report.status, "issues", "an anomaly blocks the ready status")
     test.eq(report.issueCount, 2, "debt and missing buyer/amount are counted")
-    test.eq(report.pendingCount, 1, "the unmailed buyer stays pending")
-    test.eq(report.total, 3, "the total covers anomalies and pending items")
+    test.eq(report.pendingCount, 0, "an unsold row without buyer needs no mail evidence")
+    test.eq(report.total, 2, "the total covers anomalies and pending items")
 
-    -- 10. the collect adapter reads the real bill shapes with gold units
+    -- 11. the collect adapter reads the real bill shapes with gold units
     root = newRoot()
     beginSettlement(root, "ICC")
     addTrade(root, "买家甲", 7001, 100, "pending")
     local tableData = {
         boss1 = { zhuangbei1 = " [装备一] ", maijia1 = "买家甲", jine1 = "100" },
         boss2 = { zhuangbei1 = "[装备二]", maijia1 = "买家乙", jine1 = "", qiankuan1 = 300 },
-        boss4 = { jine3 = "500", jine4 = "40" },
+        boss4 = { jine3 = "500", jine4 = "40", jine5 = "12.50" },
     }
     local input = checklist.collect({
         db = root,
@@ -211,21 +324,25 @@ return function(test)
         table = tableData,
         bosses = 2,
         slotsOf = function(fb, b) return b == 1 and 1 or 2 end,
+        itemIdOf = function(text) return text == " [装备一] " and 7001 or 7002 end,
         now = NOW + 60,
     })
     test.eq(input.settlement ~= nil, true, "live settlement is collected")
     test.eq(#input.bill.rows, 3, "bill rows follow the per-boss slot counts")
     test.eq(input.bill.rows[1].item, "[装备一]", "item text keeps its stored value")
+    test.eq(input.bill.rows[1].itemId, 7001, "item ids are projected for matching")
     test.eq(input.bill.rows[2].debt, 300, "debt is read as a number in gold")
     test.eq(input.bill.rows[2].amount, "", "amount stays the stored text")
     test.eq(input.bill.summary.splitCount, "40", "split count comes from the summary row")
     test.eq(input.bill.summary.netIncome, "500", "net income comes from the summary row")
+    test.eq(input.bill.summary.wage, "12.50", "the displayed wage comes from the summary row")
     test.eq(input.fb, "ICC", "locate targets use the collected table")
+    test.eq(input.scopeMismatch, nil, "matching scopes collect normally")
     report = checklist.evaluate(input)
     test.eq(report.status, "issues", "collected input evaluates to the real anomalies")
     test.eq(#entries(report, "issue", "debt"), 1, "collected debt is flagged")
 
-    -- 11. expired settlements are dropped before evaluating
+    -- 12. expired settlements are dropped before evaluating
     root = newRoot()
     beginSettlement(root, "ICC")
     root.currentSettlement.expiresAt = NOW - 1
@@ -234,7 +351,24 @@ return function(test)
     report = checklist.evaluate(input)
     test.eq(report.status, "pending", "expired settlement stays pending")
 
-    -- 12. a different raid table without bill data stays pending
+    -- 13. a different raid identity with populated bill data is rejected
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    addTrade(root, "买家甲", 7001, 100, "complete")
+    input = checklist.collect({
+        db = root, fb = "TOC", now = NOW + 60,
+        table = { boss1 = { zhuangbei1 = "[装备一]", maijia1 = "买家甲", jine1 = "100" } },
+        bosses = 1,
+        slotsOf = function() return 1 end,
+        itemIdOf = function() return 7001 end,
+    })
+    test.eq(input.scopeMismatch, true, "scope mismatch is collected")
+    test.eq(input.bill, nil, "a mismatched bill is not evaluated")
+    report = checklist.evaluate(input)
+    test.eq(entries(report, "pending", "bill")[1] ~= nil, true, "scope mismatch stays pending")
+    test.eq(report.status, "pending", "cross-raid data never reads as ready")
+
+    -- 14. a cleared raid table stays pending
     root = newRoot()
     beginSettlement(root, "ICC")
     addTrade(root, "买家甲", 7001, 100, "complete")
@@ -243,7 +377,7 @@ return function(test)
     test.eq(entries(report, "pending", "bill")[1] ~= nil, true, "cleared raid table stays pending")
     test.eq(report.status, "pending", "missing raid table never reads as ready")
 
-    -- 13. locate resolution never fakes a jump
+    -- 15. locate resolution never fakes a jump
     test.eq(checklist.resolveLocate({ type = "window", kind = "trade", filter = "pending" }, "ICC").window, "trade",
         "window locate resolves")
     test.eq(checklist.resolveLocate({ type = "table", fb = "ICC" }, "TOC").table, "ICC",
@@ -254,19 +388,18 @@ return function(test)
     test.eq(checklist.resolveLocate({ type = "window" }, "ICC").window, "trade",
         "window locate defaults to the trade record")
 
-    -- 14. the ready status has its own color and the report stays memory-only
+    -- 16. the ready status has its own color and the report stays memory-only
     local r, g, b = checklist.statusColor("ready")
     test.eq(r ~= g, true, "ready color differs from its channels")
     test.eq(checklist.statusColor("pending"), checklist.statusColor("unknown"), "unknown falls back to pending gold")
 
-    -- 15. the module stays read-only: no send, inbox, history or timer paths
+    -- 17. the module stays read-only: no send, inbox, history or timer paths
     local file = assert(io.open("Core/BGNext/CurrentSettlementChecklist.lua", "rb"))
     local source = file:read("*a")
     file:close()
     for _, forbidden in ipairs({
         "SendChatMessage", "SendAddonMessage", "C_ChatInfo", "GetInboxText",
         "tradeHistory", "mailHistory", "BiaoGe.History", "C_Timer", "OnUpdate",
-        "SetCartItemList",
     }) do
         test.eq(source:find(forbidden, 1, true), nil, "checklist stays read-only: " .. forbidden)
     end

@@ -346,6 +346,8 @@ function M.onTableCleared(root, fb)
         return false
     end
     life.clearSettlement(root)
+    -- Derived views (checklist, tables) must drop the cleared scope at once.
+    refreshUI("trade")
     return true
 end
 
@@ -398,6 +400,7 @@ if BG.Init then
             local root = BG.BGNext and BG.BGNext.DB
             if root then
                 activeSettlement(root, liveContext())
+                refreshUI("trade")
             end
         end)
 
@@ -420,6 +423,17 @@ if BG.Init then
                 playeritems = trade.playeritems,
             })
         end)
+
+        -- Clearing the active raid table must invalidate the settlement and
+        -- every derived view at once.
+        if type(hooksecurefunc) == "function" and type(BG.ClearBiaoGe) == "function" then
+            hooksecurefunc(BG, "ClearBiaoGe", function(_, fb)
+                local root = BG.BGNext and BG.BGNext.DB
+                if root and M.onTableCleared(root, fb) then
+                    refreshUI("trade")
+                end
+            end)
+        end
     end)
 end
 

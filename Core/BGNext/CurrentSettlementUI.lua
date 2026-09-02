@@ -300,8 +300,26 @@ local function checklistOptions(now)
         table = type(BiaoGe) == "table" and BiaoGe[fb] or nil,
         bosses = ns and ns.Maxb and ns.Maxb[fb] or nil,
         slotsOf = BG.GetMaxi,
+        itemIdOf = ns and ns.GetItemID or nil,
+        moLing = type(BiaoGe) == "table" and type(BiaoGe.options) == "table"
+            and BiaoGe.options.moLing == 1 or false,
         normalizeName = BG.GSN,
     }
+end
+
+local CATEGORY_ORDER = { "settlement", "trade", "sold", "debt", "bill", "summary", "mail" }
+local CATEGORY_LABELS = {
+    settlement = "结算状态",
+    trade = "未核对交易",
+    sold = "销售交付核对",
+    debt = "未处理欠款",
+    bill = "账单完整性",
+    summary = "分金与工资",
+    mail = "邮件核对",
+}
+
+local function categoryLabel(category)
+    return L[CATEGORY_LABELS[category] or category]
 end
 
 local function acquireChecklistRow(win, index)
@@ -326,18 +344,51 @@ local function acquireChecklistRow(win, index)
     return row
 end
 
-local function fillChecklistRow(win, row, entryData)
+local function configureHeaderRow(row, category)
+    row.isHeader = true
+    row.entry = nil
+    row.fullReason = nil
+    row.text:SetText(categoryLabel(category))
+    row.text:SetTextColor(0, 0.75, 1)
+    row.text:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
+    if row.locateButton then
+        row.locateButton:SetScript("OnClick", nil)
+        row.locateButton:Hide()
+    end
+    row:Show()
+end
+
+local function configureEntryRow(row, entryData)
+    row.isHeader = false
     row.entry = entryData
     local text = L[entryData.reasonKey]
     if #(entryData.args or {}) > 0 then
         text = string.format(text, unpack(entryData.args))
     end
+    row.fullReason = text
     row.text:SetText(text)
+    row.text:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
     if entryData.severity == "issue" then
         row.text:SetTextColor(1, 0.35, 0.35)
     else
         row.text:SetTextColor(1, 0.82, 0)
     end
+    -- The row keeps to one line; the tooltip carries the full reason so long
+    -- English text is never lost to clipping.
+    row:SetScript("OnEnter", function(self)
+        if type(GameTooltip) ~= "table" then
+            return
+        end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine(self.fullReason or "", 1, 0.82, 0, true)
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function()
+        if type(GameTooltip) == "table" and GameTooltip.Hide then
+            GameTooltip:Hide()
+        end
+    end)
     local C = checklist()
     local target = C and C.resolveLocate and C.resolveLocate(entryData.locate, BG.FB1) or nil
     if target then
@@ -351,9 +402,9 @@ local function fillChecklistRow(win, row, entryData)
         end)
         row.locateButton:Show()
     else
+        row.locateButton:SetScript("OnClick", nil)
         row.locateButton:Hide()
     end
-    row:Show()
 end
 
 local function renderChecklist(win, report)
@@ -368,13 +419,45 @@ local function renderChecklist(win, report)
     for _, row in ipairs(win.rowPool) do
         row:Hide()
     end
-    win.checklistRows = {}
-    for index, entryData in ipairs(report.entries) do
-        local row = acquireChecklistRow(win, index)
-        fillChecklistRow(win, row, entryData)
-        win.checklistRows[index] = row
+
+    -- One row per entry, grouped under a category header row.
+    local display = {}
+    for _, category in ipairs(CATEGORY_ORDER) do
+        local groupStarted
+        for _, entryData in ipairs(report.entries) do
+            if entryData.category == category then
+                if not groupStarted then
+                    groupStarted = true
+                    display[#display + 1] = { header = true, category = category }
+                end
+                display[#display + 1] = { entry = entryData }
+            end
+        end
     end
-    win.child:SetHeight(math.max(#report.entries * (ROW_HEIGHT + ROW_GAP), win.scrollHeight))
+    win.checklistRows = {}
+    for index, item in ipairs(display) do
+        local row = acquireChecklistRow(win, index)
+        if item.header then
+            configureHeaderRow(row, item.category)
+        else
+            configureEntryRow(row, item.entry)
+        end
+        win.checklistRows[#win.checklistRows + 1] = row
+    end
+    -- Surplus pooled rows lose their derived references immediately.
+    for index = #display + 1, #win.rowPool do
+        local row = win.rowPool[index]
+        row.isHeader = nil
+        row.entry = nil
+        row.fullReason = nil
+        row.text:SetText("")
+        if row.locateButton then
+            row.locateButton:SetScript("OnClick", nil)
+            row.locateButton:Hide()
+        end
+        row:Hide()
+    end
+    win.child:SetHeight(math.max(#display * (ROW_HEIGHT + ROW_GAP), win.scrollHeight))
 end
 
 -- Recomputes only while the checklist window is visible; any record or window
@@ -394,6 +477,72 @@ local function refreshChecklist()
     local report = C.report(checklistOptions(now))
     win.report = report
     renderChecklist(win, report)
+end
+
+-- Bursts of record updates coalesce into one recompute on the next frame.
+local checklistScheduled = false
+local function processChecklistRefresh()
+    checklistScheduled = false
+    refreshChecklist()
+end
+
+local function requestChecklistRefresh()
+    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+        if checklistScheduled then
+            return
+        end
+        checklistScheduled = true
+        C_Timer.After(0, processChecklistRefresh)
+    else
+        processChecklistRefresh()
+    end
+end
+
+-- While the window shows, a single low-frequency, scope-bound ticker revalidates
+-- the data the checklist cannot subscribe to (bill, buyer, amount and debt edits
+-- in the baseline table, and settlement expiry). It is cancelled on hide, so
+-- nothing runs for a hidden or closed window.
+local function startChecklistTicker(win)
+    if win.updateTicker ~= nil then
+        return
+    end
+    if type(C_Timer) ~= "table" or type(C_Timer.NewTicker) ~= "function" then
+        return
+    end
+    win.updateTicker = C_Timer.NewTicker(1, function()
+        if not win.frame:IsShown() then
+            return
+        end
+        M.prepare(database(), serverNow())
+        win.report = nil
+        requestChecklistRefresh()
+    end)
+end
+
+local function stopChecklistTicker(win)
+    if win.updateTicker and type(win.updateTicker.Cancel) == "function" then
+        win.updateTicker:Cancel()
+    end
+    win.updateTicker = nil
+end
+
+-- Frames stay pooled for reuse, but every derived reference (entry, reason
+-- text, locate closure) is dropped with the window or the scope.
+local function releaseChecklistRows(win)
+    win.report = nil
+    win.checklistRows = nil
+    for _, row in ipairs(win.rowPool) do
+        row.isHeader = nil
+        row.entry = nil
+        row.fullReason = nil
+        row.text:SetText("")
+        row.text:SetTextColor(0.8, 0.8, 0.8)
+        if row.locateButton then
+            row.locateButton:SetScript("OnClick", nil)
+            row.locateButton:Hide()
+        end
+        row:Hide()
+    end
 end
 
 local function createChecklistWindow()
@@ -432,13 +581,22 @@ local function createChecklistWindow()
     local hint = frame:CreateFontString()
     hint:SetFont(BIAOGE_TEXT_FONT, 11, "OUTLINE")
     hint:SetPoint("BOTTOMLEFT", 14, 14)
+    hint:SetWidth(width - 28)
+    hint:SetJustifyH("LEFT")
+    hint:SetWordWrap(true)
     hint:SetTextColor(0.6, 0.6, 0.6)
     hint:SetText(L["只读检查：不会自动修改账目、发送邮件或执行结算。"])
 
-    frame:SetScript("OnShow", function() M.Refresh(CHECKLIST_KIND) end)
-    -- The derived report is dropped with the window; nothing survives a close,
-    -- a manual clear or a settlement switch.
-    frame:SetScript("OnHide", function() win.report = nil end)
+    frame:SetScript("OnShow", function()
+        startChecklistTicker(win)
+        M.Refresh(CHECKLIST_KIND)
+    end)
+    -- The derived report, rendered rows and locate closures are dropped with
+    -- the window; nothing survives a close, a manual clear or a scope switch.
+    frame:SetScript("OnHide", function()
+        stopChecklistTicker(win)
+        releaseChecklistRows(win)
+    end)
 
     windows[CHECKLIST_KIND] = win
     return win
@@ -573,9 +731,9 @@ local function fillRow(win, row, data)
 end
 
 function M.Refresh(kind)
-    -- Any record or window refresh also updates a visible checklist, so a
-    -- single pipeline serves all refresh sources without extra timers.
-    refreshChecklist()
+    -- Any record or window refresh also updates a visible checklist; bursts
+    -- coalesce into one recompute via the deferred refresh request.
+    requestChecklistRefresh()
     if kind == CHECKLIST_KIND then
         return
     end
@@ -764,8 +922,8 @@ function M.Show(kind, filter)
     if filter ~= nil and win.filter ~= nil and KNOWN_FILTERS[filter] then
         win.filter = filter
     end
+    -- OnShow drives the refresh, so showing and re-showing never render twice.
     win.frame:Show()
-    M.Refresh(kind)
     return true
 end
 
@@ -788,12 +946,13 @@ end
 function M.checklistState()
     local win = windows[CHECKLIST_KIND]
     if not win then
-        return { shown = false, report = nil, rows = {} }
+        return { shown = false, report = nil, rows = {}, pooledRows = {} }
     end
     return {
         shown = win.frame:IsShown() and true or false,
         report = win.report,
         rows = win.checklistRows or {},
+        pooledRows = win.rowPool,
     }
 end
 
