@@ -128,10 +128,15 @@ function M.nextCell(difficultyIndex, bossIndex, slotIndex, key, difficultyCount,
     return nil
 end
 
-function M.shortcutAction(isMasterLooter, button, altDown)
-    if not altDown then return nil end
-    if button == "LeftButton" then return "wishlist" end
-    if isMasterLooter and button == "RightButton" then return "auction" end
+function M.shortcutAction(isMasterLooter, button, altDown, controlDown, shiftDown)
+    if altDown then
+        if button == "LeftButton" then return "wishlist" end
+        if isMasterLooter and button == "RightButton" then return "auction" end
+        return nil
+    end
+    if isMasterLooter and controlDown and not shiftDown and button == "RightButton" then
+        return "leader-price"
+    end
     return nil
 end
 

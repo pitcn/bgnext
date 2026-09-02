@@ -431,6 +431,17 @@ function BG.FBZhuangBeiUI(FB, t, b, bb, i, ii, scrollFrame)
     bt:SetScript("OnTextChanged", OnTextChanged)
     -- 鼠标按下时
     bt:SetScript("OnMouseDown", function(self, button)
+        local shortcut = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(
+            BG.IsML, button, IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown())
+        if shortcut == "leader-price" then
+            local itemID = GetItemID(self:GetText())
+            if itemID and BG.GetLeiTingItem then itemID = BG.GetLeiTingItem(itemID, FB) end
+            if itemID and BG.BGNext.AuctionPriceUI and BG.BGNext.AuctionPriceUI.openLeaderPriceEditor then
+                BG.BGNext.AuctionPriceUI.openLeaderPriceEditor(itemID, FB)
+            end
+            self:ClearFocus()
+            return
+        end
         if button == "RightButton" and not IsAltKeyDown() and self ~= BG.Frame[FB]["boss" .. Maxb[FB] + 2]["zhuangbei" .. i] then
             UpdateCancelDelete(self, FB, bossnum, i, self.type)
             self:SetEnabled(false)

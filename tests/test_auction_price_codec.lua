@@ -38,6 +38,55 @@ return function(test)
     test.eq(codec.applyLeader(dst, preview, { mode = "new" }), true, "apply leader new")
     test.eq(store.resolveLeaderPrice(dst, "titan", "ULD", 1001), 500, "applied item resolves")
 
+    -- One-way compatibility import for the previous BGLite price string. The
+    -- decoder is injected by the UI so the codec remains deterministic here.
+    local legacy = codec.parse("ULD:encoded", "leader", knownItems, {
+        clientFamily = "titan",
+        defaultBasePrice = 1000,
+        isBase64 = function(text) return text == "encoded" end,
+        decodeBase64 = function() return "1001-500-note,1002-0-," end,
+    })
+    test.eq(legacy.ok, true, "legacy leader price string parses")
+    test.eq(legacy.sourceFormat, "bglite-legacy", "legacy source is disclosed in preview")
+    test.eq(legacy.clientFamily, "titan", "legacy import is scoped to the current client")
+    test.eq(legacy.raidId, "ULD", "legacy raid prefix is retained")
+    test.eq(legacy.presets.p1.basePrice, 1000, "legacy import uses the current safe fallback")
+    test.eq(legacy.presets.p1.itemPrices[1001], 500, "legacy item price is converted")
+    test.eq(legacy.presets.p1.itemPrices[1002], 0, "legacy explicit zero is retained")
+
+    -- Exercise the bundled Base64 implementation against a real legacy string,
+    -- not only a stub decoder. The globals below mirror WoW's string aliases.
+    local oldGlobals = {
+        wipe = wipe, format = format, strsub = strsub, strchar = strchar, strbyte = strbyte,
+    }
+    wipe = function(tbl) for key in pairs(tbl) do tbl[key] = nil end return tbl end
+    format, strsub, strchar, strbyte = string.format, string.sub, string.char, string.byte
+    local base64 = {}
+    assert(loadfile("Libs/LibBase64/LibBase64.lua"))(nil, base64)
+    wipe, format, strsub, strchar, strbyte =
+        oldGlobals.wipe, oldGlobals.format, oldGlobals.strsub, oldGlobals.strchar, oldGlobals.strbyte
+    local realLegacy = codec.parse("ULD:MTAwMS01MDAtbm90ZSwxMDAyLTAtLA==", "leader", knownItems, {
+        clientFamily = "titan",
+        raidId = "ULD",
+        defaultBasePrice = 1000,
+        isBase64 = base64.IsBase64,
+        decodeBase64 = base64.Decode,
+    })
+    test.eq(realLegacy.ok, true, "bundled Base64 decodes a real legacy price string")
+    test.eq(realLegacy.presets.p1.itemPrices[1001], 500, "real legacy string retains the 500 price")
+    test.eq(codec.parse("ULD:not base64", "leader", knownItems, {
+        clientFamily = "titan", raidId = "ULD", defaultBasePrice = 1000,
+        isBase64 = base64.IsBase64, decodeBase64 = base64.Decode,
+    }).ok, false, "malformed legacy encoding is rejected")
+    test.eq(codec.parse("NAXX:MTAwMS01MDAtLA==", "leader", knownItems, {
+        clientFamily = "titan", raidId = "ULD", defaultBasePrice = 1000,
+        isBase64 = base64.IsBase64, decodeBase64 = base64.Decode,
+    }).ok, false, "legacy import cannot cross the selected raid")
+    test.eq(codec.parse("ULD:MTAwMS01MDAtLDEwMDEtNjAwLSw=", "leader", knownItems, {
+        clientFamily = "titan", raidId = "ULD", defaultBasePrice = 1000,
+        isBase64 = base64.IsBase64, decodeBase64 = base64.Decode,
+    }).ok, false, "duplicate legacy item ids are rejected")
+
     -- Type isolation: leader text cannot parse as personal and vice versa.
     test.eq(codec.parse(text, "personal", knownItems).ok, false, "leader rejected as personal")
     local ptext = codec.exportPersonal("titan", "ULD", { [1001] = 900 })

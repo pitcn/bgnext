@@ -60,6 +60,23 @@ function M.prefillPersonalText(frame, savedMoney, floor)
     return true
 end
 
+-- Applies a resolved leader price to the existing auction editor. Direct start
+-- deliberately reuses that frame's original OnClick handler, so every existing
+-- permission, validation, sound, message and close path remains authoritative.
+function M.applyLeaderPrefill(frame, money, directStart)
+    if type(frame) ~= "table" or type(money) ~= "number" then return false end
+    if type(frame.Edit2) ~= "table" or type(frame.Edit2.SetText) ~= "function" then return false end
+    local start
+    if directStart then
+        if type(frame.bt) ~= "table" or type(frame.bt.GetScript) ~= "function" then return false end
+        start = frame.bt:GetScript("OnClick")
+        if type(start) ~= "function" then return false end
+    end
+    frame.Edit2:SetText(tostring(money))
+    if start then start(frame.bt) end
+    return true
+end
+
 local _, ns = ...
 
 local function runtimeReady()
@@ -121,7 +138,7 @@ if runtimeReady() then
     -- Fills the existing starting-price box only when every item resolves to
     -- the current recognized raid and to one unanimous price. Any unknown or
     -- ambiguous item, differing price, or invalid data leaves the box untouched.
-    local function prefillLeaderFrame(frame, context)
+    local function prefillLeaderFrame(frame, context, directStart)
         if not frame then return end
         local items = frame.bt and frame.bt.items
         if type(items) ~= "table" or #items == 0 then return end
@@ -151,9 +168,7 @@ if runtimeReady() then
         end
 
         local common = M.chooseLeaderPrefill(prices)
-        if type(common) == "number" and frame.Edit2 then
-            frame.Edit2:SetText(tostring(common))
-        end
+        return M.applyLeaderPrefill(frame, common, directStart)
     end
 
     -- Fills the bidder's existing money EditBox from the saved personal price
@@ -187,12 +202,13 @@ if runtimeReady() then
         local original = BG.StartAuction
         BG.StartAuction = function(...)
             local previous = BG.StartAucitonFrame
+            local directStart = select(5, ...) == true
             local result = original(...)
             -- Only prefill the frame the original call actually created; an
             -- early return (permission gate, no item, over max count) leaves
             -- BG.StartAucitonFrame unchanged and is ignored.
             if BG.StartAucitonFrame ~= previous then
-                prefillLeaderFrame(BG.StartAucitonFrame, contextProvider())
+                prefillLeaderFrame(BG.StartAucitonFrame, contextProvider(), directStart)
             end
             return result
         end

@@ -53,6 +53,37 @@ return function(test)
 
     test.eq(runtime.prefillPersonalText({}, 150, 100), false, "frame without edit box reports no write")
 
+    -- The leader action writes the resolved price before optionally invoking
+    -- the existing start button. An ordinary open remains manual; Alt+right is
+    -- the explicit direct-start gesture.
+    local function fakeLeaderFrame(initialText)
+        local frame = { starts = 0 }
+        frame.Edit2 = {
+            text = initialText,
+            SetText = function(self, text) self.text = text end,
+        }
+        frame.bt = {
+            GetScript = function(_, script)
+                if script ~= "OnClick" then return nil end
+                return function() frame.starts = frame.starts + 1 end
+            end,
+        }
+        return frame
+    end
+    local leaderEdit = fakeLeaderFrame("1000")
+    test.eq(runtime.applyLeaderPrefill(leaderEdit, 500, false), true, "resolved price fills the auction editor")
+    test.eq(leaderEdit.Edit2.text, "500", "leader editor receives the saved price")
+    test.eq(leaderEdit.starts, 0, "ordinary open remains manual")
+
+    local leaderDirect = fakeLeaderFrame("1000")
+    test.eq(runtime.applyLeaderPrefill(leaderDirect, 500, true), true, "direct start accepts a resolved price")
+    test.eq(leaderDirect.Edit2.text, "500", "direct start writes the preset before starting")
+    test.eq(leaderDirect.starts, 1, "direct start invokes the existing start action once")
+
+    local unresolvedDirect = fakeLeaderFrame("1000")
+    test.eq(runtime.applyLeaderPrefill(unresolvedDirect, nil, true), false, "unresolved price cannot direct start")
+    test.eq(unresolvedDirect.starts, 0, "unresolved price stays manual")
+
     -- The runtime wraps the existing leader hook, calls it first, and only ever
     -- touches the existing price EditBox. It must never bypass the permission
     -- gates, toggle auto-bid, or send anything itself.

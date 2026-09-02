@@ -779,6 +779,36 @@ if runtimeReady() then
             end)
         end
 
+        -- Opens the same validated editor from a bill-table Ctrl+right-click.
+        -- The shortcut saves only a local per-item override in the active leader
+        -- scheme; it never starts an auction or sends a message.
+        function M.openLeaderPriceEditor(itemId, raidId)
+            raidId = raidId or BG.FB1
+            if type(itemId) ~= "number" or type(raidId) ~= "string" or raidId == "" then return false end
+            local root, family = context(raidId)
+            local raid = root and family and Store.ensureLeaderRaid(root, family, raidId, globalMoney())
+            local presetId = raid and raid.activePresetId
+            local preset = presetId and raid.presets and raid.presets[presetId]
+            if type(preset) ~= "table" then return false end
+            local current = type(preset.itemPrices) == "table" and preset.itemPrices[itemId]
+            if type(current) ~= "number" then current = preset.basePrice end
+            showEditPopup(L["修改预设起拍价"] or "修改预设起拍价", tostring(current or ""), function(text)
+                local money = tonumber(text)
+                if not money or money % 1 ~= 0 or money < 0 or money > Store.MAX_MONEY then
+                    localMessage(L["价格无效。"] or "价格无效。")
+                    return
+                end
+                if Store.setLeaderItemPrice(root, family, raidId, presetId, itemId, money) then
+                    if pageState.raidId == raidId then
+                        refreshToolbar()
+                        refreshRows()
+                    end
+                    localMessage(L["预设起拍价已保存。"] or "预设起拍价已保存。")
+                end
+            end)
+            return true
+        end
+
         function deleteScheme()
             local root, family = context(pageState.raidId)
             local presetId = activePresetId(pageState.raidId)
@@ -1255,7 +1285,20 @@ if runtimeReady() then
         -- preview is valid and an import mode has been explicitly chosen. The
         -- "replace" mode is confirmed separately at commit time.
         function refreshImportPreview(panel)
-            local preview = Codec.parse(panel.edit:GetText(), pageState.mode, knownItems)
+            local parseOptions
+            if pageState.mode == "leader" then
+                local root, family = context(pageState.raidId)
+                local raid = root and family and Store.ensureLeaderRaid(root, family, pageState.raidId, globalMoney())
+                local preset = raid and raid.presets and raid.presets[raid.activePresetId]
+                parseOptions = {
+                    clientFamily = family,
+                    raidId = pageState.raidId,
+                    defaultBasePrice = preset and preset.basePrice or globalMoney(),
+                    decodeBase64 = ns.Decode,
+                    isBase64 = ns.IsBase64,
+                }
+            end
+            local preview = Codec.parse(panel.edit:GetText(), pageState.mode, knownItems, parseOptions)
             panel.preview = preview
             if not preview.ok then
                 panel.summary:SetText((L["无法导入："] or "无法导入：") .. tostring(preview.reason or "未知错误"))
@@ -1266,6 +1309,9 @@ if runtimeReady() then
                 if preview.type == "leader" then
                     parts[#parts + 1] = (L["方案"] or "方案") .. " " .. tostring(preview.presetCount)
                     parts[#parts + 1] = (L["装备"] or "装备") .. " " .. tostring(preview.itemCount)
+                    if preview.sourceFormat == "bglite-legacy" then
+                        parts[#parts + 1] = L["旧版价格字符串"] or "旧版价格字符串"
+                    end
                 else
                     parts[#parts + 1] = (L["装备"] or "装备") .. " " .. tostring(preview.itemCount)
                 end
@@ -1295,7 +1341,13 @@ if runtimeReady() then
             local apply
             if pageState.mode == "leader" then
                 if panel.mode == "replace" then codecMode = "replace-all" end
-                apply = function() return Codec.applyLeader(root, preview, { mode = codecMode }) end
+                apply = function()
+                    return Codec.applyLeader(root, preview, {
+                        mode = codecMode,
+                        clientFamily = family,
+                        raidId = pageState.raidId,
+                    })
+                end
             else
                 apply = function()
                     return Codec.applyPersonal(root, { clientFamily = family, realmId = realmId, player = player, raidId = pageState.raidId }, preview, { mode = codecMode })
@@ -1371,16 +1423,24 @@ if runtimeReady() then
         exportButton:SetScript("OnClick", showExportPanel)
         importPersonalButton:SetScript("OnClick", showImportPanel)
         exportPersonalButton:SetScript("OnClick", showExportPanel)
-        basePriceEdit:SetScript("OnEnterPressed", function(self)
+        local function saveBasePrice(self)
             local money = tonumber(self:GetText())
-            if not money or money % 1 ~= 0 or money < 0 or money > Store.MAX_MONEY then return end
+            if not money or money % 1 ~= 0 or money < 0 or money > Store.MAX_MONEY then
+                refreshToolbar()
+                return false
+            end
             local presetId = activePresetId(pageState.raidId)
-            if not presetId then return end
+            if not presetId then return false end
             local root, family = context(pageState.raidId)
-            Store.setBasePrice(root, family, pageState.raidId, presetId, money)
+            if not Store.setBasePrice(root, family, pageState.raidId, presetId, money) then return false end
             refreshToolbar()
             refreshRows()
+            return true
+        end
+        basePriceEdit:SetScript("OnEnterPressed", function(self)
+            if saveBasePrice(self) then self:ClearFocus() end
         end)
+        basePriceEdit:SetScript("OnEditFocusLost", saveBasePrice)
         searchBox:SetScript("OnTextChanged", function(self)
             if self._refreshing then return end
             M.setFilter(pageState, "text", self:GetText())
@@ -1437,7 +1497,22 @@ if runtimeReady() then
                     end
                 end
             end)
-            row.edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+            row.edit:SetScript("OnEditFocusLost", function(self)
+                if self._discardOnBlur then
+                    self._discardOnBlur = nil
+                    refreshRows()
+                    return
+                end
+                local r = self:GetParent()
+                if validateEdit(r) and saveEdit(r) then
+                    refreshToolbar()
+                    refreshRows()
+                end
+            end)
+            row.edit:SetScript("OnEscapePressed", function(self)
+                self._discardOnBlur = true
+                self:ClearFocus()
+            end)
             row.clear:SetScript("OnClick", function(self) clearRow(self:GetParent()) end)
         end
 

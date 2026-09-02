@@ -27,6 +27,14 @@ return function(test)
     test.eq(ui.shortcutAction(true, "RightButton", true), "auction", "master looter alt-right starts auction")
     test.eq(ui.shortcutAction(false, "RightButton", true), nil, "member alt-right has no privileged action")
     test.eq(ui.shortcutAction(false, "LeftButton", false), nil, "no modifier does not set wishlist")
+    test.eq(ui.shortcutAction(true, "RightButton", false, true, false), "leader-price",
+        "ctrl-right edits the saved leader price")
+    test.eq(ui.shortcutAction(false, "RightButton", false, true, false), nil,
+        "member ctrl-right cannot edit the leader price")
+    test.eq(ui.shortcutAction(true, "RightButton", true, true, false), "auction",
+        "alt-right keeps priority over ctrl-right")
+    test.eq(ui.shortcutAction(true, "RightButton", false, true, true), nil,
+        "shift combinations are left to existing table actions")
     test.eq(ui.isLooted(7001, { 7002, 7001 }), true, "recorded current-raid item shows looted marker")
     test.eq(ui.isLooted(7001, { 7002 }), false, "unrecorded item hides looted marker")
 
@@ -114,4 +122,6 @@ return function(test)
     billFile:close()
     test.eq(billSource:find("shortcutAction(BG.IsML, button, true)", 1, true) ~= nil, true,
         "bill-table alt-click call site passes the explicit modifier state")
+    test.eq(billSource:find('shortcut == "leader-price"', 1, true) ~= nil, true,
+        "bill table routes ctrl-right to the leader-price editor")
 end

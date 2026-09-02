@@ -223,6 +223,12 @@ return function(test)
         "clear action appears only for explicit item prices")
     test.eq(source:find('main.itemScroll:SetScript("OnMouseWheel"', 1, true) ~= nil, true, "long item lists are mouse-wheel scrollable")
     test.eq(source:find("GameTooltip:SetHyperlink(link)", 1, true) ~= nil, true, "item rows show the native item tooltip")
+    test.eq(source:find('basePriceEdit:SetScript("OnEditFocusLost"', 1, true) ~= nil, true,
+        "base price saves when the player clicks away")
+    test.eq(source:find('row.edit:SetScript("OnEditFocusLost"', 1, true) ~= nil, true,
+        "item price saves when the player clicks away")
+    test.eq(source:find("function M.openLeaderPriceEditor", 1, true) ~= nil, true,
+        "table shortcut can open the leader-price editor")
     test.eq(source:find("BG.TabButtonsFB:Hide()", 1, true) ~= nil, true, "price page hides the global raid navigation")
     test.eq(source:find("BG.TabButtonsFB:Show()", 1, true) ~= nil, true, "price page restores the global raid navigation")
     for _, token in ipairs({
@@ -247,6 +253,12 @@ return function(test)
     }) do
         test.eq(source:find(token, 1, true) ~= nil, true, "import/export panel wires " .. token)
     end
+    test.eq(source:find("decodeBase64 = ns.Decode", 1, true) ~= nil, true,
+        "leader import supplies the bundled legacy decoder")
+    test.eq(source:find("isBase64 = ns.IsBase64", 1, true) ~= nil, true,
+        "leader import validates legacy encoding")
+    test.eq(source:find("sourceFormat == \"bglite-legacy\"", 1, true) ~= nil, true,
+        "legacy compatibility is disclosed in the import preview")
 
     for _, forbidden in ipairs({
         "SetClipboard",
