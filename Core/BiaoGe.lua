@@ -796,10 +796,15 @@ BG.Init(function()
                 BG["Button" .. FB]:SetEnabled(false)
             end
             C_Timer.After(0.5, function()
-                for i, FB in ipairs(BG.FBtable) do
-                    BG["Button" .. FB]:SetEnabled(true)
+                for _, raidID in ipairs(BG.FBtable) do
+                    local button = BG["Button" .. raidID]
+                    local selected = raidID == FB
+
+                    button:SetEnabled(not selected)
                 end
-                BG["Button" .. FB]:SetEnabled(false)
+                if BG.BGNext and BG.BGNext.LegacyLedgerSkin then
+                    BG.BGNext.LegacyLedgerSkin.refreshRaidSelection()
+                end
             end)
             BG.FB1 = FB
             BiaoGe.FB = FB
