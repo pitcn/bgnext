@@ -195,6 +195,7 @@ return function(test)
             function frame:SetTexture() end
             function frame:SetShown(value) self.shown = value and true or false end
             function frame:Show()
+                if self.shown then return end
                 self.shown = true
                 if self.scripts.OnShow then self.scripts.OnShow(self) end
             end
@@ -328,6 +329,15 @@ return function(test)
         test.eq(clickedWindow and clickedTable, true, "both locate kinds are offered")
         test.eq(clickTargets[1], "ICC", "table locate switches to the raid table")
         test.eq(ui2.windowState("trade").filter, "pending", "window locate applies the pending filter")
+        local refreshTradeCalls = 0
+        local originalRefresh = ui2.Refresh
+        ui2.Refresh = function(kind)
+            if kind == "trade" then refreshTradeCalls = refreshTradeCalls + 1 end
+            return originalRefresh(kind)
+        end
+        ui2.Show("trade", "all")
+        test.eq(refreshTradeCalls, 1, "changing a visible window filter refreshes its rows once")
+        ui2.Refresh = originalRefresh
 
         -- 10b. the full reason is available through the row tooltip
         local entryRow = state.rows[2]

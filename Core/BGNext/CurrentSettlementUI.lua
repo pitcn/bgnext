@@ -923,8 +923,13 @@ function M.Show(kind, filter)
     if filter ~= nil and win.filter ~= nil and KNOWN_FILTERS[filter] then
         win.filter = filter
     end
-    -- OnShow drives the refresh, so showing and re-showing never render twice.
-    win.frame:Show()
+    -- Show only fires OnShow on a visibility transition. An already visible
+    -- window still needs to render changes to its requested filter.
+    if win.frame:IsShown() then
+        M.Refresh(kind)
+    else
+        win.frame:Show()
+    end
     return true
 end
 
