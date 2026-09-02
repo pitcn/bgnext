@@ -26,6 +26,7 @@ local info = {
         },
         contributors = {
             "Yuke Huang (@pitcn) — BGNext 发起与社区维护",
+            "Wesley (@wesleysui) — 副本标签切换高亮修复",
             "国服社区贡献者、测试者与安全报告者",
         },
     },

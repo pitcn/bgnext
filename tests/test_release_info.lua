@@ -22,6 +22,9 @@ return function(test)
     test.eq(type(info.credits.upstream), "table", "upstream credits")
     test.eq(info.credits.contributors[1]:find("@pitcn", 1, true) ~= nil, true,
         "named BGNext maintainer is included in in-game credits")
+    local contributorItems = table.concat(info.credits.contributors, "\n")
+    test.eq(contributorItems:find("@wesleysui", 1, true) ~= nil, true,
+        "merged pull request author is included in in-game credits")
 
     local about = dofile("Core/BGNext/About.lua")
     local aboutText = about.buildText("about", info)

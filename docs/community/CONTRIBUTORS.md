@@ -15,7 +15,7 @@ BGNext 感谢每一项可核验的实际贡献。名单按贡献类型分类，�
 
 ## 代码与架构
 
-名单将在相关 Pull Request 合并后更新。
+- **Wesley ([@wesleysui](https://github.com/wesleysui))** — 修复副本切换后顶部副本标签选中高亮未及时刷新的问题（[#42](https://github.com/pitcn/bgnext/pull/42)）。
 
 ## 测试与问题复现
 
