@@ -1,6 +1,6 @@
 # BGNext data inventory
 
-BGNext stores new data only under the existing local SavedVariables namespace `BiaoGe.BGNext`. No field listed here is transmitted outside the game. Existing BGLite fields outside this namespace are not migrated, searched, aggregated, or exposed by BGNext enhancement modules.
+BGNext stores new data only under the existing local SavedVariables namespace `BiaoGe.BGNext`. No field listed here is transmitted outside the game. Existing BGLite fields outside this namespace are not migrated, searched, aggregated, or exposed by BGNext enhancement modules. The sole cleanup exception is a direct existence check and user-confirmed deletion of the four legacy history roots described below; their contents are never traversed.
 
 | Field | Subject/source | Purpose | Storage and retention | Recipients | User control | Risk |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -36,7 +36,9 @@ The values of `status` and `direction` are whitelisted as well, so free text can
 
 Runtime attribution is stricter than storage validation: a trade or batch-mail result is accepted only when its counterparty appears in BGLite's existing roster for the active settlement. That roster is read transiently and is not copied. Batch mail must also originate from the existing `raid` recipient scope; custom recipient lists are rejected. Identical client result messages are guarded by memory-only attempt state before they reach storage.
 
-Mail subject, body, unrelated attachments, chat text, account identifiers, device identifiers, GUIDs, private notes, and cross-raid aggregates are prohibited. `BiaoGe.tradeHistory`, `BiaoGe.mailHistory`, and `BiaoGe.History` are never read or migrated.
+Mail subject, body, unrelated attachments, chat text, account identifiers, device identifiers, GUIDs, private notes, and cross-raid aggregates are prohibited. BGNext never reads, displays, migrates, copies, aggregates, or reuses the contents of `BiaoGe.History`, `BiaoGe.HistoryList`, `BiaoGe.tradeHistory`, or `BiaoGe.mailHistory`.
+
+The Storage & Privacy settings page may check only whether each of those four top-level keys exists. It does not inspect their values. Nothing is deleted during login, upgrade, reload, detection, or cancellation. Only after the player selects “清理 BGNext 中的旧历史数据” and accepts a second irreversible-action warning are those exact four keys set to `nil`. Current bills, settings, wishlists, current-settlement records, and own-character overview data are outside the deletion whitelist and remain untouched. The cleanup creates no replacement copy or persistent marker and sends no message.
 
 ## Own-character overview data
 
