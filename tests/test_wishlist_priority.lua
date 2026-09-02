@@ -206,24 +206,16 @@ return function(test)
     for _, required in ipairs({
         "wishlist.cyclePriority",
         "wishlist.setSlotPriority",
-        "wishlist.priorityTagKey",
-        "wishlist.priorityTipKey",
+        "M.priorityTooltipLines",
+        "priorityMark",
         'SetScript("OnMouseWheel"',
     }) do
         test.eq(uiSource:find(required, 1, true) ~= nil, true, "wishlist UI keeps priority contract: " .. required)
     end
-    for _, forbidden in ipairs({ "C_Timer", "OnUpdate" }) do
-        test.eq(uiSource:find(forbidden, 1, true), nil, "wishlist UI stays event-free: " .. forbidden)
+    for _, forbidden in ipairs({ "C_Timer", "OnUpdate", "slot:SetTextInsets(", "slot.priorityTag" }) do
+        test.eq(uiSource:find(forbidden, 1, true), nil, "wishlist UI stays event-free and keeps item text width: "
+            .. forbidden)
     end
-    for _, required in ipairs({
-        "M.slotTagLayout",
-        "SetTextInsets",
-        'SetPoint("LEFT", slot, "LEFT", 2, 0)',
-    }) do
-        test.eq(uiSource:find(required, 1, true) ~= nil, true, "wishlist UI keeps tag layout contract: " .. required)
-    end
-    test.eq(uiSource:find('priorityTag:SetPoint("BOTTOMRIGHT"', 1, true), nil,
-        "priority tag no longer overlays the status-marker corner")
 
     -- 19) hot wish lookups must not allocate per scanned slot (GC paused, no
     --     wall-time assertions)
@@ -261,31 +253,40 @@ return function(test)
     test.eq(wish.contains(perfRoot, "realm", "A", "ICC", 9001), true, "hit lookup still works after the GC pause")
     test.eq(wish.highestPriority(perfRoot, "realm", "A", "ICC", 9001), "normal", "hit priority still works")
 
-    -- 20) the priority tag owns a reserved left strip; item text and the
-    --     upstream owned/dropped/level markers keep disjoint regions
+    -- 20) the tooltip carries the full priority name and explanation; the
+    --     on-slot indicator itself is compact and text-free
     local ui = dofile("Core/BGNext/WishlistUI.lua")
-    local layout = ui.slotTagLayout(115)
-    test.eq(layout.textLeftInset, layout.tagStrip + 2, "item text starts after the tag strip")
-    test.eq(layout.textLeftInset + layout.textWidth + layout.textRightInset, layout.slotWidth,
-        "text and tag regions tile the slot width")
-    test.eq(layout.textWidth >= 65, true, "item text keeps a readable region")
-    test.eq(layout.tagStrip <= layout.textLeftInset, true, "tag strip never reaches the text region")
-    -- Glyph-width model for outline UI fonts: CJK/fullwidth glyphs render at
-    -- the font height, Latin letters/digits/space at roughly 0.55x.
-    local function estimatedTextWidth(text, fontHeight)
-        local width = 0
-        for index = 1, #text do
-            local byte = string.byte(text, index)
-            if byte >= 0xC0 then
-                width = width + fontHeight
-            elseif byte < 0x80 then
-                width = width + fontHeight * 0.55
-            end
-        end
-        return width
-    end
-    for _, label in ipairs({ "BIS", "次BIS", "备选", "備選", "BiS", "2nd BiS", "Backup" }) do
-        test.eq(estimatedTextWidth(label, layout.tagFontHeight) <= layout.tagMaxTextWidth, true,
-            "priority tag fits its reserved strip: " .. label)
-    end
+    local coreLines = ui.priorityTooltipLines("core", nil)
+    test.eq(coreLines[1], "心愿优先级：BIS（核心提升）", "missing locale falls back to the stable keys")
+    test.eq(coreLines[2], "BIS：核心提升，最高优先级的毕业装备。", "core explanation line")
+    test.eq(coreLines[3], "滚轮切换心愿优先级", "wheel hint line")
+    local normalLines = ui.priorityTooltipLines("normal", nil)
+    test.eq(normalLines[1], "心愿优先级：次BIS（普通需求）", "default priority is named in the tooltip")
+    local backupLines = ui.priorityTooltipLines("backup", nil)
+    test.eq(backupLines[1], "心愿优先级：备选", "matching tag and name collapse into one line")
+    -- Representative translated tables (including long English strings) must
+    -- pass through unchanged; real font rendering stays an in-game check.
+    local english = {
+        ["BIS"] = "BiS",
+        ["核心提升"] = "Core upgrade",
+        ["心愿优先级：%s（%s）"] = "Wish priority: %s (%s)",
+    }
+    local englishLines = ui.priorityTooltipLines("core", english)
+    test.eq(englishLines[1], "Wish priority: BiS (Core upgrade)", "english tooltip line")
+    local longEnglish = {
+        ["次BIS"] = "2nd BiS",
+        ["普通需求"] = "Normal need",
+        ["备选"] = "Backup",
+        ["次BIS：普通需求，明确的提升或第二选择。"] =
+            "2nd BiS: Normal need, a clear upgrade or a deliberate second choice for this slot.",
+        ["备选：过渡装备，或无人需求时才考虑。"] =
+            "Backup: A transitional item, or one to consider only when nobody else needs it.",
+        ["心愿优先级：%s"] = "Wish priority: %s",
+        ["滚轮切换心愿优先级"] = "Use the mouse wheel over the slot to change the wish priority",
+    }
+    local longBackupLines = ui.priorityTooltipLines("backup", longEnglish)
+    test.eq(longBackupLines[1], "Wish priority: Backup", "long english tables keep the collapsed line")
+    test.eq(longBackupLines[2], longEnglish["备选：过渡装备，或无人需求时才考虑。"],
+        "long english explanation passes through untruncated")
+    test.eq(longBackupLines[3], longEnglish["滚轮切换心愿优先级"], "long english hint passes through untruncated")
 end

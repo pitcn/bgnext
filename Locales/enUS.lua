@@ -54,6 +54,8 @@ do -- BGNext wish priorities
     L["备选：过渡装备，或无人需求时才考虑。"] = "Backup: A transitional item, or one to consider only when nobody else needs it."
     L["滚轮切换心愿优先级"] = "Mouse wheel changes the wish priority"
     L["心愿：%s"] = "Wish: %s"
+    L["心愿优先级：%s"] = "Wish priority: %s"
+    L["心愿优先级：%s（%s）"] = "Wish priority: %s (%s)"
 end
 
 do

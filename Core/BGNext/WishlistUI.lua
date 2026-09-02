@@ -143,27 +143,35 @@ function M.isLooted(wishItemId, recordedItemIds)
     return false
 end
 
--- Pure geometry contract for one wishlist slot row (default width 115). The
--- priority tag owns a fixed strip at the left edge of the edit box and the
--- item text starts after it, so the two never overlap. The upstream
--- owned/dropped/level indicators keep their existing right-edge overlays,
--- which the tag strip never reaches (the owned checkmark sits outside the
--- box's left edge on wishlist slots). Plain integers so the contract is
--- testable without real font metrics.
-local TAG_FONT_HEIGHT = 9
-function M.slotTagLayout(slotWidth)
-    local tagStrip = 40
-    local textLeftInset = tagStrip + 2
-    local textRightInset = 5
-    return {
-        slotWidth = slotWidth,
-        tagStrip = tagStrip,
-        tagFontHeight = TAG_FONT_HEIGHT,
-        tagMaxTextWidth = tagStrip - 4,
-        textLeftInset = textLeftInset,
-        textRightInset = textRightInset,
-        textWidth = slotWidth - textLeftInset - textRightInset,
-    }
+-- Compact priority presentation: a thin low-saturation underline on the
+-- slot's bottom edge (hidden for the default priority) while the tooltip
+-- carries the full BIS / 次BIS / 备选 name and explanation. The indicator
+-- reserves no width from the item name, and its band sits below the upstream
+-- dropped label (which is vertically centered and 15px high in a 20px slot)
+-- and clear of the right-edge level/binding overlays. Real-client rendering
+-- is verified in game; the unit tests pin the applied anchors and bounds.
+local PRIORITY_MARK_HEIGHT = 2
+local PRIORITY_LINE_KEY = "心愿优先级：%s（%s）"
+local PRIORITY_LINE_PLAIN_KEY = "心愿优先级：%s"
+local WHEEL_HINT_KEY = "滚轮切换心愿优先级"
+
+function M.priorityTooltipLines(priority, L)
+    local wishlist = BG.BGNext and BG.BGNext.Wishlist
+    if not wishlist or not wishlist.priorityTagKey then
+        return nil
+    end
+    local function translate(key)
+        return L and L[key] or key
+    end
+    local tag = translate(wishlist.priorityTagKey(priority))
+    local name = translate(wishlist.priorityNameKey(priority))
+    local label
+    if tag == name then
+        label = string.format(translate(PRIORITY_LINE_PLAIN_KEY), name)
+    else
+        label = string.format(translate(PRIORITY_LINE_KEY), tag, name)
+    end
+    return { label, translate(wishlist.priorityTipKey(priority)), translate(WHEEL_HINT_KEY) }
 end
 
 -- Computes where one difficulty header block sits in the wishlist grid. Pure
@@ -221,13 +229,10 @@ if runtimeReady() then
     local maxb = ns.Maxb
     local L = ns.L or setmetatable({}, { __index = function(_, key) return key end })
 
-    local tagLayout = M.slotTagLayout(115)
-
-    -- Small low-saturation tags; the default priority stays muted so it never
-    -- competes with the item text for attention.
-    local priorityTagColors = {
+    -- Small low-saturation colors; the default priority draws nothing so it
+    -- never competes with the item name for attention.
+    local priorityMarkColors = {
         core = { 1, 0.82, 0.35 },
-        normal = { 0.62, 0.62, 0.62 },
         backup = { 0.55, 0.68, 0.78 },
     }
 
@@ -323,14 +328,14 @@ if runtimeReady() then
         return record and record.priority or nil
     end
 
-    local function updateSlotPriorityTag(slot)
+    local function updateSlotPriorityMark(slot)
         local priority = slot.itemId and slotPriority(slot) or nil
-        if priority then
-            slot.priorityTag:SetText(L[wishlist.priorityTagKey(priority)])
-            local color = priorityTagColors[priority]
-            slot.priorityTag:SetTextColor(color[1], color[2], color[3])
+        if priority and priority ~= "normal" then
+            local color = priorityMarkColors[priority]
+            slot.priorityMark:SetColorTexture(color[1], color[2], color[3])
+            slot.priorityMark:Show()
         else
-            slot.priorityTag:SetText("")
+            slot.priorityMark:Hide()
         end
     end
 
@@ -351,7 +356,7 @@ if runtimeReady() then
             if BG.LevelText then BG.LevelText(slot) end
             if BG.IsHave then BG.IsHave(slot) end
         end
-        updateSlotPriorityTag(slot)
+        updateSlotPriorityMark(slot)
         if BG.UpdateFilter then BG.UpdateFilter(slot) end
         if slot.looted then
             local canonicalItemId = itemId
@@ -367,9 +372,11 @@ if runtimeReady() then
         GameTooltip:SetItemByID(slot.itemId)
         GameTooltip:AddLine("右键取消心愿装备", 0.5, 1, 0.5, true)
         local priority = slotPriority(slot)
-        if priority then
-            GameTooltip:AddLine(L[wishlist.priorityTipKey(priority)], 0.7, 0.7, 0.7, true)
-            GameTooltip:AddLine(L["滚轮切换心愿优先级"], 0.5, 0.8, 1, true)
+        local lines = priority and M.priorityTooltipLines(priority, L) or nil
+        if lines then
+            GameTooltip:AddLine(lines[1], 0.95, 0.85, 0.55, true)
+            GameTooltip:AddLine(lines[2], 0.7, 0.7, 0.7, true)
+            GameTooltip:AddLine(lines[3], 0.5, 0.8, 1, true)
         end
         GameTooltip:Show()
     end
@@ -416,18 +423,19 @@ if runtimeReady() then
         slot:SetFrameLevel(110)
         slot:SetPoint("TOPLEFT", anchor, slotIndex == 1 and "BOTTOMLEFT" or "TOPLEFT", xOffset or 0, slotIndex == 1 and -1 or 0)
         slot:SetAutoFocus(false)
-        -- The reserved left strip keeps the item text clear of the priority
-        -- tag; the upstream right-edge status overlays are untouched.
-        slot:SetTextInsets(tagLayout.textLeftInset, tagLayout.textRightInset, 0, 0)
         if BG.SetEditStickyFocus then BG.SetEditStickyFocus(slot) end
         slot.FB, slot.hopenandu, slot.bossnum, slot.i = raidId, difficultyIndex, bossIndex, slotIndex
         slot.icon = slot:CreateTexture(nil, "ARTWORK")
         slot.icon:SetPoint("LEFT", -22, 0)
         slot.icon:SetSize(16, 16)
-        slot.priorityTag = slot:CreateFontString(nil, "OVERLAY")
-        slot.priorityTag:SetPoint("LEFT", slot, "LEFT", 2, 0)
-        slot.priorityTag:SetFont(BIAOGE_TEXT_FONT, tagLayout.tagFontHeight, "OUTLINE")
-        slot.priorityTag:SetJustifyH("LEFT")
+        -- Compact priority indicator: a 2px underline on the bottom edge. It
+        -- keeps the full item-name width and stays below the vertically
+        -- centered dropped label and clear of the right-edge overlays.
+        slot.priorityMark = slot:CreateTexture(nil, "OVERLAY")
+        slot.priorityMark:SetPoint("BOTTOMLEFT", slot, "BOTTOMLEFT", 0, 0)
+        slot.priorityMark:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", 0, 0)
+        slot.priorityMark:SetHeight(PRIORITY_MARK_HEIGHT)
+        slot.priorityMark:Hide()
         if BG.LootedText then BG.LootedText(slot) end
 
         slot.hover = slot:CreateTexture(nil, "BACKGROUND")
@@ -482,7 +490,7 @@ if runtimeReady() then
             local root, realmId, player, raidId = context(self.FB)
             if wishlist.setSlotPriority(root, realmId, player, raidId, self.hopenandu, self.bossnum, self.i,
                 wishlist.cyclePriority(slotPriority(self), delta)) then
-                updateSlotPriorityTag(self)
+                updateSlotPriorityMark(self)
                 if GameTooltip:IsOwned(self) then showSlotTooltip(self) end
             end
         end)
