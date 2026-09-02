@@ -33,6 +33,7 @@ Core\BGNext\AuctionPriceUI.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
 Core\BGNext\CurrentSettlementView.lua
+Core\BGNext\CurrentSettlementChecklist.lua
 Core\BGNext\CurrentSettlementRuntime.lua
 Core\BGNext\ReleaseInfo.lua
 Core\BGNext\Wishlist.lua

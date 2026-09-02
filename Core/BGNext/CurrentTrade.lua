@@ -2,7 +2,16 @@ BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
 local M = {}
-local FIELDS = { "player", "itemId", "amount", "time", "status" }
+local FIELDS = { "player", "itemId", "amount", "time", "status", "direction" }
+
+-- Direction is written by the runtime from the trade it observed (outgoing =
+-- the player delivered the recorded items, incoming = the player received
+-- them); nil stays valid for no-gold trades and records from before this
+-- field existed, which the checklist can never treat as sale proof.
+local DIRECTION = {
+    outgoing = true,
+    incoming = true,
+}
 
 -- Reconciliation states only. Free text is rejected so notes, chat or mail
 -- content can never reach the stored record through the status field.
@@ -28,6 +37,9 @@ local function isCurrent(root, record)
         return false
     end
     if record.itemId ~= nil and type(record.itemId) ~= "number" then
+        return false
+    end
+    if record.direction ~= nil and not DIRECTION[record.direction] then
         return false
     end
     if record.amount ~= nil and (type(record.amount) ~= "number" or record.amount < 0) then
