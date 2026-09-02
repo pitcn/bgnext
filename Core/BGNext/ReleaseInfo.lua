@@ -25,6 +25,7 @@ local info = {
             "CQZS (Lite) — BGLite 2.4.0 上游作者",
         },
         contributors = {
+            "Yuke Huang (@pitcn) — BGNext 发起与社区维护",
             "国服社区贡献者、测试者与安全报告者",
         },
     },
