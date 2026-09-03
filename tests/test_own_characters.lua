@@ -327,6 +327,28 @@ return function(test)
     test.eq(M.get(bossRoot, "retail", 123, "Piti").raidStates.DR.difficulties[1].encounters[1].killed, false,
         "per-boss lists are deep-copied")
 
+    -- A degraded difficulty (no reliable per-boss list, so no killed count) still
+    -- survives the whitelist with its label and reliable boss total, and its
+    -- killed count stays absent rather than being fabricated into a number.
+    local degradedRoot = {}
+    M.upsert(degradedRoot, "retail", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        raidStates = {
+            DR = {
+                difficulty = 16, difficultyLabel = "M", resetsAt = 9000,
+                difficulties = {
+                    { difficulty = 16, difficultyLabel = "M", totalParts = 3, resetsAt = 9000 },
+                },
+            },
+        },
+    })
+    local degradedDiff = M.get(degradedRoot, "retail", 123, "Piti").raidStates.DR.difficulties[1]
+    test.eq(degradedDiff ~= nil, true, "a degraded difficulty survives the whitelist")
+    test.eq(degradedDiff.difficultyLabel, "M", "the degraded difficulty keeps its label")
+    test.eq(degradedDiff.totalParts, 3, "the degraded difficulty keeps its reliable boss total")
+    test.eq(degradedDiff.completedParts, nil, "the degraded difficulty keeps its killed count blank")
+    test.eq(degradedDiff.encounters, nil, "the degraded difficulty carries no per-boss list")
+
     -- Expiring one difficulty repicks the representative and recomputes the flat
     -- persisted fields, so an expired Mythic 6/6 can never stay as the root
     -- representative while a Normal 2/6 remains active.

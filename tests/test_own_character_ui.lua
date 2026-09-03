@@ -282,6 +282,16 @@ return function(test)
     test.eq(#malformedDiffTip.lines, 1, "a malformed difficulty line is skipped")
     test.eq(malformedDiffTip.lines[1], "N 6/6", "the valid difficulty still renders")
 
+    -- A degraded difficulty keeps its reliable total but renders an unknown
+    -- killed count, never a fabricated 0/N or the farthest-reached index.
+    local degradedDiffTip = UI.raidTooltip({
+        difficulties = {
+            { difficulty = 16, difficultyLabel = "M", totalParts = 3 },
+        },
+    })
+    test.eq(#degradedDiffTip.lines, 1, "a degraded difficulty still produces one tooltip line")
+    test.eq(degradedDiffTip.lines[1], "M 未知/3", "the degraded killed count renders as unknown")
+
     -- A retail difficulty's own per-boss list renders under its difficulty line,
     -- scoped to that difficulty and using each boss's real killed flag.
     local bossTooltipCell = {

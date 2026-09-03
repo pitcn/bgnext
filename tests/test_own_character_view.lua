@@ -147,6 +147,32 @@ return function(test)
     test.eq(breakdownCells.DR.difficultyLabel, "M", "the representative difficulty still drives the cell")
     test.eq(breakdownCells.DR.encounters, nil, "no per-boss list is fabricated from a kill count")
 
+    -- A degraded retail difficulty (no reliable per-boss list, so no killed
+    -- count) keeps its reliable boss total but renders an unknown numerator,
+    -- never a fabricated 0/N or the farthest-reached encounter index.
+    local degradedView = View.project(input({
+        family = "retail",
+        catalog = Catalog.forFamily("retail"),
+        snapshots = { snapshot({
+            raidStates = {
+                DR = {
+                    difficultyLabel = "M", resetsAt = 9000,
+                    difficulties = {
+                        { difficulty = 16, difficultyLabel = "M", totalParts = 3, resetsAt = 9000 },
+                    },
+                },
+            },
+        }) },
+        visibility = { raid = { DR = true } },
+    }))
+    local degradedCells = {}
+    for _, cell in ipairs(degradedView.raid.rows[1].cells) do degradedCells[cell.columnId] = cell end
+    test.eq(degradedCells.DR.state, "progress", "a degraded difficulty still renders as a row")
+    test.eq(degradedCells.DR.text, "未知/3", "the degraded killed count renders as unknown, never 0/3")
+    test.eq(degradedCells.DR.total, 3, "the degraded cell keeps its reliable boss total")
+    test.eq(degradedCells.DR.progress, nil, "the degraded cell carries no fabricated progress")
+    test.eq(degradedCells.DR.difficultyLabel, "M", "the degraded cell keeps its difficulty label")
+
     -- Per-difficulty independent expiry: an expired difficulty is dropped at
     -- projection time while a still-active one keeps rendering, so one reset
     -- never hides another difficulty's live progress.

@@ -244,10 +244,17 @@ function M.raidTooltip(cell)
         for _, difficulty in ipairs(difficulties) do
             local parts = type(difficulty.completedParts) == "number" and difficulty.completedParts or nil
             local total = type(difficulty.totalParts) == "number" and difficulty.totalParts or nil
-            if parts ~= nil and total ~= nil then
+            if total ~= nil then
                 local label = (type(difficulty.difficultyLabel) == "string" and difficulty.difficultyLabel ~= "")
                     and difficulty.difficultyLabel or tostring(difficulty.difficulty or "")
-                lines[#lines + 1] = label .. " " .. tostring(parts) .. "/" .. tostring(total)
+                if parts ~= nil then
+                    lines[#lines + 1] = label .. " " .. tostring(parts) .. "/" .. tostring(total)
+                else
+                    -- A degraded difficulty keeps its reliable total but no
+                    -- killed count, so the numerator renders as unknown rather
+                    -- than a fabricated kill count.
+                    lines[#lines + 1] = label .. " " .. L["未知"] .. "/" .. tostring(total)
+                end
                 local bosses = type(difficulty.encounters) == "table" and difficulty.encounters or nil
                 if bosses then
                     for _, boss in ipairs(bosses) do

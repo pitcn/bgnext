@@ -557,7 +557,11 @@ function M.readRaidStates(api, raidColumns, family)
                     local state = ranked[rank]
                     if not state then
                         local encounters = readBossEncounters(api, index, numEncounters)
-                        local completedParts = encounterProgress
+                        -- Fail closed: the killed count exists only when the real
+                        -- per-boss list was read. Without it the aggregate farthest
+                        -- index is never exposed as a killed count, so a degraded
+                        -- difficulty keeps its reliable total but a blank numerator.
+                        local completedParts
                         local completed
                         if encounters then
                             -- The real per-boss list is authoritative. Progress is
