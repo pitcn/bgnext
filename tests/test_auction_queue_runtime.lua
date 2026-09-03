@@ -85,6 +85,7 @@ return function(test)
         function f:SetClampedToScreen() end
         function f:SetMovable() end
         function f:EnableMouse() end
+        function f:EnableMouseWheel(v) self.mouseWheelEnabled = v end
         function f:SetToplevel() end
         function f:SetAutoFocus() end
         function f:SetNumeric() end
@@ -433,6 +434,8 @@ return function(test)
     test.eq(M.addFromText("not-an-item"), nil, "invalid typed text is rejected")
 
     local frame = M.openFrame()
+    test.eq(frame.mouseWheelEnabled, true, "the scroll frame enables the mouse wheel")
+    test.eq(type(frame.scripts.OnMouseWheel), "function", "the wheel handler is still wired")
     test.eq(type(frame.rows), "table", "frame exposes a row pool")
     test.eq(#frame.rows, 40, "row pool is fixed")
     test.eq(frame.rows[1].shown, true, "the first row is bound and shown")
@@ -639,6 +642,14 @@ return function(test)
     test.eq(lastSlot.id, id40, "the 40th row is reachable and bound after scrolling")
     lastSlot.remove.scripts.OnClick(lastSlot.remove)
     test.eq(M.state().queueSize, 39, "the 40th row is operable after scrolling")
+
+    -- The up/down arrow buttons keep working alongside the wheel enable.
+    M.scrollToTop()
+    test.eq(full.scrollOffset, 0, "scrollToTop resets the offset")
+    full.scrollDown.scripts.OnClick(full.scrollDown)
+    test.eq(full.scrollOffset, 1, "the down arrow scrolls forward one")
+    full.scrollUp.scripts.OnClick(full.scrollUp)
+    test.eq(full.scrollOffset, 0, "the up arrow scrolls back to the top")
 
     -- --- Finding 6: the runtime never sends directly ------------------------
 

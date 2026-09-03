@@ -679,6 +679,7 @@ function M.openFrame()
         frame.scrollDown:SetText("v")
         frame.scrollDown:SetScript("OnClick", function() M.scrollBy(1) end)
 
+        frame:EnableMouseWheel(true)
         frame:SetScript("OnMouseWheel", function(self, delta) M.scrollBy(-delta) end)
 
         frame.rows = {}
