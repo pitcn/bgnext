@@ -1051,10 +1051,16 @@ BG.Init(function()
                 end
             end
 
+            local eventRefresh = BG.BGNext and BG.BGNext.EventRefresh
+            local refreshOwnedMarks = eventRefresh and eventRefresh.debounce(
+                BG.After, 0.1, BG.UpdateBiaoGeAllIsHaved
+            )
             BG.RegisterEvent({ "BAG_UPDATE_DELAYED", "PLAYERBANKSLOTS_CHANGED" }, function()
-                BG.After(0.1, function()
-                    BG.UpdateBiaoGeAllIsHaved()
-                end)
+                if refreshOwnedMarks then
+                    refreshOwnedMarks()
+                else
+                    BG.After(0.1, BG.UpdateBiaoGeAllIsHaved)
+                end
             end)
         end
     end

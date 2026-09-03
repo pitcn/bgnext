@@ -673,19 +673,25 @@ end
 -- Reads only resources that the current family's explicit catalog declares.
 -- A readable API alone is not permission to collect a value: absent and
 -- pending columns stay absent from the snapshot as well as the UI.
-function M.readResources(api, family, resourceColumns)
-    local result = { currencies = {}, items = {} }
+function M.readResources(api, family, resourceColumns, selection)
+    local scoped = type(selection) == "table"
+    local wantCurrencies = not scoped or selection.currencies == true
+    local wantItems = not scoped or selection.items == true
+    local wantCooldowns = not scoped or selection.professionCooldowns == true
+    local result = {}
+    if wantCurrencies then result.currencies = {} end
+    if wantItems then result.items = {} end
     local allowedKeys, allowedPrefixes, allowedCooldowns = resourceWhitelist(resourceColumns)
 
     local getHonor = api and api.UnitHonor
-    if allowedKeys.honor and type(getHonor) == "function" then
+    if wantCurrencies and allowedKeys.honor and type(getHonor) == "function" then
         local honor = M.safeCall(getHonor, "player")
         if type(honor) == "number" then result.currencies.honor = honor end
     end
 
     local getRest = api and api.GetXPExhaustion
     local getRestModern = api and api.C_PlayerInfo and api.C_PlayerInfo.GetRestExperience or nil
-    if allowedKeys.restXp and (type(getRest) == "function" or type(getRestModern) == "function") then
+    if wantCurrencies and allowedKeys.restXp and (type(getRest) == "function" or type(getRestModern) == "function") then
         local restXp = M.readRestExperience(api)
         if type(restXp) == "number" then result.currencies.restXp = restXp end
     end
@@ -698,7 +704,7 @@ function M.readResources(api, family, resourceColumns)
     -- MoP and Retail currencies carry weekly caps; their snapshots record the
     -- cap fields alongside the amount. Legacy families keep a plain count.
     local readCaps = family == "mop" or family == "retail"
-    if ids and type(getCurrency) == "function" then
+    if wantCurrencies and ids and type(getCurrency) == "function" then
         for key, id in pairs(ids) do
             if allowedKeys[key] and type(id) == "number" then
                 local ok, first, amount = callAll(getCurrency, id)
@@ -723,7 +729,7 @@ function M.readResources(api, family, resourceColumns)
 
     local itemIds = ITEM_IDS[family]
     local getCount = api and api.GetItemCount
-    if itemIds and type(getCount) == "function" then
+    if wantItems and itemIds and type(getCount) == "function" then
         for key, itemId in pairs(itemIds) do
             if allowedKeys[key] and type(itemId) == "number" then
                 local count = M.safeCall(getCount, itemId, true)
@@ -734,7 +740,7 @@ function M.readResources(api, family, resourceColumns)
         end
     end
 
-    if family == "titan" and allowedPrefixes["legendary:"] and type(getCount) == "function" then
+    if wantItems and family == "titan" and allowedPrefixes["legendary:"] and type(getCount) == "function" then
         for _, group in ipairs(TITAN_LEGENDARY_GROUPS) do
             for _, itemId in ipairs(group) do
                 local count = M.safeCall(getCount, itemId, true)
@@ -745,7 +751,7 @@ function M.readResources(api, family, resourceColumns)
             end
         end
     end
-    if family == "titan" and allowedPrefixes["upgrade:"] and type(getCount) == "function" then
+    if wantItems and family == "titan" and allowedPrefixes["upgrade:"] and type(getCount) == "function" then
         for _, itemId in ipairs(TITAN_UPGRADE_ITEMS) do
             local count = M.safeCall(getCount, itemId, true)
             if type(count) == "number" and count > 0 then
@@ -754,16 +760,18 @@ function M.readResources(api, family, resourceColumns)
         end
     end
 
-    local cooldowns = {}
-    for key, spellId in pairs(allowedCooldowns) do
-        local entry = M.readProfessionCooldown(api, spellId)
-        if type(entry) == "table" and next(entry) ~= nil then
-            cooldowns[key] = entry
+    if wantCooldowns then
+        local cooldowns = {}
+        for key, spellId in pairs(allowedCooldowns) do
+            local entry = M.readProfessionCooldown(api, spellId)
+            if type(entry) == "table" and next(entry) ~= nil then
+                cooldowns[key] = entry
+            end
         end
+        if next(cooldowns) ~= nil then result.professionCooldowns = cooldowns end
     end
-    if next(cooldowns) ~= nil then result.professionCooldowns = cooldowns end
 
-    if next(result.currencies) == nil and next(result.items) == nil
+    if next(result.currencies or {}) == nil and next(result.items or {}) == nil
         and next(result.professionCooldowns or {}) == nil then return nil end
     return result
 end
@@ -784,7 +792,7 @@ function M.readers(family, api, raidColumns, resourceColumns)
         equipment = function() return M.readEquipment(api) end,
         raidStates = function() return M.readRaidStates(api, raidColumns, family) end,
         professions = function() return M.readProfessions(api) end,
-        resources = function() return M.readResources(api, family, resourceColumns) end,
+        resources = function(selection) return M.readResources(api, family, resourceColumns, selection) end,
     }
 end
 

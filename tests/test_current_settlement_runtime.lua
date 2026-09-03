@@ -48,7 +48,7 @@ return function(test)
     --    (loot master hands over the item, the buyer puts up the gold)
     test.eq(runtime.recordTrade(root, context(5100, 5000), {
         completed = true, target = "甲", targetmoney = 100, playermoney = 0,
-        playeritems = { { itemId = 11 } },
+        playeritems = { { itemId = 11, count = 1 } },
     }), 1, "completed trade recorded")
     test.eq(root.currentSettlement.raidId, "ICC@5000", "settlement established from the raid roster")
     local first = root.currentSettlement.trades[1]
@@ -61,7 +61,7 @@ return function(test)
     -- 3. a repeated success event for the same trade writes nothing extra
     test.eq(runtime.recordTrade(root, context(5100, 5000), {
         completed = true, target = "甲", targetmoney = 100, playermoney = 0,
-        playeritems = { { itemId = 11 } },
+        playeritems = { { itemId = 11, count = 1 } },
     }), 0, "duplicate trade completion ignored")
     test.eq(#root.currentSettlement.trades, 1, "duplicate trade completion not stored")
 
@@ -87,6 +87,44 @@ return function(test)
     test.eq(runtime.recordTrade(root, context(5400, 5000), {
         completed = true, target = "丁", targetmoney = 0, playermoney = 0,
     }), 0, "empty trade is not recorded")
+
+    -- 6b. gold on both sides cannot name the buyer or the direction: the
+    --     delivered item is kept as a pending record with no amount and no
+    --     direction, so the checklist can never read it as a proven sale.
+    local ambiguous = runtime.tradeRows({
+        completed = true, target = "甲", targetmoney = 100, playermoney = 50,
+        playeritems = { { itemId = 7001 } },
+    })
+    test.eq(#ambiguous, 1, "both-gold trade projects one pending row")
+    test.eq(ambiguous[1].itemId, 7001, "the delivered item is kept")
+    test.eq(ambiguous[1].amount, nil, "no amount is invented for a both-gold trade")
+    test.eq(ambiguous[1].direction, nil, "both-gold direction is not guessed")
+    test.eq(ambiguous[1].status, "pending", "both-gold trade stays pending")
+    local ambiguousRoot = life.ensureRoot({})
+    test.eq(runtime.recordTrade(ambiguousRoot, context(5450, 5000), {
+        completed = true, target = "甲", targetmoney = 100, playermoney = 50,
+        playeritems = { { itemId = 7001 } },
+    }), 1, "both-gold trade is recorded as pending")
+    local ambiguousRecord = ambiguousRoot.currentSettlement.trades[1]
+    test.eq(ambiguousRecord.direction, nil, "stored both-gold direction stays nil")
+    test.eq(ambiguousRecord.amount, nil, "stored both-gold amount stays nil")
+    test.eq(ambiguousRecord.status, "pending", "stored both-gold status is pending")
+
+    -- 6c. quantity and barter ambiguity must not become a proven bill sale.
+    for _, count in ipairs({ 2, 0, -1, 0.5, false }) do
+        local rows = runtime.tradeRows({
+            completed = true, target = "甲", targetmoney = 100,
+            playeritems = { { itemId = 7001, count = count or nil } },
+        })
+        test.eq(rows[1].status, "pending", "stacked or unknown quantity cannot prove a single sale")
+        test.eq(rows[1].amount, 100, "observed gold is retained for manual reconciliation")
+    end
+    local mixed = runtime.tradeRows({
+        completed = true, target = "甲", targetmoney = 100,
+        playeritems = { { itemId = 7001, count = 1 } },
+        targetitems = { { itemId = 7002, count = 1 } },
+    })
+    test.eq(mixed[1].status, "pending", "barter plus gold cannot prove a single sale")
 
     -- 7. mail: only a plugin-executed send result, whitelisted fields only
     test.eq(runtime.recordMail(root, context(5500, 5000), {

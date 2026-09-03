@@ -362,4 +362,11 @@ return function(test)
     }) do
         test.eq(string.find(source, required, 1, true) ~= nil, true, "renderer uses " .. required)
     end
+
+    UI.SetFrame(nil)
+    test.eq(UI.IsVisible(), false, "an uncreated overview is not visible")
+    UI.SetFrame({ IsShown = function() return false end })
+    test.eq(UI.IsVisible(), false, "a hidden overview reports not visible")
+    UI.SetFrame({ IsShown = function() return true end })
+    test.eq(UI.IsVisible(), true, "a shown overview reports visible")
 end

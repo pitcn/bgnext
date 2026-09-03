@@ -123,6 +123,88 @@ local function collectUnknown(itemPrices, knownItemSet)
     return unknown
 end
 
+-- Converts the previous BGLite one-raid price string into one BGNext leader
+-- scheme. This is intentionally import-only: BGNext continues to export its
+-- own versioned, previewable format. Base64 validation/decoding is injected by
+-- the caller from the already bundled library.
+local function parseLegacyLeader(text, expectedType, knownItemSet, options)
+    local raidId, encoded = text:match("^([^:\r\n]+):(.+)$")
+    if not raidId then return nil end
+    local preview = { ok = false, sourceFormat = "bglite-legacy" }
+    if expectedType ~= nil and expectedType ~= "leader" then
+        preview.reason = "type mismatch"
+        return preview
+    end
+    options = options or {}
+    local family = options.clientFamily
+    local basePrice = tonumber(options.defaultBasePrice)
+    if type(family) ~= "string" or family == "" then
+        preview.reason = "missing family"
+        return preview
+    end
+    if type(options.raidId) == "string" and options.raidId ~= "" and options.raidId ~= raidId then
+        preview.reason = "raid mismatch"
+        return preview
+    end
+    if not basePrice or basePrice % 1 ~= 0 or basePrice < 0 or basePrice > M.MAX_MONEY then
+        preview.reason = "invalid base price"
+        return preview
+    end
+    if type(options.decodeBase64) ~= "function" then
+        preview.reason = "legacy decoder unavailable"
+        return preview
+    end
+    if type(options.isBase64) == "function" then
+        local valid, isBase64 = pcall(options.isBase64, encoded)
+        if not valid or not isBase64 then
+            preview.reason = "invalid legacy encoding"
+            return preview
+        end
+    end
+    local decodedOk, decoded = pcall(options.decodeBase64, encoded)
+    if not decodedOk or type(decoded) ~= "string" or #decoded > M.MAX_TEXT_BYTES then
+        preview.reason = "invalid legacy encoding"
+        return preview
+    end
+
+    local itemPrices = {}
+    local itemCount = 0
+    for entry in decoded:gmatch("([^,]+)") do
+        local itemText, moneyText = entry:match("^(%d+)%-(%d+)%-.*$")
+        local itemId, money = tonumber(itemText), tonumber(moneyText)
+        if not itemId or itemId < 1 or not money or money > M.MAX_MONEY then
+            preview.reason = "invalid legacy item"
+            return preview
+        end
+        if itemPrices[itemId] ~= nil then
+            preview.reason = "duplicate legacy item"
+            return preview
+        end
+        itemPrices[itemId] = money
+        itemCount = itemCount + 1
+        if itemCount > M.MAX_ITEMS then
+            preview.reason = "too many items"
+            return preview
+        end
+    end
+    if itemCount == 0 then
+        preview.reason = "no items"
+        return preview
+    end
+
+    preview.ok = true
+    preview.type = "leader"
+    preview.clientFamily = family
+    preview.raidId = raidId
+    preview.presets = {
+        p1 = { name = "旧版价格", basePrice = basePrice, itemPrices = itemPrices },
+    }
+    preview.presetCount = 1
+    preview.itemCount = itemCount
+    preview.unknownItems = collectUnknown(itemPrices, knownItemSet)
+    return preview
+end
+
 -- ---------------------------------------------------------------------------
 -- Export
 -- ---------------------------------------------------------------------------
@@ -188,7 +270,7 @@ end
 -- `reason` (when rejected) or the decoded type, clientFamily, raidId, presets /
 -- itemPrices, item counts and the set of unknown item ids. Parsing never mutates
 -- the saved root.
-function M.parse(text, expectedType, knownItemSet)
+function M.parse(text, expectedType, knownItemSet, options)
     local preview = { ok = false }
     if type(text) ~= "string" then
         preview.reason = "invalid input"
@@ -211,6 +293,8 @@ function M.parse(text, expectedType, knownItemSet)
     elseif prefix == PREFIX_PERSONAL then
         kind = "personal"
     else
+        local legacy = parseLegacyLeader(text, expectedType, knownItemSet, options)
+        if legacy then return legacy end
         preview.reason = "unknown format"
         return preview
     end

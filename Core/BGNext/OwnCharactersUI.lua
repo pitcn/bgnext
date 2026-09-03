@@ -801,6 +801,13 @@ function M.SetFrame(target)
     frame = target
 end
 
+function M.IsVisible()
+    if not frame then return false end
+    if type(frame.IsShown) == "function" then return frame:IsShown() == true end
+    if type(frame.IsVisible) == "function" then return frame:IsVisible() == true end
+    return false
+end
+
 -- Rebuilds from the current provider. Safe to call after a settings change,
 -- a Shift toggle, a refresh click or a new snapshot.
 function M.Refresh()

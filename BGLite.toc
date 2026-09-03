@@ -6,7 +6,7 @@
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.0
-## X-BGNext-Version: 0.4.0
+## X-BGNext-Version: 0.5.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.0
@@ -33,6 +33,7 @@ Core\BGNext\AuctionPriceUI.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
 Core\BGNext\CurrentSettlementView.lua
+Core\BGNext\CurrentSettlementChecklist.lua
 Core\BGNext\CurrentSettlementRuntime.lua
 Core\BGNext\ReleaseInfo.lua
 Core\BGNext\Wishlist.lua
@@ -60,10 +61,12 @@ Core\BGNext\TradeAuctionState.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua
+Core\BGNext\AuctionTimerSync.lua
 Core\BGNext\AuctionReadiness.lua
 Core\BGNext\TooltipDebtCache.lua
 Core\BGNext\TooltipDebtRuntime.lua
 Core\BGNext\HighlightManager.lua
+Core\BGNext\EventRefresh.lua
 Core\function1.lua
 Core\function2.lua
 Core\FBUI\FBUI.xml
@@ -101,3 +104,4 @@ Core\Module\hooks.lua
 Core\Module\minimap.lua
 Core\Options.lua
 Core\BGNext\UIThemeSettings.lua
+Core\BGNext\LegacyHistoryCleanup.lua

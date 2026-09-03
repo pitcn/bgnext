@@ -144,4 +144,360 @@ return function(test)
     test.eq(source:find("交易记录（当前团）", 1, true) ~= nil, true, "trade window is explicitly labelled")
     test.eq(source:find("邮件记录（当前团）", 1, true) ~= nil, true, "mail window is explicitly labelled")
     test.eq(source:find("StaticPopup_Show", 1, true) ~= nil, true, "clearing goes through a confirmation popup")
+    test.eq(source:find("OnUpdate", 1, true), nil, "settlement UI adds no per-frame handler")
+    test.eq(source:find("C_Timer.NewTicker", 1, true), nil, "settlement UI adds no repeating ticker")
+    test.eq(source:find("C_Timer.NewTimer(remaining + 1", 1, true) ~= nil, true,
+        "expiry uses a cancellable one-shot timer just past the deadline")
+    test.eq(source:find(":Cancel()", 1, true) ~= nil, true, "the one-shot timer is cancelled on hide")
+    test.eq(source:find("HookScript", 1, true) ~= nil, true, "bill edit frames are subscribed by hooking")
+
+    -- 10. the settlement checklist window: refresh, locate and cleanup run on
+    --     real frames (mocked), and every swapped global comes back
+    local watchedGlobals = {
+        "BG", "CreateFrame", "BIAOGE_TEXT_FONT", "GetServerTime", "BiaoGe",
+        "GameTooltip", "C_Timer", "hooksecurefunc",
+    }
+    local originalValues = {}
+    for _, name in ipairs(watchedGlobals) do
+        originalValues[name] = rawget(_G, name)
+    end
+    local function setGlobal(name, value)
+        rawset(_G, name, value)
+    end
+
+    local checklistOk, checklistErr = pcall(function()
+        BG = { BGNext = {} }
+        local checklistLife = dofile("Core/BGNext/DataLifecycle.lua")
+        local checklistTrade = dofile("Core/BGNext/CurrentTrade.lua")
+        dofile("Core/BGNext/CurrentMail.lua")
+        dofile("Core/BGNext/CurrentSettlementView.lua")
+        dofile("Core/BGNext/CurrentSettlementChecklist.lua")
+
+        local function makeFrame()
+            local frame = {
+                points = {}, scripts = {}, children = {},
+                text = "", shown = true, width = 0, height = 0,
+            }
+            function frame:SetPoint(point, relative, relativePoint)
+                self.points[#self.points + 1] = { point = point, relative = relative, relativePoint = relativePoint }
+            end
+            function frame:SetSize(width, height) self.width, self.height = width, height end
+            function frame:SetWidth(width) self.width = width end
+            function frame:SetHeight(height) self.height = height end
+            function frame:SetScript(name, handler) self.scripts[name] = handler end
+            function frame:HookScript(name, handler)
+                local previous = self.scripts[name]
+                self.scripts[name] = function(...)
+                    if previous then previous(...) end
+                    handler(...)
+                end
+            end
+            function frame:SetText(value) self.text = value end
+            function frame:GetText() return self.text end
+            function frame:SetTextColor() end
+            function frame:SetFont() end
+            function frame:SetJustifyH() end
+            function frame:SetWordWrap() end
+            function frame:SetAllPoints() end
+            function frame:ClearAllPoints() self.points = {} end
+            function frame:SetColorTexture() end
+            function frame:SetTexture() end
+            function frame:SetShown(value) self.shown = value and true or false end
+            function frame:Show()
+                if self.shown then return end
+                self.shown = true
+                if self.scripts.OnShow then self.scripts.OnShow(self) end
+            end
+            function frame:Hide()
+                self.shown = false
+                if self.scripts.OnHide then self.scripts.OnHide(self) end
+            end
+            function frame:IsShown() return self.shown end
+            function frame:EnableMouse() end
+            function frame:SetFrameLevel() end
+            function frame:SetCursorPosition() end
+            function frame:CreateFontString()
+                local label = makeFrame()
+                self.children[#self.children + 1] = label
+                return label
+            end
+            function frame:CreateTexture()
+                local texture = makeFrame()
+                self.children[#self.children + 1] = texture
+                return texture
+            end
+            return frame
+        end
+
+        setGlobal("CreateFrame", function(_, _, parent)
+            local frame = makeFrame()
+            if parent and parent.children then
+                parent.children[#parent.children + 1] = frame
+            end
+            return frame
+        end)
+        setGlobal("BIAOGE_TEXT_FONT", "Fonts\\FRIZQT__.TTF")
+        local nowValue = 1000000
+        setGlobal("GetServerTime", function() return nowValue end)
+        local tooltipLines = {}
+        setGlobal("GameTooltip", {
+            SetOwner = function() end,
+            ClearLines = function()
+                for key in pairs(tooltipLines) do tooltipLines[key] = nil end
+            end,
+            AddLine = function(_, text) tooltipLines[#tooltipLines + 1] = text end,
+            Show = function() end,
+            Hide = function() end,
+        })
+        local tickers = {}
+        local afters = {}
+        setGlobal("C_Timer", {
+            -- Burst coalescing uses After(0) and runs immediately in tests. The
+            -- one-shot expiry invalidation uses NewTimer, which returns a real
+            -- cancellable handle; those are recorded in `afters` for the
+            -- lifecycle assertions below. Both take the client's dot-notation
+            -- signature (no self argument), matching how production calls them.
+            After = function(delay, callback)
+                if delay == 0 then
+                    callback()
+                end
+            end,
+            NewTimer = function(delay, callback)
+                local timer = { delay = delay, callback = callback, cancelled = false }
+                function timer:Cancel() self.cancelled = true end
+                function timer:IsCancelled() return self.cancelled end
+                afters[#afters + 1] = timer
+                return timer
+            end,
+            NewTicker = function(_, _, callback)
+                local ticker = { callback = callback, cancelled = false }
+                function ticker:Cancel() self.cancelled = true end
+                tickers[#tickers + 1] = ticker
+                return ticker
+            end,
+        })
+        setGlobal("hooksecurefunc", function(object, name, hook)
+            local original = object[name]
+            object[name] = function(...)
+                original(...)
+                hook(...)
+            end
+        end)
+
+        BG.CreateMainFrame = function()
+            local frame = makeFrame()
+            frame.titleText = makeFrame()
+            return frame
+        end
+        BG.CreateScrollFrame = function()
+            return makeFrame(), makeFrame()
+        end
+        BG.CreateButton = function() return makeFrame() end
+        BG.GetMaxi = function() return 2 end
+        local clickTargets = {}
+        BG.ClickFBbutton = function(fb) clickTargets[#clickTargets + 1] = fb end
+        BG.RegisterEvent = function() end
+        BG.ClearBiaoGe = function() end
+        BG.SetListjine = function()
+            local edit = makeFrame()
+            edit:SetScript("OnTextChanged", function(self)
+                BiaoGe.ICC.boss1.qiankuan2 = tonumber(self:GetText())
+            end)
+            BG.FrameQianKuanEdit = edit
+        end
+        BG.Init = function(callback) callback() end
+        setGlobal("BiaoGe", {
+            options = {},
+            ICC = {
+                boss1 = {
+                    zhuangbei1 = "[装备一]", maijia1 = "买家甲", jine1 = "100",
+                    zhuangbei2 = "[装备二]", maijia2 = "买家乙", jine2 = "", qiankuan2 = 300,
+                },
+                boss4 = { jine3 = "500", jine4 = "40", jine5 = "12.50" },
+            },
+        })
+        -- Real bill edit frames for the hook-based invalidation.
+        local hookCounts = {}
+        BG.Frame = { ICC = {} }
+        for boss = 1, 4 do
+            BG.Frame.ICC["boss" .. boss] = {}
+        end
+        BG.Frame.ICC.boss1.jine1 = makeFrame()
+        BG.Frame.ICC.boss1.zhuangbei1 = makeFrame()
+        BG.Frame.ICC.boss1.maijia1 = makeFrame()
+        BG.Frame.ICC.boss1.qiankuan1 = makeFrame()
+        for _, frame in ipairs({ BG.Frame.ICC.boss1.jine1, BG.Frame.ICC.boss1.zhuangbei1,
+            BG.Frame.ICC.boss1.maijia1, BG.Frame.ICC.boss1.qiankuan1 }) do
+            hookCounts[frame] = 0
+            local rawHook = frame.HookScript
+            frame.HookScript = function(self, name, handler)
+                hookCounts[frame] = hookCounts[frame] + 1
+                local previous = self.scripts[name]
+                self.scripts[name] = function(...)
+                    if previous then previous(...) end
+                    handler(...)
+                end
+            end
+        end
+
+        -- The collector runtime wires the real clear-table notification and
+        -- roots the SavedVariables on the mocked BiaoGe table.
+        dofile("Core/BGNext/CurrentSettlementRuntime.lua")
+        -- Mirror DataLifecycle's init: root the SavedVariables on the mocked
+        -- BiaoGe table.
+        BG.BGNext.DB = checklistLife.ensureRoot(BiaoGe)
+
+        checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
+        checklistTrade.append(BG.BGNext.DB, {
+            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
+            time = nowValue, status = "pending",
+        })
+
+        local chunk = assert(loadfile("Core/BGNext/CurrentSettlementUI.lua"))
+        local ui2 = chunk("BGNEXT", {
+            Maxb = { ICC = 2 },
+            GetItemID = function(text)
+                return text == "[装备一]" and 7001 or 7002
+            end,
+        })
+
+        test.eq(ui2.Show("checklist"), true, "checklist window opens")
+        local state = ui2.checklistState()
+        test.eq(state.shown, true, "checklist window is shown")
+        test.eq(state.report ~= nil, true, "opening computes the report")
+        test.eq(state.report.status, "issues", "collected anomalies surface as issues")
+        test.eq(state.report.issueCount, 3, "unconfirmed trade, debt and missing amount are counted")
+        test.eq(#state.rows, state.report.total + 4, "entries render grouped under four category headers")
+        test.eq(state.rows[1].isHeader, true, "the first group starts with a category header")
+
+        -- 10a. locate buttons perform real jumps only
+        local clickedWindow, clickedTable = false, false
+        for _, row in ipairs(state.rows) do
+            local locate = row.entry and row.entry.locate
+            if locate and locate.type == "table" then
+                row.locateButton.scripts.OnClick(row.locateButton)
+                clickedTable = true
+            elseif locate and locate.type == "window" then
+                row.locateButton.scripts.OnClick(row.locateButton)
+                clickedWindow = true
+            end
+        end
+        test.eq(clickedWindow and clickedTable, true, "both locate kinds are offered")
+        test.eq(clickTargets[1], "ICC", "table locate switches to the raid table")
+        test.eq(ui2.windowState("trade").filter, "pending", "window locate applies the pending filter")
+        local refreshTradeCalls = 0
+        local originalRefresh = ui2.Refresh
+        ui2.Refresh = function(kind)
+            if kind == "trade" then refreshTradeCalls = refreshTradeCalls + 1 end
+            return originalRefresh(kind)
+        end
+        ui2.Show("trade", "all")
+        test.eq(refreshTradeCalls, 1, "changing a visible window filter refreshes its rows once")
+        ui2.Refresh = originalRefresh
+
+        -- 10b. the full reason is available through the row tooltip
+        local entryRow = state.rows[2]
+        test.eq(entryRow.isHeader, false, "the second row is an entry")
+        entryRow.scripts.OnEnter(entryRow)
+        test.eq(tooltipLines[1], entryRow.fullReason, "the tooltip carries the untruncated reason")
+
+        -- 10c. bill edits reach the checklist through the real hooked frames,
+        --      with no repeating ticker and one one-shot expiry invalidation
+        test.eq(#tickers, 0, "no repeating ticker is created")
+        test.eq(#afters, 1, "one one-shot expiry invalidation is armed")
+        test.eq(afters[1].delay, 604801, "the one-shot fires just after the deadline")
+        test.eq(hookCounts[BG.Frame.ICC.boss1.jine1], 1, "the bill edit frame is subscribed once")
+        BiaoGe.ICC.boss1.qiankuan1 = 999
+        BG.Frame.ICC.boss1.jine1.scripts.OnTextChanged(BG.Frame.ICC.boss1.jine1)
+        state = ui2.checklistState()
+        test.eq(state.report.issueCount, 4, "the new debt appears through the hooked frame")
+        for _, row in ipairs(state.rows) do
+            test.eq(row:IsShown(), true, "refreshed checklist entries and headers remain visible")
+        end
+
+        -- 10d. idle time alone rebuilds nothing
+        -- Opening a new popup after the checklist must subscribe immediately,
+        -- even when the existing debt indicator never hides or shows again.
+        for _, debt in ipairs({ 500, 300 }) do
+            local previousReport = state.report
+            BG.SetListjine()
+            local edit = BG.FrameQianKuanEdit
+            edit:SetText(tostring(debt))
+            edit.scripts.OnTextChanged(edit)
+            state = ui2.checklistState()
+            test.eq(state.report ~= previousReport, true, "new debt popup invalidates the checklist")
+            test.eq(BiaoGe.ICC.boss1.qiankuan2, debt, "original debt editor handler is preserved")
+        end
+        local idleReport = state.report
+        nowValue = nowValue + 30
+        test.eq(ui2.checklistState().report, idleReport, "idle time causes zero report builds")
+
+        -- 10e. back to live data; the purged settlement is re-established and
+        --      the findings return through the normal pipeline
+        nowValue = 1000000
+        BiaoGe.ICC.boss1.qiankuan1 = nil
+        checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
+        checklistTrade.append(BG.BGNext.DB, {
+            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
+            time = nowValue, status = "pending",
+        })
+        ui2.Refresh("trade")
+        state = ui2.checklistState()
+        test.eq(state.report.issueCount, 3, "re-established findings return on refresh")
+
+        -- 10f. closing releases the report, rows and locate closures
+        ui2.Toggle("checklist")
+        state = ui2.checklistState()
+        test.eq(state.shown, false, "checklist window closes")
+        test.eq(state.report, nil, "closing releases the derived report")
+        test.eq(next(state.rows), nil, "closing releases the active row list")
+        local retainedEntries = 0
+        for _, row in ipairs(state.pooledRows) do
+            if row.entry ~= nil or row.fullReason ~= nil or row.text:GetText() ~= "" then
+                retainedEntries = retainedEntries + 1
+            end
+        end
+        test.eq(retainedEntries, 0, "pooled rows retain no derived entries or text")
+        test.eq(afters[1].cancelled, true, "the one-shot expiry timer is cancelled on hide")
+        test.eq(#tickers, 0, "still no repeating ticker after a full cycle")
+
+        -- 10g. reopening arms a fresh one-shot for the re-established scope
+        --      and does not accumulate frame hooks
+        ui2.Show("checklist")
+        test.eq(ui2.checklistState().report.status, "issues", "report is recomputed on reopen")
+        test.eq(#afters, 2, "reopening arms a fresh one-shot expiry timer")
+        test.eq(afters[2].delay, 604801, "the fresh timer matches the new deadline")
+        test.eq(hookCounts[BG.Frame.ICC.boss1.jine1], 1, "reopening does not accumulate frame hooks")
+
+        -- 10h. expiry fires once and drops the purged scope to pending
+        nowValue = 1000000 + 8 * 86400
+        afters[2].callback()
+        state = ui2.checklistState()
+        test.eq(state.report.status, "pending", "an expired re-established scope drops to pending")
+        test.eq(#afters, 2, "no re-arm without a live settlement")
+
+        -- 10i. clearing the active raid table invalidates the scope at once
+        checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
+        checklistTrade.append(BG.BGNext.DB, {
+            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
+            time = nowValue, status = "pending",
+        })
+        ui2.Refresh("checklist")
+        test.eq(ui2.checklistState().report.status, "issues", "the re-established scope is checked")
+        BG.ClearBiaoGe("biaoge", "ICC")
+        test.eq(BG.BGNext.DB.currentSettlement.raidId, nil, "clearing the raid table clears the settlement")
+        state = ui2.checklistState()
+        test.eq(state.report.status, "pending", "the checklist follows the scope reset immediately")
+        ui2.Toggle("checklist")
+    end)
+
+    for _, name in ipairs(watchedGlobals) do
+        rawset(_G, name, originalValues[name])
+    end
+    for _, name in ipairs(watchedGlobals) do
+        test.eq(rawget(_G, name), originalValues[name], "settlement UI suite restores global: " .. name)
+    end
+    if not checklistOk then
+        error(checklistErr, 0)
+    end
 end

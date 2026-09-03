@@ -4,7 +4,7 @@ return function(test)
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
-    test.eq(info.version, "0.4.0", "BGNext version is independent")
+    test.eq(info.version, "0.5.0", "BGNext version is independent")
     test.eq(info.upstreamVersion, "2.4.0", "upstream version remains disclosed")
     test.eq(info.protocolVersion, "2.4.0", "mixed-group protocol version remains compatible")
     test.eq(info.author, "国服社区共创", "community author")
@@ -13,12 +13,9 @@ return function(test)
     local changelogItems = table.concat(info.changelog, "\n")
     test.eq(changelogItems:find("价格预设", 1, true) ~= nil, true,
         "in-game changelog includes price presets")
-    test.eq(changelogItems:find("已就绪", 1, true) ~= nil, true,
-        "in-game changelog includes team raid readiness check")
-    test.eq(changelogItems:find("预览外观", 1, true) ~= nil, true,
-        "in-game changelog includes opt-in preview theme")
-    test.eq(changelogItems:find("Boss 模型", 1, true) ~= nil, true,
-        "in-game changelog includes boss model removal and readability")
+    for _, text in ipairs({ "新选装备默认备选", "独立文字徽标", "截止时间", "重复刷新", "结算前检查", "存储与隐私", "回落英文" }) do
+        test.eq(changelogItems:find(text, 1, true) ~= nil, true, "in-game release notes cover " .. text)
+    end
     test.eq(type(info.credits.upstream), "table", "upstream credits")
     test.eq(info.credits.contributors[1]:find("@pitcn", 1, true) ~= nil, true,
         "named BGNext maintainer is included in in-game credits")

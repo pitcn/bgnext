@@ -204,6 +204,37 @@ return function(test)
     test.eq(resources.items["legendary:255103"], 1, "owned legendary items are tracked by item id")
     test.eq(resources.items["upgrade:265340"], 2, "legendary upgrade items are tracked by item id")
 
+    local scopedCalls = { currency = 0, item = 0 }
+    local currencyOnly = Adapters.readers("titan", api({
+        C_CurrencyInfo = { GetCurrencyInfo = function()
+            scopedCalls.currency = scopedCalls.currency + 1
+            return { quantity = 1 }
+        end },
+        GetItemCount = function()
+            scopedCalls.item = scopedCalls.item + 1
+            return 1
+        end,
+    }), titanRaidColumns, Catalog.forFamily("titan").resourceColumns).resources({ currencies = true })
+    test.eq(type(currencyOnly.currencies), "table", "currency refresh returns the currency section")
+    test.eq(scopedCalls.currency > 0, true, "currency refresh calls currency APIs")
+    test.eq(scopedCalls.item, 0, "currency refresh skips bag item APIs")
+    test.eq(currencyOnly.items, nil, "currency refresh omits the unrequested item section")
+
+    scopedCalls = { currency = 0, item = 0 }
+    local itemsOnly = Adapters.readers("titan", api({
+        C_CurrencyInfo = { GetCurrencyInfo = function()
+            scopedCalls.currency = scopedCalls.currency + 1
+            return { quantity = 1 }
+        end },
+        GetItemCount = function()
+            scopedCalls.item = scopedCalls.item + 1
+            return 0
+        end,
+    }), titanRaidColumns, Catalog.forFamily("titan").resourceColumns).resources({ items = true })
+    test.eq(scopedCalls.item > 0, true, "bag refresh calls item-count APIs")
+    test.eq(scopedCalls.currency, 0, "bag refresh skips currency APIs")
+    test.eq(itemsOnly, nil, "an empty scoped bag read safely returns no values")
+
     local vanillaCatalog = Catalog.forFamily("vanilla")
     local vanillaResources = Adapters.readers("vanilla", api({
         UnitHonor = function() return 999 end,

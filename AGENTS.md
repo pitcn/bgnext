@@ -38,6 +38,14 @@ git diff --check
 
 Before a Release, also verify the data inventory, third-party provenance, package contents, BGLite mixed-group behavior, SavedVariables migration, all stop/clear conditions, and the compatibility matrix. Missing evidence must be reported as missing; it must never be converted into a passing claim.
 
+## Localization
+
+- BGNext supports Simplified Chinese (`zhCN`) and Traditional Chinese (`zhTW`). Every other client locale must fall back to English rather than Simplified Chinese.
+- Every new player-facing static string must use the locale table and add reviewed `zhCN`, `zhTW`, and English entries in the same change.
+- Translations must preserve the source string's ordered `string.format` placeholders and WoW color/link markup.
+- UI changes must account for longer English labels. Prefer measured or responsive sizing; do not rely on Chinese-only fixed widths that clip controls or obscure meaning.
+- Run `tests/test_english_locale.lua` whenever player-facing text, locale loading, or localized layout changes.
+
 ## Stop conditions
 
 Stop implementation and report the blocker when provenance is unclear, authorization scope is undocumented, a privacy boundary would be crossed, a required test cannot run, the baseline check fails, or the requested behavior conflicts with these rules. Do not work around a stop condition by renaming a feature, hiding code, changing hashes, or weakening documentation.

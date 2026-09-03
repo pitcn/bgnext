@@ -1,29 +1,44 @@
 local AddonName, ns = ...
 
-if (GetLocale() ~= "enUS") then return end
+local locale = GetLocale()
+if locale == "zhCN" or locale == "zhTW" then return end
 
 ns.enUS = true
 
 local L = ns.L
 local c1 = ns.c1
 
+do -- BGNext 0.5.0 release text
+    L["心愿清单：新选装备默认备选，可用滚轮按备选、次 BIS、BIS 切换；已有优先级保持不变。"] = "Wishlist: new selections start as Backup. Use the mouse wheel to cycle Backup, 2nd BiS and BiS; existing priorities are preserved."
+    L["心愿优先级改用独立文字徽标，不遮挡装备名称与装等；长列表可以滚动。"] = "Wishlist priorities now use separate text badges without covering item names or levels; long lists can be scrolled."
+    L["修复价格预设失焦保存、Alt+右键按预设开拍、Ctrl+右键改价；支持旧价格和心愿字符串导入。"] = "Fixed preset saving on focus loss, Alt+right-click auction starts using presets, and Ctrl+right-click price editing. Legacy price and wishlist imports remain available."
+    L["同时拍卖相同装备时，收到有效出价后同步刷新截止时间。"] = "Valid bids now refresh deadlines together when identical items are being auctioned."
+    L["减少角色总览和背包变化时的重复刷新；结算检查不再每秒扫描账单。"] = "Reduced redundant character and bag refreshes. Settlement checks no longer scan the bill every second."
+    L["新增当前团结算前检查，提示欠款、缺失账目信息及待核对交易；证据不足时不会自动判为结清。"] = "Added a current-raid settlement checklist for debts, incomplete entries and trades needing review. Insufficient evidence is never treated as settled."
+    L["新增存储与隐私清理入口，旧历史数据只有手动确认后才删除；修复该页面的文字报错。"] = "Added Storage & Privacy cleanup: legacy history is deleted only after explicit confirmation. Fixed text errors on that page."
+    L["完善简中、繁中与其他语言回落英文的文案及部分按钮排版。"] = "Improved Simplified Chinese, Traditional Chinese and English fallback text, plus several translated button layouts."
+    L["BGNext 是为金团记账、拍卖和结算准备的非官方社区插件：团长管理起拍价与账单，团员整理心愿和个人心理价，自己的角色进度集中查看。"] = "BGNext is an unofficial community addon for gold-based raid accounting, auctions and settlement. Leaders manage prices and bills; members track wishlists, personal price expectations and their own characters."
+    L["输入 /bgn 或 /bgnext 打开。账单用于记录装备、买家和金额；结算前检查只辅助核对，不代替团长确认。"] = "Open with /bgn or /bgnext. Record items, buyers and amounts in the bill. Settlement checks assist review and do not replace leader confirmation."
+    L["价格预设可保存多套团长方案及个人心理价。团长在表格装备上 Alt+右键按方案开拍，Ctrl+右键修改单件价；价格框点空白或按回车保存。"] = "Save leader price schemes and personal price expectations in Price Presets. On a bill item, leaders can Alt+right-click to start with the preset or Ctrl+right-click to edit its price. Press Enter or leave the price field to save."
+    L["备选为灰蓝、次 BIS 为淡紫、BIS 为金色；右键删除心愿。旧字符串继续可用，无优先级的旧心愿保留次 BIS 含义。"] = "Backup is slate blue, 2nd BiS lavender and BiS gold. Right-click to remove a wish. Legacy strings remain valid; old wishes without a priority retain their 2nd BiS meaning."
+    L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"] = "Character overview records only characters you log into yourself. Current-raid trade and mail reconciliation lasts at most seven days, without mail bodies or other-player history profiles."
+    L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"] = "Legacy history cleanup in Storage & Privacy cannot be undone: back up WTF first. Updating or reloading does not delete it. Do not enable BGLite, BiaoGe or their dependent extensions alongside BGNext."
+    L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"] = "Clients other than Simplified or Traditional Chinese fall back to English. See the release notes for tested client coverage; not all client features have been verified."
+    L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.0 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
+end
+
 do --英语说明书
     ns.instructionsText = {
         "|cff00BFFF<BGNext Guide>|r",
-        "BGNext v0.2.3 is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
-        "Core auctions continue to use BGLite's existing public protocol. Players using BGNext and BGLite may participate in the same basic auction; consult the release notes for the actual compatibility test status.",
-        "Personal wishlists, own-character information, and personal helper data stay local and are not sent to the raid or outside the game. Current-raid trade and mail reconciliation keeps only the most recent raid for at most seven days and never stores mail bodies.",
-        "If another BiaoGe/BGLite-family addon is enabled on this client, BGNext warns the player but never disables it without confirmation.",
-        "Code, testing, translation, design, and security-review contributions are welcome through Issues and Pull Requests. Contributors are recorded in the credits and relevant release notes.",
-        "This project is not endorsed by upstream authors, the game operator, or any platform.",
-        " ",
-        "|cff00BFFFCommands:|r",
-        "|cffFFFFFF-Open: |r/bgn or /bgnext, or bind a key in the game settings. The legacy /bglite command remains available.",
-        "|cffFFFFFF-Quick action: |rRight-click an input box to clear its contents.",
-        "|cffFFFFFF-Automatic auction: |rALT+click an item in the table, bags, or chat to open the auction panel.",
-        "|cffFFFFFF-Auction countdown: |rRight-click an item in chat to start the automatic countdown. (When you are the group Leader or item distributor)",
-        "|cffFFFFFF-Quick accounting: |rRight-click an item in chat to open quick accounting. (When you are a member of the group)",
-        " ",
+        L["BGNext 是为金团记账、拍卖和结算准备的非官方社区插件：团长管理起拍价与账单，团员整理心愿和个人心理价，自己的角色进度集中查看。"],
+        L["输入 /bgn 或 /bgnext 打开。账单用于记录装备、买家和金额；结算前检查只辅助核对，不代替团长确认。"],
+        L["价格预设可保存多套团长方案及个人心理价。团长在表格装备上 Alt+右键按方案开拍，Ctrl+右键修改单件价；价格框点空白或按回车保存。"],
+        L["心愿清单：新选装备默认备选，可用滚轮按备选、次 BIS、BIS 切换；已有优先级保持不变。"],
+        L["备选为灰蓝、次 BIS 为淡紫、BIS 为金色；右键删除心愿。旧字符串继续可用，无优先级的旧心愿保留次 BIS 含义。"],
+        L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"],
+        L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"],
+        L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"],
+        L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
     }
     ns.updateText_now = {
 
@@ -33,14 +48,41 @@ do --英语说明书
     }
 end
 
+do -- BGNext legacy history cleanup
+    L["存储与隐私"] = "Storage & Privacy"
+    L["旧历史数据清理"] = "Legacy History Cleanup"
+    L["BGNext 不会读取或迁移旧版历史表格、交易记录和邮件记录。若旧数据仍保存在本地，可在这里手动清理以减少常驻内存。"] = "BGNext does not read or migrate legacy table, trade, or mail history. If old data remains locally, you can remove it here to reduce memory use."
+    L["清理 BGNext 中的旧历史数据"] = "Remove Legacy BGNext History"
+    L["此操作不可恢复。建议先退出游戏并备份 WTF 文件夹；当前账单、设置、心愿清单、当前团结算和角色总览不会被删除。"] = "This cannot be undone. Exit the game and back up your WTF folder first. Current bills, settings, wishlists, current-raid settlement, and character overview are preserved."
+    L["检测到 %d 项旧历史数据。"] = "%d legacy history fields detected."
+    L["未检测到旧历史数据。"] = "No legacy history data detected."
+    L["确定清理 BGNext 中的旧历史数据吗？\n\n此操作不可恢复。建议先退出游戏并备份 WTF 文件夹。只会删除旧版历史表格、交易记录和邮件记录。"] = "Remove legacy BGNext history data?\n\nThis cannot be undone. Exit the game and back up your WTF folder first. Only legacy table, trade, and mail history will be removed."
+    L["确认清理"] = "Remove History"
+end
+
 do -- BGNext temporary current-raid reconciliation
-    L["开始对账"] = "Start reconciliation"
+    L["开始对账"] = "Start Reconciliation"
     L["停止对账"] = "Stop reconciliation"
     L["当前团队临时对账"] = "Temporary current-raid reconciliation"
     L["只有点击开始后才会读取账单；数据不会写入插件保存文件，重载、离团或停止后立即清空。"] = "The next announced bill is read only after you start. It is not saved and is cleared on reload, leaving the raid, or stopping."
     L["已停止对账并清空本次临时数据。"] = "Stopped reconciliation and cleared its temporary data."
     L["已开始对账：仅临时读取当前团队接下来通报的一份账单。"] = "Reconciliation started. The next bill announced by the current raid will be read temporarily."
     L["对账数据超出安全限制或等待超时，已停止本次对账。"] = "Reconciliation exceeded its safety limit or timed out and has been stopped."
+end
+
+do -- BGNext wish priorities
+    L["BIS"] = "BiS"
+    L["次BIS"] = "2nd BiS"
+    L["备选"] = "Backup"
+    L["核心提升"] = "Core upgrade"
+    L["普通需求"] = "Normal need"
+    L["BIS：核心提升，最高优先级的毕业装备。"] = "BiS: Core upgrade, the highest-priority item."
+    L["次BIS：普通需求，明确的提升或第二选择。"] = "2nd BiS: Normal need, a clear upgrade or second choice."
+    L["备选：过渡装备，或无人需求时才考虑。"] = "Backup: A transitional item, or one to consider only when nobody else needs it."
+    L["滚轮切换心愿优先级"] = "Mouse wheel changes the wish priority"
+    L["心愿：%s"] = "Wish: %s"
+    L["心愿优先级：%s"] = "Wish priority: %s"
+    L["心愿优先级：%s（%s）"] = "Wish priority: %s (%s)"
 end
 
 do
@@ -455,7 +497,7 @@ do
     L["UI层级"] = "UI Layers"
     L["只能在非团队状态使用调试模式。"] = "Debug Mode can only be used in non-team state."
     L["调试模式"] = "Debug Mode"
-    L["你可以在该模式，调整拍卖UI的位置，预览UI缩放和层级效果。只能在非团队状态下使用。"] = "In this mode, you can 'Improved Gouge' the position of the auction UI, preview the UI zoom and hierarchy effects. It can only be used in non-team state."
+    L["你可以在该模式，调整拍卖UI的位置，预览UI缩放和层级效果。只能在非团队状态下使用。"] = "Use this mode outside a group to reposition the auction UI and preview its scale and frame level."
     L["退出调试模式"] = "Exiting Debug Mode"
     L["进入调试模式"] = "Enter Debug Mode"
     L["竞拍欢呼语"] = "Bidding Cheer"
@@ -835,10 +877,10 @@ do
     L["没有心愿"] = "No Wish"
     L["由于%s多次点击WA链接，不再提示他的相关文本了。"] = "Due to %s multiple clicks on the WA link, no longer prompting for his associated text."
     L["手动增加记录"] = "Adding records manually"
-    L['添加装备'] = "添加裝備"
+    L['添加装备'] = "Add Equipment"
     L["按住Shift+点击表格/背包/聊天框装备；直接把装备拖到格子里"] = "Hold Shift+click on form/backpack/chat box Gear; drag Gear directly to the grid"
     L["自动拍卖"] = "AutoAuction"
-    L["调整自动拍卖UI的大小。"] = "Improved Gouge' automatically auctions the size of the UI."
+    L["调整自动拍卖UI的大小。"] = "Adjust the automatic auction UI size."
     L["v1.9：增加一个绿色钩子，用来表示你是否已经拥有该物品"] = "v1.9: add a green hook to indicate if you already have the item or not"
     L["没有WCL记录"] = "No record of WCL"
     L["———通报WCL———"] = "--- Inform WCL ---"
@@ -850,7 +892,7 @@ do
     L["删除该账单"] = "Delete this bill"
     L["正在接收拍卖WA"] = "Receiving Auction WA"
     L["接收完毕，但未导入"] = "Received, but not imported"
-    L["%s正在接收拍卖WA。"] = "Auction WA is being received."
+    L["%s正在接收拍卖WA。"] = "%s is receiving the Auction WA."
     L["%s已成功导入拍卖WA。"] = "%s has successfully imported the auction WA."
     L["v1.8：增加出价记录；UI缩小了一点；提高了最小加价幅度"] = "v1.8: Add bid log; UI 'Iron Shield Spike' a bit; Increase the minimum bidding range."
     L["当前难度："] = "Curr Diff: "
@@ -1039,8 +1081,8 @@ do
     L["已自动记入表格：%s%s%s => %s< %s >%s"] = "Automatically entered into the table: %s%s%s => %s< %s >%s"
     L["已自动记入表格：%s%s%s x%d => %s< %s >%s"] = "Automatically recorded in the table: %s%s%s x%d => %s< %s >%s"
     L["自动记录失败：%s%s%s。因为%s< %s >%s的格子满了"] = "Auto-documentation failed: %s%s%s. because the %s< %s >%s cell is full"
-    L["调整装备记录通知和交易通知的位置。"] = "The 'Improved Gouge' Gear records the location of notifications and transaction notifications."
-    L["快捷命令：/BGM"] = "Shortcut 'Enchant Bracer - Superior Strength' : /BGM"
+    L["调整装备记录通知和交易通知的位置。"] = "Adjust the position of loot-record and trade notifications."
+    L["快捷命令：/BGM"] = "Shortcut: /BGM"
     L["把当前表格保存至历史表格。"] = "Save current form to history form."
     L["把当前表格发给别人，类似发WA那样。"] = "Send the current form to someone else, similar to sending a WA."
     L["把表格导出为文本。"] = "Export the form as text."
@@ -1107,8 +1149,8 @@ do
     L["（"] = "("
     L["）"] = ")"
     L["|cff%s感谢你的评价：YY%s，>>%s<<%s。|r"] = "|cff%sThanks for your comment: YY%s, >>%s<<%s.|r"
-    L["恭喜你们击杀尾王！YY%s你曾评价为：|cff%s>>%s<<。|r"] = "Congratulations on your 'Killing Blows' Tail King! |r"
-    L["恭喜你们击杀尾王！由于没有记录到团长YY，快速评价框不会弹出。"] = "Congratulations to 'Killing Blows', King Tail! YY%s you have rated as: |cff%s>>%s<<<<."
+    L["恭喜你们击杀尾王！YY%s你曾评价为：|cff%s>>%s<<。|r"] = "Congratulations on defeating the final boss! You previously rated YY%s as |cff%s>>%s<<.|r"
+    L["恭喜你们击杀尾王！由于没有记录到团长YY，快速评价框不会弹出。"] = "Congratulations on defeating the final boss! Quick rating is unavailable because the leader's YY was not recorded."
     L["这个词缀是赛季服新增的，指物理和法系的命中，治疗一般需要过滤此词缀"] = "This is a new suffix for physical and legal hits, and is usually filtered for 'Fire Blast'."
     L["这个词缀是指物理命中"] = "This affix refers to physical hits."
     L["这个词缀是指物理爆击"] = "This is for physical 'Critical Strike'."
@@ -1131,16 +1173,16 @@ do
     L["在拍卖行Shift点击[遭劫货物]时，只会搜索其所需货物，而不是搜索[遭劫货物]（支持原生界面和Auctionator插件）。"] = "When you Shift-click on a looted item in the Auction House, it will only 'Pick Pocket' the item it needs instead of 'Pick Pocket' the looted item (native interface and Auctionator plugin supported)."
     L["UI缩放"] = "UI Zoom"
     L["|cff808080（右键还原设置）|r"] = "|cff808080 (right-click to restore settings)|r"
-    L["调整表格UI的大小。"] = "The size of the 'Improved Gouge' form UI."
+    L["调整表格UI的大小。"] = "Adjust the table UI size."
     L["背景材质透明度"] = "Background material transparency"
-    L["调整背景材质透明度。"] = "Improved Gouge' Background material transparency."
+    L["调整背景材质透明度。"] = "Adjust the background opacity."
     L["自动记录装备"] = "Auto Record Gear"
     L["在团本里拾取装备时，会自动记录进表格。"] = "When you pick up a Gear in a mission, it will be automatically recorded in the table."
     L["不同的副本，要求的最低品质会不同。大团本一般从紫装开始记录，小团本一般从蓝装开始记录。小怪的掉落会记录到杂项里。"] = "The minimum quality required will be different for different copies. Large group books usually start recording from Purple Gear, and small group books usually start recording from Blue Gear. Drops from small monsters will be recorded in the Miscellaneous section."
     L["装备记录通知时长"] = "Gear Record Notification Duration"
     L["自动记录装备后会在屏幕上方通知记录结果。"] = "Gear will notify you of the logging result at the top of the screen when it is logged automatically."
     L["装备记录通知字号"] = "Gear Record Notification Size"
-    L["调整该字体的大小。"] = "Improved Gouge' The size of the font."
+    L["调整该字体的大小。"] = "Adjust this font size."
     L["交易自动记账"] = "Transaction Auto-Recording"
     L["需要配合自动记录装备，因为如果表格里没有该交易的装备，则记账失败。"] = "It is necessary to work with Auto Gear Recording because if there is no Gear in the table for the transaction, the transaction will fail."
     L["如果一次交易两件装备以上，则只会记第一件装备。"] = "If there are more than two Gears in a transaction, only the first Gear will be recorded."
@@ -1168,7 +1210,7 @@ do
     L["清空表格时根据副本难度设置分钱人数"] = "Setting the number of people to share money according to the difficulty of the copy when clearing the form"
     L["10人团本默认分钱人数为10人，25人团本默认分钱人数为25人。"] = "The default number of subscribers for a 10-person copy is 10, and the default number of subscribers for a 25-person copy is 25."
     L["金额自动加零"] = "Auto Zeroing of Amounts"
-    L["输入金额和欠款时自动加两个0，减少记账操作，提高记账效率。"] = "Automatically add two zeros when you enter the amount of money and the amount owed, which reduces the operation of accounting and improves the 'Ice Totem' of accounting."
+    L["输入金额和欠款时自动加两个0，减少记账操作，提高记账效率。"] = "Automatically append two zeros to amounts and debts for faster bookkeeping."
     L["对账单保存时长"] = "How long do you keep the statement?"
     L["对账单保存多久后自动删除。"] = "How long the statement will be saved and then automatically deleted."
     L["按键交互声音"] = "Button Interaction Sound"
@@ -1407,7 +1449,7 @@ do
     L["< 收 %s 入 >"] = "< Income %s >"
     L["< 支 %s 出 >"] = "< Expenses %s Out >"
     L["< 总 %s 览 >"] = "< Total %s Pageview >"
-    L["< 工 %s 资 >"] = "< Salary >"
+    L["< 工 %s 资 >"] = "< %s Salary >"
     L["长按ALT：仅通报总览"] = "Press and hold ALT: overview only"
     L["长按SHITF：仅通报罚款"] = "Press and hold SHITF: only fines are notified."
     L["———通报总览———"] = "--- Notify Overview ---"
@@ -1514,7 +1556,7 @@ do
     L["护甲类型过滤"] = "Strong Troll's Blood Elixir' type filter."
     L["像套装兑换物这种有职业限定的装备，不适合你的会被过滤"] = "Gear that has an occupation limit, such as Set Exchange, will be filtered if it doesn't fit you."
     L["职业限定过滤"] = "Profession-specific filtering"
-    L["没有%s任一属性的装备会被过滤（武器、饰品、圣物除外）"] = "Gear without any of the 'Lesser Stats' will be filtered (except for weapons, jewelry, and dmg11)."
+    L["没有%s任一属性的装备会被过滤（武器、饰品、圣物除外）"] = "Gear without any of these attributes (%s) will be filtered, except weapons, trinkets, and relics."
     L["坦克专属过滤"] = "Tank-specific filters"
     L["死亡骑士-冰霜/邪恶"] = "Deaths Knight - 'Felcloth Hood' / Evil"
     L["战士-武器/狂怒"] = "Warrior - Weapon / 'Netherfury Belt"
@@ -1691,7 +1733,7 @@ do
     L["评价"] = "Evaluation"
     L["理由"] = "Reason"
     L["正在初始化"] = "Initializing"
-    L["|cffffffff< 共享我的评价 >   （你已共享|r |cff00FF00%s|r |cffffffff人次评价）|r\n\n1、当别人查询大众评价时，如果你有该YY的评价，则会以匿名的方式共享给对方\n2、如果你不开启该功能，则你的查询大众评价功能会被禁用，所以共享是相互的\n3、没满级的角色会被禁止共享和使用查询大众评价"] = " If you don't 'Freezing Trap Effect' the function will be disabled, so the sharing is mutual. 3. Characters without full level will be prohibited to share and use to check the public evaluation."
+    L["|cffffffff< 共享我的评价 >   （你已共享|r |cff00FF00%s|r |cffffffff人次评价）|r\n\n1、当别人查询大众评价时，如果你有该YY的评价，则会以匿名的方式共享给对方\n2、如果你不开启该功能，则你的查询大众评价功能会被禁用，所以共享是相互的\n3、没满级的角色会被禁止共享和使用查询大众评价"] = "|cffffffff< Share My Ratings > (shared |r |cff00FF00%s|r |cffffffff ratings)|r\n\n1. Your matching YY rating is shared anonymously when another player requests community ratings.\n2. Community lookup is disabled when sharing is disabled because sharing is reciprocal.\n3. Characters below the level cap cannot share or query community ratings."
     L["好评"] = "Good"
     L["中评"] = "Medium"
     L["差评"] = "Bad"
@@ -1761,7 +1803,7 @@ do
     L["|cffffffff< 清空表格时根据副本难度设置分钱人数 >|r\n\n1、10人团本默认分钱人数为10人\n2、25人团本默认分钱人数为25人"] = "|cffffffff< Setting the number of people to split according to the difficulty of the copy when clearing the table >|r\n\n1, default number of people to split for a 10-player group is 10 people \n2, default number of people to split for a 25-player group is 25 people"
     L["|cffFFFFFF10人团本分钱人数：|r"] = "|cffFFFFFF10M Raid Share Mem Cnt: |r"
     L["|cffFFFFFF25人团本分钱人数：|r"] = "|cffFFFFFF25M Raid Share Mem Cnt: |r"
-    L["快捷命令：/BGO"] = "Shortcut 'Enchant Bracer - Superior Strength' : /BGO"
+    L["快捷命令：/BGO"] = "Shortcut: /BGO"
     L["|cffffffff< 清空表格时保留支出补贴名称 >|r\n\n1、只保留补贴名称（例如XX补贴），支出玩家和支出金额正常清空\n2、这样就不用每次都重复填写补贴名称\n3、只有补贴名称，但没有补贴金额的，在通报账单时不会被通报"] = "|cffffffff< Keep the name of the subsidy when clearing the form >|r\n\n1, only the name of the subsidy is kept (e.g. XX subsidy), the player and the amount of the subsidy are cleared as normal \n2, so that you don't have to fill in the name of the subsidy repeatedly every time \n3, if there is only the name of the subsidy but not the amount of the subsidy, it won't be notified when you report the bill."
     L["<说明书与更新记录> "] = "<Instruction and Update Record"
     L["保存至历史表格"] = "Save to History Forms"
@@ -1856,7 +1898,7 @@ do
     L["装备：%s(%s)"] = "Gear : %s(%s)"
     L["月"] = "Month"
     L["日"] = "Day"
-    L["，价格:"] = ", Price: , Buyer: , Gear: %s(%s), Price: %s(%s)"
+    L["，价格:"] = ", Price:"
     L["，买家:"] = ", Buyer: , Buyer: , Buyer: , Buyer: , Buyer: , Buyer: , Buyer"
     L["取消交换"] = "Cancel exchange"
     L["你正在交换该行全部内容"] = "You are exchanging the entire contents of the row"
@@ -2990,6 +3032,49 @@ do -- BGNext current-raid trade and mail reconciliation
     L["当前团还没有邮件记录。"] = "No mails recorded for the current raid yet."
     L["已清空当前团的交易与邮件记录。"] = "Cleared the current raid's trade and mail records."
     L["只保留当前或最近一次未结算团本，最长七日。"] = "Keeps only the current or most recent unsettled raid, for at most seven days."
+do -- BGNext settlement checklist
+    L["结算前检查"] = "Settlement Check"
+    L["结算前检查（当前团）"] = "Settlement Check (Current Raid)"
+    L["定位"] = "Locate"
+    L["共 %s 项"] = "%s in total"
+    L["可以结算"] = "Ready to settle"
+    L["发现异常"] = "Issues found"
+    L["待确认"] = "Pending"
+    L["只读检查：不会自动修改账目、发送邮件或执行结算。"] = "Read-only checks: nothing is modified, mailed, traded or settled automatically."
+    L["当前没有进行中的团结算记录，无法核对交易与邮件"] = "No active raid settlement; trades and mails cannot be checked"
+    L["当前团还没有可核对的交易或邮件记录"] = "No trades or mails recorded for the current raid yet"
+    L["交易已记录，尚未核对完成：%s"] = "Trade recorded but not confirmed yet: %s"
+    L["邮件记录待核对：%s"] = "Mail record awaiting review: %s"
+    L["当前表格数据不可用，无法核对账单"] = "The raid table is unavailable; the bill cannot be checked"
+    L["当前表格还没有账单数据"] = "The raid table has no bill data yet"
+    L["欠款未处理：%s金（第%s个Boss 第%s件）"] = "Unhandled debt: %s gold (boss %s, item %s)"
+    L["装备缺少买家（第%s个Boss 第%s件）"] = "Missing buyer (boss %s, item %s)"
+    L["装备缺少金额（第%s个Boss 第%s件）"] = "Missing amount (boss %s, item %s)"
+    L["装备缺少买家和金额（第%s个Boss 第%s件）"] = "Missing buyer and amount (boss %s, item %s)"
+    L["分金人数未设置或无效"] = "Split count missing or invalid"
+    L["净收入为负数（%s金）"] = "Negative net income (%s gold)"
+    L["净收入为 0，请确认收入与支出是否录入完整"] = "Net income is 0; check income and expenses"
+    L["净收入未录入，无法计算工资"] = "Net income missing; wages cannot be calculated"
+    L["结算状态"] = "Settlement"
+    L["未核对交易"] = "Unconfirmed trades"
+    L["销售交付核对"] = "Sold item delivery"
+    L["未处理欠款"] = "Unhandled debts"
+    L["账单完整性"] = "Bill completeness"
+    L["分金与工资"] = "Split and wages"
+    L["邮件核对"] = "Mail review"
+    L["账单已售装备暂无对应交易证据（第%s个Boss 第%s件）"] = "Sold item without trade evidence (boss %s, item %s)"
+    L["账单装备无法识别，无法核对交易证据（第%s个Boss 第%s件）"] = "Unidentified item; trade evidence cannot be matched (boss %s, item %s)"
+    L["结算与当前表格不一致，账单未核对"] = "Settlement and raid table differ; bill not checked"
+    L["邮件发送失败：%s"] = "Mail failed to send: %s"
+    L["人均工资（%s）与分金设置计算值（%s）不一致"] = "Displayed wage (%s) differs from the split setting (%s)"
+    L["人均工资未录入，无法核对工资"] = "Displayed wage missing; wages cannot be verified"
+    L["对应交易的实收金额与账单不一致（%s金 / 账单%s金）（第%s个Boss 第%s件）"] = "The trade's received gold (%s) differs from the bill (%s) (boss %s, item %s)"
+    L["对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）"] = "The trade shares its gold across items or the association is ambiguous; this item's share cannot be confirmed (boss %s, item %s)"
+    L["已找到对应交易，但交易方向无法从记录确认，请人工核对（第%s个Boss 第%s件）"] = "A matching trade exists, but its direction cannot be proven from the record; please review (boss %s, item %s)"
+    L["该交易记录为买入方向，不能作为卖出交付证据（第%s个Boss 第%s件）"] = "The trade is an inbound purchase and cannot prove an outgoing delivery (boss %s, item %s)"
+    L["存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记"] = "%s completed delivery record(s) are not covered by the bill; please review for missing rows"
+end
+
     L["确认清空当前团的交易与邮件记录吗？\n只清除当前团结算记录，不影响表格账单、心愿清单和角色总览。"] = "Clear the current raid's trade and mail records?\nOnly the current-raid settlement records are removed; the bill, wishlist and character overview are not affected."
 end
 
@@ -3025,4 +3110,43 @@ do -- BGNext auction price presets
     L["确定清除本团本心理价？"] = "Clear this raid's price limits?"
     L["最多"] = "At most"
     L["套方案。"] = "presets."
+    L["当前方案"] = "Current preset"
+    L["当前没有可导出的价格。"] = "No prices are available to export."
+    L["导出范围"] = "Export scope"
+    L["导出价格"] = "Export Prices"
+    L["导入"] = "Import"
+    L["导入成功。"] = "Import complete."
+    L["导入方式"] = "Import mode"
+    L["导入价格"] = "Import Prices"
+    L["导入失败：角色信息不可用。"] = "Import failed: character information is unavailable."
+    L["导入失败。"] = "Import failed."
+    L["合并"] = "Merge"
+    L["价格无效。"] = "Invalid price."
+    L["旧版价格字符串"] = "Legacy price string"
+    L["全部方案"] = "All presets"
+    L["替换"] = "Replace"
+    L["替换将覆盖当前已保存的价格，确定继续？"] = "Replacing will overwrite your saved prices. Continue?"
+    L["替换全部"] = "Replace all"
+    L["未知装备将被跳过"] = "Unknown items will be skipped"
+    L["无法导入："] = "Cannot import: "
+    L["新建方案"] = "New preset"
+    L["修改预设起拍价"] = "Edit preset starting price"
+    L["预设起拍价已保存。"] = "Preset starting price saved."
+    L["重命名方案"] = "Rename preset"
+end
+
+do -- BGNext character overview
+    L["本周获得"] = "Earned this week"
+    L["不足1分钟"] = "Less than 1 min"
+    L["当前数量"] = "Current"
+    L["总上限"] = "Total cap"
+    L["每周上限"] = "Weekly cap"
+    L["启用角色总览"] = "Enable Character Overview"
+    L["清空"] = "Clear"
+    L["清空当前版本角色数据"] = "Clear This Client's Character Data"
+    L["清空全部角色数据"] = "Clear All Character Data"
+    L["确认清空当前版本的角色数据？此操作不可撤销。"] = "Clear character data for this client? This cannot be undone."
+    L["确认清空全部版本的角色数据？此操作不可撤销。"] = "Clear character data for all clients? This cannot be undone."
+    L["确认删除角色 %s（%s）的记录？此操作不可撤销。"] = "Delete the record for %s (%s)? This cannot be undone."
+    L["该版本角色总览适配中。"] = "Character overview support for this client is in progress."
 end

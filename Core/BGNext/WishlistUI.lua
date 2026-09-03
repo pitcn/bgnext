@@ -128,10 +128,15 @@ function M.nextCell(difficultyIndex, bossIndex, slotIndex, key, difficultyCount,
     return nil
 end
 
-function M.shortcutAction(isMasterLooter, button, altDown)
-    if not altDown then return nil end
-    if button == "LeftButton" then return "wishlist" end
-    if isMasterLooter and button == "RightButton" then return "auction" end
+function M.shortcutAction(isMasterLooter, button, altDown, controlDown, shiftDown)
+    if altDown then
+        if button == "LeftButton" then return "wishlist" end
+        if isMasterLooter and button == "RightButton" then return "auction" end
+        return nil
+    end
+    if isMasterLooter and controlDown and not shiftDown and button == "RightButton" then
+        return "leader-price"
+    end
     return nil
 end
 
@@ -141,6 +146,33 @@ function M.isLooted(wishItemId, recordedItemIds)
         if itemId == wishItemId then return true end
     end
     return false
+end
+
+-- A dedicated second line preserves the item name, icon and level bounds.
+-- Rows reserve badge space even when empty, so changing priority never reflows.
+local PRIORITY_MARK_HEIGHT = 14
+local SLOT_ROW_PITCH = 36
+local PRIORITY_LINE_KEY = "心愿优先级：%s（%s）"
+local PRIORITY_LINE_PLAIN_KEY = "心愿优先级：%s"
+local WHEEL_HINT_KEY = "滚轮切换心愿优先级"
+
+function M.priorityTooltipLines(priority, L)
+    local wishlist = BG.BGNext and BG.BGNext.Wishlist
+    if not wishlist or not wishlist.priorityTagKey then
+        return nil
+    end
+    local function translate(key)
+        return L and L[key] or key
+    end
+    local tag = translate(wishlist.priorityTagKey(priority))
+    local name = translate(wishlist.priorityNameKey(priority))
+    local label
+    if tag == name then
+        label = string.format(translate(PRIORITY_LINE_PLAIN_KEY), name)
+    else
+        label = string.format(translate(PRIORITY_LINE_KEY), tag, name)
+    end
+    return { label, translate(wishlist.priorityTipKey(priority)), translate(WHEEL_HINT_KEY) }
 end
 
 -- Computes where one difficulty header block sits in the wishlist grid. Pure
@@ -166,7 +198,7 @@ function M.difficultyAnchor(difficultyIndex, difficultyCount)
         return {
             point = "TOPRIGHT",
             relative = { index = difficultyIndex - 1, anchor = "bottomFirst" },
-            relativePoint = "TOPLEFT", x = -20, y = -30,
+            relativePoint = "TOPLEFT", x = -20, y = -46,
         }
     end
     if difficultyIndex == 3 then
@@ -174,16 +206,22 @@ function M.difficultyAnchor(difficultyIndex, difficultyCount)
             return {
                 point = "TOPRIGHT",
                 relative = { index = difficultyIndex - 1, anchor = "bottomFirst" },
-                relativePoint = "TOPLEFT", x = -20, y = -30,
+                relativePoint = "TOPLEFT", x = -20, y = -46,
             }
         end
         return {
             point = "TOPLEFT",
-            relative = { index = difficultyIndex - 1, anchor = "headerLast" },
+            relative = { index = 1, anchor = "headerLast" },
             relativePoint = "TOPRIGHT", x = 20, y = 0,
         }
     end
     return nil
+end
+
+function M.gridContentHeight(difficultyCount, bossCount)
+    local rows = difficultyCount == 4 and 2 or difficultyCount
+    return (rows - 1) * (bossCount * SLOT_ROW_PITCH + 31)
+        + bossCount * SLOT_ROW_PITCH + 24
 end
 
 local function runtimeReady()
@@ -197,6 +235,14 @@ if runtimeReady() then
     local hopeMaxi = ns.HopeMaxi
     local maxb = ns.Maxb
     local L = ns.L or setmetatable({}, { __index = function(_, key) return key end })
+
+    -- Three distinct tiers without changing the item's own quality color:
+    -- backup (slate blue) < normal/second BiS (lavender) < core/BiS (gold).
+    local priorityMarkColors = {
+        core = { 1, 0.82, 0.35 },
+        normal = { 0.76, 0.62, 0.94 },
+        backup = { 0.48, 0.60, 0.70 },
+    }
 
     local function context(raidId)
         return BG.BGNext.DB, BG.realmID, BG.playerName, raidId or BG.FB1
@@ -284,6 +330,27 @@ if runtimeReady() then
         return result
     end
 
+    local function slotPriority(slot)
+        local root, realmId, player, raidId = context(slot.FB)
+        local record = wishlist.getSlotRecord(root, realmId, player, raidId, slot.hopenandu, slot.bossnum, slot.i)
+        return record and record.priority or nil
+    end
+
+    local function updateSlotPriorityMark(slot)
+        local priority = slot.itemId and slotPriority(slot) or nil
+        if priority then
+            local color = priorityMarkColors[priority]
+            local mark = slot.priorityMark
+            mark.label:SetText(L[wishlist.priorityTagKey(priority)])
+            mark.label:SetTextColor(color[1], color[2], color[3])
+            mark.background:SetColorTexture(color[1], color[2], color[3], 0.18)
+            mark:SetWidth(math.max(36, mark.label:GetStringWidth() + 12))
+            slot.priorityMark:Show()
+        else
+            slot.priorityMark:Hide()
+        end
+    end
+
     local function updateSlotAppearance(slot)
         local text = slot:GetText()
         local itemId = wishlist.itemIdFromValue(text)
@@ -301,6 +368,7 @@ if runtimeReady() then
             if BG.LevelText then BG.LevelText(slot) end
             if BG.IsHave then BG.IsHave(slot) end
         end
+        updateSlotPriorityMark(slot)
         if BG.UpdateFilter then BG.UpdateFilter(slot) end
         if slot.looted then
             local canonicalItemId = itemId
@@ -309,6 +377,20 @@ if runtimeReady() then
             end
             slot.looted:SetShown(M.isLooted(canonicalItemId, recordedRaidItems(slot.FB)))
         end
+    end
+
+    local function showSlotTooltip(slot)
+        GameTooltip:SetOwner(slot, BG.ButtonIsInRight and BG.ButtonIsInRight(slot) and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
+        GameTooltip:SetItemByID(slot.itemId)
+        GameTooltip:AddLine("右键取消心愿装备", 0.5, 1, 0.5, true)
+        local priority = slotPriority(slot)
+        local lines = priority and M.priorityTooltipLines(priority, L) or nil
+        if lines then
+            GameTooltip:AddLine(lines[1], 0.95, 0.85, 0.55, true)
+            GameTooltip:AddLine(lines[2], 0.7, 0.7, 0.7, true)
+            GameTooltip:AddLine(lines[3], 0.5, 0.8, 1, true)
+        end
+        GameTooltip:Show()
     end
 
     local function persistSlot(slot)
@@ -328,7 +410,12 @@ if runtimeReady() then
         if not location or location.difficultyIndex ~= slot.hopenandu or location.bossIndex ~= slot.bossnum then
             return false
         end
-        wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId), slot.hopenandu, slot.bossnum, slot.i, itemId)
+        -- Re-confirming the same item keeps its priority; a genuinely new item
+        -- starts at backup. Legacy decoding still treats plain IDs as normal.
+        local existing = wishlist.getSlotRecord(root, realmId, player, raidId, slot.hopenandu, slot.bossnum, slot.i)
+        local priority = existing and existing.itemId == itemId and existing.priority or "backup"
+        wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId), slot.hopenandu, slot.bossnum, slot.i,
+            itemId, priority)
         slot.itemId = itemId
         updateSlotAppearance(slot)
         return true
@@ -346,13 +433,25 @@ if runtimeReady() then
         local slot = CreateFrame("EditBox", nil, parent, BG.editTemplate)
         slot:SetSize(115, 20)
         slot:SetFrameLevel(110)
-        slot:SetPoint("TOPLEFT", anchor, slotIndex == 1 and "BOTTOMLEFT" or "TOPLEFT", xOffset or 0, slotIndex == 1 and -1 or 0)
+        local rowGap = bossIndex == 1 and 1 or SLOT_ROW_PITCH - 20
+        slot:SetPoint("TOPLEFT", anchor, slotIndex == 1 and "BOTTOMLEFT" or "TOPLEFT", xOffset or 0, slotIndex == 1 and -rowGap or 0)
         slot:SetAutoFocus(false)
         if BG.SetEditStickyFocus then BG.SetEditStickyFocus(slot) end
         slot.FB, slot.hopenandu, slot.bossnum, slot.i = raidId, difficultyIndex, bossIndex, slotIndex
         slot.icon = slot:CreateTexture(nil, "ARTWORK")
         slot.icon:SetPoint("LEFT", -22, 0)
         slot.icon:SetSize(16, 16)
+        local mark = CreateFrame("Frame", nil, slot)
+        mark:SetPoint("TOPLEFT", slot, "BOTTOMLEFT", 0, -1)
+        mark:SetSize(36, PRIORITY_MARK_HEIGHT)
+        mark:EnableMouse(false)
+        mark.background = mark:CreateTexture(nil, "BACKGROUND")
+        mark.background:SetAllPoints(mark)
+        mark.label = mark:CreateFontString(nil, "OVERLAY")
+        mark.label:SetFont(BIAOGE_TEXT_FONT, 11, "OUTLINE")
+        mark.label:SetPoint("CENTER", mark, "CENTER", 0, 0)
+        mark:Hide()
+        slot.priorityMark = mark
         if BG.LootedText then BG.LootedText(slot) end
 
         slot.hover = slot:CreateTexture(nil, "BACKGROUND")
@@ -402,13 +501,19 @@ if runtimeReady() then
                 ClearCursor()
             end
         end)
+        slot:SetScript("OnMouseWheel", function(self, delta)
+            if not self.itemId then return end
+            local root, realmId, player, raidId = context(self.FB)
+            if wishlist.setSlotPriority(root, realmId, player, raidId, self.hopenandu, self.bossnum, self.i,
+                wishlist.cyclePriority(slotPriority(self), delta)) then
+                updateSlotPriorityMark(self)
+                if GameTooltip:IsOwned(self) then showSlotTooltip(self) end
+            end
+        end)
         slot:SetScript("OnEnter", function(self)
             self.hover:Show()
             if self.itemId then
-                GameTooltip:SetOwner(self, BG.ButtonIsInRight and BG.ButtonIsInRight(self) and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
-                GameTooltip:SetItemByID(self.itemId)
-                GameTooltip:AddLine("右键取消心愿装备", 0.5, 1, 0.5, true)
-                GameTooltip:Show()
+                showSlotTooltip(self)
             end
         end)
         slot:SetScript("OnLeave", function(self)
@@ -461,20 +566,34 @@ if runtimeReady() then
         local frame = CreateFrame("Frame", nil, parent)
         frame:SetAllPoints(parent)
         frame:Hide()
+        -- Extra badge rows can exceed the viewport on multi-difficulty raids.
+        -- Use the existing native scrollbar; no recurring work is added.
+        local scroll = CreateFrame("ScrollFrame", nil, frame, BG.scrollTemplate)
+        scroll:SetPoint("TOPLEFT", BG.MainFrame, "TOPLEFT", 0, -60)
+        scroll:SetPoint("BOTTOMRIGHT", BG.MainFrame, "BOTTOMRIGHT", -28, 65)
+        local content = CreateFrame("Frame", nil, scroll)
+        content:SetSize(math.max(1, BG.MainFrame:GetWidth() - 28),
+            M.gridContentHeight(hopeMaxn[raidId], hopeMaxb[raidId]))
+        scroll:SetScrollChild(content)
+        scroll:HookScript("OnSizeChanged", function(self, width)
+            content:SetWidth(math.max(1, width))
+        end)
+        frame.scroll, frame.content = scroll, content
         BG.HopeFrame[raidId] = {}
         local bottomFirstByDifficulty, headerLastByDifficulty = {}, {}
 
         for difficultyIndex = 1, hopeMaxn[raidId] do
-            local difficulty = frame:CreateFontString(nil, "OVERLAY")
+            local difficulty = content:CreateFontString(nil, "OVERLAY")
             local anchor = M.difficultyAnchor(difficultyIndex, hopeMaxn[raidId])
-            local relative = BG.MainFrame
+            local relative = content
             if anchor and type(anchor.relative) == "table" then
                 relative = anchor.relative.anchor == "bottomFirst"
                     and bottomFirstByDifficulty[anchor.relative.index]
                     or headerLastByDifficulty[anchor.relative.index]
             end
             if anchor and relative then
-                difficulty:SetPoint(anchor.point, relative, anchor.relativePoint, anchor.x, anchor.y)
+                difficulty:SetPoint(anchor.point, relative, anchor.relativePoint, anchor.x,
+                    anchor.relative == "main" and 0 or anchor.y)
             end
             difficulty:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
             difficulty:SetTextColor(1, 0.82, 0)
@@ -484,7 +603,7 @@ if runtimeReady() then
 
             local headers, priorHeader = {}, difficulty
             for slotIndex = 1, hopeMaxi do
-                local header = frame:CreateFontString(nil, "OVERLAY")
+                local header = content:CreateFontString(nil, "OVERLAY")
                 header:SetPoint("TOPLEFT", priorHeader, "TOPRIGHT", slotIndex == 1 and 20 or 26, 0)
                 header:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
                 header:SetTextColor(1, 0.82, 0)
@@ -504,11 +623,11 @@ if runtimeReady() then
                 for slotIndex = 1, hopeMaxi do
                     local anchor = slotIndex == 1 and rowAnchor or boss["zhuangbei1"]
                     local xOffset = slotIndex == 1 and 0 or (115 + 26) * (slotIndex - 1)
-                    local slot = createSlot(frame, raidId, difficultyIndex, bossIndex, slotIndex, anchor, xOffset)
+                    local slot = createSlot(content, raidId, difficultyIndex, bossIndex, slotIndex, anchor, xOffset)
                     boss["zhuangbei" .. slotIndex] = slot
                 end
                 priorFirstSlot = boss.zhuangbei1
-                local bossLabel = frame:CreateFontString(nil, "OVERLAY")
+                local bossLabel = content:CreateFontString(nil, "OVERLAY")
                 bossLabel:SetPoint("TOPRIGHT", boss.zhuangbei1, "TOPLEFT", -26, -3)
                 bossLabel:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
                 local bossInfo = BG.Boss[raidId] and BG.Boss[raidId]["boss" .. bossIndex]
@@ -528,11 +647,13 @@ if runtimeReady() then
                 for bossIndex = 1, hopeMaxb[raidId] do
                     local writeIndex = 1
                     for slotIndex = 1, hopeMaxi do
-                        local itemId = wishlist.getSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
+                        local record = wishlist.getSlotRecord(root, realmId, player, raidId,
+                            difficultyIndex, bossIndex, slotIndex)
+                        local itemId = record and record.itemId or nil
                         if itemId then
                             if writeIndex ~= slotIndex then
                                 wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId),
-                                    difficultyIndex, bossIndex, writeIndex, itemId)
+                                    difficultyIndex, bossIndex, writeIndex, itemId, record.priority)
                                 wishlist.clearSlot(root, realmId, player, raidId, difficultyIndex, bossIndex, slotIndex)
                             end
                             writeIndex = writeIndex + 1
