@@ -681,26 +681,45 @@ if runtimeReady() then
             return Store.getPersonalPrice(root, family, realmId, player, pageState.raidId, itemId) ~= nil
         end
 
+        -- The filtered catalog is cached and rebuilt only when a data input
+        -- changes (search, mode, raid, boss, scheme, or price data). Size and
+        -- geometry changes never rebuild it, so a resize animation performs
+        -- zero catalog scans; refreshRows and the stable commit only consume
+        -- this cached list.
+        local filteredCache = nil
+        local filterDirty = true
+
+        local function invalidateFilter()
+            filterDirty = true
+        end
+
         local function filteredItems()
+            if not filterDirty then return filteredCache end
             local model = models[pageState.raidId]
-            if not model then return {} end
-            local results = Catalog.filter(model, {
-                text = pageState.filters.text,
-                equipLoc = pageState.filters.equipLoc,
-                quality = pageState.filters.quality,
-                state = pageState.filters.state,
-                hasPrice = hasPriceFor,
-            })
-            local searching = pageState.filters.text and pageState.filters.text ~= ""
-            local bossId = pageState.bossId
-            if not searching and bossId and bossId ~= "all" then
-                local scoped = {}
-                for _, item in ipairs(results) do
-                    if item.groupId == bossId then scoped[#scoped + 1] = item end
+            local results
+            if not model then
+                results = {}
+            else
+                results = Catalog.filter(model, {
+                    text = pageState.filters.text,
+                    equipLoc = pageState.filters.equipLoc,
+                    quality = pageState.filters.quality,
+                    state = pageState.filters.state,
+                    hasPrice = hasPriceFor,
+                })
+                local searching = pageState.filters.text and pageState.filters.text ~= ""
+                local bossId = pageState.bossId
+                if not searching and bossId and bossId ~= "all" then
+                    local scoped = {}
+                    for _, item in ipairs(results) do
+                        if item.groupId == bossId then scoped[#scoped + 1] = item end
+                    end
+                    results = scoped
                 end
-                return scoped
             end
-            return results
+            filteredCache = results
+            filterDirty = false
+            return filteredCache
         end
 
         local function validateEdit(row)
@@ -789,6 +808,7 @@ if runtimeReady() then
             if index < 1 then index = #ids end
             local root, family = context(pageState.raidId)
             if Store.selectPreset(root, family, pageState.raidId, ids[index]) then
+                invalidateFilter()
                 refreshToolbar()
                 refreshRows()
             end
@@ -807,6 +827,7 @@ if runtimeReady() then
                     localMessage(L["无法创建方案。"] or "无法创建方案。")
                 else
                     Store.selectPreset(root, family, pageState.raidId, id)
+                    invalidateFilter()
                     refreshToolbar()
                     refreshRows()
                 end
@@ -824,6 +845,7 @@ if runtimeReady() then
             local id = Store.copyPreset(root, family, pageState.raidId, presetId, nil)
             if id then
                 Store.selectPreset(root, family, pageState.raidId, id)
+                invalidateFilter()
                 refreshToolbar()
                 refreshRows()
             else
@@ -868,6 +890,7 @@ if runtimeReady() then
                 end
                 if Store.setLeaderItemPrice(root, family, raidId, presetId, itemId, money) then
                     if pageState.raidId == raidId then
+                        invalidateFilter()
                         refreshToolbar()
                         refreshRows()
                     end
@@ -902,6 +925,7 @@ if runtimeReady() then
             dialog.text = L["确定删除当前方案？"] or "确定删除当前方案？"
             dialog.OnAccept = function()
                 if Store.deletePreset(root, family, pageState.raidId, presetId, fallback) then
+                    invalidateFilter()
                     refreshToolbar()
                     refreshRows()
                 end
@@ -923,6 +947,7 @@ if runtimeReady() then
             dialog.OnAccept = function()
                 local root, family, realmId, player = context(pageState.raidId)
                 Store.clearPersonalRaid(root, family, realmId, player, pageState.raidId)
+                invalidateFilter()
                 refreshToolbar()
                 refreshRows()
             end
@@ -1008,6 +1033,7 @@ if runtimeReady() then
             else
                 Store.clearPersonalPrice(root, family, realmId, player, pageState.raidId, itemId)
             end
+            invalidateFilter()
             refreshRows()
             refreshToolbar()
         end
@@ -1022,6 +1048,7 @@ if runtimeReady() then
                     bt = BG.CreateButton(main.raidBar)
                     bt:SetScript("OnClick", function(self)
                         M.selectRaid(pageState, self.raidId)
+                        invalidateFilter()
                         refreshAll()
                     end)
                     raidButtons[idx] = bt
@@ -1116,6 +1143,7 @@ if runtimeReady() then
                     bt = BG.CreateButton(main.bossScroll)
                     bt:SetScript("OnClick", function(self)
                         M.selectBoss(pageState, self.nodeId)
+                        invalidateFilter()
                         refreshBossBar()
                         refreshRows()
                     end)
@@ -1152,11 +1180,15 @@ if runtimeReady() then
             refreshRows()
         end
 
-        -- Re-derives the reusable viewport from the actual content area (the
-        -- itemScroll region between the filter bar and the fixed bottom reserve),
-        -- repositions the reusable rows and refreshes what is visible. Called
-        -- once after the frame tree exists and again when the main frame resizes.
-        local function relayout()
+        -- Applies the current content-area geometry to the reusable pool:
+        -- re-derives the viewport from the actual content area (the itemScroll
+        -- region between the filter bar and the fixed bottom reserve), repositions
+        -- the rows and hides any row beyond the new capacity. This is the cheap,
+        -- synchronous half of a resize and never touches the store, catalog, or
+        -- item info, so it is safe to run on every size event (at most sixty
+        -- rows). On shrink it keeps out-of-bounds rows non-interactive before the
+        -- debounced commit, so the fixed bottom entries stay clickable.
+        local function applyGeometry()
             local contentHeight = main.itemScroll and main.itemScroll:GetHeight()
             if type(contentHeight) ~= "number" or contentHeight <= 0 then return end
             local w = BG.MainFrame and BG.MainFrame:GetWidth()
@@ -1172,31 +1204,50 @@ if runtimeReady() then
                 wireRow(main.rows[i])
             end
             positionRows()
+            M.poolShown(main.rows, pageCapacity)
+        end
+
+        -- The stable commit: applies the final geometry and populates the visible
+        -- rows from the cached filtered list. refreshRows reuses the cache, so
+        -- this never re-filters the catalog.
+        local function relayout()
+            applyGeometry()
             refreshRows()
         end
 
         -- The main frame animates between table heights and a mode switch can
         -- wrap the localized description (moving the item list), both of which
-        -- fire size changes every frame. Each such burst is coalesced into a
-        -- single relayout: successive requests advance a monotonic token, so
-        -- only the last debounced callback survives and it reads the final
-        -- window size. Hiding the page advances the token too, invalidating any
-        -- pending relayout. A one-shot delayed timer drives this, never a
-        -- ticker or a persistent OnUpdate.
+        -- fire size changes every frame. Geometry safety is applied synchronously
+        -- by the OnSizeChanged handler (see applyGeometry), and only the stable
+        -- commit is deferred behind a single cancellable one-shot timer. The
+        -- settlePending flag keeps at most one timer alive for the whole burst,
+        -- and the generation counter invalidates a stale callback after OnHide.
+        -- Without C_Timer.After the page degrades to geometry-only handling and
+        -- never re-filters per event.
         local RELAYOUT_DEBOUNCE = 0.05
-        local relayoutToken = 0
+        local settleGeneration = 0
+        local settlePending = false
+
+        local function cancelSettle()
+            settleGeneration = settleGeneration + 1
+            settlePending = false
+        end
+
         local function scheduleRelayout()
-            relayoutToken = relayoutToken + 1
-            local token = relayoutToken
+            if settlePending then return end
+            settlePending = true
+            local gen = settleGeneration
             if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
                 C_Timer.After(RELAYOUT_DEBOUNCE, function()
-                    if token ~= relayoutToken then return end
+                    settlePending = false
+                    if gen ~= settleGeneration then return end
                     if main:IsShown() then relayout() end
                 end)
             else
-                -- Clients without C_Timer.After fall back to an immediate
-                -- bounded relayout (still one per request, not per frame).
-                if main:IsShown() then relayout() end
+                settlePending = false
+                -- No timer API: the synchronous geometry already applied by the
+                -- size handler keeps the bottom region safe. Never fall back to
+                -- per-event catalog filtering.
             end
         end
 
@@ -1490,6 +1541,7 @@ if runtimeReady() then
                 if apply() then
                     localMessage(L["导入成功。"] or "导入成功。")
                     panel:Hide()
+                    invalidateFilter()
                     refreshAll()
                 else
                     localMessage(L["导入失败。"] or "导入失败。")
@@ -1540,11 +1592,13 @@ if runtimeReady() then
         -- ---- Wire scripts now that every function is defined ----
         leaderButton:SetScript("OnClick", function()
             M.setMode(pageState, "leader")
+            invalidateFilter()
             refreshAll()
             scheduleRelayout()
         end)
         personalButton:SetScript("OnClick", function()
             M.setMode(pageState, "personal")
+            invalidateFilter()
             refreshAll()
             scheduleRelayout()
         end)
@@ -1568,6 +1622,7 @@ if runtimeReady() then
             if not presetId then return false end
             local root, family = context(pageState.raidId)
             if not Store.setBasePrice(root, family, pageState.raidId, presetId, money) then return false end
+            invalidateFilter()
             refreshToolbar()
             refreshRows()
             return true
@@ -1579,6 +1634,7 @@ if runtimeReady() then
         searchBox:SetScript("OnTextChanged", function(self)
             if self._refreshing then return end
             M.setFilter(pageState, "text", self:GetText())
+            invalidateFilter()
             refreshRows()
             refreshBossBar()
         end)
@@ -1587,11 +1643,13 @@ if runtimeReady() then
             if s == nil or s == "all" then M.setFilter(pageState, "state", "set")
             elseif s == "set" then M.setFilter(pageState, "state", "unset")
             else M.setFilter(pageState, "state", nil) end
+            invalidateFilter()
             refreshFilterBar()
             refreshRows()
         end)
         clearFiltersButton:SetScript("OnClick", function()
             M.clearFilters(pageState)
+            invalidateFilter()
             refreshFilterBar()
             refreshBossBar()
             refreshRows()
@@ -1618,6 +1676,7 @@ if runtimeReady() then
             row.edit:SetScript("OnEnterPressed", function(self)
                 local r = self:GetParent()
                 if validateEdit(r) and saveEdit(r) then
+                    invalidateFilter()
                     refreshToolbar()
                     local items = filteredItems()
                     local next = M.nextVisibleIndex(items, r.absoluteIndex)
@@ -1642,6 +1701,7 @@ if runtimeReady() then
                 end
                 local r = self:GetParent()
                 if validateEdit(r) and saveEdit(r) then
+                    invalidateFilter()
                     refreshToolbar()
                     refreshRows()
                 end
@@ -1663,21 +1723,28 @@ if runtimeReady() then
             -- also resets its local boss/search state. Hide the global ledger
             -- selector while the page is visible so the two bars never overlap.
             if BG.TabButtonsFB then BG.TabButtonsFB:Hide() end
+            cancelSettle()
+            -- A reopen refreshes the cache in case prices changed while hidden;
+            -- the layout then commits from the cached list without re-filtering.
+            invalidateFilter()
             relayout()
             refreshAll()
         end)
         main:SetScript("OnHide", function()
-            -- Drop any pending debounced relayout: a hidden page must never
+            -- Drop any pending debounced settle: a hidden page must never
             -- re-filter the catalog, even if a size change was still coalescing.
-            relayoutToken = relayoutToken + 1
+            cancelSettle()
             if BG.TabButtonsFB then BG.TabButtonsFB:Show() end
         end)
         -- The main frame animates between table heights and responds to UI scale
-        -- and locale-driven description height changes; re-derive the viewport
-        -- from the actual content area instead of a one-time estimate, but only
-        -- once per animation burst via the debounced scheduler.
+        -- and locale-driven description height changes. Each size event applies
+        -- geometry synchronously (hiding/reflowing out-of-bounds rows at once so
+        -- the fixed bottom entries stay clickable) and defers only the stable
+        -- commit, so the catalog is never re-filtered during an animation burst.
         main:SetScript("OnSizeChanged", function()
-            if main:IsShown() then scheduleRelayout() end
+            if not main:IsShown() then return end
+            applyGeometry()
+            scheduleRelayout()
         end)
         relayout()
         refreshAll()
