@@ -21,14 +21,43 @@ return function(test)
     test.eq(largeLayout.capacity, 60, "large layout exposes sixty reusable rows")
     test.eq(largeLayout.columnWidth > 500, true, "large layout fills horizontal space")
 
-    local standardLayout = ui.viewportLayout(1280, 800)
-    test.eq(standardLayout.rowsPerColumn, 25, "standard layout derives rows from height")
-    test.eq(standardLayout.capacity, 50, "standard layout exposes both columns")
+    -- Rows derive from the actual content height (main frame minus the fixed
+    -- controls above and the bottom reserve), not from a raw frame height.
+    test.eq(ui.contentHeight(800), 576, "content height deducts top chrome and bottom reserve")
+    local standardLayout = ui.viewportLayout(1280, ui.contentHeight(800))
+    test.eq(standardLayout.rowsPerColumn, 24, "standard layout derives rows from content height")
+    test.eq(standardLayout.capacity, 48, "standard layout exposes both columns")
+    test.eq(standardLayout.itemHeight <= ui.contentHeight(800), true,
+        "item rows stay inside the content area")
+
+    -- A very short frame still keeps the safe minimum rows rather than zero.
+    local shortLayout = ui.viewportLayout(1280, ui.contentHeight(400))
+    test.eq(shortLayout.rowsPerColumn, 12, "short frame keeps the minimum row count")
+    test.eq(shortLayout.capacity, 24, "short frame uses two columns at minimum")
 
     local fallbackLayout = ui.viewportLayout(nil, nil)
     test.eq(fallbackLayout.rowsPerColumn, 12, "invalid height uses safe minimum")
     test.eq(fallbackLayout.capacity, 24, "fallback still uses two columns")
     test.eq(fallbackLayout.columnWidth, 320, "invalid width uses safe column width")
+
+    -- The viewport is derived only from the measured content area, so it is
+    -- identical for the classic and preview themes and for every supported
+    -- locale. Theme tokens and label text change what is drawn, never how many
+    -- rows fit; locale and UI scale reach the viewport only by changing the
+    -- measured content height, which the next block exercises.
+    local invariant = ui.viewportLayout(1280, ui.contentHeight(800))
+    test.eq(invariant.rowsPerColumn, 24,
+        "viewport is theme- and locale-invariant at a fixed content height")
+
+    -- A taller locale description or a changed UI scale shrinks the measured
+    -- content height; the derived row count must shrink with it rather than keep
+    -- a one-time estimate that would overflow the frame. zhCN/zhTW/enUS
+    -- descriptions share the same fixed 560px wrap width, so the wider English
+    -- text wraps to more lines and shortens the content area exactly like this.
+    local shrunkByLocale = ui.contentHeight(760)
+    test.eq(ui.viewportLayout(1280, shrunkByLocale).rowsPerColumn <
+        ui.viewportLayout(1280, ui.contentHeight(800)).rowsPerColumn, true,
+        "a shorter measured content area yields fewer rows instead of overflowing")
 
     -- Exact product labels.
     test.eq(ui.LABELS.leader, "团长起拍价", "leader label")
@@ -205,6 +234,12 @@ return function(test)
         "page shell creates only the computed reusable rows")
     test.eq(source:find("math.floor((i - 1) / layout.rowsPerColumn)", 1, true) ~= nil, true,
         "rows flow into a second column")
+    test.eq(source:find("main.itemScroll:SetPoint(\"BOTTOMLEFT\", main, \"BOTTOMLEFT\", 0, M.BOTTOM_RESERVE)", 1, true) ~= nil, true,
+        "item list bottom is anchored above the fixed bottom entries")
+    test.eq(source:find("local function relayout()", 1, true) ~= nil, true,
+        "viewport re-derives from the actual content area")
+    test.eq(source:find("main:SetScript(\"OnSizeChanged\"", 1, true) ~= nil, true,
+        "viewport updates when the main frame resizes")
     test.eq(source:find('main.bossScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")', 1, true) ~= nil, true,
         "boss navigation uses a scoped surface")
     test.eq(source:find('main.itemScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")', 1, true) ~= nil, true,

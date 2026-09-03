@@ -19,16 +19,34 @@ M.ROW_CAPACITY = M.COLUMN_COUNT * M.MAX_ROWS_PER_COLUMN
 M.DECORATIVE_REGION_COUNT = 1
 M.ITEM_FONT_SIZE = 13
 M.PRICE_FONT_SIZE = 13
+-- Vertical space reserved at the bottom of the main frame for the fixed
+-- bottom-right entries (角色总览, 交易记录, 邮件记录, 结算前检查) plus a small
+-- margin, so the item list never covers those buttons.
+M.BOTTOM_RESERVE = 34
 
--- Computes the reusable viewport once from the existing main-frame size. The
--- fixed deductions cover the left margin, 230px Boss picker, inter-panel gap,
--- slim slider/right margin, and the controls above/below the item rows.
-function M.viewportLayout(width, height)
+-- Height of the fixed controls above the item rows (raid bar, mode bar,
+-- description, toolbar, boss picker, filter bar and their gaps). Combined with
+-- BOTTOM_RESERVE it separates the reusable list from the frame's fixed chrome.
+M.TOP_CHROME = 190
+
+-- Available vertical space for the item list: the main frame height minus the
+-- fixed controls above and the fixed bottom entries below.
+function M.contentHeight(mainHeight)
+    mainHeight = math.max(tonumber(mainHeight) or 0, 0)
+    return math.max(mainHeight - M.TOP_CHROME - M.BOTTOM_RESERVE, 0)
+end
+
+-- Computes the reusable viewport from the content area. The left margin, 230px
+-- Boss picker, inter-panel gap and slim slider/right margin are fixed
+-- deductions; the row count derives from the actual content height, so a
+-- shorter main frame or a taller locale/tooltip line yields fewer rows instead
+-- of overflowing the bottom of the frame.
+function M.viewportLayout(width, contentHeight)
     width = math.max(tonumber(width) or 0, 0)
-    height = math.max(tonumber(height) or 0, 0)
+    contentHeight = math.max(tonumber(contentHeight) or 0, 0)
     local availableWidth = math.max(width - 292, 652)
     local columnWidth = math.max(math.floor((availableWidth - 12) / M.COLUMN_COUNT), 320)
-    local rows = math.floor((height - 190) / M.ROW_HEIGHT)
+    local rows = math.floor(contentHeight / M.ROW_HEIGHT)
     if rows < M.MIN_ROWS_PER_COLUMN then rows = M.MIN_ROWS_PER_COLUMN end
     if rows > M.MAX_ROWS_PER_COLUMN then rows = M.MAX_ROWS_PER_COLUMN end
     return {
@@ -381,7 +399,7 @@ if runtimeReady() then
         main:SetAllPoints(BG.MainFrame)
         main:Hide()
         BG.PricePresetMainFrame = main
-        local layout = M.viewportLayout(BG.MainFrame:GetWidth(), BG.MainFrame:GetHeight())
+        local layout = M.viewportLayout(BG.MainFrame:GetWidth(), M.contentHeight(BG.MainFrame:GetHeight()))
         local pageCapacity = layout.capacity
 
         main.raidBar = CreateFrame("Frame", nil, main)
@@ -404,7 +422,8 @@ if runtimeReady() then
 
         main.bossScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")
         main.bossScroll:SetPoint("TOPLEFT", main.toolbar, "BOTTOMLEFT", 0, -8)
-        main.bossScroll:SetSize(230, layout.itemHeight + 32)
+        main.bossScroll:SetPoint("BOTTOMLEFT", main, "BOTTOMLEFT", 0, M.BOTTOM_RESERVE)
+        main.bossScroll:SetWidth(230)
         Style.applySurface(main.bossScroll, "surface", 0.44)
 
         main.filterBar = CreateFrame("Frame", nil, main)
@@ -413,10 +432,8 @@ if runtimeReady() then
 
         main.itemScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")
         main.itemScroll:SetPoint("TOPLEFT", main.filterBar, "BOTTOMLEFT", 0, -8)
-        main.itemScroll:SetSize(
-            layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1),
-            layout.itemHeight
-        )
+        main.itemScroll:SetPoint("BOTTOMLEFT", main, "BOTTOMLEFT", 0, M.BOTTOM_RESERVE)
+        main.itemScroll:SetWidth(layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1))
         main.itemScroll:EnableMouseWheel(true)
         Style.applySurface(main.itemScroll, "surface", 0.44)
 
@@ -448,20 +465,31 @@ if runtimeReady() then
         sliderThumb:SetSize(10, 28)
         sliderThumb:SetVertexColor(0.15, 0.75, 0.95, 0.9)
 
-        -- Reusable rows fill two columns and are calculated once when this page
-        -- is created. Even the largest layout is capped at sixty row objects.
+        -- Reusable rows fill two columns and are created once. Even the largest
+        -- layout is capped at sixty row objects; their position is (re)applied by
+        -- positionRows whenever the content area changes, so a resize never
+        -- leaves rows stranded outside the scrolled region.
+        local function positionRows()
+            for i = 1, pageCapacity do
+                local row = main.rows[i]
+                if not row then return end
+                local column = math.floor((i - 1) / layout.rowsPerColumn)
+                local rowInColumn = (i - 1) % layout.rowsPerColumn
+                row:ClearAllPoints()
+                row:SetPoint(
+                    "TOPLEFT",
+                    main.itemScroll,
+                    "TOPLEFT",
+                    column * (layout.columnWidth + layout.columnGap),
+                    -rowInColumn * layout.rowHeight
+                )
+                row:SetWidth(layout.columnWidth)
+            end
+        end
+
         main.rows = {}
         for i = 1, pageCapacity do
             local row = CreateFrame("Frame", nil, main.itemScroll)
-            local column = math.floor((i - 1) / layout.rowsPerColumn)
-            local rowInColumn = (i - 1) % layout.rowsPerColumn
-            row:SetPoint(
-                "TOPLEFT",
-                main.itemScroll,
-                "TOPLEFT",
-                column * (layout.columnWidth + layout.columnGap),
-                -rowInColumn * layout.rowHeight
-            )
             row:SetSize(layout.columnWidth, 22)
             row.index = i
             row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -508,6 +536,7 @@ if runtimeReady() then
             end)
             main.rows[i] = row
         end
+        positionRows()
 
         -- Mode buttons.
         local leaderButton = BG.CreateButton(main.modeBar)
@@ -1089,6 +1118,21 @@ if runtimeReady() then
             refreshRows()
         end
 
+        -- Re-derives the reusable viewport from the actual content area (the
+        -- itemScroll region between the filter bar and the fixed bottom reserve),
+        -- repositions the reusable rows and refreshes what is visible. Called
+        -- once after the frame tree exists and again when the main frame resizes.
+        local function relayout()
+            local contentHeight = main.itemScroll and main.itemScroll:GetHeight()
+            if type(contentHeight) ~= "number" or contentHeight <= 0 then return end
+            local w = BG.MainFrame and BG.MainFrame:GetWidth()
+            layout = M.viewportLayout(type(w) == "number" and w or layout.columnWidth, contentHeight)
+            pageCapacity = layout.capacity
+            main.itemScroll:SetWidth(layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1))
+            positionRows()
+            refreshRows()
+        end
+
         -- ---- Import/export panels ----
         -- Export never touches the clipboard or chat; it only fills an editable
         -- box and selects the text so the player can copy it manually.
@@ -1544,11 +1588,19 @@ if runtimeReady() then
             -- also resets its local boss/search state. Hide the global ledger
             -- selector while the page is visible so the two bars never overlap.
             if BG.TabButtonsFB then BG.TabButtonsFB:Hide() end
+            relayout()
             refreshAll()
         end)
         main:SetScript("OnHide", function()
             if BG.TabButtonsFB then BG.TabButtonsFB:Show() end
         end)
+        -- The main frame animates between table heights and responds to UI scale
+        -- and locale-driven description height changes; re-derive the viewport
+        -- from the actual content area instead of a one-time estimate.
+        main:SetScript("OnSizeChanged", function()
+            if main:IsShown() then relayout() end
+        end)
+        relayout()
         refreshAll()
     end)
 end
