@@ -153,6 +153,34 @@ return function(test)
     test.eq(ui.visibleRowCount(5, 12), 5, "small list uses only what it needs")
     test.eq(ui.visibleRowCount(0, 12), 0, "empty list needs no rows")
 
+    -- The reusable row pool must settle its visibility against the current
+    -- capacity whenever the content area changes size. On shrink, rows beyond
+    -- the new capacity must be hidden (not left interactive outside the
+    -- viewport); on growth, rows inside the enlarged capacity stay visible.
+    local function mockPool(size)
+        local pool, states = {}, {}
+        for i = 1, size do
+            pool[i] = {
+                index = i,
+                shown = true,
+                Show = function(self) self.shown = true end,
+                Hide = function(self) self.shown = false end,
+            }
+        end
+        return pool
+    end
+    local shrinkPool = mockPool(60)
+    test.eq(ui.poolShown(shrinkPool, 48), 48, "shrink keeps only the first forty-eight rows visible")
+    test.eq(shrinkPool[48].shown, true, "the last in-capacity row stays visible after shrink")
+    test.eq(shrinkPool[49].shown, false, "the first out-of-capacity row is hidden after shrink")
+    test.eq(shrinkPool[60].shown, false, "the final out-of-capacity row is hidden after shrink")
+
+    local growPool = mockPool(48)
+    test.eq(ui.poolShown(growPool, 60), 48, "growth cannot invent rows that do not exist")
+    test.eq(growPool[48].shown, true, "growth keeps the last real row visible")
+
+    test.eq(ui.poolShown({}, 24), 0, "an empty pool hides nothing")
+
     -- A fixed twelve-row viewport must still expose every item through a
     -- clamped zero-based scroll offset.
     local many = {}
@@ -238,6 +266,12 @@ return function(test)
         "item list bottom is anchored above the fixed bottom entries")
     test.eq(source:find("local function relayout()", 1, true) ~= nil, true,
         "viewport re-derives from the actual content area")
+    test.eq(source:find("for i = #main.rows + 1, pageCapacity do", 1, true) ~= nil, true,
+        "relayout grows the reusable pool when the capacity rises")
+    test.eq(source:find("M.poolShown(main.rows, pageCapacity)", 1, true) ~= nil, true,
+        "refresh hides pool rows that fall outside the new capacity")
+    test.eq(source:find("for i = 1, #main.rows do", 1, true) ~= nil, true,
+        "refresh walks the whole dense pool instead of only the initial count")
     test.eq(source:find("main:SetScript(\"OnSizeChanged\"", 1, true) ~= nil, true,
         "viewport updates when the main frame resizes")
     test.eq(source:find('main.bossScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")', 1, true) ~= nil, true,

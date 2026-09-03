@@ -247,6 +247,27 @@ function M.visibleWindow(items, offset, capacity)
     return visible, offset, maxOffset
 end
 
+-- Settles the visibility of a reusable row pool against a target capacity and
+-- returns how many rows are left visible. Rows beyond the capacity are hidden
+-- so a shrinking viewport never leaves stale rows interactive outside the
+-- scrolled region; rows that do not exist are not invented, so a caller that
+-- grows the capacity must create those rows first. The pool is expected to be
+-- dense from 1 upwards, but a nil slot is skipped safely.
+function M.poolShown(pool, capacity)
+    local rows = type(pool) == "table" and pool or {}
+    capacity = math.max(math.floor(tonumber(capacity) or 0), 0)
+    local shown = 0
+    for index, row in ipairs(rows) do
+        if index <= capacity then
+            if row and row.Show then row:Show() end
+            shown = shown + 1
+        else
+            if row and row.Hide then row:Hide() end
+        end
+    end
+    return shown
+end
+
 -- Ordered toolbar action keys for a mode. Leader keeps the full scheme toolbar;
 -- personal has a single set of prices and only import/export/clear.
 function M.toolbarActions(mode)
@@ -391,6 +412,7 @@ if runtimeReady() then
         local refreshRows, refreshRaidBar, refreshModeBar, refreshToolbar
         local refreshBossBar, refreshFilterBar, refreshAll
         local clearRow, cyclePreset
+        local createRow, wireRow
         local newScheme, copyScheme, renameScheme, deleteScheme, confirmClearPersonal
         local showExportPanel, showImportPanel, refreshImportPreview, exportText, applyImport
 
@@ -487,8 +509,10 @@ if runtimeReady() then
             end
         end
 
-        main.rows = {}
-        for i = 1, pageCapacity do
+        -- Creates one reusable row with its fixed child controls and the
+        -- mouse-wheel/tooltip scripts. Edit-box and clear-button scripts are
+        -- wired separately (below) because they close over the edit handlers.
+        createRow = function(i)
             local row = CreateFrame("Frame", nil, main.itemScroll)
             row:SetSize(layout.columnWidth, 22)
             row.index = i
@@ -534,7 +558,12 @@ if runtimeReady() then
             row:SetScript("OnLeave", function()
                 if GameTooltip then GameTooltip:Hide() end
             end)
-            main.rows[i] = row
+            return row
+        end
+
+        main.rows = {}
+        for i = 1, pageCapacity do
+            main.rows[i] = createRow(i)
         end
         positionRows()
 
@@ -910,7 +939,12 @@ if runtimeReady() then
             main.itemSlider:SetValue(offset)
             main.itemSlider._refreshing = nil
             main.itemSlider:SetShown(maxOffset > 0)
-            for i = 1, pageCapacity do
+            -- Hide any pool rows that now fall outside the capacity, then walk
+            -- the whole dense pool so a shrinking viewport cannot leave stale
+            -- rows visible or interactive. `items` is capped at pageCapacity,
+            -- so a pool row above it reads a nil item and is hidden here too.
+            M.poolShown(main.rows, pageCapacity)
+            for i = 1, #main.rows do
                 local row = main.rows[i]
                 local item = items[i]
                 if item then
@@ -1129,6 +1163,14 @@ if runtimeReady() then
             layout = M.viewportLayout(type(w) == "number" and w or layout.columnWidth, contentHeight)
             pageCapacity = layout.capacity
             main.itemScroll:SetWidth(layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1))
+            -- A wider/taller content area can raise the capacity after the pool
+            -- was first built. Create and wire the missing rows before anyone
+            -- reads main.rows[i], so refreshRows and positionRows never touch a
+            -- nil slot (a shrink only hides rows, it never removes them).
+            for i = #main.rows + 1, pageCapacity do
+                main.rows[i] = createRow(i)
+                wireRow(main.rows[i])
+            end
             positionRows()
             refreshRows()
         end
@@ -1538,8 +1580,10 @@ if runtimeReady() then
             main.itemSlider:SetValue(offset - (tonumber(delta) or 0) * 3)
         end)
 
-        for i = 1, pageCapacity do
-            local row = main.rows[i]
+        -- Wires the edit-box and clear-button scripts for one row. Kept as a
+        -- named function so relayout can wire rows it creates when the capacity
+        -- grows; the initial pool and any later growth share the same handlers.
+        wireRow = function(row)
             row.edit:SetScript("OnTextChanged", function(self)
                 if self:GetParent().edit._refreshing then return end
                 validateEdit(self:GetParent())
@@ -1580,6 +1624,10 @@ if runtimeReady() then
                 self:ClearFocus()
             end)
             row.clear:SetScript("OnClick", function(self) clearRow(self:GetParent()) end)
+        end
+
+        for i = 1, #main.rows do
+            wireRow(main.rows[i])
         end
 
         BG.Create_TabButton(M.tabNumber, L["价格预设"], main)
