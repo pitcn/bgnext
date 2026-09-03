@@ -1,4 +1,14 @@
 return function(test)
+    local tocFile = assert(io.open("BGLite.toc", "rb"))
+    local toc = tocFile:read("*a")
+    tocFile:close()
+    local announcementPos = assert(toc:find("Core\\BGNext\\TradeAnnouncement.lua", 1, true),
+        "the loaded addon graph includes TradeAnnouncement")
+    local tradePos = assert(toc:find("Core\\Module\\Trade.lua", 1, true),
+        "the loaded addon graph includes the legacy trade module")
+    test.eq(announcementPos < tradePos, true,
+        "TradeAnnouncement captures TRADE_SHOW before Trade.lua mutates shared trade state")
+
     -- Exercises the live wiring end to end: a confirmed completion message or an
     -- explicit cancel error is announced once, a repeated message is not
     -- re-sent, and a plain window close announces nothing. The trade partner is
