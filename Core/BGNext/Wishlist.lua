@@ -320,7 +320,7 @@ function M.placeItem(root, realmId, player, raidId, limits, itemId, resolver, pr
     for slotIndex = 1, limits.slots do
         if M.getSlot(root, realmId, player, raidId, location.difficultyIndex, location.bossIndex, slotIndex) == nil then
             M.setSlot(root, realmId, player, raidId, limits, location.difficultyIndex, location.bossIndex,
-                slotIndex, itemId, priority)
+                slotIndex, itemId, priority or "backup")
             return {
                 ok = true,
                 difficultyIndex = location.difficultyIndex,
@@ -377,7 +377,8 @@ function M.migrateFlatRaid(root, realmId, player, raidId, limits, resolver)
     local placed, quarantined = 0, 0
     local unplacedItems = {}
     for _, itemId in ipairs(itemIds) do
-        local result = M.placeItem(temporaryRoot, realmId, player, raidId, limits, itemId, resolver)
+        -- Migration is not a new selection: preserve the legacy normal tier.
+        local result = M.placeItem(temporaryRoot, realmId, player, raidId, limits, itemId, resolver, "normal")
         if result.ok then
             placed = placed + 1
         else

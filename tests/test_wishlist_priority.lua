@@ -253,8 +253,24 @@ return function(test)
     test.eq(wish.contains(perfRoot, "realm", "A", "ICC", 9001), true, "hit lookup still works after the GC pause")
     test.eq(wish.highestPriority(perfRoot, "realm", "A", "ICC", 9001), "normal", "hit priority still works")
 
-    -- 20) the tooltip carries the full priority name and explanation; the
-    --     on-slot indicator itself is compact and text-free
+    -- New selections start at the lowest tier without reinterpreting old data.
+    local selected = { wishlist = {} }
+    local function selectionLocation() return { difficultyIndex = 1, bossIndex = 1 } end
+    test.eq(wish.placeItem(selected, "realm", "A", "ICC", limits, 7401, selectionLocation).ok, true,
+        "new selection succeeds")
+    test.eq(wish.getSlotPriority(selected, "realm", "A", "ICC", 1, 1, 1), "backup",
+        "newly selected item starts at backup")
+    local selectedText = wish.exportRaid(selected, "realm", "A", "ICC", limits)
+    local selectedCopy = { wishlist = {} }
+    wish.applyImport(selectedCopy, "realm", "A", wish.parseImport(selectedText, { ICC = limits }))
+    test.eq(wish.getSlotPriority(selectedCopy, "realm", "A", "ICC", 1, 1, 1), "backup",
+        "new default survives export and import")
+    local flat = { wishlist = { realm = { A = { ICC = { [7401] = true } } } } }
+    wish.migrateFlatRaid(flat, "realm", "A", "ICC", limits, selectionLocation)
+    test.eq(wish.getSlotPriority(flat, "realm", "A", "ICC", 1, 1, 1), "normal",
+        "legacy flat migration retains its established priority")
+
+    -- 20) the tooltip carries the full priority name and explanation.
     local ui = dofile("Core/BGNext/WishlistUI.lua")
     local coreLines = ui.priorityTooltipLines("core", nil)
     test.eq(coreLines[1], "心愿优先级：BIS（核心提升）", "missing locale falls back to the stable keys")

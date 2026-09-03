@@ -305,6 +305,16 @@ return function(test)
             "translated badge text has measured horizontal padding")
         test.eq(mark.width <= slot.width, true, "English badge fits within its own column")
         ns.L["次BIS"] = nil
+        BG.difficultyTable.ICC = { "N", "H" }
+        BG.Loot = { ICC = { N = { boss1 = { 7001, 7002 } } } }
+        slot:SetText("7002")
+        slot.scripts.OnTextChanged(slot)
+        test.eq(mark.label.text, "备选", "replacing an item starts at backup")
+        slot.scripts.OnMouseWheel(slot, 1)
+        test.eq(mark.label.text, "次BIS", "first step promotes backup to second BiS")
+        slot.scripts.OnMouseWheel(slot, 1)
+        slot.scripts.OnTextChanged(slot)
+        test.eq(mark.label.text, "BIS", "confirming the same item preserves chosen priority")
         wish.clearSlot(BG.BGNext.DB, "realm", "A", "ICC", 1, 1, 1)
         grid:Refresh()
         test.eq(mark.shown, false, "empty slot has no priority color")

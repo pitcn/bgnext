@@ -8,23 +8,37 @@ ns.enUS = true
 local L = ns.L
 local c1 = ns.c1
 
+do -- BGNext 0.5.0 release text
+    L["心愿清单：新选装备默认备选，可用滚轮按备选、次 BIS、BIS 切换；已有优先级保持不变。"] = "Wishlist: new selections start as Backup. Use the mouse wheel to cycle Backup, 2nd BiS and BiS; existing priorities are preserved."
+    L["心愿优先级改用独立文字徽标，不遮挡装备名称与装等；长列表可以滚动。"] = "Wishlist priorities now use separate text badges without covering item names or levels; long lists can be scrolled."
+    L["修复价格预设失焦保存、Alt+右键按预设开拍、Ctrl+右键改价；支持旧价格和心愿字符串导入。"] = "Fixed preset saving on focus loss, Alt+right-click auction starts using presets, and Ctrl+right-click price editing. Legacy price and wishlist imports remain available."
+    L["同时拍卖相同装备时，收到有效出价后同步刷新截止时间。"] = "Valid bids now refresh deadlines together when identical items are being auctioned."
+    L["减少角色总览和背包变化时的重复刷新；结算检查不再每秒扫描账单。"] = "Reduced redundant character and bag refreshes. Settlement checks no longer scan the bill every second."
+    L["新增当前团结算前检查，提示欠款、缺失账目信息及待核对交易；证据不足时不会自动判为结清。"] = "Added a current-raid settlement checklist for debts, incomplete entries and trades needing review. Insufficient evidence is never treated as settled."
+    L["新增存储与隐私清理入口，旧历史数据只有手动确认后才删除；修复该页面的文字报错。"] = "Added Storage & Privacy cleanup: legacy history is deleted only after explicit confirmation. Fixed text errors on that page."
+    L["完善简中、繁中与其他语言回落英文的文案及部分按钮排版。"] = "Improved Simplified Chinese, Traditional Chinese and English fallback text, plus several translated button layouts."
+    L["BGNext 是为金团记账、拍卖和结算准备的非官方社区插件：团长管理起拍价与账单，团员整理心愿和个人心理价，自己的角色进度集中查看。"] = "BGNext is an unofficial community addon for gold-based raid accounting, auctions and settlement. Leaders manage prices and bills; members track wishlists, personal price expectations and their own characters."
+    L["输入 /bgn 或 /bgnext 打开。账单用于记录装备、买家和金额；结算前检查只辅助核对，不代替团长确认。"] = "Open with /bgn or /bgnext. Record items, buyers and amounts in the bill. Settlement checks assist review and do not replace leader confirmation."
+    L["价格预设可保存多套团长方案及个人心理价。团长在表格装备上 Alt+右键按方案开拍，Ctrl+右键修改单件价；价格框点空白或按回车保存。"] = "Save leader price schemes and personal price expectations in Price Presets. On a bill item, leaders can Alt+right-click to start with the preset or Ctrl+right-click to edit its price. Press Enter or leave the price field to save."
+    L["备选为灰蓝、次 BIS 为淡紫、BIS 为金色；右键删除心愿。旧字符串继续可用，无优先级的旧心愿保留次 BIS 含义。"] = "Backup is slate blue, 2nd BiS lavender and BiS gold. Right-click to remove a wish. Legacy strings remain valid; old wishes without a priority retain their 2nd BiS meaning."
+    L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"] = "Character overview records only characters you log into yourself. Current-raid trade and mail reconciliation lasts at most seven days, without mail bodies or other-player history profiles."
+    L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"] = "Legacy history cleanup in Storage & Privacy cannot be undone: back up WTF first. Updating or reloading does not delete it. Do not enable BGLite, BiaoGe or their dependent extensions alongside BGNext."
+    L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"] = "Clients other than Simplified or Traditional Chinese fall back to English. See the release notes for tested client coverage; not all client features have been verified."
+    L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.0 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
+end
+
 do --英语说明书
     ns.instructionsText = {
         "|cff00BFFF<BGNext Guide>|r",
-        "BGNext is an independent, unofficial community project maintained on the BGLite 2.4.0 baseline.",
-        "Core auctions continue to use BGLite's existing public protocol. Players using BGNext and BGLite may participate in the same basic auction; consult the release notes for the actual compatibility test status.",
-        "Personal wishlists, own-character information, and personal helper data stay local and are not sent to the raid or outside the game. Current-raid trade and mail reconciliation keeps only the most recent raid for at most seven days and never stores mail bodies.",
-        "If another BiaoGe/BGLite-family addon is enabled on this client, BGNext warns the player but never disables it without confirmation.",
-        "Code, testing, translation, design, and security-review contributions are welcome through Issues and Pull Requests. Contributors are recorded in the credits and relevant release notes.",
-        "This project is not endorsed by upstream authors, the game operator, or any platform.",
-        " ",
-        "|cff00BFFFCommands:|r",
-        "|cffFFFFFF-Open: |r/bgn or /bgnext, or bind a key in the game settings. The legacy /bglite command remains available.",
-        "|cffFFFFFF-Quick action: |rRight-click an input box to clear its contents.",
-        "|cffFFFFFF-Automatic auction: |rALT+click an item in the table, bags, or chat to open the auction panel.",
-        "|cffFFFFFF-Auction countdown: |rRight-click an item in chat to start the automatic countdown. (When you are the group Leader or item distributor)",
-        "|cffFFFFFF-Quick accounting: |rRight-click an item in chat to open quick accounting. (When you are a member of the group)",
-        " ",
+        L["BGNext 是为金团记账、拍卖和结算准备的非官方社区插件：团长管理起拍价与账单，团员整理心愿和个人心理价，自己的角色进度集中查看。"],
+        L["输入 /bgn 或 /bgnext 打开。账单用于记录装备、买家和金额；结算前检查只辅助核对，不代替团长确认。"],
+        L["价格预设可保存多套团长方案及个人心理价。团长在表格装备上 Alt+右键按方案开拍，Ctrl+右键修改单件价；价格框点空白或按回车保存。"],
+        L["心愿清单：新选装备默认备选，可用滚轮按备选、次 BIS、BIS 切换；已有优先级保持不变。"],
+        L["备选为灰蓝、次 BIS 为淡紫、BIS 为金色；右键删除心愿。旧字符串继续可用，无优先级的旧心愿保留次 BIS 含义。"],
+        L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"],
+        L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"],
+        L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"],
+        L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
     }
     ns.updateText_now = {
 

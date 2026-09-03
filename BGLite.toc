@@ -6,7 +6,7 @@
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.0
-## X-BGNext-Version: 0.4.0
+## X-BGNext-Version: 0.5.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.0

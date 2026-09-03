@@ -411,9 +411,9 @@ if runtimeReady() then
             return false
         end
         -- Re-confirming the same item keeps its priority; a genuinely new item
-        -- starts at the default.
+        -- starts at backup. Legacy decoding still treats plain IDs as normal.
         local existing = wishlist.getSlotRecord(root, realmId, player, raidId, slot.hopenandu, slot.bossnum, slot.i)
-        local priority = existing and existing.itemId == itemId and existing.priority or nil
+        local priority = existing and existing.itemId == itemId and existing.priority or "backup"
         wishlist.setSlot(root, realmId, player, raidId, limitsFor(raidId), slot.hopenandu, slot.bossnum, slot.i,
             itemId, priority)
         slot.itemId = itemId

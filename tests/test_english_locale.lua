@@ -115,6 +115,16 @@ return function(test)
             test.eq(type(value), "string", "loaded UI translation must be text: " .. key)
         end
         test.eq(type(localized.L["存储与隐私"]), "string", "storage tab receives text, never a boolean")
+        local guide = table.concat(localized.instructionsText, "\n")
+        test.eq(guide:find(localized.L["备选"], 1, true) ~= nil, true,
+            "guide explains the starting wishlist priority in every locale")
+        local previousBG = BG
+        BG = { BGNext = {} }
+        dofile("Core/BGNext/Identity.lua")
+        local releaseInfo = assert(loadfile("Core/BGNext/ReleaseInfo.lua"))("BGNext", localized)
+        test.eq(releaseInfo.changelog[1]:find(localized.L["备选"], 1, true) ~= nil, true,
+            "in-game release notes use the selected locale")
+        BG = previousBG
     end
     test.eq(zhCN.L["开始对账"], "开始对账", "Simplified Chinese clients use zhCN")
     test.eq(zhTW.L["开始对账"], "開始對賬", "Traditional Chinese clients use zhTW")
