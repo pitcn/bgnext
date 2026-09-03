@@ -428,14 +428,6 @@ end
 
 if BG.Init then
     BG.Init(function()
-        -- Memory-only guard so one trade cannot be booked twice if the client
-        -- repeats the completion message.
-        local booked = false
-
-        BG.RegisterEvent("TRADE_SHOW", function()
-            booked = false
-        end)
-
         -- At encounter start the player is confirmed inside the detected
         -- instance and BGLite has not yet replaced the table roster with the
         -- just-finished boss roster. This is the safe moment to distinguish a
@@ -450,22 +442,29 @@ if BG.Init then
         end)
 
         BG.RegisterEvent("UI_INFO_MESSAGE", function(_, _, _, text)
-            if text ~= ERR_TRADE_COMPLETE or booked then
+            if text ~= ERR_TRADE_COMPLETE then
                 return
             end
-            booked = true
-            local root = BG.BGNext.DB
-            local trade = BG.trade
-            if not root or type(trade) ~= "table" then
+            local root = BG.BGNext and BG.BGNext.DB
+            local capture = BG.BGNext and BG.BGNext.TradeCapture
+            if not root or not capture then
+                return
+            end
+            -- TradeCapture registered its completion handler first, so by the
+            -- time this handler runs the frozen snapshot is committed and
+            -- published. Reading committed() (never the mutable BG.trade) keeps
+            -- the settlement record identical to the bill and auction mark.
+            local snap = capture.committed()
+            if not snap then
                 return
             end
             M.recordTrade(root, liveContext(), {
                 completed = true,
-                target = trade.target,
-                targetmoney = trade.targetmoney,
-                playermoney = trade.playermoney,
-                targetitems = trade.targetitems,
-                playeritems = trade.playeritems,
+                target = snap.target,
+                targetmoney = snap.targetmoney,
+                playermoney = snap.playermoney,
+                targetitems = snap.targetitems,
+                playeritems = snap.playeritems,
             })
         end)
 
