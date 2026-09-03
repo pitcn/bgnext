@@ -1,0 +1,46 @@
+local Guard = dofile("Core/BGNext/AutoClearGuard.lua")
+
+return function(test)
+    -- needsConfirmation: ask only when enabled + new CD + old content
+    test.eq(Guard.needsConfirmation(true, true, true), true, "enabled + new CD + content asks")
+    test.eq(Guard.needsConfirmation(false, true, true), false, "disabled setting never asks")
+    test.eq(Guard.needsConfirmation(true, false, true), false, "not a new CD never asks")
+    test.eq(Guard.needsConfirmation(true, true, false), false, "empty table never asks")
+    test.eq(Guard.needsConfirmation(false, false, false), false, "all-false never asks")
+    test.eq(Guard.needsConfirmation(true, true, nil), false, "missing content is treated as empty")
+
+    -- createPending validates the table id
+    test.eq(Guard.createPending(nil, 1), nil, "nil table id yields nil")
+    test.eq(Guard.createPending("", 1), nil, "empty table id yields nil")
+    local p = Guard.createPending("ZUG", 1)
+    test.eq(p.fb, "ZUG", "captures the table id")
+    test.eq(p.clearType, 1, "captures the clear reason")
+    test.eq(p.state, Guard.STATE_PENDING, "starts pending")
+
+    -- accept with content clears exactly once
+    test.eq(Guard.accept(p, true), "clear", "accept with content clears")
+    test.eq(p.state, Guard.STATE_CLEARED, "state advances to cleared")
+    test.eq(Guard.accept(p, true), "skip", "a cleared request never clears again")
+
+    -- accept with an emptied table skips
+    local p2 = Guard.createPending("ZUG", 2)
+    test.eq(Guard.accept(p2, false), "skip", "emptied table skips")
+    test.eq(p2.state, Guard.STATE_SKIPPED, "state advances to skipped")
+    test.eq(Guard.accept(p2, true), "skip", "a skipped request never clears later")
+
+    -- refuse / cancel abandons without clearing
+    local p3 = Guard.createPending("ZUG", 1)
+    test.eq(Guard.refuse(p3), false, "refuse returns false (do not clear)")
+    test.eq(p3.state, Guard.STATE_CANCELLED, "state advances to cancelled")
+    test.eq(Guard.accept(p3, true), "skip", "a cancelled request never clears")
+
+    -- refuse after a clear does not regress the state
+    local p4 = Guard.createPending("ZUG", 1)
+    Guard.accept(p4, true)
+    test.eq(p4.state, Guard.STATE_CLEARED, "cleared state established")
+    test.eq(Guard.refuse(p4), false, "refuse after clear still returns false")
+    test.eq(p4.state, Guard.STATE_CLEARED, "refuse does not regress a cleared request")
+
+    -- accept on a nil request is a no-op
+    test.eq(Guard.accept(nil, true), "skip", "nil request never clears")
+end
