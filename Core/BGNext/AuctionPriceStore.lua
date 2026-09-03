@@ -277,6 +277,30 @@ function M.resolveLeaderPrice(root, clientFamily, raidId, itemId)
     return nil
 end
 
+-- Resolves a leader price together with its source, for the pending-auction
+-- queue's price display. Returns `{ price = number, source = "override"|"base" }`
+-- or nil when no scheme or price is available. Read-only: it never writes back.
+function M.resolveLeaderPriceDetail(root, clientFamily, raidId, itemId)
+    local raid = getRaid(root, clientFamily, raidId, false)
+    if not raid or type(raid.presets) ~= "table" then return nil end
+    local preset = raid.presets[raid.activePresetId]
+    if type(preset) ~= "table" then
+        for _, candidate in pairs(raid.presets) do
+            if type(candidate) == "table" and type(candidate.basePrice) == "number" then
+                preset = candidate
+                break
+            end
+        end
+        if not preset then return nil end
+    end
+    if type(preset.itemPrices) == "table" then
+        local value = preset.itemPrices[itemId]
+        if type(value) == "number" then return { price = value, source = "override" } end
+    end
+    if type(preset.basePrice) == "number" then return { price = preset.basePrice, source = "base" } end
+    return nil
+end
+
 local function personalRaid(root, clientFamily, realmId, player, raidId, create)
     if type(root) ~= "table" or not validKey(clientFamily) or not M.isValidRealmId(realmId)
         or not validKey(player) or not validKey(raidId) then

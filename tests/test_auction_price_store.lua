@@ -42,6 +42,17 @@ return function(test)
     test.eq(store.setBasePrice(root, "titan", "ULD", active, 500), true, "set base price")
     test.eq(store.resolveLeaderPrice(root, "titan", "ULD", 9999), 500, "new base price applies")
 
+    -- resolveLeaderPriceDetail exposes the price source for the pending-auction
+    -- queue: an item override is labelled "override", the fallback is "base".
+    test.eq(store.setLeaderItemPrice(root, "titan", "ULD", active, 1003, 800), true, "set item price for detail")
+    local detail = store.resolveLeaderPriceDetail(root, "titan", "ULD", 1003)
+    test.eq(detail.price, 800, "detail override price")
+    test.eq(detail.source, "override", "detail override source")
+    local baseDetail = store.resolveLeaderPriceDetail(root, "titan", "ULD", 9999)
+    test.eq(baseDetail.price, 500, "detail base price")
+    test.eq(baseDetail.source, "base", "detail base source")
+    test.eq(store.resolveLeaderPriceDetail(root, "titan", "NO_RAID", 1003), nil, "detail missing raid is nil")
+
     -- createPreset with validated name and price.
     local p2 = store.createPreset(root, "titan", "ULD", "英雄团", 1200)
     test.eq(type(p2), "string", "createPreset returns an id")
