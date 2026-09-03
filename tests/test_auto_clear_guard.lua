@@ -1,6 +1,19 @@
 local Guard = dofile("Core/BGNext/AutoClearGuard.lua")
 
 return function(test)
+    -- TOC-style load registration: a real WoW TOC load runs the file and
+    -- discards its return value, so the module must publish itself into the
+    -- runtime namespace exactly like every other BGNext runtime module.
+    do
+        local savedBG = BG
+        BG = { BGNext = {} }
+        local returned = dofile("Core/BGNext/AutoClearGuard.lua")
+        test.eq(type(returned), "table", "AutoClearGuard returns its module table")
+        test.eq(type(BG.BGNext.AutoClearGuard), "table", "TOC load registers the module into BG.BGNext")
+        test.eq(BG.BGNext.AutoClearGuard, returned, "the registered module is the returned table")
+        BG = savedBG
+    end
+
     -- needsConfirmation: ask only when enabled + new CD + old content
     test.eq(Guard.needsConfirmation(true, true, true), true, "enabled + new CD + content asks")
     test.eq(Guard.needsConfirmation(false, true, true), false, "disabled setting never asks")

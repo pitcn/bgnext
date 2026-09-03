@@ -253,29 +253,27 @@ function BG.ClearBiaoGeUI()
         -- memory-only; nothing is cleared on refuse, Esc or cancel.
         local function ShowAutoClearConfirm(FB, clearType, startB, endB, teamText, instanceID)
             local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
-            if Guard then
-                local pending = Guard.createPending(FB, clearType)
-                if not pending then return end
-                pending.startB = startB
-                pending.endB = endB
-                pending.teamText = teamText
-                pending.instanceID = instanceID
-                BG.AutoClearPending = pending
-                StaticPopup_Show("AUTO_QINGKONG_CONFIRM", BG.GetFBinfo(FB, "shortName"))
-            else
-                -- Guard not loaded: preserve the previous direct-clear behavior
-                -- rather than silently dropping the feature.
-                DoAutoClear(FB, clearType, startB, endB, teamText)
+            if not Guard then
+                -- Guard failed to load: fail closed. Never auto-clear without
+                -- the confirmation gate; warn and leave the table and settlement intact.
+                BG.SendSystemMessage(L["自动清空保护模块未加载，已跳过自动清空以避免误删；如需清空请手动操作。"])
+                return
             end
+            local pending = Guard.createPending(FB, clearType)
+            if not pending then return end
+            pending.startB = startB
+            pending.endB = endB
+            pending.teamText = teamText
+            pending.instanceID = instanceID
+            StaticPopup_Show("AUTO_QINGKONG_CONFIRM", BG.GetFBinfo(FB, "shortName"), nil, pending)
         end
 
         StaticPopupDialogs["AUTO_QINGKONG_CONFIRM"] = {
             text = L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"],
             button1 = L["清空表格"],
             button2 = L["取消"],
-            OnAccept = function()
-                local pending = BG.AutoClearPending
-                BG.AutoClearPending = nil
+            OnAccept = function(self, data)
+                local pending = data
                 if not pending then return end
                 local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
                 local hasContent = StillHasContent(pending)
@@ -284,9 +282,8 @@ function BG.ClearBiaoGeUI()
                     DoAutoClear(pending.fb, pending.clearType, pending.startB, pending.endB, pending.teamText)
                 end
             end,
-            OnCancel = function()
-                local pending = BG.AutoClearPending
-                BG.AutoClearPending = nil
+            OnCancel = function(self, data)
+                local pending = data
                 local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
                 if Guard and pending then
                     Guard.refuse(pending)

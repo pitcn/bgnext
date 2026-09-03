@@ -62,4 +62,8 @@ M.STATE_CLEARED = STATE_CLEARED
 M.STATE_SKIPPED = STATE_SKIPPED
 M.STATE_CANCELLED = STATE_CANCELLED
 
+-- Publish into the runtime namespace exactly like every other BGNext module:
+-- a WoW TOC load discards the return value, so the guard must be reachable at
+-- BG.BGNext.AutoClearGuard. The value is still returned for the test harness.
+BG.BGNext.AutoClearGuard = M
 return M
