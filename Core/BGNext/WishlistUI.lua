@@ -149,12 +149,12 @@ function M.isLooted(wishItemId, recordedItemIds)
 end
 
 -- Compact priority presentation: a thin low-saturation underline on the
--- slot's bottom edge (hidden for the default priority) while the tooltip
+-- slot's bottom edge (visible for all three priorities) while the tooltip
 -- carries the full BIS / 次BIS / 备选 name and explanation. The indicator
 -- reserves no width from the item name, and its band sits below the upstream
 -- dropped label (which is vertically centered and 15px high in a 20px slot)
 -- and clear of the right-edge level/binding overlays. Real-client rendering
--- is verified in game; the unit tests pin the applied anchors and bounds.
+-- still needs game validation; tests pin the applied anchors and bounds.
 local PRIORITY_MARK_HEIGHT = 2
 local PRIORITY_LINE_KEY = "心愿优先级：%s（%s）"
 local PRIORITY_LINE_PLAIN_KEY = "心愿优先级：%s"
@@ -234,11 +234,12 @@ if runtimeReady() then
     local maxb = ns.Maxb
     local L = ns.L or setmetatable({}, { __index = function(_, key) return key end })
 
-    -- Small low-saturation colors; the default priority draws nothing so it
-    -- never competes with the item name for attention.
+    -- Three distinct tiers without changing the item's own quality color:
+    -- backup (slate blue) < normal/second BiS (lavender) < core/BiS (gold).
     local priorityMarkColors = {
         core = { 1, 0.82, 0.35 },
-        backup = { 0.55, 0.68, 0.78 },
+        normal = { 0.76, 0.62, 0.94 },
+        backup = { 0.48, 0.60, 0.70 },
     }
 
     local function context(raidId)
@@ -335,7 +336,7 @@ if runtimeReady() then
 
     local function updateSlotPriorityMark(slot)
         local priority = slot.itemId and slotPriority(slot) or nil
-        if priority and priority ~= "normal" then
+        if priority then
             local color = priorityMarkColors[priority]
             slot.priorityMark:SetColorTexture(color[1], color[2], color[3])
             slot.priorityMark:Show()

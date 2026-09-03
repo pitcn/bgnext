@@ -206,11 +206,14 @@ return function(test)
         grid:Refresh()
         test.eq(isHaveCalls > 0, true, "owned indicator still runs on refresh")
 
-        -- 4. the default priority shows no mark
+        -- 4. every occupied priority tier has a visible, distinct color
         wish.setSlot(BG.BGNext.DB, "realm", "A", "ICC", limits, 1, 1, 1, 7001)
         grid:Refresh()
         test.eq(slot.itemId, 7001, "refresh populates the slot item")
-        test.eq(mark.shown, false, "default priority shows no mark")
+        test.eq(mark.shown, true, "second BiS has a visible mark too")
+        test.eq(mark.color[3] > mark.color[1] and mark.color[1] > mark.color[2], true,
+            "second BiS uses lavender")
+        local normalColor = table.concat(mark.color, ",")
 
         -- 5. core shows the mark; the wheel keeps switching and updates it
         --    (cycle order: backup -> normal -> core)
@@ -221,11 +224,14 @@ return function(test)
         slot.scripts["OnMouseWheel"](slot, -1)
         test.eq(wish.getSlotPriority(BG.BGNext.DB, "realm", "A", "ICC", 1, 1, 1), "normal",
             "wheel down moves core back to the default")
-        test.eq(mark.shown, false, "default priority hides the mark again")
+        test.eq(mark.shown, true, "second BiS stays visible after wheel change")
+        test.eq(table.concat(mark.color, ","), normalColor, "wheel restores second BiS color")
         slot.scripts["OnMouseWheel"](slot, -1)
         test.eq(wish.getSlotPriority(BG.BGNext.DB, "realm", "A", "ICC", 1, 1, 1), "backup",
             "wheel down reaches backup")
         test.eq(mark.color[3] > mark.color[1], true, "backup mark switches to the cool color")
+        test.eq(mark.shown, true, "backup also shows its mark")
+        test.eq(table.concat(mark.color, ",") ~= normalColor, true, "backup and second BiS are distinct")
         slot.scripts["OnMouseWheel"](slot, 1)
         test.eq(wish.getSlotPriority(BG.BGNext.DB, "realm", "A", "ICC", 1, 1, 1), "normal",
             "wheel up steps backup up to normal")
@@ -248,6 +254,9 @@ return function(test)
         slot.scripts["OnMouseWheel"](slot, -1)
         test.eq(tooltipLines[2], "心愿优先级：次BIS（普通需求）", "visible tooltip re-renders after a wheel change")
         tooltipOwned = false
+        wish.clearSlot(BG.BGNext.DB, "realm", "A", "ICC", 1, 1, 1)
+        grid:Refresh()
+        test.eq(mark.shown, false, "empty slot has no priority color")
     end)
 
     restoreGlobals()
