@@ -121,8 +121,9 @@ return function(test)
     test.eq(retailCells.DR.state, "complete", "a labelled retail raid is still complete")
     test.eq(retailCells.DR.difficultyLabel, "M", "the raid cell carries its difficulty letter")
 
-    -- A retail raid cell also carries its per-difficulty and per-boss breakdown
-    -- so the hover surface can list them.
+    -- A retail raid cell carries its per-difficulty breakdown so the hover
+    -- surface can list every difficulty; the representative difficulty still
+    -- drives the cell body.
     local breakdownView = View.project(input({
         family = "retail",
         catalog = Catalog.forFamily("retail"),
@@ -134,10 +135,6 @@ return function(test)
                         { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6, resetsAt = 9000 },
                         { difficulty = 16, difficultyLabel = "M", completedParts = 6, totalParts = 6, resetsAt = 9000 },
                     },
-                    encounters = {
-                        { id = 1001, name = "首王", done = true },
-                        { id = 1002, name = "次王", done = false },
-                    },
                 },
             },
         }) },
@@ -147,8 +144,58 @@ return function(test)
     for _, cell in ipairs(breakdownView.raid.rows[1].cells) do breakdownCells[cell.columnId] = cell end
     test.eq(type(breakdownCells.DR.difficulties), "table", "the raid cell surfaces its difficulties")
     test.eq(#breakdownCells.DR.difficulties, 2, "both difficulties reach the cell")
-    test.eq(type(breakdownCells.DR.encounters), "table", "the raid cell surfaces its encounters")
-    test.eq(#breakdownCells.DR.encounters, 2, "both bosses reach the cell")
+    test.eq(breakdownCells.DR.difficultyLabel, "M", "the representative difficulty still drives the cell")
+    test.eq(breakdownCells.DR.encounters, nil, "no per-boss list is fabricated from a kill count")
+
+    -- Per-difficulty independent expiry: an expired difficulty is dropped at
+    -- projection time while a still-active one keeps rendering, so one reset
+    -- never hides another difficulty's live progress.
+    local independentExpiry = View.project(input({
+        family = "retail",
+        catalog = Catalog.forFamily("retail"),
+        snapshots = { snapshot({
+            raidStates = {
+                DR = {
+                    difficultyLabel = "M", resetsAt = 9000,
+                    difficulties = {
+                        { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6, resetsAt = 500 },
+                        { difficulty = 16, difficultyLabel = "M", completedParts = 3, totalParts = 6, resetsAt = 9000 },
+                    },
+                },
+            },
+        }) },
+        visibility = { raid = { DR = true } },
+    }))
+    local expiryCells = {}
+    for _, cell in ipairs(independentExpiry.raid.rows[1].cells) do expiryCells[cell.columnId] = cell end
+    test.eq(#expiryCells.DR.difficulties, 1, "the expired difficulty is dropped at projection")
+    test.eq(expiryCells.DR.difficulties[1].difficultyLabel, "M", "only the active difficulty survives")
+    test.eq(expiryCells.DR.difficultyLabel, "M", "the cell body follows the active difficulty")
+    test.eq(expiryCells.DR.text, "3/6", "the active difficulty's progress drives the cell body")
+    test.eq(expiryCells.DR.resetsAt, 9000, "the cell countdown follows the active difficulty")
+
+    -- An expired cell keeps no hover detail: body and every difficulty line are
+    -- gone past reset, so previous-week progress is never exposed.
+    local expiredBreakdown = View.project(input({
+        family = "retail",
+        catalog = Catalog.forFamily("retail"),
+        snapshots = { snapshot({
+            raidStates = {
+                DR = {
+                    completed = true, resetsAt = 500, difficultyLabel = "M",
+                    difficulties = {
+                        { difficulty = 16, difficultyLabel = "M", completedParts = 6, totalParts = 6, resetsAt = 500 },
+                    },
+                },
+            },
+        }) },
+        visibility = { raid = { DR = true } },
+    }))
+    local expiredCells = {}
+    for _, cell in ipairs(expiredBreakdown.raid.rows[1].cells) do expiredCells[cell.columnId] = cell end
+    test.eq(expiredCells.DR.state, "empty", "an expired raid renders blank")
+    test.eq(expiredCells.DR.text, "", "an expired raid has no text")
+    test.eq(expiredCells.DR.difficulties, nil, "an expired raid exposes no difficulty detail")
 
     -- Real reset countdown, surfaced as a section-level hint.
     test.eq(View.formatCountdown(1000, 1000 + 2 * 86400 + 3 * 3600), "2天3小时", "countdown spans days and hours")

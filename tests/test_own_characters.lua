@@ -223,8 +223,9 @@ return function(test)
     test.eq(M.get(cdRoot, "vanilla", 123, "Piti").professionCooldowns.transmute.ready, true,
         "profession cooldown records are deep-copied")
 
-    -- Retail raid states keep their per-difficulty and per-boss breakdowns
-    -- through the nested whitelist, deep-copied and stripped of junk.
+    -- Retail raid states keep their per-difficulty breakdown through the nested
+    -- whitelist, deep-copied and stripped of junk. No per-boss `encounters` list
+    -- is stored: boss completion is never reconstructed from a kill count.
     local retailRoot = {}
     local retailSaved = M.upsert(retailRoot, "retail", {
         realmId = 123, realmName = "时光II", player = "Piti",
@@ -236,27 +237,23 @@ return function(test)
                     { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6, resetsAt = 9000, junk = "x" },
                     { difficulty = 15, difficultyLabel = "H", completedParts = 3, totalParts = 6, resetsAt = 9000 },
                     { difficulty = 16, difficultyLabel = "M", completedParts = 6, totalParts = 6, resetsAt = 9000 },
+                    { difficulty = 17, difficultyLabel = "LFR", completedParts = 4, totalParts = 4, resetsAt = 9000 },
                 },
                 encounters = {
-                    { id = 1001, name = "首王", done = true, note = "drop me" },
+                    { id = 1001, name = "首王", done = true },
                     { id = 1002, name = "次王", done = false },
-                    { id = 1003, name = "末王", done = "yes" },
                 },
             },
         },
     })
     local drSaved = retailSaved.raidStates.DR
     test.eq(type(drSaved.difficulties), "table", "retail difficulties array is stored")
-    test.eq(#drSaved.difficulties, 3, "every difficulty is stored")
+    test.eq(#drSaved.difficulties, 4, "every difficulty is stored, including LFR")
     test.eq(drSaved.difficulties[1].difficultyLabel, "N", "difficulty label survives")
     test.eq(drSaved.difficulties[1].completedParts, 6, "difficulty count survives")
     test.eq(drSaved.difficulties[1].junk, nil, "junk difficulty fields are dropped")
-    test.eq(type(drSaved.encounters), "table", "retail encounters array is stored")
-    test.eq(#drSaved.encounters, 3, "every boss is stored")
-    test.eq(drSaved.encounters[1].done, true, "a done boss flag survives")
-    test.eq(drSaved.encounters[1].name, "首王", "a boss name survives")
-    test.eq(drSaved.encounters[1].note, nil, "junk encounter fields are dropped")
-    test.eq(drSaved.encounters[3].done, nil, "a non-boolean done flag is dropped")
+    test.eq(drSaved.difficulties[4].difficultyLabel, "LFR", "the LFR difficulty survives")
+    test.eq(drSaved.encounters, nil, "no per-boss encounter list is persisted")
 
     -- The nested arrays are deep-copied so callers cannot mutate stored state.
     local mutableDifficulties = { { difficulty = 16, difficultyLabel = "M", completedParts = 6, totalParts = 6, resetsAt = 9000 } }

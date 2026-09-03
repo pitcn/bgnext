@@ -234,40 +234,46 @@ return function(test)
     test.eq(UI.showCurrencyTooltip({ SetText = function() end }, { value = 5 }, function() return nil end),
         false, "a cell without an id cannot populate a tooltip")
 
-    -- A raid cell with a per-boss breakdown builds a per-boss tooltip; a cell
-    -- with only per-difficulty counts falls back to per-difficulty lines.
-    local raidBossCell = {
-        encounters = {
-            { id = 1001, name = "首王", done = true },
-            { id = 1002, name = "次王", done = false },
-        },
-    }
-    local raidTip = UI.raidTooltip(raidBossCell)
-    test.eq(#raidTip.lines, 2, "a per-boss tooltip lists each boss")
-    test.eq(raidTip.lines[1], "已完成  首王", "a done boss is marked complete")
-    test.eq(raidTip.lines[2], "未完成  次王", "a not-done boss is marked incomplete")
-
+    -- A raid cell with a per-difficulty breakdown builds a per-difficulty
+    -- tooltip that names every difficulty. There is no per-boss list: boss
+    -- completion is never reconstructed from a kill count.
     local raidDifficultyCell = {
         difficulties = {
             { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6 },
             { difficulty = 15, difficultyLabel = "H", completedParts = 3, totalParts = 6 },
+            { difficulty = 17, difficultyLabel = "LFR", completedParts = 4, totalParts = 4 },
         },
     }
     local raidDiffTip = UI.raidTooltip(raidDifficultyCell)
-    test.eq(#raidDiffTip.lines, 2, "a per-difficulty tooltip lists each difficulty")
+    test.eq(#raidDiffTip.lines, 3, "a per-difficulty tooltip lists each difficulty")
     test.eq(raidDiffTip.lines[1], "N 6/6", "the normal difficulty count is listed")
     test.eq(raidDiffTip.lines[2], "H 3/6", "the heroic partial count is listed")
+    test.eq(raidDiffTip.lines[3], "LFR 4/4", "the raid finder count is named")
 
+    test.eq(UI.raidTooltip({ encounters = { { id = 1, done = true } } }), nil,
+        "a per-boss list is never rendered, so a stale encounters table yields nothing")
     test.eq(UI.raidTooltip({}), nil, "a cell without a breakdown has no raid tooltip")
+
+    -- A malformed difficulty line without a usable count is skipped, never a
+    -- fabricated 0/N.
+    local malformedDifficultyCell = {
+        difficulties = {
+            { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6 },
+            { difficulty = 16, difficultyLabel = "M" },
+        },
+    }
+    local malformedDiffTip = UI.raidTooltip(malformedDifficultyCell)
+    test.eq(#malformedDiffTip.lines, 1, "a malformed difficulty line is skipped")
+    test.eq(malformedDiffTip.lines[1], "N 6/6", "the valid difficulty still renders")
 
     local raidTooltipTitle, raidTooltipLines = nil, {}
     local fakeRaidTooltip = {
         SetText = function(_, value) raidTooltipTitle = value end,
         AddLine = function(_, value) raidTooltipLines[#raidTooltipLines + 1] = value end,
     }
-    test.eq(UI.showRaidTooltip(fakeRaidTooltip, raidBossCell), true,
+    test.eq(UI.showRaidTooltip(fakeRaidTooltip, raidDifficultyCell), true,
         "a raid cell can populate the Blizzard tooltip")
-    test.eq(#raidTooltipLines, 2, "both boss lines reach the tooltip")
+    test.eq(#raidTooltipLines, 3, "every difficulty line reaches the tooltip")
     test.eq(UI.showRaidTooltip({ SetText = function() end }, {}), false,
         "a cell without a breakdown cannot populate a tooltip")
 

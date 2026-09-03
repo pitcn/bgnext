@@ -42,7 +42,7 @@ local RAID_STATE_FIELDS = {
     completed = "boolean", progress = "number", total = "number",
     completedParts = "number", totalParts = "number",
     difficulty = "number", difficultyLabel = "string", resetsAt = "number",
-    difficulties = "table", encounters = "table",
+    difficulties = "table",
 }
 
 -- A retail lockout's per-difficulty breakdown. Every difficulty keeps only its
@@ -50,12 +50,6 @@ local RAID_STATE_FIELDS = {
 local DIFFICULTY_STATE_FIELDS = {
     difficulty = "number", difficultyLabel = "string",
     completedParts = "number", totalParts = "number", resetsAt = "number",
-}
-
--- A retail lockout's per-boss list: a stable encounter id, an optional
--- localized name and a best-effort done flag. Nothing else is retained.
-local ENCOUNTER_FIELDS = {
-    id = "number", name = "string", done = "boolean",
 }
 
 local PROFESSION_FIELDS = {
@@ -165,9 +159,10 @@ local function copyCurrencyMap(source)
     return copy
 end
 
--- Raid states get a nested whitelist: the flat fields plus sanitized
--- `difficulties` and `encounters` arrays. This replaces copyRecordMap so the
--- arrays are copied deeply rather than carried by reference.
+-- Raid states get a nested whitelist: the flat fields plus a sanitized
+-- `difficulties` array. This replaces copyRecordMap so the array is copied
+-- deeply rather than carried by reference. No per-boss `encounters` array is
+-- accepted: per-boss completion is never reconstructed from a kill count.
 local function sanitizeRaidStates(source)
     if type(source) ~= "table" then return {} end
     local copy = {}
@@ -176,7 +171,6 @@ local function sanitizeRaidStates(source)
             local entry = copyRecord(record, RAID_STATE_FIELDS)
             if entry and next(entry) ~= nil then
                 entry.difficulties = copyArray(record.difficulties, DIFFICULTY_STATE_FIELDS)
-                entry.encounters = copyArray(record.encounters, ENCOUNTER_FIELDS)
                 copy[key] = entry
             end
         end
@@ -317,7 +311,9 @@ function M.list(root, clientFamily)
 end
 
 -- Weekly state is valid only until its official reset. Expired entries are
--- deleted outright; they are never demoted into a previous-week record.
+-- deleted outright; they are never demoted into a previous-week record. A retail
+-- state expires per difficulty: only the reset difficulties are pruned, and the
+-- whole state is dropped once none of its difficulties remains.
 function M.expireRaidStates(root, now)
     if type(now) ~= "number" then return end
     local store = type(root) == "table" and root.ownCharacters or nil
@@ -330,9 +326,32 @@ function M.expireRaidStates(root, now)
                         local states = type(snapshot) == "table" and snapshot.raidStates or nil
                         if type(states) == "table" then
                             for id, state in pairs(states) do
-                                local resetsAt = type(state) == "table" and state.resetsAt or nil
-                                if type(resetsAt) == "number" and now >= resetsAt then
+                                if type(state) ~= "table" then
                                     states[id] = nil
+                                elseif type(state.difficulties) == "table" then
+                                    local kept = {}
+                                    local resetsAt
+                                    for _, entry in ipairs(state.difficulties) do
+                                        local entryReset = type(entry) == "table"
+                                            and type(entry.resetsAt) == "number" and entry.resetsAt or nil
+                                        if entryReset == nil or now < entryReset then
+                                            kept[#kept + 1] = entry
+                                            if entryReset and (resetsAt == nil or entryReset < resetsAt) then
+                                                resetsAt = entryReset
+                                            end
+                                        end
+                                    end
+                                    if #kept == 0 then
+                                        states[id] = nil
+                                    else
+                                        state.difficulties = kept
+                                        if resetsAt then state.resetsAt = resetsAt end
+                                    end
+                                else
+                                    local resetsAt = type(state.resetsAt) == "number" and state.resetsAt or nil
+                                    if resetsAt and now >= resetsAt then
+                                        states[id] = nil
+                                    end
                                 end
                             end
                         end

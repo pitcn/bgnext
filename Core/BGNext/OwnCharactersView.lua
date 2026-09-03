@@ -176,24 +176,101 @@ local function measureColumns(columns, rows, totals)
     end
 end
 
+-- Retail difficulties order LFR < N < H < M; used to pick the representative
+-- difficulty when several lockouts coexist and to keep the adapter and the
+-- projection in agreement.
+local function difficultyRank(label)
+    if label == "M" then return 4 end
+    if label == "H" then return 3 end
+    if label == "N" then return 2 end
+    if label == "LFR" then return 1 end
+    return 0
+end
+
+-- The difficulty that drives the cell body: the highest carrying any progress,
+-- otherwise the highest difficulty, so a fresh lockout still renders.
+local function representativeDifficulty(difficulties)
+    local best
+    for _, entry in ipairs(difficulties or {}) do
+        if not best then
+            best = entry
+        else
+            local entryProgress = type(entry.completedParts) == "number" and entry.completedParts > 0
+            local bestProgress = type(best.completedParts) == "number" and best.completedParts > 0
+            if entryProgress and not bestProgress then
+                best = entry
+            elseif entryProgress == bestProgress
+                and difficultyRank(entry.difficultyLabel) > difficultyRank(best.difficultyLabel) then
+                best = entry
+            end
+        end
+    end
+    return best
+end
+
 -- A weekly raid state is meaningful only until its official reset. Past that
--- it renders blank; it is never demoted into a previous-week record.
+-- it renders blank; it is never demoted into a previous-week record. Each
+-- retail difficulty carries its own reset, so an expired difficulty is dropped
+-- while the still-active ones keep rendering.
+local function activeDifficulties(state, now)
+    local source = type(state.difficulties) == "table" and state.difficulties or nil
+    if not source or #source == 0 then return nil end
+    local active = {}
+    for _, entry in ipairs(source) do
+        local resetsAt = type(entry.resetsAt) == "number" and entry.resetsAt or nil
+        if resetsAt == nil or type(now) ~= "number" or now < resetsAt then
+            active[#active + 1] = entry
+        end
+    end
+    if #active == 0 then return nil end
+    return active
+end
+
 local function raidCell(column, snapshot, now)
     local cell = { columnId = column.id, state = "empty", text = "" }
     local states = type(snapshot.raidStates) == "table" and snapshot.raidStates or nil
     local state = states and states[column.id] or nil
     if type(state) ~= "table" then return cell end
-    if type(state.resetsAt) == "number" then cell.resetsAt = state.resetsAt end
-    if type(state.difficultyLabel) == "string" then cell.difficultyLabel = state.difficultyLabel end
-    if type(state.difficulties) == "table" and #state.difficulties > 0 then
-        cell.difficulties = state.difficulties
+
+    -- Retail carries a per-difficulty breakdown; the cell body and every hover
+    -- line are derived only from the difficulties that have not yet reset.
+    if type(state.difficulties) == "table" then
+        local difficulties = activeDifficulties(state, now)
+        if not difficulties then return cell end
+        local representative = representativeDifficulty(difficulties)
+        if type(representative.difficultyLabel) == "string" then
+            cell.difficultyLabel = representative.difficultyLabel
+        end
+        cell.difficulties = difficulties
+        local resetsAt
+        for _, entry in ipairs(difficulties) do
+            if type(entry.resetsAt) == "number" and (resetsAt == nil or entry.resetsAt < resetsAt) then
+                resetsAt = entry.resetsAt
+            end
+        end
+        if resetsAt then cell.resetsAt = resetsAt end
+
+        local totalParts = type(representative.totalParts) == "number" and representative.totalParts or 0
+        local completedParts = type(representative.completedParts) == "number" and representative.completedParts or 0
+        if totalParts > 1 and completedParts < totalParts then
+            cell.state = "progress"
+            cell.progress = completedParts
+            cell.total = totalParts
+            cell.text = string.format("%d/%d", completedParts, totalParts)
+        elseif totalParts > 0 and completedParts >= totalParts then
+            cell.state = "complete"
+            cell.text = ""
+        end
+        return cell
     end
-    if type(state.encounters) == "table" and #state.encounters > 0 then
-        cell.encounters = state.encounters
-    end
+
+    -- Classic and flat-only states: the expiry check runs before any detail is
+    -- copied so a reset cell never exposes its previous-week data.
     if type(state.resetsAt) == "number" and type(now) == "number" and now >= state.resetsAt then
         return cell
     end
+    if type(state.resetsAt) == "number" then cell.resetsAt = state.resetsAt end
+    if type(state.difficultyLabel) == "string" then cell.difficultyLabel = state.difficultyLabel end
     if type(state.totalParts) == "number" and state.totalParts > 1
         and type(state.completedParts) == "number" and state.completedParts < state.totalParts then
         cell.state = "progress"

@@ -222,28 +222,23 @@ function M.showCurrencyTooltip(tooltip, cell, currencyInfo)
     return true
 end
 
--- Builds the localized tooltip lines for a raid cell that carries per-boss or
--- per-difficulty detail. Only the real Blizzard-reported counts and journal
--- names are shown; a cell without a breakdown surfaces nothing.
+-- Builds the localized tooltip lines for a raid cell that carries per-difficulty
+-- detail. Each line names its difficulty and shows only the real Blizzard count
+-- pair; a difficulty without a usable count is skipped rather than rendered as a
+-- fabricated 0/N. A cell without a breakdown surfaces nothing.
 function M.raidTooltip(cell)
     if type(cell) ~= "table" then return nil end
-    local lines = {}
-    local encounters = type(cell.encounters) == "table" and cell.encounters or nil
     local difficulties = type(cell.difficulties) == "table" and cell.difficulties or nil
-    if encounters and #encounters > 0 then
-        for _, encounter in ipairs(encounters) do
-            local name = (type(encounter.name) == "string" and encounter.name ~= "") and encounter.name
-                or tostring(encounter.id or "")
-            local marker = encounter.done and L["已完成"] or L["未完成"]
-            lines[#lines + 1] = marker .. "  " .. name
-        end
-    elseif difficulties and #difficulties > 0 then
+    local lines = {}
+    if difficulties then
         for _, difficulty in ipairs(difficulties) do
-            local label = (type(difficulty.difficultyLabel) == "string" and difficulty.difficultyLabel ~= "")
-                and difficulty.difficultyLabel or tostring(difficulty.difficulty or "")
-            local parts = type(difficulty.completedParts) == "number" and difficulty.completedParts or 0
-            local total = type(difficulty.totalParts) == "number" and difficulty.totalParts or 0
-            lines[#lines + 1] = label .. " " .. parts .. "/" .. total
+            local parts = type(difficulty.completedParts) == "number" and difficulty.completedParts or nil
+            local total = type(difficulty.totalParts) == "number" and difficulty.totalParts or nil
+            if parts ~= nil and total ~= nil then
+                local label = (type(difficulty.difficultyLabel) == "string" and difficulty.difficultyLabel ~= "")
+                    and difficulty.difficultyLabel or tostring(difficulty.difficulty or "")
+                lines[#lines + 1] = label .. " " .. tostring(parts) .. "/" .. tostring(total)
+            end
         end
     end
     if #lines == 0 then return nil end
@@ -748,7 +743,7 @@ function M.Draw(layout)
                             label:SetTextColor(M.colors.complete.r, M.colors.complete.g, M.colors.complete.b)
                             label:SetText(cell.difficultyLabel)
                         end
-                        if cell.difficulties or cell.encounters then
+                        if cell.difficulties then
                             local valueButton = nextValueButton()
                             valueButton:SetPoint("CENTER", frame, "TOPLEFT",
                                 M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
@@ -809,7 +804,7 @@ function M.Draw(layout)
                         -- A currency value with a confirmed id gets a hover
                         -- surface so its caps can surface as a tooltip without
                         -- crowding the cell body.
-                        if type(cell.currencyId) == "number" or cell.difficulties or cell.encounters then
+                        if type(cell.currencyId) == "number" or cell.difficulties then
                             local valueButton = nextValueButton()
                             valueButton:SetPoint("CENTER", frame, "TOPLEFT",
                                 M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
