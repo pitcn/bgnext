@@ -148,14 +148,10 @@ function M.isLooted(wishItemId, recordedItemIds)
     return false
 end
 
--- Compact priority presentation: a thin low-saturation underline on the
--- slot's bottom edge (visible for all three priorities) while the tooltip
--- carries the full BIS / 次BIS / 备选 name and explanation. The indicator
--- reserves no width from the item name, and its band sits below the upstream
--- dropped label (which is vertically centered and 15px high in a 20px slot)
--- and clear of the right-edge level/binding overlays. Real-client rendering
--- still needs game validation; tests pin the applied anchors and bounds.
-local PRIORITY_MARK_HEIGHT = 2
+-- A dedicated second line preserves the item name, icon and level bounds.
+-- Rows reserve badge space even when empty, so changing priority never reflows.
+local PRIORITY_MARK_HEIGHT = 14
+local SLOT_ROW_PITCH = 36
 local PRIORITY_LINE_KEY = "心愿优先级：%s（%s）"
 local PRIORITY_LINE_PLAIN_KEY = "心愿优先级：%s"
 local WHEEL_HINT_KEY = "滚轮切换心愿优先级"
@@ -202,7 +198,7 @@ function M.difficultyAnchor(difficultyIndex, difficultyCount)
         return {
             point = "TOPRIGHT",
             relative = { index = difficultyIndex - 1, anchor = "bottomFirst" },
-            relativePoint = "TOPLEFT", x = -20, y = -30,
+            relativePoint = "TOPLEFT", x = -20, y = -46,
         }
     end
     if difficultyIndex == 3 then
@@ -210,16 +206,22 @@ function M.difficultyAnchor(difficultyIndex, difficultyCount)
             return {
                 point = "TOPRIGHT",
                 relative = { index = difficultyIndex - 1, anchor = "bottomFirst" },
-                relativePoint = "TOPLEFT", x = -20, y = -30,
+                relativePoint = "TOPLEFT", x = -20, y = -46,
             }
         end
         return {
             point = "TOPLEFT",
-            relative = { index = difficultyIndex - 1, anchor = "headerLast" },
+            relative = { index = 1, anchor = "headerLast" },
             relativePoint = "TOPRIGHT", x = 20, y = 0,
         }
     end
     return nil
+end
+
+function M.gridContentHeight(difficultyCount, bossCount)
+    local rows = difficultyCount == 4 and 2 or difficultyCount
+    return (rows - 1) * (bossCount * SLOT_ROW_PITCH + 31)
+        + bossCount * SLOT_ROW_PITCH + 24
 end
 
 local function runtimeReady()
@@ -338,7 +340,11 @@ if runtimeReady() then
         local priority = slot.itemId and slotPriority(slot) or nil
         if priority then
             local color = priorityMarkColors[priority]
-            slot.priorityMark:SetColorTexture(color[1], color[2], color[3])
+            local mark = slot.priorityMark
+            mark.label:SetText(L[wishlist.priorityTagKey(priority)])
+            mark.label:SetTextColor(color[1], color[2], color[3])
+            mark.background:SetColorTexture(color[1], color[2], color[3], 0.18)
+            mark:SetWidth(math.max(36, mark.label:GetStringWidth() + 12))
             slot.priorityMark:Show()
         else
             slot.priorityMark:Hide()
@@ -427,21 +433,25 @@ if runtimeReady() then
         local slot = CreateFrame("EditBox", nil, parent, BG.editTemplate)
         slot:SetSize(115, 20)
         slot:SetFrameLevel(110)
-        slot:SetPoint("TOPLEFT", anchor, slotIndex == 1 and "BOTTOMLEFT" or "TOPLEFT", xOffset or 0, slotIndex == 1 and -1 or 0)
+        local rowGap = bossIndex == 1 and 1 or SLOT_ROW_PITCH - 20
+        slot:SetPoint("TOPLEFT", anchor, slotIndex == 1 and "BOTTOMLEFT" or "TOPLEFT", xOffset or 0, slotIndex == 1 and -rowGap or 0)
         slot:SetAutoFocus(false)
         if BG.SetEditStickyFocus then BG.SetEditStickyFocus(slot) end
         slot.FB, slot.hopenandu, slot.bossnum, slot.i = raidId, difficultyIndex, bossIndex, slotIndex
         slot.icon = slot:CreateTexture(nil, "ARTWORK")
         slot.icon:SetPoint("LEFT", -22, 0)
         slot.icon:SetSize(16, 16)
-        -- Compact priority indicator: a 2px underline on the bottom edge. It
-        -- keeps the full item-name width and stays below the vertically
-        -- centered dropped label and clear of the right-edge overlays.
-        slot.priorityMark = slot:CreateTexture(nil, "OVERLAY")
-        slot.priorityMark:SetPoint("BOTTOMLEFT", slot, "BOTTOMLEFT", 0, 0)
-        slot.priorityMark:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", 0, 0)
-        slot.priorityMark:SetHeight(PRIORITY_MARK_HEIGHT)
-        slot.priorityMark:Hide()
+        local mark = CreateFrame("Frame", nil, slot)
+        mark:SetPoint("TOPLEFT", slot, "BOTTOMLEFT", 0, -1)
+        mark:SetSize(36, PRIORITY_MARK_HEIGHT)
+        mark:EnableMouse(false)
+        mark.background = mark:CreateTexture(nil, "BACKGROUND")
+        mark.background:SetAllPoints(mark)
+        mark.label = mark:CreateFontString(nil, "OVERLAY")
+        mark.label:SetFont(BIAOGE_TEXT_FONT, 11, "OUTLINE")
+        mark.label:SetPoint("CENTER", mark, "CENTER", 0, 0)
+        mark:Hide()
+        slot.priorityMark = mark
         if BG.LootedText then BG.LootedText(slot) end
 
         slot.hover = slot:CreateTexture(nil, "BACKGROUND")
@@ -556,20 +566,34 @@ if runtimeReady() then
         local frame = CreateFrame("Frame", nil, parent)
         frame:SetAllPoints(parent)
         frame:Hide()
+        -- Extra badge rows can exceed the viewport on multi-difficulty raids.
+        -- Use the existing native scrollbar; no recurring work is added.
+        local scroll = CreateFrame("ScrollFrame", nil, frame, BG.scrollTemplate)
+        scroll:SetPoint("TOPLEFT", BG.MainFrame, "TOPLEFT", 0, -60)
+        scroll:SetPoint("BOTTOMRIGHT", BG.MainFrame, "BOTTOMRIGHT", -28, 65)
+        local content = CreateFrame("Frame", nil, scroll)
+        content:SetSize(math.max(1, BG.MainFrame:GetWidth() - 28),
+            M.gridContentHeight(hopeMaxn[raidId], hopeMaxb[raidId]))
+        scroll:SetScrollChild(content)
+        scroll:HookScript("OnSizeChanged", function(self, width)
+            content:SetWidth(math.max(1, width))
+        end)
+        frame.scroll, frame.content = scroll, content
         BG.HopeFrame[raidId] = {}
         local bottomFirstByDifficulty, headerLastByDifficulty = {}, {}
 
         for difficultyIndex = 1, hopeMaxn[raidId] do
-            local difficulty = frame:CreateFontString(nil, "OVERLAY")
+            local difficulty = content:CreateFontString(nil, "OVERLAY")
             local anchor = M.difficultyAnchor(difficultyIndex, hopeMaxn[raidId])
-            local relative = BG.MainFrame
+            local relative = content
             if anchor and type(anchor.relative) == "table" then
                 relative = anchor.relative.anchor == "bottomFirst"
                     and bottomFirstByDifficulty[anchor.relative.index]
                     or headerLastByDifficulty[anchor.relative.index]
             end
             if anchor and relative then
-                difficulty:SetPoint(anchor.point, relative, anchor.relativePoint, anchor.x, anchor.y)
+                difficulty:SetPoint(anchor.point, relative, anchor.relativePoint, anchor.x,
+                    anchor.relative == "main" and 0 or anchor.y)
             end
             difficulty:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
             difficulty:SetTextColor(1, 0.82, 0)
@@ -579,7 +603,7 @@ if runtimeReady() then
 
             local headers, priorHeader = {}, difficulty
             for slotIndex = 1, hopeMaxi do
-                local header = frame:CreateFontString(nil, "OVERLAY")
+                local header = content:CreateFontString(nil, "OVERLAY")
                 header:SetPoint("TOPLEFT", priorHeader, "TOPRIGHT", slotIndex == 1 and 20 or 26, 0)
                 header:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
                 header:SetTextColor(1, 0.82, 0)
@@ -599,11 +623,11 @@ if runtimeReady() then
                 for slotIndex = 1, hopeMaxi do
                     local anchor = slotIndex == 1 and rowAnchor or boss["zhuangbei1"]
                     local xOffset = slotIndex == 1 and 0 or (115 + 26) * (slotIndex - 1)
-                    local slot = createSlot(frame, raidId, difficultyIndex, bossIndex, slotIndex, anchor, xOffset)
+                    local slot = createSlot(content, raidId, difficultyIndex, bossIndex, slotIndex, anchor, xOffset)
                     boss["zhuangbei" .. slotIndex] = slot
                 end
                 priorFirstSlot = boss.zhuangbei1
-                local bossLabel = frame:CreateFontString(nil, "OVERLAY")
+                local bossLabel = content:CreateFontString(nil, "OVERLAY")
                 bossLabel:SetPoint("TOPRIGHT", boss.zhuangbei1, "TOPLEFT", -26, -3)
                 bossLabel:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
                 local bossInfo = BG.Boss[raidId] and BG.Boss[raidId]["boss" .. bossIndex]
