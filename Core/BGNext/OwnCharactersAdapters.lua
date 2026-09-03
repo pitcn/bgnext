@@ -556,19 +556,35 @@ function M.readRaidStates(api, raidColumns, family)
                     end
                     local state = ranked[rank]
                     if not state then
+                        local encounters = readBossEncounters(api, index, numEncounters)
+                        local completedParts = encounterProgress
+                        local completed
+                        if encounters then
+                            -- The real per-boss list is authoritative. Progress is
+                            -- the number of bosses whose own isKilled flag is true,
+                            -- never the farthest-reached encounter index.
+                            local killedCount = 0
+                            for _, boss in ipairs(encounters) do
+                                if boss.killed == true then killedCount = killedCount + 1 end
+                            end
+                            completedParts = killedCount
+                            if killedCount == numEncounters then completed = true end
+                        end
                         state = {
-                            completedParts = encounterProgress,
+                            completedParts = completedParts,
                             totalParts = numEncounters,
                             difficulty = type(difficulty) == "number" and difficulty or nil,
                             difficultyLabel = label,
-                            encounters = readBossEncounters(api, index, numEncounters),
+                            encounters = encounters,
+                            -- Only a reliable per-boss list can prove a full clear;
+                            -- the aggregate farthest index is never a killed count.
+                            completed = completed,
                         }
                         ranked[rank] = state
                     end
                     -- A retail lockout is reported once per difficulty; taking the
                     -- max guards against any duplicate row without over-counting.
                     if numEncounters > state.totalParts then state.totalParts = numEncounters end
-                    if encounterProgress > state.completedParts then state.completedParts = encounterProgress end
                     if type(reset) == "number" and reset >= 0 and type(nowValue) == "number" then
                         local resetsAt = nowValue + reset
                         if state.resetsAt == nil or resetsAt < state.resetsAt then state.resetsAt = resetsAt end
@@ -643,13 +659,19 @@ function M.readRaidStates(api, raidColumns, family)
                 total = best.totalParts,
                 resetsAt = resetsAt,
                 difficulties = difficulties,
+                completed = best.completed,
             }
         end
     end
 
     for _, state in pairs(states) do
-        if state.totalParts > 0 and state.completedParts == state.totalParts then
-            state.completed = true
+        -- Retail (per-difficulty) states already carry their representative's
+        -- reliable completion above; this flat aggregate is the classic family's
+        -- "every mapped instance cleared" check.
+        if type(state.difficulties) ~= "table" then
+            if state.totalParts > 0 and state.completedParts == state.totalParts then
+                state.completed = true
+            end
         end
     end
     if next(states) == nil then return nil end

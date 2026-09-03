@@ -73,14 +73,14 @@ return function(test)
     test.eq(dr.difficultyLabel, "M", "representative is the highest difficulty with progress")
     test.eq(dr.completedParts, 6, "representative killed count is the mythic count")
     test.eq(dr.totalParts, 6, "representative total is the boss count, not the instance grouping")
-    test.eq(dr.completed, true, "a full mythic clear completes the raid")
+    test.eq(dr.completed, nil, "a full aggregate count never claims completion without a per-boss list")
 
     -- 2. LFR alone is a complete difficulty, never dropped or mislabelled.
     local lfrOnly = retailStates({ row(2939, 17, 4, 4) })
     test.eq(lfrOnly.DR.difficultyLabel, "LFR", "an LFR-only lockout keeps its label")
     test.eq(lfrOnly.DR.difficulty, 17, "an LFR-only lockout keeps its difficulty ID")
     test.eq(lfrOnly.DR.completedParts, 4, "an LFR-only lockout keeps its killed count")
-    test.eq(lfrOnly.DR.completed, true, "a full LFR clear completes the raid")
+    test.eq(lfrOnly.DR.completed, nil, "an LFR-only full count without per-boss detail never claims completion")
     test.eq(#lfrOnly.DR.difficulties, 1, "an LFR-only lockout has exactly one difficulty")
 
     -- 3. A full Normal clear must not be hidden by a fresh empty Heroic lockout.
@@ -90,7 +90,7 @@ return function(test)
     })
     local dn = fullNormal.DR
     test.eq(dn.difficultyLabel, "N", "a full normal clear is not hidden by an empty heroic lockout")
-    test.eq(dn.completed, true, "the full normal clear completes the raid")
+    test.eq(dn.completed, nil, "a full normal count without per-boss detail never claims completion")
     test.eq(dn.totalParts, 6, "total bosses come from the lockout, not the instance grouping")
 
     -- 4. 0/N: a fresh lockout with no kills is partial, never complete.
@@ -109,7 +109,7 @@ return function(test)
 
     -- 6. N/N: a full clear completes the raid.
     local full = retailStates({ row(2939, 14, 6, 6) })
-    test.eq(full.DR.completed, true, "a full clear completes the raid")
+    test.eq(full.DR.completed, nil, "a full clear without per-boss detail never claims completion")
     test.eq(full.DR.difficultyLabel, "N", "a full normal clear keeps its label")
 
     -- 7. Abnormal or partial tuples leave the difficulty blank, never a
@@ -154,7 +154,8 @@ return function(test)
     test.eq(bosses[2].unknown4, nil, "the unknown fourth return is never stored")
 
     -- A non-prefix kill: boss 1 skipped, boss 2 killed must never become "first
-    -- 2 killed". The aggregate still uses the farthest-reached kill count.
+    -- 2 killed". The killed count is the number of true flags, never the
+    -- farthest-reached encounter index.
     local nonPrefix = retailStates({ row(2939, 15, 3, 2) }, {
         GetSavedInstanceEncounterInfo = function(index, encounterIndex)
             local names = { "一王", "二王", "三王" }
@@ -167,15 +168,104 @@ return function(test)
     test.eq(nb[1].killed, false, "boss 1 is not killed")
     test.eq(nb[2].killed, true, "boss 2 is killed")
     test.eq(nb[3].killed, false, "boss 3 is not killed")
-    test.eq(nonPrefix.DR.difficulties[1].completedParts, 2,
-        "the aggregate keeps the farthest-reached kill count")
+    test.eq(nonPrefix.DR.difficulties[1].completedParts, 1,
+        "the killed count is the number of true flags, not the farthest index")
+    test.eq(nonPrefix.DR.difficulties[1].totalParts, 3,
+        "the total stays the reliable encounter count")
+    test.eq(nonPrefix.DR.completed, nil, "a non-prefix kill is incomplete")
+
+    -- A kill past a skipped boss: boss 3 killed, bosses 1-2 not, and the
+    -- aggregate farthest index is 3. The summary must count the one killed boss,
+    -- never the farthest index 3, and must never complete.
+    local tailOnly = retailStates({ row(2939, 16, 3, 3) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            local names = { "一王", "二王", "三王" }
+            local killed = { false, false, true }
+            return names[encounterIndex], nil, killed[encounterIndex], false
+        end,
+    })
+    local tDiff = tailOnly.DR.difficulties[1]
+    test.eq(#tDiff.encounters, 3, "all three bosses are listed")
+    test.eq(tDiff.encounters[1].killed, false, "boss 1 is not killed")
+    test.eq(tDiff.encounters[2].killed, false, "boss 2 is not killed")
+    test.eq(tDiff.encounters[3].killed, true, "only boss 3 is killed")
+    test.eq(tDiff.completedParts, 1, "the killed count is 1, not the farthest index 3")
+    test.eq(tDiff.totalParts, 3, "the total is the reliable encounter count")
+    test.eq(tailOnly.DR.completedParts, 1, "the representative carries the killed count")
+    test.eq(tailOnly.DR.completed, nil, "farthest index 3 never completes the raid")
+
+    -- Two killed bosses out of three is 2/3, never 3/3 from the farthest index.
+    local middleKill = retailStates({ row(2939, 15, 3, 3) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            local names = { "一王", "二王", "三王" }
+            local killed = { true, false, true }
+            return names[encounterIndex], nil, killed[encounterIndex], false
+        end,
+    })
+    local mDiff = middleKill.DR.difficulties[1]
+    test.eq(mDiff.completedParts, 2, "two killed bosses are counted")
+    test.eq(mDiff.totalParts, 3, "the total stays the reliable encounter count")
+    test.eq(middleKill.DR.completed, nil, "two of three kills is incomplete")
+
+    -- Every boss killed is a reliable full clear.
+    local allKilled = retailStates({ row(2939, 14, 3, 3) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            local names = { "一王", "二王", "三王" }
+            local killed = { true, true, true }
+            return names[encounterIndex], nil, killed[encounterIndex], false
+        end,
+    })
+    local aDiff = allKilled.DR.difficulties[1]
+    test.eq(aDiff.completedParts, 3, "three killed bosses are counted")
+    test.eq(aDiff.totalParts, 3, "the total is the reliable encounter count")
+    test.eq(allKilled.DR.completed, true, "every boss killed completes the raid")
+
+    -- An abnormal second boss tuple fails the whole per-boss list closed and must
+    -- never fabricate a prefix kill or claim completion from the aggregate
+    -- farthest index.
+    local abnormalMiddle = retailStates({ row(2939, 16, 3, 3) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            if encounterIndex == 2 then return nil, nil, true, false end
+            return "首王", nil, true, false
+        end,
+    })
+    test.eq(abnormalMiddle.DR.difficulties[1].encounters, nil,
+        "an abnormal second boss tuple drops the whole per-boss list")
+    test.eq(abnormalMiddle.DR.completedParts, 3, "the degraded aggregate pair still renders")
+    test.eq(abnormalMiddle.DR.completed, nil,
+        "the farthest index never claims completion when the per-boss list failed")
+
+    -- Normal and Mythic lockouts on the same instance read their own killed sets
+    -- and never share or merge a kill count.
+    local splitDiff = retailStates({
+        row(2939, 14, 3, 3),  -- Normal
+        row(2939, 16, 3, 3),  -- Mythic
+    }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            local names = { "一王", "二王", "三王" }
+            local killedByRow = {
+                { true, true, false },   -- Normal: 2/3
+                { false, false, true },  -- Mythic: 1/3
+            }
+            return names[encounterIndex], nil, killedByRow[index][encounterIndex], false
+        end,
+    })
+    local sNormal = splitDiff.DR.difficulties[1]
+    local sMythic = splitDiff.DR.difficulties[2]
+    test.eq(sNormal.difficultyLabel, "N", "normal ranks first")
+    test.eq(sNormal.completedParts, 2, "normal killed count is isolated from mythic")
+    test.eq(sMythic.difficultyLabel, "M", "mythic ranks after normal")
+    test.eq(sMythic.completedParts, 1, "mythic killed count is isolated from normal")
+    test.eq(splitDiff.DR.difficultyLabel, "M", "the representative is the highest difficulty with progress")
+    test.eq(splitDiff.DR.completedParts, 1, "the representative carries the mythic killed count")
+    test.eq(splitDiff.DR.completed, nil, "neither difficulty is fully cleared")
 
     -- Fail closed: a missing encounter API stores no per-boss list, only the
     -- reliable aggregate count.
     local noEncounterApi = retailStates({ row(2939, 16, 3, 1) })
     test.eq(noEncounterApi.DR.difficulties[1].encounters, nil,
         "a missing encounter API stores no per-boss list")
-    test.eq(noEncounterApi.DR.completedParts, 1, "the aggregate kill count still renders")
+    test.eq(noEncounterApi.DR.completedParts, 1, "the degraded aggregate pair still renders")
 
     -- Fail closed: an abnormal tuple (non-boolean kill flag or missing name)
     -- leaves the whole per-boss list absent, never a fabricated boss state.

@@ -252,14 +252,25 @@ local function raidCell(column, snapshot, now)
 
         local totalParts = type(representative.totalParts) == "number" and representative.totalParts or 0
         local completedParts = type(representative.completedParts) == "number" and representative.completedParts or 0
-        if totalParts > 1 and completedParts < totalParts then
+        local reliable = type(representative.encounters) == "table"
+        if totalParts > 0 and completedParts >= totalParts then
+            if reliable then
+                cell.state = "complete"
+                cell.text = ""
+            else
+                -- The aggregate farthest index alone can never prove every boss is
+                -- down, so a degraded full count renders as a plain pair instead of
+                -- a completion checkmark.
+                cell.state = "progress"
+                cell.progress = completedParts
+                cell.total = totalParts
+                cell.text = string.format("%d/%d", completedParts, totalParts)
+            end
+        elseif totalParts > 1 and completedParts < totalParts then
             cell.state = "progress"
             cell.progress = completedParts
             cell.total = totalParts
             cell.text = string.format("%d/%d", completedParts, totalParts)
-        elseif totalParts > 0 and completedParts >= totalParts then
-            cell.state = "complete"
-            cell.text = ""
         end
         return cell
     end

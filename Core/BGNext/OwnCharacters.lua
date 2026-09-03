@@ -381,7 +381,10 @@ local function recomputeRaidState(state, entries)
     state.totalParts = best.totalParts
     state.progress = state.completedParts
     state.total = state.totalParts
-    if state.totalParts and state.totalParts > 0 and state.completedParts == state.totalParts then
+    -- Completion requires the representative difficulty's reliable per-boss list
+    -- to show every boss killed; the aggregate farthest index never proves that.
+    if state.totalParts and state.totalParts > 0 and state.completedParts == state.totalParts
+        and type(best.encounters) == "table" then
         state.completed = true
     else
         state.completed = nil
