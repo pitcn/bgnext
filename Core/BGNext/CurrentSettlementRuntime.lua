@@ -134,22 +134,42 @@ local function resolveItemId(item, itemIdOf)
     return nil
 end
 
+-- Aggregates a trade slot list into one entry per distinct item id, summing
+-- the slot quantities. `quantity` becomes nil when any contributing slot has
+-- an unknown or invalid count, so a partially-known delivery is never read as
+-- a specific count. `singleUnits` stays true only when every slot resolves to
+-- exactly one unit, which preserves the existing proof rule (a stack or
+-- unknown count can never prove a single sale).
 local function itemIds(value, itemIdOf)
-    local ids = {}
+    local entries = {}
+    local byIndex = {}
     local singleUnits = true
     if type(value) ~= "table" then
-        return ids
+        return entries, singleUnits
     end
     for _, item in ipairs(value) do
         local id = resolveItemId(item, itemIdOf)
-        if id then
-            ids[#ids + 1] = id
+        local count = type(item) == "table" and tonumber(item.count) or nil
+        if count ~= nil and (count < 1 or count % 1 ~= 0) then
+            count = nil
         end
-        if not id or type(item) ~= "table" or item.count ~= 1 then
+        if not id or count ~= 1 then
             singleUnits = false
         end
+        if id then
+            local slot = byIndex[id]
+            if not slot then
+                slot = { itemId = id, quantity = count }
+                byIndex[id] = slot
+                entries[#entries + 1] = slot
+            elseif slot.quantity ~= nil and count ~= nil then
+                slot.quantity = slot.quantity + count
+            else
+                slot.quantity = nil
+            end
+        end
     end
-    return ids, singleUnits
+    return entries, singleUnits
 end
 
 local function normalizedName(context, name)
@@ -251,9 +271,9 @@ function M.tradeRows(trade, itemIdOf)
     end
 
     local status = amount ~= nil and "complete" or "pending"
-    -- The record has no quantity field: a stack, unknown quantity, or barter
-    -- must stay unconfirmed rather than masquerading as a single sold item.
-    -- Retain the observed gold/direction for manual reconciliation only.
+    -- A stack, unknown quantity, or barter stays unconfirmed rather than
+    -- masquerading as a single sold item; the observed count is preserved on
+    -- the row (quantity) and the gold/direction for manual reconciliation.
     if (direction == "outgoing" and not mySingleUnits)
         or (direction == "incoming" and not theirSingleUnits)
         or (#theirItems > 0 and #myItems > 0) then
@@ -263,10 +283,11 @@ function M.tradeRows(trade, itemIdOf)
     if #items == 0 then
         rows[1] = { player = player, itemId = nil, amount = amount, status = status, direction = direction }
     else
-        for index, itemId in ipairs(items) do
+        for index, entry in ipairs(items) do
             rows[index] = {
                 player = player,
-                itemId = itemId,
+                itemId = entry.itemId,
+                quantity = entry.quantity,
                 -- The gold belongs to the trade, not to each packed item.
                 amount = index == 1 and amount or nil,
                 status = status,
@@ -290,6 +311,7 @@ function M.recordTrade(root, context, trade)
             raidId = raidId,
             player = row.player,
             itemId = row.itemId,
+            quantity = row.quantity,
             amount = row.amount,
             time = now,
             status = row.status,

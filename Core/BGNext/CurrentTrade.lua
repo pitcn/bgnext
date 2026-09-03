@@ -2,7 +2,7 @@ BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
 local M = {}
-local FIELDS = { "player", "itemId", "amount", "time", "status", "direction" }
+local FIELDS = { "player", "itemId", "amount", "time", "status", "direction", "quantity" }
 
 -- Direction is written by the runtime from the trade it observed (outgoing =
 -- the player delivered the recorded items, incoming = the player received
@@ -43,6 +43,13 @@ local function isCurrent(root, record)
         return false
     end
     if record.amount ~= nil and (type(record.amount) ~= "number" or record.amount < 0) then
+        return false
+    end
+    -- Quantity records the delivered item count of one trade (nil when unknown).
+    -- Only a positive whole number survives, so a zero or fractional count can
+    -- never be stored and later read as a delivered item.
+    if record.quantity ~= nil and (type(record.quantity) ~= "number"
+        or record.quantity < 1 or record.quantity % 1 ~= 0) then
         return false
     end
     if settlement.startedAt and record.time < settlement.startedAt then

@@ -88,10 +88,15 @@ local function evaluateSoldRows(input, addPending)
                     list = {}
                     candidates[key] = list
                 end
+                local quantity = type(record.quantity) == "number"
+                    and record.quantity >= 1 and record.quantity % 1 == 0
+                    and record.quantity or nil
                 list[#list + 1] = {
                     amount = tonumber(record.amount),
                     direction = record.direction,
                     tradeKey = tradeKey,
+                    quantity = quantity,
+                    remaining = quantity,
                     consumed = false,
                 }
             end
@@ -100,6 +105,8 @@ local function evaluateSoldRows(input, addPending)
     for _, list in pairs(candidates) do
         for _, candidate in ipairs(list) do
             candidate.packed = (packedTrades[candidate.tradeKey] or 0) > 1
+                or candidate.quantity == nil
+                or (candidate.quantity ~= nil and candidate.quantity > 1)
         end
     end
     for _, row in ipairs(input.bill.rows) do
@@ -167,7 +174,18 @@ local function evaluateSoldRows(input, addPending)
                         { tostring(pick.candidate.amount), tostring(amount), location[1], location[2] })
                 elseif pick.reason == "packed" then
                     if pick.candidate then
-                        pick.candidate.consumed = true
+                        -- One bill row can account for at most one delivered
+                        -- unit of a shared/ambiguous delivery; the rest stays
+                        -- uncovered. A legacy record of unknown quantity is
+                        -- treated as fully accounted once it is flagged.
+                        if pick.candidate.remaining ~= nil then
+                            pick.candidate.remaining = pick.candidate.remaining - 1
+                            if pick.candidate.remaining < 0 then
+                                pick.candidate.remaining = 0
+                            end
+                        else
+                            pick.candidate.consumed = true
+                        end
                     end
                     addPending("sold", "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）", location)
                 elseif pick.reason == "unknown" then
@@ -183,7 +201,7 @@ local function evaluateSoldRows(input, addPending)
         local leftover = 0
         for _, candidate in ipairs(list) do
             if not candidate.consumed and candidate.direction == "outgoing" then
-                leftover = leftover + 1
+                leftover = leftover + (candidate.remaining or 1)
             end
         end
         if leftover > 0 then

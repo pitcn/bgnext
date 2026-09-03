@@ -299,4 +299,44 @@ return function(test)
         "leaving an instance cannot race a delayed team-boundary check")
     test.eq(source:find('BG.RegisterEvent("ENCOUNTER_START"', 1, true) ~= nil, true,
         "same-instance team boundary is checked before BGLite replaces the boss roster")
+
+    -- 14. two identical items delivered in one trade collapse into one
+    --     quantity-aware record instead of being deduplicated into a loss.
+    local dupRows = runtime.tradeRows({
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    })
+    test.eq(#dupRows, 1, "two identical items aggregate to one quantity-aware row")
+    test.eq(dupRows[1].itemId, 11, "aggregated row keeps the item id")
+    test.eq(dupRows[1].quantity, 2, "aggregated row preserves the delivered count")
+
+    local qtyRoot = life.ensureRoot({})
+    test.eq(runtime.recordTrade(qtyRoot, context(14000, 13900), {
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    }), 1, "two identical items in one trade write one quantity-aware record")
+    test.eq(#qtyRoot.currentSettlement.trades, 1, "the second identical item is not dropped")
+    test.eq(qtyRoot.currentSettlement.trades[1].quantity, 2, "the record preserves the delivered count")
+
+    -- A stack of two expresses the same count and is preserved too.
+    local stackRoot = life.ensureRoot({})
+    test.eq(runtime.recordTrade(stackRoot, context(14000, 13900), {
+        completed = true, target = "乙", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 22, count = 2 } },
+    }), 1, "a stack of two writes one record")
+    test.eq(stackRoot.currentSettlement.trades[1].quantity, 2, "the stack count is preserved")
+
+    -- A repeated completion event for the same two-item trade still writes nothing.
+    test.eq(runtime.recordTrade(qtyRoot, context(14000, 13900), {
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    }), 0, "a repeated completion event is still deduplicated")
+    test.eq(#qtyRoot.currentSettlement.trades, 1, "no second record from the repeated event")
+
+    -- Two distinct identical trades at different times are never merged.
+    test.eq(runtime.recordTrade(qtyRoot, context(14002, 13900), {
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    }), 1, "a distinct later trade is recorded")
+    test.eq(#qtyRoot.currentSettlement.trades, 2, "two distinct trades stay separate")
 end

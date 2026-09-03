@@ -81,4 +81,19 @@ return function(test)
     test.eq(mail.append(root, {
         raidId = "raid-a", player = "丙", amount = 50, time = 105, status = "sent", direction = "私人备注",
     }), false, "free-text mail direction rejected")
+
+    -- quantity is whitelisted and validated: only a positive whole count survives
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "丁", itemId = 3, amount = 50, time = 106,
+        status = "complete", quantity = 2,
+    }), true, "a valid quantity is stored")
+    test.eq(root.currentSettlement.trades[3].quantity, 2, "quantity field is preserved")
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "戊", itemId = 4, amount = 50, time = 107,
+        status = "complete", quantity = 0,
+    }), false, "a zero quantity is rejected")
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "戊", itemId = 4, amount = 50, time = 107,
+        status = "complete", quantity = 1.5,
+    }), false, "a fractional quantity is rejected")
 end
