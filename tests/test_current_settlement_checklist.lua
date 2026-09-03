@@ -302,7 +302,7 @@ return function(test)
     test.eq(#sold, 2, "the shared amount and the uncovered delivery are flagged")
     test.eq(sold[1].reasonKey, "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）",
         "the duplicate sale cannot be proven against the packed trade")
-    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记",
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记",
         "the surplus finding names the uncovered delivery")
 
     -- 7g. an unidentifiable bill item cannot use trade evidence
@@ -320,7 +320,7 @@ return function(test)
     test.eq(#sold, 2, "an unidentifiable item and its uncovered delivery are flagged")
     test.eq(sold[1].reasonKey, "账单装备无法识别，无法核对交易证据（第%s个Boss 第%s件）",
         "the unidentifiable row is flagged")
-    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记",
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记",
         "the delivered item cannot be matched to any bill row")
 
     -- 7h. gold on both sides is ambiguous and can never prove a bill sale
@@ -355,7 +355,7 @@ return function(test)
     test.eq(#sold, 2, "the shared delivery and its uncovered second item are flagged")
     test.eq(sold[1].reasonKey, "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）",
         "a quantity above one is treated as a shared delivery")
-    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记",
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记",
         "the uncovered second item is surfaced as surplus")
 
     -- 7j. a legacy record without a quantity cannot masquerade as one settled item

@@ -205,7 +205,7 @@ local function evaluateSoldRows(input, addPending)
             end
         end
         if leftover > 0 then
-            addPending("sold", "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记", { tostring(leftover) })
+            addPending("sold", "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记", { tostring(leftover) })
         end
     end
 end
