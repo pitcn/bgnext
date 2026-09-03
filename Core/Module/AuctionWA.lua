@@ -1226,6 +1226,8 @@ BG.Init(function()
  end
  function wa.EndAuction(bidFrame, kind)
   if bidFrame.IsEnd then return end
+  -- 结束立即解除倒计时，成交/流拍/取消三路一致；自然到期重复解除安全。
+  bidFrame.bar:SetScript("OnUpdate", nil)
   if kind == "cancel" then
    wa.SetEndState(bidFrame, L["拍卖取消"], 1, 0, 0)
    wa.expandFrame(bidFrame, true)
@@ -1246,6 +1248,9 @@ BG.Init(function()
     bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. bidFrame.colorplayer)
    end
   end
+  -- 折叠卡片强制展开会改变高度；结束态完成布局后做一次有界重排，
+  -- 避免同时拍卖的其他卡片重叠，不引入周期性布局。
+  wa.UpdateAllFrames()
   After(wa.END_DISPLAY_TIME, function()
    wa.UpdateFrame(bidFrame)
   end)

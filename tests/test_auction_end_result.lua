@@ -1,10 +1,3 @@
-local function readAll(path)
-    local file = assert(io.open(path, "rb"))
-    local content = file:read("*a")
-    file:close()
-    return content
-end
-
 return function(test)
     -- Drives the real AuctionWA.lua countdown end callback with a minimal WoW API
     -- surface and asserts the final buyer/price becomes visible for a collapsed
@@ -277,15 +270,25 @@ return function(test)
         test.eq(auctionEndCalls[1][1], 1, "success still reports kind 1")
         test.eq(sentChat[1] == nil, true, "no extra chat is introduced outside the raid-leader path")
 
-        -- (10) The cancel path in AuctionWAEvent routes through the same bounded
-        -- end transition and preserves its own ledger callback and raid notice.
-        local eventSource = readAll("Core/Module/AuctionWAEvent.lua")
-        test.eq(eventSource:find('wa.EndAuction(frame, "cancel")', 1, true) ~= nil, true,
-            "cancel routes through the shared end transition")
-        test.eq(eventSource:find('wa.HIDEFRAME_TIME', 1, true), nil,
-            "cancel no longer uses the one-second hide delay")
-        test.eq(eventSource:find('BG.AuctionWAEnd(3', 1, true) ~= nil, true,
-            "cancel keeps its ledger callback")
+        -- (10) A forced end expansion rearranges siblings exactly once (bounded,
+        -- no periodic layout) so simultaneous folded cards do not overlap.
+        local arrangeCount = 0
+        local origUpdateAllFrames = wa.UpdateAllFrames
+        wa.UpdateAllFrames = function()
+            arrangeCount = arrangeCount + 1
+            return origUpdateAllFrames()
+        end
+        local fCollapsed = newBidFrame(20, "买家壬", true)
+        wa.EndAuction(fCollapsed, "success")
+        test.eq(arrangeCount, 1, "forced end expansion rearranges siblings exactly once")
+        wa.UpdateAllFrames = origUpdateAllFrames
+
+        -- (11) Cancelling also detaches the countdown OnUpdate immediately (the
+        -- network cancel path has no natural-expiry cleanup to rely on).
+        local fCancel = newBidFrame(21, "买家癸", false)
+        wa.Auctioning(fCancel, 20)
+        wa.EndAuction(fCancel, "cancel")
+        test.eq(fCancel.bar.scripts.OnUpdate, nil, "cancel detaches the countdown OnUpdate")
     end)
 
     for _, name in ipairs(watchedGlobals) do
