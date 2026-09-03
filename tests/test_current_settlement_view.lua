@@ -64,6 +64,21 @@ return function(test)
     test.eq(rows[1].amountText, "100", "amount formatted for display")
     test.eq(rows[1].timeText, "t1100", "time formatted through the injected formatter")
     test.eq(rows[1].statusKey, "complete", "status key preserved for the UI")
+
+    -- quantity is carried through the projection so the visible table can show
+    -- that two of the same item were delivered; a legacy record with no
+    -- quantity stays unknown rather than being invented as a single item.
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "乙", itemId = 22, amount = 400, time = 1400,
+        status = "complete", quantity = 2,
+    }), true, "a quantity-aware trade is stored")
+    rows, isEmpty = view.trades(root, { now = 1500, dateFn = stubDate })
+    test.eq(#rows, 4, "the quantity-aware trade adds one projected row")
+    local qtyRow = rows[4]
+    test.eq(qtyRow.quantity, 2, "the projected row carries the delivered count")
+    test.eq(qtyRow.itemId, 22, "the quantity-aware row still names the item")
+    local legacyRow = rows[1]
+    test.eq(legacyRow.quantity, nil, "a legacy record without quantity projects nil, not one")
     local r, g, b = view.statusColor("trade", "complete")
     test.eq(r == 0 and g == 1 and b == 0, true, "success status is green")
     r, g, b = view.statusColor("trade", "pending")

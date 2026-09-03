@@ -80,6 +80,7 @@ local function project(records, dateFn)
             sortKey = type(record.time) == "number" and record.time or 0,
             player = record.player,
             itemId = record.itemId,
+            quantity = record.quantity,
             amount = record.amount,
             time = record.time,
             statusKey = record.status,

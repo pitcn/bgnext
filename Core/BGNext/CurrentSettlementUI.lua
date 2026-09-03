@@ -262,6 +262,16 @@ local function itemDisplay(itemId)
     return text or ("item:" .. string.format("%d", itemId)), texture
 end
 
+-- A compact count suffix for one delivered item row. Only a positive whole
+-- quantity is shown, so a legacy record with no quantity (or a stack of
+-- unknown size) stays silent instead of inventing "×1".
+function M.quantityText(quantity)
+    if type(quantity) ~= "number" or quantity < 1 or quantity % 1 ~= 0 then
+        return ""
+    end
+    return "×" .. string.format("%d", quantity)
+end
+
 ------------------------------------------------------------------------
 -- Rendering. Nothing below runs outside the game.
 ------------------------------------------------------------------------
@@ -808,7 +818,7 @@ local function fillRow(win, row, data)
     local itemCell = cells.item
     if itemCell then
         local text, texture = itemDisplay(data.itemId)
-        itemCell.text:SetText(text)
+        itemCell.text:SetText(text .. M.quantityText(data.quantity))
         itemCell.icon:SetTexture(texture)
         itemCell.icon:SetShown(texture ~= nil)
     end
