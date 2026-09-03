@@ -1175,6 +1175,31 @@ if runtimeReady() then
             refreshRows()
         end
 
+        -- The main frame animates between table heights and a mode switch can
+        -- wrap the localized description (moving the item list), both of which
+        -- fire size changes every frame. Each such burst is coalesced into a
+        -- single relayout: successive requests advance a monotonic token, so
+        -- only the last debounced callback survives and it reads the final
+        -- window size. Hiding the page advances the token too, invalidating any
+        -- pending relayout. A one-shot delayed timer drives this, never a
+        -- ticker or a persistent OnUpdate.
+        local RELAYOUT_DEBOUNCE = 0.05
+        local relayoutToken = 0
+        local function scheduleRelayout()
+            relayoutToken = relayoutToken + 1
+            local token = relayoutToken
+            if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+                C_Timer.After(RELAYOUT_DEBOUNCE, function()
+                    if token ~= relayoutToken then return end
+                    if main:IsShown() then relayout() end
+                end)
+            else
+                -- Clients without C_Timer.After fall back to an immediate
+                -- bounded relayout (still one per request, not per frame).
+                if main:IsShown() then relayout() end
+            end
+        end
+
         -- ---- Import/export panels ----
         -- Export never touches the clipboard or chat; it only fills an editable
         -- box and selects the text so the player can copy it manually.
@@ -1516,10 +1541,12 @@ if runtimeReady() then
         leaderButton:SetScript("OnClick", function()
             M.setMode(pageState, "leader")
             refreshAll()
+            scheduleRelayout()
         end)
         personalButton:SetScript("OnClick", function()
             M.setMode(pageState, "personal")
             refreshAll()
+            scheduleRelayout()
         end)
         presetButton:SetScript("OnClick", function() cyclePreset(1) end)
         newButton:SetScript("OnClick", newScheme)
@@ -1640,13 +1667,17 @@ if runtimeReady() then
             refreshAll()
         end)
         main:SetScript("OnHide", function()
+            -- Drop any pending debounced relayout: a hidden page must never
+            -- re-filter the catalog, even if a size change was still coalescing.
+            relayoutToken = relayoutToken + 1
             if BG.TabButtonsFB then BG.TabButtonsFB:Show() end
         end)
         -- The main frame animates between table heights and responds to UI scale
         -- and locale-driven description height changes; re-derive the viewport
-        -- from the actual content area instead of a one-time estimate.
+        -- from the actual content area instead of a one-time estimate, but only
+        -- once per animation burst via the debounced scheduler.
         main:SetScript("OnSizeChanged", function()
-            if main:IsShown() then relayout() end
+            if main:IsShown() then scheduleRelayout() end
         end)
         relayout()
         refreshAll()
