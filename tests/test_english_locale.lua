@@ -110,6 +110,12 @@ return function(test)
     local enUS = loadLocale("enUS")
     local enGB = loadLocale("enGB")
     local deDE = loadLocale("deDE")
+    for _, localized in ipairs({ zhCN, zhTW, enUS, enGB, deDE }) do
+        for key, value in pairs(localized.L) do
+            test.eq(type(value), "string", "loaded UI translation must be text: " .. key)
+        end
+        test.eq(type(localized.L["存储与隐私"]), "string", "storage tab receives text, never a boolean")
+    end
     test.eq(zhCN.L["开始对账"], "开始对账", "Simplified Chinese clients use zhCN")
     test.eq(zhTW.L["开始对账"], "開始對賬", "Traditional Chinese clients use zhTW")
     test.eq(enUS.L["开始对账"], "Start Reconciliation", "enUS clients use English")
