@@ -26,26 +26,29 @@ return function(test)
         local timers = {}
         local timerCounter = 0
         local maxPending = 0
+        -- `timers` is a map keyed by a monotonic timer id, so a fired timer's
+        -- deleted slot never hides later live timers behind a nil hole the way
+        -- an ipairs walk over a dense array would.
         local function pendingTimers()
             local n = 0
-            for _, t in ipairs(timers) do
-                if t then n = n + 1 end
+            for _ in pairs(timers) do
+                n = n + 1
             end
             return n
         end
         local function advance(dt)
             now = now + dt
             while true do
-                local idx, best = nil, math.huge
-                for i, t in ipairs(timers) do
-                    if t and t.due <= now and t.due < best then
+                local id, best = nil, math.huge
+                for tid, t in pairs(timers) do
+                    if t.due <= now and t.due < best then
                         best = t.due
-                        idx = i
+                        id = tid
                     end
                 end
-                if not idx then break end
-                local t = timers[idx]
-                timers[idx] = nil
+                if not id then break end
+                local t = timers[id]
+                timers[id] = nil
                 t.cb()
             end
         end
@@ -130,7 +133,7 @@ return function(test)
             -- interleave size events with callbacks at any frame rate.
             After = function(delay, callback)
                 timerCounter = timerCounter + 1
-                timers[#timers + 1] = { due = now + delay, cb = callback }
+                timers[timerCounter] = { due = now + delay, cb = callback }
                 local n = pendingTimers()
                 if n > maxPending then maxPending = n end
             end,
@@ -313,7 +316,40 @@ return function(test)
         test.eq(main.rows[reopened.capacity].shown, true, "reopen lays out within capacity")
         test.eq(main.rows[reopened.capacity + 1].shown, false, "reopen hides rows beyond capacity")
 
-        -- 5. Mode switch with a long localized description that wraps and
+        -- 5. Timer ownership (round-4 race): schedule the pre-hide settle, hide
+        --    + reopen, schedule a new settle, then fire the OLD callback first.
+        --    A stale callback must not clear the new generation's pending flag,
+        --    so the following resize schedules no second current-generation
+        --    timer and the final commit runs exactly once.
+        resetClock()
+        local itemInfoReads = 0
+        setGlobal("GetItemInfo", function()
+            itemInfoReads = itemInfoReads + 1
+            return nil
+        end)
+        main.itemScroll.height = 400
+        main.scripts.OnSizeChanged(main)
+        test.eq(pendingTimers(), 1, "old settle armed")
+        main:Hide()
+        test.eq(pendingTimers(), 1, "old timer stays queued after hide")
+        advance(0.02)
+        main.itemScroll.height = 300
+        main:Show()
+        test.eq(filterCount, 1, "reopen refreshes once")
+        main.scripts.OnSizeChanged(main)
+        test.eq(pendingTimers(), 2, "old and new settle timers both queued")
+        test.eq(timerCounter, 2, "exactly two settle timers scheduled before firing")
+        local readsBeforeCommit = itemInfoReads
+        advance(0.04) -- fires the OLD callback first (due 0.05 < new due 0.07)
+        test.eq(pendingTimers(), 1, "old callback drained, new still pending")
+        main.scripts.OnSizeChanged(main)
+        test.eq(timerCounter, 2, "stale callback cleared no pending: no second timer")
+        test.eq(pendingTimers(), 1, "still exactly one current-generation timer")
+        advance(0.06)
+        test.eq(pendingTimers(), 0, "all settle timers drained")
+        test.eq(itemInfoReads - readsBeforeCommit, 24, "exactly one final relayout commit")
+
+        -- 6. Mode switch with a long localized description that wraps and
         --    shortens the content area: the description is updated, the cache is
         --    rebuilt exactly once, and the settle commits with the real height.
         resetClock()

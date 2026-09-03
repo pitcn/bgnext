@@ -1219,32 +1219,34 @@ if runtimeReady() then
         -- wrap the localized description (moving the item list), both of which
         -- fire size changes every frame. Geometry safety is applied synchronously
         -- by the OnSizeChanged handler (see applyGeometry), and only the stable
-        -- commit is deferred behind a single cancellable one-shot timer. The
-        -- settlePending flag keeps at most one timer alive for the whole burst,
-        -- and the generation counter invalidates a stale callback after OnHide.
+        -- commit is deferred behind a single cancellable one-shot timer.
+        -- settlePending records the generation that owns the pending settle, so
+        -- at most one timer is alive per burst; the generation counter plus the
+        -- ownership check invalidates a stale callback after OnHide before it
+        -- can clear a newer generation's pending record.
         -- Without C_Timer.After the page degrades to geometry-only handling and
         -- never re-filters per event.
         local RELAYOUT_DEBOUNCE = 0.05
         local settleGeneration = 0
-        local settlePending = false
+        local settlePending = nil
 
         local function cancelSettle()
             settleGeneration = settleGeneration + 1
-            settlePending = false
+            settlePending = nil
         end
 
         local function scheduleRelayout()
-            if settlePending then return end
-            settlePending = true
+            if settlePending ~= nil then return end
             local gen = settleGeneration
+            settlePending = gen
             if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
                 C_Timer.After(RELAYOUT_DEBOUNCE, function()
-                    settlePending = false
                     if gen ~= settleGeneration then return end
+                    settlePending = nil
                     if main:IsShown() then relayout() end
                 end)
             else
-                settlePending = false
+                settlePending = nil
                 -- No timer API: the synchronous geometry already applied by the
                 -- size handler keeps the bottom region safe. Never fall back to
                 -- per-event catalog filtering.
