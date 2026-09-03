@@ -121,10 +121,38 @@ return function(test)
 
     test.eq(queue.setPrice(d, q3, 1200), true, "setPrice records a manual price")
     test.eq(d.items[q3].manualPrice, 1200, "manual price stored on the row")
-    test.eq(queue.setPrice(d, q3, 0), false, "setPrice rejects a non-positive price")
+    test.eq(queue.setPrice(d, q3, 0), true, "setPrice accepts an integer zero starting price")
+    test.eq(d.items[q3].manualPrice, 0, "zero starting price stored")
+    test.eq(queue.setPrice(d, q3, -1), false, "setPrice rejects a negative price")
     test.eq(queue.setPrice(d, q3, 12.5), false, "setPrice rejects a fractional price")
+    test.eq(queue.setPrice(d, q3, 0 / 0), false, "setPrice rejects NaN")
+    test.eq(queue.setPrice(d, q3, 10000000), true, "setPrice accepts the protocol max")
+    test.eq(queue.setPrice(d, q3, 10000001), false, "setPrice rejects over the protocol max")
     test.eq(queue.setPrice(d, q3, nil), true, "setPrice clears the manual price")
     test.eq(d.items[q3].manualPrice, nil, "manual price cleared")
+
+    -- --- Price bounds in the confirm gate -----------------------------------
+
+    local gateAllowed = { isController = true, inCombat = false, auctionInProgress = false }
+    test.eq(queue.gate({ id = 1, itemId = 1001, link = "item:1001", quantity = 1, price = 0, source = "base" },
+        gateAllowed), nil, "gate accepts an integer zero price")
+    test.eq(queue.gate({ id = 1, itemId = 1001, link = "item:1001", quantity = 1, price = -1, source = "base" },
+        gateAllowed), "invalid-item", "gate rejects a negative price")
+    test.eq(queue.gate({ id = 1, itemId = 1001, link = "item:1001", quantity = 1, price = 10000001, source = "base" },
+        gateAllowed), "invalid-item", "gate rejects a price over the protocol max")
+
+    -- --- 40-item cap ---------------------------------------------------------
+
+    local cap = queue.create("raid:ULD")
+    for i = 1, 40 do
+        test.eq(type(queue.add(cap, { itemId = 3000 + i, link = "item:" .. (3000 + i) })), "number",
+            "cap: row " .. i .. " accepted")
+    end
+    test.eq(queue.size(cap), 40, "cap: forty rows held")
+    local overflow, overflowReason = queue.add(cap, { itemId = 4000, link = "item:4000" })
+    test.eq(overflow, nil, "cap: the 41st row is rejected")
+    test.eq(overflowReason, "queue-full", "cap: rejection reports queue-full")
+    test.eq(queue.size(cap), 40, "cap: size stays capped after rejection")
 
     -- Manual price resolves an otherwise unresolved row in projection.
     local manual = queue.create("raid:ULD")

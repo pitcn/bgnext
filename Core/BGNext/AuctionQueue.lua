@@ -19,6 +19,12 @@ M.REASON_AUCTION_BUSY = "auction-busy"
 M.REASON_PENDING_START = "pending-start"
 M.REASON_SCOPE_CHANGED = "scope-changed"
 M.REASON_PRICE_CHANGED = "price-changed"
+M.REASON_QUEUE_FULL = "queue-full"
+
+-- The maximum auction price matches the existing money input / protocol bound
+-- (AuctionSender.M.MAX_MONEY); the queue is capped at one row per pooled row.
+M.MAX_PRICE = 10000000
+M.MAX_ITEMS = 40
 
 function M.create(scopeKey)
     return { scopeKey = scopeKey, items = {}, order = {}, nextId = 1 }
@@ -58,6 +64,7 @@ function M.add(q, item)
     local quantity = validQuantity(item.quantity)
     if quantity == nil then return nil, M.REASON_INVALID_ITEM end
     local link = type(item.link) == "string" and item.link ~= "" and item.link or nil
+    if #q.order >= M.MAX_ITEMS then return nil, M.REASON_QUEUE_FULL end
     local id = q.nextId
     q.nextId = q.nextId + 1
     q.items[id] = { id = id, itemId = itemId, link = link, quantity = quantity }
@@ -167,7 +174,8 @@ function M.setPrice(q, id, price)
         q.items[id].manualPrice = nil
         return true
     end
-    if type(price) ~= "number" or price ~= price or price % 1 ~= 0 or price <= 0 then
+    if type(price) ~= "number" or price ~= price or price % 1 ~= 0
+        or price < 0 or price > M.MAX_PRICE then
         return false
     end
     q.items[id].manualPrice = price
@@ -234,7 +242,10 @@ function M.gate(row, ctx)
     if ctx.scopeChanged then return M.REASON_SCOPE_CHANGED end
     if ctx.pendingStart then return M.REASON_PENDING_START end
     if row.price == nil then return M.REASON_PRICE_UNRESOLVED end
-    if row.price % 1 ~= 0 or row.price <= 0 then return M.REASON_INVALID_ITEM end
+    if type(row.price) ~= "number" or row.price ~= row.price or row.price % 1 ~= 0
+        or row.price < 0 or row.price > M.MAX_PRICE then
+        return M.REASON_INVALID_ITEM
+    end
     return nil
 end
 

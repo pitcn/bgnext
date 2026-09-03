@@ -17,7 +17,7 @@ local M = {}
 local Queue = assert(BG.BGNext.AuctionQueue, "AuctionQueue must load before AuctionQueueRuntime")
 local Store = BG.BGNext.AuctionPriceStore
 
-local MAX_ROWS = 40
+local MAX_ROWS = Queue.MAX_ITEMS
 local ROW_HEIGHT = 26
 local TIMEOUT_SECONDS = 10
 
@@ -42,6 +42,7 @@ local REASON_TEXT = {
     [Queue.REASON_PENDING_START] = L["已有待确认的拍卖"],
     [Queue.REASON_SCOPE_CHANGED] = L["团队或表格已变更"],
     [Queue.REASON_PRICE_CHANGED] = L["起拍价已变更，请重新确认"],
+    [Queue.REASON_QUEUE_FULL] = L["待拍队列已满（最多40项）"],
 }
 
 local SOURCE_TEXT = {
@@ -185,7 +186,13 @@ function M.addFromText(text, quantity)
         return nil
     end
     local link = "item:" .. itemId
-    local id = M.add({ itemId = itemId, link = link, quantity = quantity })
+    local id, reason = M.add({ itemId = itemId, link = link, quantity = quantity })
+    if id == nil then
+        local text = M.reasonText(reason)
+        if text and type(BG.SendSystemMessage) == "function" then
+            BG.SendSystemMessage(text)
+        end
+    end
     M.refreshUI()
     return id
 end
@@ -284,6 +291,31 @@ local function installSecondGate(frame, pending)
         if type(frame.Edit3.SetEnabled) == "function" then frame.Edit3:SetEnabled(false) end
     end
 
+    -- Bind the approved amount to the confirmation button's per-send money so the
+    -- legacy handler (`self.money or BiaoGe.Auction.money`) can never fall back to
+    -- a stale global preset. The saved preset is left untouched.
+    local approved = type(pending.snapshot) == "table" and pending.snapshot.price or nil
+    if approved ~= nil then
+        frame.bt.money = approved
+    end
+
+    -- Show the approved amount in Edit2 without writing back to the saved preset
+    -- (the legacy OnTextChanged stores whatever is typed into BiaoGe.Auction).
+    if type(frame.Edit2) == "table" and type(frame.Edit2.SetText) == "function" then
+        local edit2 = frame.Edit2
+        local onChanged
+        if type(edit2.GetScript) == "function" then
+            onChanged = edit2:GetScript("OnTextChanged")
+            if type(edit2.SetScript) == "function" then
+                edit2:SetScript("OnTextChanged", nil)
+            end
+        end
+        edit2:SetText(tostring(approved))
+        if onChanged and type(edit2.SetScript) == "function" then
+            edit2:SetScript("OnTextChanged", onChanged)
+        end
+    end
+
     local original = type(frame.bt.GetScript) == "function" and frame.bt:GetScript("OnClick")
     if type(frame.bt.SetScript) == "function" then
         frame.bt:SetScript("OnClick", function(self)
@@ -294,6 +326,19 @@ local function installSecondGate(frame, pending)
                     BG.SendSystemMessage(text)
                 end
                 return
+            end
+            -- Editing the price box after confirmation invalidates the approval;
+            -- require a fresh confirm instead of silently sending a changed amount.
+            if approved ~= nil and type(frame.Edit2) == "table"
+                and type(frame.Edit2.GetText) == "function" then
+                local edited = tonumber(frame.Edit2:GetText())
+                if edited ~= approved then
+                    local text = M.reasonText(Queue.REASON_PRICE_CHANGED)
+                    if text and type(BG.SendSystemMessage) == "function" then
+                        BG.SendSystemMessage(text)
+                    end
+                    return
+                end
             end
             if type(frame.Edit3) == "table" and type(frame.Edit3.SetText) == "function" then
                 frame.Edit3:SetText("1")
@@ -359,7 +404,8 @@ end
 local function onLoopback(frame)
     local pending = state.pending
     if not pending then return end
-    if type(frame) ~= "table" or frame.itemID ~= pending.itemId then return end
+    if not pending.fired or pending.auctionID == nil then return end
+    if type(frame) ~= "table" or frame.auctionID ~= pending.auctionID then return end
     local q = M.ensureQueue()
     Queue.decrement(q, pending.id)
     state.pending = nil
@@ -410,7 +456,8 @@ function M.refreshUI()
         end
     end
     if type(frame.SetHeight) == "function" then
-        frame:SetHeight(frame.headerHeight + #rows * ROW_HEIGHT + 10)
+        local shown = math.min(#rows, MAX_ROWS)
+        frame:SetHeight(frame.headerHeight + shown * ROW_HEIGHT + 10)
     end
 end
 
@@ -650,6 +697,22 @@ BG.Init(function()
                 installSecondGate(BG.StartAucitonFrame, state.pending)
             end
             return result
+        end
+    end
+
+    -- Capture the auctionID this local send generated so the created-auction
+    -- round-trip can be matched exactly (never by itemID or timing alone). The
+    -- wrapped send returns the same auctionID, so every existing caller stays
+    -- compatible; only the fired queue pending records it.
+    if type(BG.SendStartAuctionMsg) == "function" then
+        local originalSend = BG.SendStartAuctionMsg
+        BG.SendStartAuctionMsg = function(itemID, money, duration, link)
+            local auctionID = originalSend(itemID, money, duration, link)
+            if state.pending and state.pending.fired and state.pending.auctionID == nil
+                and state.pending.itemId == itemID then
+                state.pending.auctionID = auctionID
+            end
+            return auctionID
         end
     end
 

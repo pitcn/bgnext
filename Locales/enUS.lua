@@ -3128,6 +3128,7 @@ do -- BGNext auction price presets
     L["已有待确认的拍卖"] = "A queued auction is already pending confirmation"
     L["团队或表格已变更"] = "The raid or table has changed"
     L["起拍价已变更，请重新确认"] = "The starting price changed, please confirm again"
+    L["待拍队列已满（最多40项）"] = "Pending auction queue is full (max 40 items)"
     L["导出价格"] = "Export Prices"
     L["导入"] = "Import"
     L["导入成功。"] = "Import complete."

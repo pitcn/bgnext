@@ -122,20 +122,33 @@ return function(test)
     local after = {}
     BG.After = function(delay, fn) after[#after + 1] = { delay = delay, fn = fn } end
     local sends = 0
+    local sentRecords = {}
+    local auctionIdSeq = 0
     local clearCalls = 0
     local defaultResolve = function(root, family, raidId, itemId)
         if itemId == 1001 then return { price = 900, source = "override" } end
         if itemId == 1002 then return { price = 500, source = "base" } end
         return nil
     end
+    BiaoGe = { Auction = { money = 100 } }
+    BG.SendStartAuctionMsg = function(itemID, money, duration, link)
+        auctionIdSeq = auctionIdSeq + 1
+        sends = sends + 1
+        sentRecords[#sentRecords + 1] = { auctionID = auctionIdSeq, itemID = itemID, money = money }
+        return auctionIdSeq
+    end
     BG.StartAuction = function(link, bt, isNotAuctioned, notAlt, isRightButton, noSound, callback)
+        local itemId = tonumber(tostring(link):match("item:(%d+)")) or 1001
         local frame = fakeFrame("StartAucitonFrame")
         frame.Edit3 = fakeFrame("Edit3")
         frame.Edit3.text = "5"
+        frame.Edit2 = fakeFrame("Edit2")
+        frame.Edit2.text = tostring(BiaoGe.Auction.money)
         frame.bt = fakeFrame("bt")
-        frame.bt.items = { { id = 1001, link = link } }
+        frame.bt.items = { { id = itemId, link = link } }
         frame.bt:SetScript("OnClick", function(self)
-            sends = sends + 1
+            local money = self.money or tonumber(BiaoGe.Auction.money)
+            BG.SendStartAuctionMsg(self.items[1].id, money, 40, self.items[1].link)
             frame:Hide()
         end)
         BG.StartAucitonFrame = frame
@@ -167,6 +180,8 @@ return function(test)
         M.clear()
         M.onLeavingWorld()
         sends = 0
+        sentRecords = {}
+        auctionIdSeq = 0
         after = {}
         messages = {}
     end
@@ -175,8 +190,12 @@ return function(test)
         BG.StartAucitonFrame.bt.scripts.OnClick(BG.StartAucitonFrame.bt)
     end
 
-    local function loopback(itemID)
-        BG.HookCreateAuction({ itemID = itemID, link = "item:" .. itemID })
+    local function lastAuctionID()
+        return sentRecords[#sentRecords] and sentRecords[#sentRecords].auctionID
+    end
+
+    local function loopback(itemID, auctionID)
+        BG.HookCreateAuction({ itemID = itemID, link = "item:" .. itemID, auctionID = auctionID })
     end
 
     -- --- Finding 1: opening the dialog never removes the row ----------------
@@ -210,7 +229,7 @@ return function(test)
     clickStart()
     test.eq(sends, 1, "a second click never re-sends")
 
-    loopback(1001)
+    loopback(1001, lastAuctionID())
     test.eq(M.state().queueSize, 0, "the matching loopback removes the row")
     test.eq(M.state().hasPending, false, "the loopback clears the pending")
 
@@ -220,14 +239,14 @@ return function(test)
     local qid = M.add({ itemId = 1001, link = "item:1001", quantity = 2 })
     test.eq(M.confirm(qid), true, "first confirm opens for a quantity-two row")
     clickStart()
-    loopback(1001)
+    loopback(1001, lastAuctionID())
     test.eq(M.state().queueSize, 1, "quantity two becomes one, not removed")
     test.eq(M.project()[1].quantity, 1, "remaining quantity is one")
     test.eq(M.state().hasPending, false, "pending cleared after the round-trip")
 
     test.eq(M.confirm(M.project()[1].id), true, "second confirm opens again")
     clickStart()
-    loopback(1001)
+    loopback(1001, lastAuctionID())
     test.eq(M.state().queueSize, 0, "the second confirm removes the last quantity")
 
     -- --- Finding 1: a timed-out send keeps the entry ------------------------
@@ -396,13 +415,92 @@ return function(test)
     test.eq(type(entry), "table", "the main-tab entry button is built")
     test.eq(entry.text, "待拍队列", "the entry is labelled with the queue title")
 
+    -- --- Finding 7: exact loopback binding (auctionID, not itemID) ---------
+
+    -- quantity=2, open confirm but do NOT click Start, then inject a same-item
+    -- other-auction frame: the row is untouched.
+    freshQueue()
+    local b1 = M.add({ itemId = 1001, link = "item:1001", quantity = 2 })
+    test.eq(M.confirm(b1), true, "confirm opens without starting")
+    loopback(1001, 777)
+    test.eq(M.project()[1].quantity, 2, "a same-item loopback before Start never consumes")
+    test.eq(M.state().queueSize, 1, "the quantity-two row is still one row")
+
+    -- Click Start, then only the exact auctionID consumes, exactly once.
+    clickStart()
+    test.eq(M.state().pendingFired, true, "Start marks the pending fired")
+    loopback(1001, 999)
+    test.eq(M.project()[1].quantity, 2, "a wrong auctionID loopback is ignored")
+    loopback(1001, lastAuctionID())
+    test.eq(M.project()[1].quantity, 1, "the exact auctionID decrements exactly once")
+    test.eq(M.state().hasPending, false, "the round-trip clears the pending")
+    loopback(1001, lastAuctionID())
+    test.eq(M.project()[1].quantity, 1, "a repeated loopback never consumes again")
+
+    -- --- Finding 8: approved price is bound to the real send amount ---------
+
+    -- manual=500, stale global=100, no edit -> sends 500, never 100.
+    freshQueue()
+    BiaoGe.Auction.money = 100
+    local p1 = M.add({ itemId = 1003, link = "item:1003" })
+    test.eq(M.setPrice(p1, 500), true, "manual price 500 stored")
+    test.eq(M.confirm(p1), true, "manual price confirm opens")
+    test.eq(BG.StartAucitonFrame.bt.money, 500, "button money bound to the approved amount")
+    test.eq(BG.StartAucitonFrame.Edit2.text, "500", "dialog displays the approved amount")
+    test.eq(BiaoGe.Auction.money, 100, "the saved preset is not mutated")
+    clickStart()
+    test.eq(sends, 1, "start sends once")
+    test.eq(sentRecords[1].money, 500, "the stale global never swaps the approved amount")
+
+    -- manual=500, stale global=100, Edit2 edited to 999 -> blocked, never 999.
+    freshQueue()
+    BiaoGe.Auction.money = 100
+    local p2 = M.add({ itemId = 1003, link = "item:1003" })
+    test.eq(M.setPrice(p2, 500), true, "second manual price 500 stored")
+    test.eq(M.confirm(p2), true, "second manual confirm opens")
+    BG.StartAucitonFrame.Edit2.text = "999"
+    clickStart()
+    test.eq(sends, 0, "editing the dialog input after confirm blocks the send")
+    test.eq(M.state().queueSize, 1, "the row is kept for a fresh confirm")
+    test.eq(M.state().pendingFired, false, "the blocked send is not marked fired")
+    BG.StartAucitonFrame:Hide()
+
+    -- --- Finding 9: integer zero starting price is sent as zero -------------
+
+    freshQueue()
+    local z1 = M.add({ itemId = 1003, link = "item:1003" })
+    test.eq(M.setPrice(z1, 0), true, "manual zero price accepted")
+    test.eq(M.confirm(z1), true, "zero-price row is confirmable")
+    test.eq(BG.StartAucitonFrame.bt.money, 0, "zero bound to the button")
+    test.eq(BG.StartAucitonFrame.Edit2.text, "0", "dialog displays zero")
+    clickStart()
+    test.eq(sends, 1, "zero price sends once")
+    test.eq(sentRecords[1].money, 0, "zero is sent as zero through the send path")
+    loopback(1003, lastAuctionID())
+    test.eq(M.state().queueSize, 0, "the zero-price round-trip consumes the row")
+
+    -- --- Finding 10: the 41st row is rejected with a localized reason -------
+
+    freshQueue()
+    for i = 1, 40 do
+        M.add({ itemId = 5000 + i, link = "item:" .. (5000 + i) })
+    end
+    test.eq(M.state().queueSize, 40, "forty rows are accepted")
+    local overflow, overflowReason = M.add({ itemId = 6000, link = "item:6000" })
+    test.eq(overflow, nil, "the 41st row is rejected")
+    test.eq(overflowReason, "queue-full", "the rejection reason is queue-full")
+    test.eq(M.state().queueSize, 40, "the queue stays at 40")
+    M.addFromText("item:6000")
+    test.eq(messages[#messages], "待拍队列已满（最多40项）", "a localized full-queue message is shown")
+    test.eq(M.state().queueSize, 40, "a rejected typed add never grows the queue")
+
     -- --- Finding 6: the runtime never sends directly ------------------------
 
     local file = assert(io.open("Core/BGNext/AuctionQueueRuntime.lua", "rb"))
     local source = file:read("*a")
     file:close()
     for _, token in ipairs({
-        "SendStartAuctionMsg",
+        "BG.SendStartAuctionMsg(",
         "SendAddonMessage",
         "C_ChatInfo.SendAddonMessage",
         "SendChatMessage",

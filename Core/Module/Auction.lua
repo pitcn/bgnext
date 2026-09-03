@@ -234,9 +234,11 @@ BG.Init(function()
         local errorMsg = L['错误：同时拍卖的数量不能超过%s个']:format(maxCount)
 
         function BG.SendStartAuctionMsg(itemID, money, duration, link)
+            local auctionID = GetTime()
             local text = format("StartAuction,%s,%s,%s,%s,,%s,%s",
-                GetTime(), itemID, money, duration, "normal", link)
+                auctionID, itemID, money, duration, "normal", link)
             C_ChatInfo.SendAddonMessage("BiaoGeAuction", text, "RAID")
+            return auctionID
         end
 
         local function OverAuctionMaxCount(i)
