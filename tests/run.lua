@@ -58,6 +58,7 @@ local suites = {
     "tests/test_auction_timer_sync.lua",
     "tests/test_auction_readiness.lua",
     "tests/test_auction_queue.lua",
+    "tests/test_auction_queue_runtime.lua",
     "tests/test_ledger_capture.lua",
     "tests/test_ledger_runtime_privacy.lua",
     "tests/test_chat_yy_copy.lua",

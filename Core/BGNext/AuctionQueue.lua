@@ -16,6 +16,9 @@ M.REASON_COMBAT = "combat"
 M.REASON_INVALID_ITEM = "invalid-item"
 M.REASON_PRICE_UNRESOLVED = "price-unresolved"
 M.REASON_AUCTION_BUSY = "auction-busy"
+M.REASON_PENDING_START = "pending-start"
+M.REASON_SCOPE_CHANGED = "scope-changed"
+M.REASON_PRICE_CHANGED = "price-changed"
 
 function M.create(scopeKey)
     return { scopeKey = scopeKey, items = {}, order = {}, nextId = 1 }
@@ -111,6 +114,66 @@ function M.clear(q)
     q.order = {}
 end
 
+-- Consumes exactly one pending item from a row: a quantity of one removes the
+-- row, a higher quantity decrements by one and leaves the row to be confirmed
+-- again. Returns the remaining quantity, nil when the row was removed, or false
+-- for an unknown id.
+function M.decrement(q, id)
+    if type(q) ~= "table" or type(q.items) ~= "table" or type(q.items[id]) ~= "table" then
+        return false
+    end
+    local item = q.items[id]
+    if item.quantity <= 1 then
+        M.remove(q, id)
+        return nil
+    end
+    item.quantity = item.quantity - 1
+    return item.quantity
+end
+
+-- Replaces a row's quantity with an exact validated value. Returns true on
+-- success, false for an unknown id or an invalid quantity.
+function M.setQuantity(q, id, quantity)
+    if type(q) ~= "table" or type(q.items) ~= "table" or type(q.items[id]) ~= "table" then
+        return false
+    end
+    local value = validQuantity(quantity)
+    if value == nil then return false end
+    q.items[id].quantity = value
+    return true
+end
+
+-- Shifts a row's quantity by `delta` and clamps to the valid range. Returns the
+-- new quantity, or false for an unknown id or an out-of-range result.
+function M.adjustQuantity(q, id, delta)
+    if type(q) ~= "table" or type(q.items) ~= "table" or type(q.items[id]) ~= "table" then
+        return false
+    end
+    if type(delta) ~= "number" then return false end
+    local value = validQuantity(q.items[id].quantity + delta)
+    if value == nil then return false end
+    q.items[id].quantity = value
+    return value
+end
+
+-- Records (or clears, with nil) the leader's memory-only manual starting price
+-- for a row whose scheme price could not be resolved. Returns true on success,
+-- false for an unknown id or a non-positive non-integer price.
+function M.setPrice(q, id, price)
+    if type(q) ~= "table" or type(q.items) ~= "table" or type(q.items[id]) ~= "table" then
+        return false
+    end
+    if price == nil then
+        q.items[id].manualPrice = nil
+        return true
+    end
+    if type(price) ~= "number" or price ~= price or price % 1 ~= 0 or price <= 0 then
+        return false
+    end
+    q.items[id].manualPrice = price
+    return true
+end
+
 function M.size(q)
     if type(q) ~= "table" or type(q.order) ~= "table" then return 0 end
     return #q.order
@@ -139,6 +202,9 @@ function M.project(q, resolvePrice)
             end
             if price == nil then
                 source = M.SOURCE_MANUAL
+                if type(item.manualPrice) == "number" then
+                    price = item.manualPrice
+                end
             elseif source ~= M.SOURCE_OVERRIDE and source ~= M.SOURCE_BASE then
                 source = M.SOURCE_BASE
             end
@@ -165,7 +231,10 @@ function M.gate(row, ctx)
     if not ctx.isController then return M.REASON_NO_PERMISSION end
     if ctx.inCombat then return M.REASON_COMBAT end
     if ctx.auctionInProgress then return M.REASON_AUCTION_BUSY end
+    if ctx.scopeChanged then return M.REASON_SCOPE_CHANGED end
+    if ctx.pendingStart then return M.REASON_PENDING_START end
     if row.price == nil then return M.REASON_PRICE_UNRESOLVED end
+    if row.price % 1 ~= 0 or row.price <= 0 then return M.REASON_INVALID_ITEM end
     return nil
 end
 

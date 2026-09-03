@@ -91,6 +91,52 @@ return function(test)
         "an unresolved price blocks confirm and asks for manual input")
     test.eq(queue.gate(nil, allowed), "invalid-item", "a missing row is an invalid item")
 
+    -- New gate reasons: an in-flight pending confirm and a changed scope both
+    -- block a confirm, and a non-positive non-integer price is invalid.
+    test.eq(queue.gate(rows[2], { isController = true, inCombat = false, auctionInProgress = false, pendingStart = true }),
+        "pending-start", "an existing pending start blocks confirm")
+    test.eq(queue.gate(rows[2], { isController = true, inCombat = false, auctionInProgress = false, scopeChanged = true }),
+        "scope-changed", "a changed raid/table scope blocks confirm")
+    local fractional = { id = 1, itemId = 1001, link = "item:1001", quantity = 1, price = 100.5, source = "base" }
+    test.eq(queue.gate(fractional, allowed), "invalid-item", "a fractional price is invalid")
+
+    -- --- Consume / quantity / manual price ----------------------------------
+
+    local d = queue.create("raid:ULD")
+    local q2 = queue.add(d, { itemId = 1001, link = "item:1001", quantity = 2 })
+    test.eq(queue.decrement(d, q2), 1, "decrement from two leaves one")
+    test.eq(d.items[q2].quantity, 1, "quantity reduced by exactly one")
+    test.eq(queue.decrement(d, q2), nil, "decrement from one removes the row")
+    test.eq(queue.size(d), 0, "row removed at quantity zero")
+    test.eq(queue.decrement(d, q2), false, "decrement on an unknown id is a no-op")
+
+    local q3 = queue.add(d, { itemId = 1002, link = "item:1002", quantity = 1 })
+    test.eq(queue.setQuantity(d, q3, 4), true, "setQuantity accepts a valid value")
+    test.eq(d.items[q3].quantity, 4, "setQuantity writes the exact value")
+    test.eq(queue.setQuantity(d, q3, 0), false, "setQuantity rejects zero")
+    test.eq(queue.setQuantity(d, q3, 1.5), false, "setQuantity rejects a fraction")
+    test.eq(queue.adjustQuantity(d, q3, -1), 3, "adjustQuantity decrements")
+    test.eq(queue.adjustQuantity(d, q3, 1), 4, "adjustQuantity increments")
+    test.eq(queue.adjustQuantity(d, q3, -999), false, "adjustQuantity clamps below the valid range")
+
+    test.eq(queue.setPrice(d, q3, 1200), true, "setPrice records a manual price")
+    test.eq(d.items[q3].manualPrice, 1200, "manual price stored on the row")
+    test.eq(queue.setPrice(d, q3, 0), false, "setPrice rejects a non-positive price")
+    test.eq(queue.setPrice(d, q3, 12.5), false, "setPrice rejects a fractional price")
+    test.eq(queue.setPrice(d, q3, nil), true, "setPrice clears the manual price")
+    test.eq(d.items[q3].manualPrice, nil, "manual price cleared")
+
+    -- Manual price resolves an otherwise unresolved row in projection.
+    local manual = queue.create("raid:ULD")
+    local qm = queue.add(manual, { itemId = 1003, link = "item:1003" })
+    local projected = queue.project(manual, resolvePrice)
+    test.eq(projected[1].price, nil, "unresolved row has no price")
+    test.eq(projected[1].source, "manual", "unresolved row asks for manual input")
+    queue.setPrice(manual, qm, 1500)
+    projected = queue.project(manual, resolvePrice)
+    test.eq(projected[1].price, 1500, "manual price resolves the row")
+    test.eq(projected[1].source, "manual", "manual price keeps the manual source")
+
     -- --- Cleanup boundary ---------------------------------------------------
 
     test.eq(queue.scopeChanged(q, "raid:ULD"), false, "same scope is retained")
