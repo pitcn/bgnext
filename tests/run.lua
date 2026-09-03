@@ -66,6 +66,8 @@ local suites = {
     "tests/test_highlight_manager.lua",
     "tests/test_highlight_integration.lua",
     "tests/test_event_refresh.lua",
+    "tests/test_trade_announcement.lua",
+    "tests/test_trade_announcement_events.lua",
 }
 
 for _, path in ipairs(suites) do
