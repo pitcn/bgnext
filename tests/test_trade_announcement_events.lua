@@ -71,8 +71,26 @@ return function(test)
     test.eq(#sent, 3, "window close announces nothing")
 
     -- A blank target must not announce.
-    events.TRADE_SHOW()
     BG.trade.target = "   "
+    events.TRADE_SHOW()
     events.UI_INFO_MESSAGE(nil, nil, nil, ERR_TRADE_COMPLETE)
     test.eq(#sent, 3, "blank target is not announced")
+
+    -- The partner is captured when the trade window is shown, not re-read at
+    -- result time. The live Trade.lua handler clears BG.trade.target right after
+    -- TRADE_SHOW; a completion before the refresh repopulates it must still
+    -- whisper the partner who was visible at show time.
+    BG.trade.target = "甲"
+    events.TRADE_SHOW() -- captures "甲"
+    BG.trade.target = nil -- models ResetTradeInfo clearing the target
+    events.UI_INFO_MESSAGE(nil, nil, nil, ERR_TRADE_COMPLETE)
+    test.eq(#sent, 4, "the partner captured at show time is still announced")
+    test.eq(sent[4].target, "甲", "the cleared target does not suppress the announcement")
+
+    -- A partner change between trades must not reuse the previous partner.
+    BG.trade.target = "乙"
+    events.TRADE_SHOW() -- captures "乙"
+    events.UI_INFO_MESSAGE(nil, nil, nil, ERR_TRADE_COMPLETE)
+    test.eq(#sent, 5, "the second partner is announced")
+    test.eq(sent[5].target, "乙", "the second trade whispers the new partner, not the old one")
 end

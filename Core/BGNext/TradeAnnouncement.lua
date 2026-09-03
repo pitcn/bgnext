@@ -97,12 +97,16 @@ if BG.Init then
     BG.Init(function()
         local L = ns and ns.L
 
-        -- Memory-only, per-trade-window guard: one announcement per result.
+        -- Memory-only, per-trade-window guard: one announcement per result, and
+        -- the trade partner visible when the window opened. The partner is
+        -- captured here because the live Trade.lua handler resets BG.trade (and
+        -- clears target) immediately after TRADE_SHOW; reading BG.trade.target
+        -- again at result time would either be nil or a later trade's partner.
         local announced = false
+        local tradeTarget = nil
 
         local function announce(kind)
-            local trade = BG.trade
-            local target = type(trade) == "table" and trade.target or nil
+            local target = tradeTarget
             local options = BiaoGe and BiaoGe.options or {}
             local decision = M.decide({
                 master = options.tradeMSG == 1,
@@ -124,6 +128,8 @@ if BG.Init then
 
         BG.RegisterEvent("TRADE_SHOW", function()
             announced = false
+            local trade = BG.trade
+            tradeTarget = type(trade) == "table" and trade.target or nil
         end)
 
         BG.RegisterEvent("UI_INFO_MESSAGE", function(_, _, _, text)
