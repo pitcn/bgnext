@@ -45,12 +45,31 @@ local RAID_STATE_FIELDS = {
     difficulties = "table",
 }
 
--- A retail lockout's per-difficulty breakdown. Every difficulty keeps only its
--- own killed/total boss counts, so Normal/Heroic/Mythic stay isolated.
+-- A retail lockout's per-difficulty breakdown. Every difficulty keeps its own
+-- killed/total boss counts and its own per-boss list, so Normal/Heroic/Mythic
+-- stay isolated.
 local DIFFICULTY_STATE_FIELDS = {
     difficulty = "number", difficultyLabel = "string",
     completedParts = "number", totalParts = "number", resetsAt = "number",
 }
+
+-- A difficulty's per-boss list is whitelisted down to {name, killed}. A boss must
+-- carry both a non-empty localized name and a boolean killed flag; an entry that
+-- lacks either is dropped entirely, and texture ids, encounter ids and unknown
+-- returns never survive.
+local function copyBossEncounters(source)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for index, record in ipairs(source) do
+        if type(record) == "table" then
+            local name, killed = record.name, record.killed
+            if type(name) == "string" and name ~= "" and type(killed) == "boolean" then
+                copy[#copy + 1] = { name = name, killed = killed }
+            end
+        end
+    end
+    return copy
+end
 
 local PROFESSION_FIELDS = {
     name = "string", skill = "number", maxSkill = "number",
@@ -159,10 +178,26 @@ local function copyCurrencyMap(source)
     return copy
 end
 
+-- Copies a retail difficulty's allowed fields plus its own whitelisted per-boss
+-- list. No lockout ID, GUID, raw tuple, boss texture or unknown flag survives.
+local function copyDifficulties(source)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for index, record in ipairs(source) do
+        local entry = copyRecord(record, DIFFICULTY_STATE_FIELDS)
+        if entry and next(entry) ~= nil then
+            entry.encounters = copyBossEncounters(record.encounters)
+            copy[#copy + 1] = entry
+        end
+    end
+    return copy
+end
+
 -- Raid states get a nested whitelist: the flat fields plus a sanitized
 -- `difficulties` array. This replaces copyRecordMap so the array is copied
--- deeply rather than carried by reference. No per-boss `encounters` array is
--- accepted: per-boss completion is never reconstructed from a kill count.
+-- deeply rather than carried by reference, and each difficulty's own per-boss
+-- list is whitelisted the same way. Per-boss completion is never reconstructed
+-- from a kill count.
 local function sanitizeRaidStates(source)
     if type(source) ~= "table" then return {} end
     local copy = {}
@@ -170,7 +205,7 @@ local function sanitizeRaidStates(source)
         if isKey(key) then
             local entry = copyRecord(record, RAID_STATE_FIELDS)
             if entry and next(entry) ~= nil then
-                entry.difficulties = copyArray(record.difficulties, DIFFICULTY_STATE_FIELDS)
+                entry.difficulties = copyDifficulties(record.difficulties)
                 copy[key] = entry
             end
         end
@@ -310,6 +345,49 @@ function M.list(root, clientFamily)
     return rows
 end
 
+local function difficultyRank(label)
+    if label == "M" then return 4 end
+    if label == "H" then return 3 end
+    if label == "N" then return 2 end
+    if label == "LFR" then return 1 end
+    return 0
+end
+
+-- After pruning expired difficulties, the root flat fields must describe the
+-- highest remaining difficulty carrying progress (or the highest difficulty when
+-- none has kills yet), never a stale representative that already expired.
+local function recomputeRaidState(state, entries)
+    local best
+    for _, entry in ipairs(entries) do
+        if type(entry) == "table" then
+            if not best then
+                best = entry
+            else
+                local entryProgress = type(entry.completedParts) == "number" and entry.completedParts > 0
+                local bestProgress = type(best.completedParts) == "number" and best.completedParts > 0
+                if entryProgress and not bestProgress then
+                    best = entry
+                elseif entryProgress == bestProgress
+                    and difficultyRank(entry.difficultyLabel) > difficultyRank(best.difficultyLabel) then
+                    best = entry
+                end
+            end
+        end
+    end
+    if not best then return end
+    state.difficulty = best.difficulty
+    state.difficultyLabel = best.difficultyLabel
+    state.completedParts = best.completedParts
+    state.totalParts = best.totalParts
+    state.progress = state.completedParts
+    state.total = state.totalParts
+    if state.totalParts and state.totalParts > 0 and state.completedParts == state.totalParts then
+        state.completed = true
+    else
+        state.completed = nil
+    end
+end
+
 -- Weekly state is valid only until its official reset. Expired entries are
 -- deleted outright; they are never demoted into a previous-week record. A retail
 -- state expires per difficulty: only the reset difficulties are pruned, and the
@@ -346,6 +424,7 @@ function M.expireRaidStates(root, now)
                                     else
                                         state.difficulties = kept
                                         if resetsAt then state.resetsAt = resetsAt end
+                                        recomputeRaidState(state, kept)
                                     end
                                 else
                                     local resetsAt = type(state.resetsAt) == "number" and state.resetsAt or nil

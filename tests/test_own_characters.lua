@@ -269,4 +269,91 @@ return function(test)
     mutableDifficulties[1].completedParts = 0
     test.eq(M.get(retailRoot, "retail", 123, "Piti").raidStates.DR.difficulties[1].completedParts, 6,
         "raid difficulty arrays are deep-copied")
+
+    -- A retail difficulty's own per-boss list is deep-copied and whitelisted:
+    -- only a boss's localized name and boolean killed state survive; texture
+    -- ids, unknown flags, ids and raw tuples are dropped with the rest of the
+    -- junk.
+    local bossRoot = {}
+    local bossSaved = M.upsert(bossRoot, "retail", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        raidStates = {
+            DR = {
+                difficulty = 16, difficultyLabel = "M", completedParts = 2, totalParts = 2,
+                completed = true, resetsAt = 9000,
+                difficulties = {
+                    {
+                        difficulty = 16, difficultyLabel = "M",
+                        completedParts = 2, totalParts = 2, resetsAt = 9000,
+                        encounters = {
+                            { name = "首王", killed = false, fileDataID = 111, unknown4 = false, id = 1001 },
+                            { name = "次王", killed = true, fileDataID = 222, unknown4 = false },
+                            { name = 42, killed = false },
+                            { killed = true },
+                            { name = "三王", killed = "yes" },
+                        },
+                    },
+                },
+            },
+        },
+    })
+    local bossDiff = bossSaved.raidStates.DR.difficulties[1]
+    test.eq(type(bossDiff.encounters), "table", "a retail difficulty keeps its per-boss list")
+    test.eq(#bossDiff.encounters, 2, "only bosses with a name and boolean killed state survive")
+    test.eq(bossDiff.encounters[1].name, "首王", "a boss name survives the whitelist")
+    test.eq(bossDiff.encounters[1].killed, false, "a not-killed flag survives")
+    test.eq(bossDiff.encounters[1].fileDataID, nil, "the texture id is dropped")
+    test.eq(bossDiff.encounters[1].unknown4, nil, "the unknown fourth flag is dropped")
+    test.eq(bossDiff.encounters[1].id, nil, "a raw encounter id is dropped")
+    test.eq(bossDiff.encounters[2].name, "次王", "the second boss name survives")
+    test.eq(bossDiff.encounters[2].killed, true, "a killed flag survives")
+
+    -- Per-boss lists are deep-copied so callers cannot mutate stored state.
+    local mutableBosses = { { name = "首王", killed = false } }
+    M.upsert(bossRoot, "retail", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        raidStates = {
+            DR = {
+                difficulty = 16, difficultyLabel = "M", completedParts = 1, totalParts = 1,
+                resetsAt = 9000,
+                difficulties = {
+                    { difficulty = 16, difficultyLabel = "M", completedParts = 1, totalParts = 1,
+                        resetsAt = 9000, encounters = mutableBosses },
+                },
+            },
+        },
+    })
+    mutableBosses[1].killed = true
+    test.eq(M.get(bossRoot, "retail", 123, "Piti").raidStates.DR.difficulties[1].encounters[1].killed, false,
+        "per-boss lists are deep-copied")
+
+    -- Expiring one difficulty repicks the representative and recomputes the flat
+    -- persisted fields, so an expired Mythic 6/6 can never stay as the root
+    -- representative while a Normal 2/6 remains active.
+    local expiryRoot = {}
+    M.upsert(expiryRoot, "retail", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        raidStates = {
+            DR = {
+                difficulty = 16, difficultyLabel = "M", completedParts = 6, totalParts = 6,
+                progress = 6, total = 6, completed = true, resetsAt = 500,
+                difficulties = {
+                    { difficulty = 16, difficultyLabel = "M", completedParts = 6, totalParts = 6, resetsAt = 500 },
+                    { difficulty = 14, difficultyLabel = "N", completedParts = 2, totalParts = 6, resetsAt = 9000 },
+                },
+            },
+        },
+    })
+    M.expireRaidStates(expiryRoot, 1000)
+    local expiryDr = M.get(expiryRoot, "retail", 123, "Piti").raidStates.DR
+    test.eq(#expiryDr.difficulties, 1, "only the active difficulty survives expiry")
+    test.eq(expiryDr.difficulties[1].difficultyLabel, "N", "the nested difficulty is the surviving Normal")
+    test.eq(expiryDr.difficultyLabel, "N", "the root representative is recomputed to Normal")
+    test.eq(expiryDr.difficulty, 14, "the root difficulty id is recomputed to Normal")
+    test.eq(expiryDr.completedParts, 2, "the root completed count is recomputed from Normal")
+    test.eq(expiryDr.totalParts, 6, "the root boss total is recomputed from Normal")
+    test.eq(expiryDr.progress, 2, "the root progress field is recomputed from Normal")
+    test.eq(expiryDr.total, 6, "the root total field is recomputed from Normal")
+    test.eq(expiryDr.completed, nil, "a partial surviving Normal never stays marked complete")
+    test.eq(expiryDr.resetsAt, 9000, "the root reset follows the surviving difficulty")
 end

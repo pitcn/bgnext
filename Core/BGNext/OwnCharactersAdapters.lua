@@ -467,6 +467,30 @@ local function validEncounterPair(numEncounters, encounterProgress)
     return true
 end
 
+-- Reads the real saved-instance per-boss status. GetSavedInstanceEncounterInfo
+-- returns (bossName, fileDataID, isKilled, unknown4) for a locked instance; only
+-- the localized name and the boss's own killed flag are kept, never the texture
+-- id or the unknown fourth return. The whole list is dropped (nil) when the API
+-- is missing or any boss tuple is abnormal, so a missing name or a non-boolean
+-- kill flag can never be fabricated into a boss state.
+local function readBossEncounters(api, instanceIndex, numEncounters)
+    local getEncounter = api and api.GetSavedInstanceEncounterInfo
+    if type(getEncounter) ~= "function" or type(instanceIndex) ~= "number"
+        or type(numEncounters) ~= "number" or numEncounters < 1 then
+        return nil
+    end
+    local bosses = {}
+    for encounterIndex = 1, numEncounters do
+        local ok, bossName, _, isKilled = callAll(getEncounter, instanceIndex, encounterIndex)
+        if not ok or type(isKilled) ~= "boolean"
+            or type(bossName) ~= "string" or bossName == "" then
+            return nil
+        end
+        bosses[#bosses + 1] = { name = bossName, killed = isKilled }
+    end
+    return bosses
+end
+
 -- Reads the saved-instance lockouts for the raids this family renders. Only
 -- columns whose zoneId matches a saved instance produce a state; a lockout with
 -- no reset time still records progress/completion but not a countdown.
@@ -478,11 +502,12 @@ end
 -- reset timestamp so no two difficulties ever merge or share an expiry. A retail
 -- difficulty is published only when its numEncounters and encounterProgress form
 -- one valid pair, so a missing, protected or out-of-range progress leaves the
--- difficulty absent instead of a fabricated 0/N. Retail per-boss completion is
--- deliberately not reconstructed from a kill count: the encounter journal's
--- per-boss contract (GetEncountersOnMap + IsEncounterComplete) needs a uiMapID
--- the saved-instance tuple does not expose, so per-boss detail fails closed to
--- nil until that mapping is verified in game. Every other family keeps the first
+-- difficulty absent instead of a fabricated 0/N. Each retail difficulty also
+-- carries its own `encounters` array of {name, killed} records read from the real
+-- GetSavedInstanceEncounterInfo API; the whole list fails closed to nil when the
+-- API is missing or any boss tuple is abnormal, so per-boss completion is never
+-- reconstructed from the aggregate kill count or the encounter-journal ordering.
+-- Every other family keeps the first
 -- matching lockout per instance, so classic and private-server behaviour is
 -- unchanged.
 function M.readRaidStates(api, raidColumns, family)
@@ -536,6 +561,7 @@ function M.readRaidStates(api, raidColumns, family)
                             totalParts = numEncounters,
                             difficulty = type(difficulty) == "number" and difficulty or nil,
                             difficultyLabel = label,
+                            encounters = readBossEncounters(api, index, numEncounters),
                         }
                         ranked[rank] = state
                     end

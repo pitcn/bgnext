@@ -35,12 +35,15 @@ return function(test)
             20, "难度", numEncounters, encounterProgress, nil, instanceId }
     end
 
-    local function retailStates(savedInstances, encounterJournal)
-        return Adapters.readers("retail", api({
+    local function retailStates(savedInstances, extra)
+        local overrides = {
             GetNumSavedInstances = function() return #savedInstances end,
             GetSavedInstanceInfo = function(index) return unpack(savedInstances[index]) end,
-            C_EncounterJournal = encounterJournal,
-        }), retailColumns, retailCatalog.resourceColumns).raidStates()
+        }
+        for key, value in pairs(extra or {}) do
+            if value == false then overrides[key] = nil else overrides[key] = value end
+        end
+        return Adapters.readers("retail", api(overrides), retailColumns, retailCatalog.resourceColumns).raidStates()
     end
 
     -- 1. LFR + N/H/M coexist: every difficulty (14/15/16/17) is isolated, each
@@ -129,27 +132,68 @@ return function(test)
     test.eq(#mixedBlank.DR.difficulties, 1, "the malformed LFR is absent, not a fabricated 0/4")
     test.eq(mixedBlank.DR.difficulties[1].difficultyLabel, "M", "the surviving difficulty is the valid Mythic")
 
-    -- 8. Per-boss detail fails closed: the encounter journal is never read from a
-    --    saved-instance kill count. GetEncountersOnMap returns
-    --    EncounterJournalMapEncounterInfo records ({encounterID, mapX, mapY}) and
-    --    needs a uiMapID the saved-instance tuple does not expose, so no per-boss
-    --    list is reconstructed and no first-N-killed fabrication is possible.
-    local withJournal = retailStates({ row(2939, 16, 3, 1) }, {
-        GetEncountersOnMap = function(mapID)
-            return { { encounterID = 1001, mapX = 0, mapY = 0 }, { encounterID = 1002, mapX = 1, mapY = 1 } }
+    -- 8. Per-boss detail comes from the real retail saved-instance encounter API
+    --    GetSavedInstanceEncounterInfo(instanceIndex, encounterIndex) ->
+    --    (bossName, fileDataID, isKilled, unknown4). Each difficulty keeps its
+    --    own {name, killed} list from that boss's isKilled flag, never the
+    --    "first N killed" aggregate or the encounter-journal ordering.
+    local bossKills = retailStates({ row(2939, 16, 2, 2) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            if encounterIndex == 1 then return "首王", 111, false, false end
+            return "次王", 222, true, false
         end,
-        GetEncounterInfo = function(id) return { name = "首王" .. tostring(id) } end,
-        IsEncounterComplete = function(id) return id == 1001 end,
     })
-    test.eq(withJournal.DR.encounters, nil,
-        "the real record-tuple journal shape produces no fabricated per-boss list")
-    test.eq(withJournal.DR.completedParts, 1, "the aggregate kill count still renders")
-    local numericArrayJournal = retailStates({ row(2939, 16, 3, 1) }, {
-        GetEncountersOnMap = function(mapID) return { 1001, 1002, 1003 } end,
-        GetEncounterInfo = function(id) return { name = "首王" .. tostring(id) } end,
+    local bosses = bossKills.DR.difficulties[1].encounters
+    test.eq(type(bosses), "table", "per-boss detail is stored per difficulty")
+    test.eq(#bosses, 2, "every boss in the saved instance is listed")
+    test.eq(bosses[1].name, "首王", "boss 1 keeps its localized name")
+    test.eq(bosses[1].killed, false, "boss 1 not killed is recorded, not fabricated as killed")
+    test.eq(bosses[2].name, "次王", "boss 2 keeps its localized name")
+    test.eq(bosses[2].killed, true, "boss 2 killed is recorded from its own flag")
+    test.eq(bosses[2].fileDataID, nil, "the texture id is never stored")
+    test.eq(bosses[2].unknown4, nil, "the unknown fourth return is never stored")
+
+    -- A non-prefix kill: boss 1 skipped, boss 2 killed must never become "first
+    -- 2 killed". The aggregate still uses the farthest-reached kill count.
+    local nonPrefix = retailStates({ row(2939, 15, 3, 2) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            local names = { "一王", "二王", "三王" }
+            local killed = { false, true, false }
+            return names[encounterIndex], nil, killed[encounterIndex], false
+        end,
     })
-    test.eq(numericArrayJournal.DR.encounters, nil,
-        "a numeric-array journal no longer fabricates a first-N-killed list")
+    local nb = nonPrefix.DR.difficulties[1].encounters
+    test.eq(#nb, 3, "all three bosses are listed")
+    test.eq(nb[1].killed, false, "boss 1 is not killed")
+    test.eq(nb[2].killed, true, "boss 2 is killed")
+    test.eq(nb[3].killed, false, "boss 3 is not killed")
+    test.eq(nonPrefix.DR.difficulties[1].completedParts, 2,
+        "the aggregate keeps the farthest-reached kill count")
+
+    -- Fail closed: a missing encounter API stores no per-boss list, only the
+    -- reliable aggregate count.
+    local noEncounterApi = retailStates({ row(2939, 16, 3, 1) })
+    test.eq(noEncounterApi.DR.difficulties[1].encounters, nil,
+        "a missing encounter API stores no per-boss list")
+    test.eq(noEncounterApi.DR.completedParts, 1, "the aggregate kill count still renders")
+
+    -- Fail closed: an abnormal tuple (non-boolean kill flag or missing name)
+    -- leaves the whole per-boss list absent, never a fabricated boss state.
+    local abnormalKilled = retailStates({ row(2939, 16, 3, 1) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            return "首王", nil, (encounterIndex == 1 and "yes" or true), false
+        end,
+    })
+    test.eq(abnormalKilled.DR.difficulties[1].encounters, nil,
+        "a non-boolean kill flag fails the whole per-boss list closed")
+    test.eq(abnormalKilled.DR.completedParts, 1, "the aggregate count survives an abnormal boss tuple")
+    local missingName = retailStates({ row(2939, 16, 3, 1) }, {
+        GetSavedInstanceEncounterInfo = function(index, encounterIndex)
+            return nil, nil, true, false
+        end,
+    })
+    test.eq(missingName.DR.difficulties[1].encounters, nil,
+        "an unnameable boss fails the per-boss list closed")
 
     -- 9. Two saved instances that share a name stay independent: the mapping is
     --    by instanceId, never by display name.
@@ -179,5 +223,5 @@ return function(test)
         retailColumns, retailCatalog.resourceColumns).raidStates(), nil,
         "a missing saved-instance API yields nil")
     local noJournal = retailStates({ row(2939, 16, 6, 3) })
-    test.eq(noJournal.DR.encounters, nil, "a missing journal API stores no per-boss list")
+    test.eq(noJournal.DR.encounters, nil, "no root-level per-boss list is ever fabricated")
 end

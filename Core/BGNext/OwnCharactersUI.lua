@@ -77,6 +77,14 @@ function M.fitTextWidth(region, value, maximumWidth)
     return measured
 end
 
+-- The difficulty abbreviation lives in the width remaining after the completion
+-- checkmark and its 2px inset, so a three-character "LFR" label fits without
+-- clipping or wrapping.
+function M.difficultyLabelWidth(columnWidth)
+    return math.max(0, (type(columnWidth) == "number" and columnWidth or 0)
+        - M.metrics.iconSize - 2)
+end
+
 M.textures = {
     complete = "Interface\\RaidFrame\\ReadyCheck-Ready",
     settings = "Interface\\GossipFrame\\BinderGossipIcon",
@@ -225,7 +233,9 @@ end
 -- Builds the localized tooltip lines for a raid cell that carries per-difficulty
 -- detail. Each line names its difficulty and shows only the real Blizzard count
 -- pair; a difficulty without a usable count is skipped rather than rendered as a
--- fabricated 0/N. A cell without a breakdown surfaces nothing.
+-- fabricated 0/N. When a difficulty carries its own per-boss list, each boss is
+-- listed under that difficulty with its own killed flag. A cell without a
+-- breakdown surfaces nothing.
 function M.raidTooltip(cell)
     if type(cell) ~= "table" then return nil end
     local difficulties = type(cell.difficulties) == "table" and cell.difficulties or nil
@@ -238,6 +248,17 @@ function M.raidTooltip(cell)
                 local label = (type(difficulty.difficultyLabel) == "string" and difficulty.difficultyLabel ~= "")
                     and difficulty.difficultyLabel or tostring(difficulty.difficulty or "")
                 lines[#lines + 1] = label .. " " .. tostring(parts) .. "/" .. tostring(total)
+                local bosses = type(difficulty.encounters) == "table" and difficulty.encounters or nil
+                if bosses then
+                    for _, boss in ipairs(bosses) do
+                        if type(boss) == "table" then
+                            local name, killed = boss.name, boss.killed
+                            if type(name) == "string" and name ~= "" and type(killed) == "boolean" then
+                                lines[#lines + 1] = "    " .. name .. " " .. (killed and "✓" or "✗")
+                            end
+                        end
+                    end
+                end
             end
         end
     end
@@ -738,7 +759,7 @@ function M.Draw(layout)
                         if cell.difficultyLabel then
                             local label = nextText()
                             label:SetPoint("LEFT", check, "RIGHT", 2, 0)
-                            label:SetSize(M.metrics.columnGap, M.metrics.iconSize)
+                            label:SetSize(M.difficultyLabelWidth(column.width), M.metrics.iconSize)
                             label:SetJustifyH("LEFT")
                             label:SetTextColor(M.colors.complete.r, M.colors.complete.g, M.colors.complete.b)
                             label:SetText(cell.difficultyLabel)
