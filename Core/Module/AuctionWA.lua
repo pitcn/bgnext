@@ -98,6 +98,8 @@ BG.Init(function()
   wa.SMALL_HEIGHT = 23
   wa.REPEAT_TIME = 20
   wa.HIDEFRAME_TIME = 1
+  -- 结束后结果停留的有界可读时间；之后按 UpdateFrame 淡出并释放，不永久保留卡片。
+  wa.END_DISPLAY_TIME = 15
   wa.edgeSize = 2.5
   wa.backdropColor = { 0, 0, 0, .6 }
   wa.backdropBorderColor = { 1, 1, 0, 1 }
@@ -318,8 +320,8 @@ BG.Init(function()
   end
  end
  do
-  local function expandFrame(bidFrame)
-   if not bidFrame.hide:IsEnabled() then return end
+  function wa.expandFrame(bidFrame, force)
+   if not force and not bidFrame.hide:IsEnabled() then return end
    bidFrame.IsSmallWindow = false
    bidFrame.hide:SetText(L["折叠"])
    wa.UpdateButtonState(bidFrame)
@@ -352,7 +354,7 @@ BG.Init(function()
    end
    bidFrame.currentMoneyText:SetJustifyH("LEFT")
   end
-  local function collapseFrame(bidFrame)
+  function wa.collapseFrame(bidFrame)
    if not bidFrame.hide:IsEnabled() then return end
    bidFrame.IsSmallWindow = true
    bidFrame.hide:SetText(L["展开"])
@@ -387,7 +389,7 @@ BG.Init(function()
   end
   function wa.Hide_OnClick(self, button)
    local bidFrame = self.owner
-   local layoutFunc = bidFrame.IsSmallWindow and expandFrame or collapseFrame
+   local layoutFunc = bidFrame.IsSmallWindow and wa.expandFrame or wa.collapseFrame
    if (IsAltKeyDown() or button == "RightButton") and not bidFrame.notClick then
     for k, bidFrame in pairs(BGA.Frames) do
      layoutFunc(bidFrame)
@@ -979,7 +981,7 @@ BG.Init(function()
     btn:SetText(L["自动出价"])
    end
    btn:SetSize(btn:GetFontString():GetWidth() + 10, 18)
-   btn:SetShown(not bidFrame.IsSmallWindow)
+   btn:SetShown(not bidFrame.IsSmallWindow and not bidFrame.IsEnd)
    local btn = bidFrame.logTextButton
    btn:SetShown(not bidFrame.IsSmallWindow)
   end
@@ -1212,25 +1214,46 @@ BG.Init(function()
   end
   bidFrame.IsEnd = true
   bidFrame.autoSendDelayFrame:SetScript("OnUpdate", nil)
+  if bidFrame.autoTimer then
+   bidFrame.autoTimer:Cancel()
+   bidFrame.autoTimer = nil
+  end
   bidFrame.myMoneyEdit:Hide()
   bidFrame.cancelButton:Hide()
   bidFrame.hide:Disable()
   wa.UpdateButtonState(bidFrame)
   return bidFrame.endText
  end
- local function updateEndState(bidFrame)
-  if bidFrame.player and bidFrame.player ~= "" then
+ function wa.EndAuction(bidFrame, kind)
+  if bidFrame.IsEnd then return end
+  if kind == "cancel" then
+   wa.SetEndState(bidFrame, L["拍卖取消"], 1, 0, 0)
+   wa.expandFrame(bidFrame, true)
+   bidFrame.currentMoneyText:SetText(L["|cffFF0000拍卖取消"])
+   bidFrame.topMoneyText:SetText("")
+  elseif kind == "flow" then
+   wa.SetEndState(bidFrame, L["流拍"], 1, 0, 0)
+   wa.expandFrame(bidFrame, true)
+   bidFrame.currentMoneyText:SetText(L["|cffFF0000流拍：|r"] .. wa.FormatNumber(bidFrame.money))
+   bidFrame.topMoneyText:SetText("")
+  else
    wa.SetEndState(bidFrame, L["拍卖成功"], 0, 1, 0)
-   if bidFrame.IsSmallWindow then
-    bidFrame.currentMoneyText:SetText("|cff00FF00" .. wa.FormatNumber(bidFrame.money))
-   else
-    bidFrame.currentMoneyText:SetText(L["|cff00FF00成交价：|r"] .. wa.FormatNumber(bidFrame.money))
-   end
+   wa.expandFrame(bidFrame, true)
+   bidFrame.currentMoneyText:SetText(L["|cff00FF00成交价：|r"] .. wa.FormatNumber(bidFrame.money))
    if wa.IsMe(bidFrame) then
     bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
    else
     bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. bidFrame.colorplayer)
    end
+  end
+  After(wa.END_DISPLAY_TIME, function()
+   wa.UpdateFrame(bidFrame)
+  end)
+ end
+ local function updateEndState(bidFrame)
+  if bidFrame.IsEnd then return end
+  if bidFrame.player and bidFrame.player ~= "" then
+   wa.EndAuction(bidFrame, "success")
    if wa.IsRaidLeader() then
     After(.2, function()
      if not wa.InBoss() then
@@ -1242,13 +1265,7 @@ BG.Init(function()
     BG.AuctionWAEnd(1, bidFrame.link, bidFrame.player, bidFrame.money, bidFrame.logs, bidFrame.auctionID)
    end
   else
-   wa.SetEndState(bidFrame, L["流拍"], 1, 0, 0)
-   if bidFrame.IsSmallWindow then
-    bidFrame.currentMoneyText:SetText(L["|cffFF0000流拍"])
-   else
-    bidFrame.currentMoneyText:SetText(L["|cffFF0000流拍：|r"] .. wa.FormatNumber(bidFrame.money))
-   end
-   bidFrame.topMoneyText:SetText("")
+   wa.EndAuction(bidFrame, "flow")
    if wa.IsRaidLeader() then
     if not wa.InBoss() then
      SendChatMessage(format(L["{rt7}流拍{rt7} %s"], bidFrame.link), "RAID")
@@ -1258,9 +1275,6 @@ BG.Init(function()
     BG.AuctionWAEnd(2, bidFrame.link, bidFrame.player, bidFrame.money, nil, bidFrame.auctionID)
    end
   end
-  After(wa.HIDEFRAME_TIME, function()
-   wa.UpdateFrame(bidFrame)
-  end)
  end
  function wa.Auctioning(bidFrame, duration)
   bidFrame.bar:Show()
@@ -1298,6 +1312,7 @@ BG.Init(function()
    end
    if remaining <= -0.5 then
     updateEndState(bidFrame)
+    self:SetScript("OnUpdate", nil)
    end
   end)
  end

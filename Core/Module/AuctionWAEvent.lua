@@ -681,19 +681,13 @@ BG.Init(function()
     if not auctionID or auctionID <= 0 then return end
     for v, frame in pairs(BGA.Frames) do
      if frame[auctionIdKey] == auctionID and not frame.IsEnd then
-      wa.SetEndState(frame, L["拍卖取消"], 1, 0, 0)
-      if frame.IsSmallWindow then
-       frame.currentMoneyText:SetText("|cffFF0000" .. L["拍卖取消"])
-      end
+      wa.EndAuction(frame, "cancel")
       if wa.IsRaidLeader() then
        SendChatMessage(format(L["{rt7}拍卖取消{rt7} %s"], frame.link), "RAID")
       end
       if BG and BG.AuctionWAEnd then
        BG.AuctionWAEnd(3, frame.link, frame.player, frame.money, nil, frame.auctionID)
       end
-      After(wa.HIDEFRAME_TIME, function()
-       wa.UpdateFrame(frame)
-      end)
       return
      end
     end
