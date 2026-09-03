@@ -19,6 +19,8 @@ local Store = BG.BGNext.AuctionPriceStore
 
 local MAX_ROWS = Queue.MAX_ITEMS
 local ROW_HEIGHT = 26
+local HEADER_HEIGHT = 48
+local BOTTOM_PADDING = 26
 local TIMEOUT_SECONDS = 10
 
 local FAMILY_ORDER = {
@@ -32,6 +34,24 @@ local FAMILY_ORDER = {
 }
 
 local state = { queue = nil, frame = nil, pending = nil, gen = 0 }
+
+-- Screen-relative viewport height: rows are bound into a fixed pool whose
+-- visible count never exceeds what actually fits, so the queue window stays
+-- on-screen at any UIParent height instead of growing to 40*26 + header.
+local function availableViewport()
+    if type(UIParent) ~= "table" or type(UIParent.GetHeight) ~= "function" then
+        return nil
+    end
+    local height = UIParent:GetHeight()
+    if type(height) ~= "number" or height <= 0 then return nil end
+    return height
+end
+
+local function maxVisibleRows()
+    local viewport = availableViewport()
+    if viewport == nil then return MAX_ROWS end
+    return math.min(MAX_ROWS, math.max(1, math.floor((viewport - HEADER_HEIGHT - BOTTOM_PADDING) / ROW_HEIGHT)))
+end
 
 local REASON_TEXT = {
     [Queue.REASON_NO_PERMISSION] = L["无权限发起拍卖"],
@@ -316,37 +336,48 @@ local function installSecondGate(frame, pending)
         end
     end
 
-    local original = type(frame.bt.GetScript) == "function" and frame.bt:GetScript("OnClick")
-    if type(frame.bt.SetScript) == "function" then
-        frame.bt:SetScript("OnClick", function(self)
-            local reason = secondGate(pending)
-            if reason then
-                local text = M.reasonText(reason)
+    -- Authoritative pre-send gate. The legacy Start_OnClick invokes this before
+    -- any side effect; every activation path (button click, Edit2 Enter,
+    -- quick-price) funnels through Start_OnClick, so this single optional hook
+    -- covers them all. Returning false/nil vetoes the send with no side effects.
+    frame.bt.onPreSend = function()
+        local reason = secondGate(pending)
+        if reason then
+            local text = M.reasonText(reason)
+            if text and type(BG.SendSystemMessage) == "function" then
+                BG.SendSystemMessage(text)
+            end
+            return false
+        end
+        -- Editing the price box after confirmation invalidates the approval;
+        -- require a fresh confirm instead of silently sending a changed amount.
+        if approved ~= nil and type(frame.Edit2) == "table"
+            and type(frame.Edit2.GetText) == "function" then
+            local edited = tonumber(frame.Edit2:GetText())
+            if edited ~= approved then
+                local text = M.reasonText(Queue.REASON_PRICE_CHANGED)
                 if text and type(BG.SendSystemMessage) == "function" then
                     BG.SendSystemMessage(text)
                 end
-                return
+                return false
             end
-            -- Editing the price box after confirmation invalidates the approval;
-            -- require a fresh confirm instead of silently sending a changed amount.
-            if approved ~= nil and type(frame.Edit2) == "table"
-                and type(frame.Edit2.GetText) == "function" then
-                local edited = tonumber(frame.Edit2:GetText())
-                if edited ~= approved then
-                    local text = M.reasonText(Queue.REASON_PRICE_CHANGED)
-                    if text and type(BG.SendSystemMessage) == "function" then
-                        BG.SendSystemMessage(text)
-                    end
-                    return
-                end
-            end
-            if type(frame.Edit3) == "table" and type(frame.Edit3.SetText) == "function" then
-                frame.Edit3:SetText("1")
-            end
-            pending.fired = true
-            M.armTimeout(pending)
-            if original then original(self) end
-        end)
+        end
+        if type(frame.Edit3) == "table" and type(frame.Edit3.SetText) == "function" then
+            frame.Edit3:SetText("1")
+        end
+        pending.fired = true
+        M.armTimeout(pending)
+        return true
+    end
+
+    -- Causal auctionID capture. The legacy scheduled send closure hands the
+    -- auctionID it just received to this callback, so the queue binds exactly its
+    -- own send and never a foreign same-item sender racing in the BG.After(0)
+    -- window. Other senders do not own this callback and cannot touch the pending.
+    frame.bt.onAuctionSent = function(auctionID, itemID, money, link)
+        if state.pending == pending and pending.fired then
+            pending.auctionID = auctionID
+        end
     end
 
     -- Cancelling (close or escape) keeps the row and frees the pending slot. A
@@ -414,10 +445,10 @@ end
 
 -- --- Player-accessible UI ------------------------------------------------
 
-local function bindRow(rowFrame, projected, index)
+local function bindRow(rowFrame, projected, slot)
     rowFrame.id = projected.id
     rowFrame.link = projected.link or ("item:" .. projected.itemId)
-    rowFrame:SetPoint("TOPLEFT", state.frame, "TOPLEFT", 4, -(state.frame.headerHeight + (index - 1) * ROW_HEIGHT))
+    rowFrame:SetPoint("TOPLEFT", state.frame, "TOPLEFT", 4, -(state.frame.headerHeight + (slot - 1) * ROW_HEIGHT))
     if rowFrame.name then
         rowFrame.name:SetText(projected.link or tostring(projected.itemId))
     end
@@ -447,18 +478,52 @@ function M.refreshUI()
     local frame = state.frame
     if not frame or type(frame.rows) ~= "table" then return end
     local rows = M.project()
-    for index, rowFrame in ipairs(frame.rows) do
-        if index <= #rows then
-            bindRow(rowFrame, rows[index], index)
+    local maxVisible = frame.maxVisible or MAX_ROWS
+    local offset = frame.scrollOffset or 0
+    local maxOffset = math.max(0, #rows - maxVisible)
+    if offset > maxOffset then offset = maxOffset end
+    if offset < 0 then offset = 0 end
+    frame.scrollOffset = offset
+    for slot = 1, maxVisible do
+        local rowFrame = frame.rows[slot]
+        if not rowFrame then break end
+        local projected = rows[offset + slot]
+        if projected then
+            bindRow(rowFrame, projected, slot)
             rowFrame:Show()
         else
             rowFrame:Hide()
         end
     end
     if type(frame.SetHeight) == "function" then
-        local shown = math.min(#rows, MAX_ROWS)
-        frame:SetHeight(frame.headerHeight + shown * ROW_HEIGHT + 10)
+        local shown = math.min(#rows, maxVisible)
+        frame:SetHeight(frame.headerHeight + shown * ROW_HEIGHT + BOTTOM_PADDING)
     end
+end
+
+-- Clamps the scroll offset into [0, #rows - maxVisible] and rebinds the pool so
+-- the offset stays legal after clear/delete/reorder/price edits change row count.
+function M.scrollBy(delta)
+    local frame = state.frame
+    if not frame then return end
+    frame.scrollOffset = (frame.scrollOffset or 0) + (delta or 0)
+    M.refreshUI()
+end
+
+function M.scrollToTop()
+    if state.frame then
+        state.frame.scrollOffset = 0
+        M.refreshUI()
+    end
+end
+
+function M.scrollToBottom()
+    local frame = state.frame
+    if not frame then return end
+    local rows = M.project()
+    local maxOffset = math.max(0, #rows - (frame.maxVisible or 0))
+    frame.scrollOffset = maxOffset
+    M.refreshUI()
 end
 
 local function createRow(parent)
@@ -602,13 +667,29 @@ function M.openFrame()
             M.refreshUI()
         end)
 
+        frame.scrollUp = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        frame.scrollUp:SetSize(20, 20)
+        frame.scrollUp:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 3)
+        frame.scrollUp:SetText("^")
+        frame.scrollUp:SetScript("OnClick", function() M.scrollBy(-1) end)
+
+        frame.scrollDown = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        frame.scrollDown:SetSize(20, 20)
+        frame.scrollDown:SetPoint("RIGHT", frame.scrollUp, "LEFT", -2, 0)
+        frame.scrollDown:SetText("v")
+        frame.scrollDown:SetScript("OnClick", function() M.scrollBy(1) end)
+
+        frame:SetScript("OnMouseWheel", function(self, delta) M.scrollBy(-delta) end)
+
         frame.rows = {}
         for i = 1, MAX_ROWS do
             local row = createRow(frame)
             row:Hide()
             frame.rows[i] = row
         end
-        frame.headerHeight = 48
+        frame.headerHeight = HEADER_HEIGHT
+        frame.maxVisible = maxVisibleRows()
+        frame.scrollOffset = 0
         state.frame = frame
     end
     frame:Show()
@@ -679,6 +760,7 @@ function M.state()
         hasPending = state.pending ~= nil,
         pendingFired = state.pending and state.pending.fired or false,
         pendingItemId = state.pending and state.pending.itemId or nil,
+        pendingAuctionID = state.pending and state.pending.auctionID or nil,
         frameShown = state.frame and state.frame:IsShown() and true or false,
     }
 end
@@ -697,22 +779,6 @@ BG.Init(function()
                 installSecondGate(BG.StartAucitonFrame, state.pending)
             end
             return result
-        end
-    end
-
-    -- Capture the auctionID this local send generated so the created-auction
-    -- round-trip can be matched exactly (never by itemID or timing alone). The
-    -- wrapped send returns the same auctionID, so every existing caller stays
-    -- compatible; only the fired queue pending records it.
-    if type(BG.SendStartAuctionMsg) == "function" then
-        local originalSend = BG.SendStartAuctionMsg
-        BG.SendStartAuctionMsg = function(itemID, money, duration, link)
-            local auctionID = originalSend(itemID, money, duration, link)
-            if state.pending and state.pending.fired and state.pending.auctionID == nil
-                and state.pending.itemId == itemID then
-                state.pending.auctionID = auctionID
-            end
-            return auctionID
         end
     end
 

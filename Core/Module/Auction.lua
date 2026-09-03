@@ -281,6 +281,9 @@ BG.Init(function()
             end
         end
         local function Start_OnClick(self)
+            if self.onPreSend and not self.onPreSend(self) then
+                return
+            end
             if not self.noSound then
                 BG.PlaySound(1)
             end
@@ -294,7 +297,10 @@ BG.Init(function()
                     local itemID = v.id
                     local link = v.link
                     BG.After(delay, function()
-                        BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        local auctionID = BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        if self.onAuctionSent then
+                            self.onAuctionSent(auctionID, itemID, money, link)
+                        end
                     end)
                     delay = delay + 1
                 end
@@ -304,7 +310,10 @@ BG.Init(function()
                     local itemID = self.items[1].id
                     local link = self.items[1].link
                     BG.After(delay, function()
-                        BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        local auctionID = BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        if self.onAuctionSent then
+                            self.onAuctionSent(auctionID, itemID, money, link)
+                        end
                     end)
                     delay = delay + 1
                 end

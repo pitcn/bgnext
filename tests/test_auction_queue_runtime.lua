@@ -10,7 +10,7 @@ return function(test)
         Show = function() end,
         Hide = function() end,
     }
-    UIParent = {}
+    UIParent = { GetHeight = function() return 768 end }
 
     -- Core queue must load first.
     local Queue = dofile("Core/BGNext/AuctionQueue.lua")
@@ -130,27 +130,72 @@ return function(test)
         if itemId == 1002 then return { price = 500, source = "base" } end
         return nil
     end
-    BiaoGe = { Auction = { money = 100 } }
+    BiaoGe = { Auction = { money = 100, duration = 40, fastMoney = { 300, 500, 1000, 2000, 3000 } } }
     BG.SendStartAuctionMsg = function(itemID, money, duration, link)
         auctionIdSeq = auctionIdSeq + 1
         sends = sends + 1
         sentRecords[#sentRecords + 1] = { auctionID = auctionIdSeq, itemID = itemID, money = money }
         return auctionIdSeq
     end
+    -- Production-faithful start handler: mirrors the real Core/Module/Auction.lua
+    -- Start_OnClick contract -- a private Start_OnClick that (1) honours an optional
+    -- per-button onPreSend veto before any side effect, (2) schedules the send with
+    -- BG.After(0), and (3) hands the returned auctionID to the optional per-button
+    -- onAuctionSent. Edit2 Enter and quick-money both call the private Start_OnClick
+    -- directly, exactly like the legacy dialog.
     BG.StartAuction = function(link, bt, isNotAuctioned, notAlt, isRightButton, noSound, callback)
         local itemId = tonumber(tostring(link):match("item:(%d+)")) or 1001
         local frame = fakeFrame("StartAucitonFrame")
         frame.Edit3 = fakeFrame("Edit3")
         frame.Edit3.text = "5"
+        frame.Edit3.parent = frame
         frame.Edit2 = fakeFrame("Edit2")
         frame.Edit2.text = tostring(BiaoGe.Auction.money)
+        frame.Edit2.parent = frame
         frame.bt = fakeFrame("bt")
+        frame.bt.parent = frame
         frame.bt.items = { { id = itemId, link = link } }
-        frame.bt:SetScript("OnClick", function(self)
+
+        local function Start_OnClick(self)
+            if self.onPreSend and not self.onPreSend(self) then
+                return
+            end
+            if not self.noSound then BG.PlaySound(1) end
             local money = self.money or tonumber(BiaoGe.Auction.money)
-            BG.SendStartAuctionMsg(self.items[1].id, money, 40, self.items[1].link)
-            frame:Hide()
+            local duration = tonumber(BiaoGe.Auction.duration) or 40
+            if not (money and duration) then return end
+            local count = tonumber(self:GetParent().Edit3:GetText()) or 1
+            for _ = 1, count do
+                local itemID = self.items[1].id
+                local lnk = self.items[1].link
+                BG.After(0, function()
+                    local auctionID = BG.SendStartAuctionMsg(itemID, money, duration, lnk)
+                    if self.onAuctionSent then
+                        self.onAuctionSent(auctionID, itemID, money, lnk)
+                    end
+                end)
+            end
+            if self.callback then self.callback() end
+            self:GetParent():Hide()
+        end
+
+        frame.bt:SetScript("OnClick", Start_OnClick)
+        frame.Edit2.num = 2
+        frame.Edit2:SetScript("OnEnterPressed", function(edit)
+            if edit.num == 2 then Start_OnClick(edit:GetParent().bt) end
         end)
+        frame.fastMoney = {}
+        for i, m in ipairs(BiaoGe.Auction.fastMoney or {}) do
+            local fbtn = fakeFrame("fastMoney" .. i)
+            fbtn.money = m
+            fbtn:SetScript("OnClick", function(self)
+                frame.Edit2:SetText(tostring(self.money))
+                BiaoGe.Auction.money = self.money
+                Start_OnClick(frame.bt)
+            end)
+            frame.fastMoney[i] = fbtn
+        end
+
         BG.StartAucitonFrame = frame
         return frame
     end
@@ -184,10 +229,26 @@ return function(test)
         auctionIdSeq = 0
         after = {}
         messages = {}
+        BiaoGe.Auction.money = 100
+    end
+
+    local function flushZeroTimers()
+        local zero, rest = {}, {}
+        for _, t in ipairs(after) do
+            if t.delay == 0 then zero[#zero + 1] = t else rest[#rest + 1] = t end
+        end
+        after = rest
+        for _, t in ipairs(zero) do t.fn() end
     end
 
     local function clickStart()
         BG.StartAucitonFrame.bt.scripts.OnClick(BG.StartAucitonFrame.bt)
+    end
+    local function pressEnter()
+        BG.StartAucitonFrame.Edit2.scripts.OnEnterPressed(BG.StartAucitonFrame.Edit2)
+    end
+    local function clickFast(index)
+        BG.StartAucitonFrame.fastMoney[index].scripts.OnClick(BG.StartAucitonFrame.fastMoney[index])
     end
 
     local function lastAuctionID()
@@ -208,7 +269,6 @@ return function(test)
     test.eq(M.state().hasPending, true, "a pending confirm is armed")
     test.eq(sends, 0, "opening the dialog sends nothing")
 
-    -- Cancelling (frame hide without a start click) keeps the row and frees the slot.
     BG.StartAucitonFrame:Hide()
     test.eq(M.state().queueSize, 1, "cancelling keeps the row")
     test.eq(M.state().hasPending, false, "cancelling frees the pending slot")
@@ -222,7 +282,8 @@ return function(test)
     test.eq(BG.StartAucitonFrame.Edit3.enabled, false, "Edit3 is locked")
 
     clickStart()
-    test.eq(sends, 1, "the original start handler ran once")
+    flushZeroTimers()
+    test.eq(sends, 1, "the start handler ran once")
     test.eq(M.state().queueSize, 1, "a send without a loopback keeps the row")
     test.eq(M.state().pendingFired, true, "the pending is marked fired")
 
@@ -239,6 +300,7 @@ return function(test)
     local qid = M.add({ itemId = 1001, link = "item:1001", quantity = 2 })
     test.eq(M.confirm(qid), true, "first confirm opens for a quantity-two row")
     clickStart()
+    flushZeroTimers()
     loopback(1001, lastAuctionID())
     test.eq(M.state().queueSize, 1, "quantity two becomes one, not removed")
     test.eq(M.project()[1].quantity, 1, "remaining quantity is one")
@@ -246,6 +308,7 @@ return function(test)
 
     test.eq(M.confirm(M.project()[1].id), true, "second confirm opens again")
     clickStart()
+    flushZeroTimers()
     loopback(1001, lastAuctionID())
     test.eq(M.state().queueSize, 0, "the second confirm removes the last quantity")
 
@@ -255,62 +318,63 @@ return function(test)
     local tid = M.add({ itemId = 1001, link = "item:1001" })
     M.confirm(tid)
     clickStart()
-    test.eq(#after, 1, "a timeout is armed after the send")
-    after[1].fn()
+    local timeout
+    for _, t in ipairs(after) do
+        if t.delay == 10 then timeout = t end
+    end
+    test.eq(timeout ~= nil, true, "a timeout is armed after the send")
+    timeout.fn()
     test.eq(M.state().queueSize, 1, "a timed-out send keeps the row")
     test.eq(M.state().hasPending, false, "the timeout frees the pending slot")
 
-    -- --- Finding 2: the second gate re-checks every condition ---------------
+    -- --- Counterexample 1: all three start paths run the second gate ---------
 
-    -- Combat gained after opening blocks the send.
-    freshQueue()
-    local cid = M.add({ itemId = 1001, link = "item:1001" })
-    M.confirm(cid)
-    InCombatLockdown = function() return true end
-    clickStart()
-    test.eq(sends, 0, "combat blocks the original handler")
-    InCombatLockdown = function() return false end
-    BG.StartAucitonFrame:Hide()
-
-    -- Permission lost after opening blocks the send.
-    freshQueue()
-    local pid = M.add({ itemId = 1001, link = "item:1001" })
-    M.confirm(pid)
-    BG.IsML = false
-    clickStart()
-    test.eq(sends, 0, "lost permission blocks the original handler")
-    BG.IsML = true
-    BG.StartAucitonFrame:Hide()
-
-    -- An active auction card blocks the send.
-    freshQueue()
-    local aid = M.add({ itemId = 1001, link = "item:1001" })
-    M.confirm(aid)
-    BGA.Frames[1] = { IsEnd = false }
-    clickStart()
-    test.eq(sends, 0, "an active auction blocks the original handler")
-    BGA.Frames = {}
-    BG.StartAucitonFrame:Hide()
-
-    -- A changed price/source snapshot blocks the send.
-    freshQueue()
-    local sid = M.add({ itemId = 1001, link = "item:1001" })
-    M.confirm(sid)
-    BG.BGNext.AuctionPriceStore.resolveLeaderPriceDetail = function()
-        return { price = 999, source = "override" }
+    local paths = {
+        { name = "button", run = clickStart },
+        { name = "enter", run = pressEnter },
+        { name = "fast", run = function() clickFast(1) end },
+    }
+    local conditions = {
+        {
+            name = "combat",
+            setup = function() InCombatLockdown = function() return true end end,
+            teardown = function() InCombatLockdown = function() return false end end,
+        },
+        {
+            name = "permission",
+            setup = function() BG.IsML = false end,
+            teardown = function() BG.IsML = true end,
+        },
+        {
+            name = "auction-busy",
+            setup = function() BGA.Frames[1] = { IsEnd = false } end,
+            teardown = function() BGA.Frames = {} end,
+        },
+        {
+            name = "price-snapshot",
+            setup = function() BG.BGNext.AuctionPriceStore.resolveLeaderPriceDetail = function() return { price = 999, source = "override" } end end,
+            teardown = function() BG.BGNext.AuctionPriceStore.resolveLeaderPriceDetail = defaultResolve end,
+        },
+        {
+            name = "scope",
+            setup = function() BG.FB1 = "ICC" end,
+            teardown = function() BG.FB1 = "ULD" end,
+        },
+    }
+    for _, cond in ipairs(conditions) do
+        for _, path in ipairs(paths) do
+            freshQueue()
+            M.add({ itemId = 1001, link = "item:1001" })
+            test.eq(M.confirm(M.project()[1].id), true, cond.name .. "/" .. path.name .. ": confirm opens")
+            cond.setup()
+            path.run()
+            flushZeroTimers()
+            test.eq(sends, 0, cond.name .. "/" .. path.name .. ": second gate blocks the send")
+            test.eq(M.state().pendingFired, false, cond.name .. "/" .. path.name .. ": veto never fires")
+            cond.teardown()
+            BG.StartAucitonFrame:Hide()
+        end
     end
-    clickStart()
-    test.eq(sends, 0, "a changed price snapshot blocks the original handler")
-    BG.BGNext.AuctionPriceStore.resolveLeaderPriceDetail = defaultResolve
-    BG.StartAucitonFrame:Hide()
-
-    -- An existing pending start blocks opening a second confirm.
-    freshQueue()
-    local e1 = M.add({ itemId = 1001, link = "item:1001" })
-    local e2 = M.add({ itemId = 1002, link = "item:1002" })
-    M.confirm(e1)
-    test.eq(M.confirm(e2), false, "a second confirm is blocked while one is pending")
-    BG.StartAucitonFrame:Hide()
 
     -- --- Finding 3: one active card blocks, many ended cards do not ---------
 
@@ -333,28 +397,24 @@ return function(test)
     M.onRosterUpdate()
     test.eq(M.state().queueSize, 0, "switching raid (same table) clears the queue")
 
-    -- Leaving the raid clears.
     M.add({ itemId = 1001, link = "item:1001" })
     IsInRaid = function() return false end
     M.onRosterUpdate()
     test.eq(M.state().queueSize, 0, "leaving the raid clears the queue")
     IsInRaid = function() return true end
 
-    -- Switching the selected table clears.
     M.add({ itemId = 1001, link = "item:1001" })
     BG.FB1 = "ICC"
     M.ensureQueue()
     test.eq(M.state().queueSize, 0, "switching the table clears the queue")
     BG.FB1 = "ULD"
 
-    -- Clearing the current table clears.
     freshQueue()
     M.add({ itemId = 1001, link = "item:1001" })
     BG.ClearBiaoGe(nil, "ULD")
     test.eq(M.state().queueSize, 0, "clearing the current table clears the queue")
     test.eq(clearCalls, 1, "the original clear still runs")
 
-    -- Leaving the world clears.
     M.add({ itemId = 1001, link = "item:1001" })
     for _, fn in ipairs(events["PLAYER_LEAVING_WORLD"] or {}) do fn() end
     test.eq(M.state().queueSize, 0, "leaving the world clears the queue")
@@ -372,43 +432,36 @@ return function(test)
     test.eq(M.state().queueSize, 1, "typed add queues one item")
     test.eq(M.addFromText("not-an-item"), nil, "invalid typed text is rejected")
 
-    -- Open the frame and drive the row controls through the fixed pool.
     local frame = M.openFrame()
     test.eq(type(frame.rows), "table", "frame exposes a row pool")
     test.eq(#frame.rows, 40, "row pool is fixed")
     test.eq(frame.rows[1].shown, true, "the first row is bound and shown")
     test.eq(frame.rows[2].shown, false, "the second pooled row stays hidden")
 
-    -- Quantity +/-.
     frame.rows[1].plus.scripts.OnClick(frame.rows[1].plus)
     test.eq(M.project()[1].quantity, 2, "the plus button increments quantity")
     frame.rows[1].minus.scripts.OnClick(frame.rows[1].minus)
     test.eq(M.project()[1].quantity, 1, "the minus button decrements quantity")
 
-    -- Add a second row, then move it up.
     M.addFromText("item:1002")
     test.eq(M.project()[1].itemId, 1001, "first added item stays first")
     frame.rows[2].up.scripts.OnClick(frame.rows[2].up)
     test.eq(M.project()[1].itemId, 1002, "move up reorders the queue")
 
-    -- Remove the front row.
     local removedId = M.project()[1].id
     frame.rows[1].remove.scripts.OnClick(frame.rows[1].remove)
     test.eq(M.state().queueSize, 1, "remove drops exactly one row")
     test.eq(M.project()[1].id ~= removedId, true, "the removed row is gone")
 
-    -- Manual price for an unresolved item resolves it memory-only.
     local mrid = M.add({ itemId = 1003, link = "item:1003" })
     test.eq(M.project()[2].source, "manual", "unresolved item asks for manual input")
     test.eq(M.setPrice(mrid, 1200), true, "manual price is stored")
     test.eq(M.project()[2].price, 1200, "manual price resolves the row")
     test.eq(M.project()[2].source, "manual", "manual source is preserved")
 
-    -- Clear via the frame button.
     frame.clearButton.scripts.OnClick(frame.clearButton)
     test.eq(M.state().queueSize, 0, "the clear button empties the queue")
 
-    -- Entry reachability: slash command and a main-tab button exist.
     test.eq(type(SlashCmdList["BGNQUEUE"]), "function", "slash command is registered")
     test.eq(_G.SLASH_BGNQUEUE1, "/bgnqueue", "slash trigger is installed")
     local entry = M.installEntry(fakeFrame("MainFrame"))
@@ -417,8 +470,6 @@ return function(test)
 
     -- --- Finding 7: exact loopback binding (auctionID, not itemID) ---------
 
-    -- quantity=2, open confirm but do NOT click Start, then inject a same-item
-    -- other-auction frame: the row is untouched.
     freshQueue()
     local b1 = M.add({ itemId = 1001, link = "item:1001", quantity = 2 })
     test.eq(M.confirm(b1), true, "confirm opens without starting")
@@ -426,8 +477,8 @@ return function(test)
     test.eq(M.project()[1].quantity, 2, "a same-item loopback before Start never consumes")
     test.eq(M.state().queueSize, 1, "the quantity-two row is still one row")
 
-    -- Click Start, then only the exact auctionID consumes, exactly once.
     clickStart()
+    flushZeroTimers()
     test.eq(M.state().pendingFired, true, "Start marks the pending fired")
     loopback(1001, 999)
     test.eq(M.project()[1].quantity, 2, "a wrong auctionID loopback is ignored")
@@ -437,62 +488,157 @@ return function(test)
     loopback(1001, lastAuctionID())
     test.eq(M.project()[1].quantity, 1, "a repeated loopback never consumes again")
 
-    -- --- Finding 8: approved price is bound to the real send amount ---------
+    -- --- Counterexample 3: causal binding in the BG.After(0) window ---------
 
-    -- manual=500, stale global=100, no edit -> sends 500, never 100.
+    freshQueue()
+    local cid = M.add({ itemId = 1001, link = "item:1001", quantity = 2 })
+    test.eq(M.confirm(cid), true, "confirm opens")
+    clickStart()
+    test.eq(M.state().pendingFired, true, "Start marks the pending fired")
+    -- A foreign same-item sender runs before the queue's own zero-delay send.
+    local foreignID = BG.SendStartAuctionMsg(1001, 777, 40, "item:1001")
+    flushZeroTimers()
+    local ownID = lastAuctionID()
+    test.eq(ownID ~= foreignID, true, "foreign and own sends have distinct ids")
+    test.eq(M.state().pendingAuctionID, ownID, "the queue binds only its own auctionID")
+    loopback(1001, foreignID)
+    test.eq(M.project()[1].quantity, 2, "a foreign loopback never consumes the queue row")
+    loopback(1001, ownID)
+    test.eq(M.project()[1].quantity, 1, "the own loopback consumes exactly once")
+    test.eq(M.state().hasPending, false, "the own round-trip clears the pending")
+
+    -- --- Counterexample 2: quick-money success binds and consumes once -------
+
+    freshQueue()
+    local q2 = M.add({ itemId = 1002, link = "item:1002", quantity = 2 })
+    test.eq(M.confirm(q2), true, "confirm opens the quantity-two row")
+    test.eq(BG.StartAucitonFrame.bt.money, 500, "approved base price bound to the button")
+    clickFast(2) -- the 500 fast-money button matches the approved amount
+    test.eq(M.state().pendingFired, true, "the fast path marks the pending fired")
+    flushZeroTimers()
+    test.eq(sends, 1, "the fast path sends once")
+    test.eq(sentRecords[1].money, 500, "the fast path sends the approved amount")
+    local ownFastID = lastAuctionID()
+    test.eq(M.state().pendingAuctionID, ownFastID, "the fast path records the exact own auctionID")
+    loopback(1002, ownFastID)
+    test.eq(M.project()[1].quantity, 1, "the correct loopback decrements 2 -> 1")
+    test.eq(M.state().hasPending, false, "the round-trip clears the pending")
+    loopback(1002, ownFastID)
+    test.eq(M.project()[1].quantity, 1, "a repeated loopback never consumes again")
+
+    -- --- Counterexample 4: approved 500 never replaced by 100 or 999 ---------
+
+    -- Stale global 100 never wins (button + enter).
+    for _, path in ipairs({ { name = "button", run = clickStart }, { name = "enter", run = pressEnter } }) do
+        freshQueue()
+        BiaoGe.Auction.money = 100
+        local p = M.add({ itemId = 1003, link = "item:1003" })
+        test.eq(M.setPrice(p, 500), true, path.name .. ": manual 500 stored")
+        test.eq(M.confirm(p), true, path.name .. ": manual confirm opens")
+        test.eq(BG.StartAucitonFrame.bt.money, 500, path.name .. ": approved bound")
+        path.run()
+        flushZeroTimers()
+        test.eq(sends, 1, path.name .. ": sends once with a stale global")
+        test.eq(sentRecords[1].money, 500, path.name .. ": never sends the stale global 100")
+    end
+
+    -- An edited 999 blocks button + enter (never 999).
+    for _, path in ipairs({ { name = "button", run = clickStart }, { name = "enter", run = pressEnter } }) do
+        freshQueue()
+        BiaoGe.Auction.money = 100
+        local p = M.add({ itemId = 1003, link = "item:1003" })
+        test.eq(M.setPrice(p, 500), true, path.name .. ": manual 500 stored")
+        test.eq(M.confirm(p), true, path.name .. ": manual confirm opens")
+        BG.StartAucitonFrame.Edit2:SetText("999")
+        path.run()
+        flushZeroTimers()
+        test.eq(sends, 0, path.name .. ": never silently sends the edited 999")
+        test.eq(M.state().pendingFired, false, path.name .. ": edited 999 never fires")
+        BG.StartAucitonFrame:Hide()
+    end
+
+    -- A non-matching fast amount is blocked, and the matching one succeeds.
     freshQueue()
     BiaoGe.Auction.money = 100
-    local p1 = M.add({ itemId = 1003, link = "item:1003" })
-    test.eq(M.setPrice(p1, 500), true, "manual price 500 stored")
-    test.eq(M.confirm(p1), true, "manual price confirm opens")
-    test.eq(BG.StartAucitonFrame.bt.money, 500, "button money bound to the approved amount")
-    test.eq(BG.StartAucitonFrame.Edit2.text, "500", "dialog displays the approved amount")
-    test.eq(BiaoGe.Auction.money, 100, "the saved preset is not mutated")
-    clickStart()
-    test.eq(sends, 1, "start sends once")
-    test.eq(sentRecords[1].money, 500, "the stale global never swaps the approved amount")
-
-    -- manual=500, stale global=100, Edit2 edited to 999 -> blocked, never 999.
-    freshQueue()
-    BiaoGe.Auction.money = 100
-    local p2 = M.add({ itemId = 1003, link = "item:1003" })
-    test.eq(M.setPrice(p2, 500), true, "second manual price 500 stored")
-    test.eq(M.confirm(p2), true, "second manual confirm opens")
-    BG.StartAucitonFrame.Edit2.text = "999"
-    clickStart()
-    test.eq(sends, 0, "editing the dialog input after confirm blocks the send")
-    test.eq(M.state().queueSize, 1, "the row is kept for a fresh confirm")
-    test.eq(M.state().pendingFired, false, "the blocked send is not marked fired")
+    local p3 = M.add({ itemId = 1003, link = "item:1003" })
+    M.setPrice(p3, 500)
+    M.confirm(p3)
+    clickFast(1) -- 300
+    flushZeroTimers()
+    test.eq(sends, 0, "a fast 300 never replaces the approved 500")
+    test.eq(M.state().pendingFired, false, "a fast 300 never fires")
     BG.StartAucitonFrame:Hide()
 
-    -- --- Finding 9: integer zero starting price is sent as zero -------------
-
     freshQueue()
-    local z1 = M.add({ itemId = 1003, link = "item:1003" })
-    test.eq(M.setPrice(z1, 0), true, "manual zero price accepted")
-    test.eq(M.confirm(z1), true, "zero-price row is confirmable")
-    test.eq(BG.StartAucitonFrame.bt.money, 0, "zero bound to the button")
-    test.eq(BG.StartAucitonFrame.Edit2.text, "0", "dialog displays zero")
-    clickStart()
-    test.eq(sends, 1, "zero price sends once")
-    test.eq(sentRecords[1].money, 0, "zero is sent as zero through the send path")
-    loopback(1003, lastAuctionID())
-    test.eq(M.state().queueSize, 0, "the zero-price round-trip consumes the row")
+    BiaoGe.Auction.money = 100
+    local p4 = M.add({ itemId = 1003, link = "item:1003" })
+    M.setPrice(p4, 500)
+    M.confirm(p4)
+    clickFast(2) -- 500 == approved
+    test.eq(M.state().pendingFired, true, "the matching fast 500 fires")
+    flushZeroTimers()
+    test.eq(sends, 1, "the matching fast 500 sends once")
+    test.eq(sentRecords[1].money, 500, "the matching fast 500 sends the approved 500")
 
-    -- --- Finding 10: the 41st row is rejected with a localized reason -------
+    -- --- Counterexample 5: integer zero and invalid amounts ------------------
+
+    for _, path in ipairs({ { name = "button", run = clickStart }, { name = "enter", run = pressEnter } }) do
+        freshQueue()
+        local z = M.add({ itemId = 1003, link = "item:1003" })
+        test.eq(M.setPrice(z, 0), true, path.name .. ": manual zero accepted")
+        test.eq(M.confirm(z), true, path.name .. ": zero-price row confirmable")
+        test.eq(BG.StartAucitonFrame.bt.money, 0, path.name .. ": zero bound to the button")
+        path.run()
+        flushZeroTimers()
+        test.eq(sends, 1, path.name .. ": zero-price row sends once")
+        test.eq(sentRecords[1].money, 0, path.name .. ": zero is sent as zero")
+    end
+
+    -- A fast amount would change the zero price, so it is blocked.
+    freshQueue()
+    local z2 = M.add({ itemId = 1003, link = "item:1003" })
+    M.setPrice(z2, 0)
+    M.confirm(z2)
+    clickFast(1) -- 300
+    flushZeroTimers()
+    test.eq(sends, 0, "a fast amount never silently changes a zero-price row")
+
+    -- Negative, fractional, NaN and over-ceiling amounts are all rejected.
+    freshQueue()
+    local bad = M.add({ itemId = 1003, link = "item:1003" })
+    test.eq(M.setPrice(bad, -1), false, "negative price rejected")
+    test.eq(M.setPrice(bad, 12.5), false, "fractional price rejected")
+    test.eq(M.setPrice(bad, 0 / 0), false, "NaN price rejected")
+    test.eq(M.setPrice(bad, 10000001), false, "over-ceiling price rejected")
+    test.eq(M.project()[1].source, "manual", "the bad row stays unresolved")
+    test.eq(M.confirm(bad), false, "an unresolved row cannot be confirmed")
+
+    -- --- Counterexample 6: 40 rows stay on-screen with bounded scrolling -----
 
     freshQueue()
     for i = 1, 40 do
         M.add({ itemId = 5000 + i, link = "item:" .. (5000 + i) })
     end
     test.eq(M.state().queueSize, 40, "forty rows are accepted")
-    local overflow, overflowReason = M.add({ itemId = 6000, link = "item:6000" })
+
+    -- The 41st row is rejected while the queue is full.
+    local overflow = M.add({ itemId = 6000, link = "item:6000" })
     test.eq(overflow, nil, "the 41st row is rejected")
-    test.eq(overflowReason, "queue-full", "the rejection reason is queue-full")
-    test.eq(M.state().queueSize, 40, "the queue stays at 40")
     M.addFromText("item:6000")
     test.eq(messages[#messages], "待拍队列已满（最多40项）", "a localized full-queue message is shown")
     test.eq(M.state().queueSize, 40, "a rejected typed add never grows the queue")
+
+    local full = M.openFrame()
+    test.eq(type(full.maxVisible), "number", "the viewport exposes a visible-row cap")
+    test.eq(full:GetHeight() <= 768, true, "the frame height fits the 768 viewport")
+    test.eq(type(M.scrollToBottom), "function", "a scroll API is exposed")
+    M.scrollToBottom()
+    local id40 = M.project()[40].id
+    local lastSlot = full.rows[full.maxVisible]
+    test.eq(lastSlot ~= nil, true, "the last visible slot exists")
+    test.eq(lastSlot.id, id40, "the 40th row is reachable and bound after scrolling")
+    lastSlot.remove.scripts.OnClick(lastSlot.remove)
+    test.eq(M.state().queueSize, 39, "the 40th row is operable after scrolling")
 
     -- --- Finding 6: the runtime never sends directly ------------------------
 
@@ -508,4 +654,6 @@ return function(test)
         test.eq(source:find(token, 1, true), nil, "no direct " .. token .. " call in the runtime")
     end
     test.eq(source:find("BG.StartAuction", 1, true) ~= nil, true, "the runtime reuses the existing start path")
+    test.eq(source:find("onPreSend", 1, true) ~= nil, true, "the runtime installs the authoritative pre-send gate")
+    test.eq(source:find("onAuctionSent", 1, true) ~= nil, true, "the runtime captures the causal auctionID")
 end
