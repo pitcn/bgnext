@@ -98,10 +98,11 @@ if BG.Init then
         local L = ns and ns.L
 
         -- Memory-only, per-trade-window guard: one announcement per result, and
-        -- the trade partner visible when the window opened. The partner is
-        -- captured here because the live Trade.lua handler resets BG.trade (and
-        -- clears target) immediately after TRADE_SHOW; reading BG.trade.target
-        -- again at result time would either be nil or a later trade's partner.
+        -- the trade partner visible when the window opened. The partner is read
+        -- from the authoritative current-window unit BG.GN("NPC"), not the shared
+        -- BG.trade.target snapshot: TradeAnnouncement registers before Trade.lua,
+        -- so on TRADE_SHOW that snapshot can still be blank or a previous trade's
+        -- partner. BG.GN("NPC") reads the unit actually shown in this window.
         local announced = false
         local tradeTarget = nil
 
@@ -128,8 +129,7 @@ if BG.Init then
 
         BG.RegisterEvent("TRADE_SHOW", function()
             announced = false
-            local trade = BG.trade
-            tradeTarget = type(trade) == "table" and trade.target or nil
+            tradeTarget = BG.GN and BG.GN("NPC") or nil
         end)
 
         BG.RegisterEvent("UI_INFO_MESSAGE", function(_, _, _, text)
