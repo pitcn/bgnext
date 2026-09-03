@@ -222,6 +222,49 @@ function M.showCurrencyTooltip(tooltip, cell, currencyInfo)
     return true
 end
 
+-- Builds the localized tooltip lines for a raid cell that carries per-boss or
+-- per-difficulty detail. Only the real Blizzard-reported counts and journal
+-- names are shown; a cell without a breakdown surfaces nothing.
+function M.raidTooltip(cell)
+    if type(cell) ~= "table" then return nil end
+    local lines = {}
+    local encounters = type(cell.encounters) == "table" and cell.encounters or nil
+    local difficulties = type(cell.difficulties) == "table" and cell.difficulties or nil
+    if encounters and #encounters > 0 then
+        for _, encounter in ipairs(encounters) do
+            local name = (type(encounter.name) == "string" and encounter.name ~= "") and encounter.name
+                or tostring(encounter.id or "")
+            local marker = encounter.done and L["已完成"] or L["未完成"]
+            lines[#lines + 1] = marker .. "  " .. name
+        end
+    elseif difficulties and #difficulties > 0 then
+        for _, difficulty in ipairs(difficulties) do
+            local label = (type(difficulty.difficultyLabel) == "string" and difficulty.difficultyLabel ~= "")
+                and difficulty.difficultyLabel or tostring(difficulty.difficulty or "")
+            local parts = type(difficulty.completedParts) == "number" and difficulty.completedParts or 0
+            local total = type(difficulty.totalParts) == "number" and difficulty.totalParts or 0
+            lines[#lines + 1] = label .. " " .. parts .. "/" .. total
+        end
+    end
+    if #lines == 0 then return nil end
+    return { lines = lines }
+end
+
+-- Populates a Blizzard tooltip with a raid cell's per-boss or per-difficulty
+-- detail. Returns false when there is nothing to show or the tooltip cannot
+-- take text.
+function M.showRaidTooltip(tooltip, cell)
+    local info = M.raidTooltip(cell)
+    if not info or not tooltip or type(tooltip.SetText) ~= "function" then return false end
+    tooltip:SetText(info.name or "")
+    if type(tooltip.AddLine) == "function" then
+        for _, line in ipairs(info.lines) do
+            tooltip:AddLine(line)
+        end
+    end
+    return true
+end
+
 -- Picks the source for Blizzard's official item tooltip. A collected item link
 -- is preferred (it preserves the exact item), otherwise the item id. Returning
 -- nil means there is nothing safe to show.
@@ -469,8 +512,9 @@ end
 local function showValueTooltip(self)
     if not GameTooltip or type(GameTooltip.SetOwner) ~= "function" then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    if M.showCurrencyTooltip(GameTooltip, self.__cell)
-        and type(GameTooltip.Show) == "function" then
+    local shown = M.showRaidTooltip(GameTooltip, self.__cell)
+    if not shown then shown = M.showCurrencyTooltip(GameTooltip, self.__cell) end
+    if shown and type(GameTooltip.Show) == "function" then
         GameTooltip:Show()
     end
 end
@@ -704,6 +748,15 @@ function M.Draw(layout)
                             label:SetTextColor(M.colors.complete.r, M.colors.complete.g, M.colors.complete.b)
                             label:SetText(cell.difficultyLabel)
                         end
+                        if cell.difficulties or cell.encounters then
+                            local valueButton = nextValueButton()
+                            valueButton:SetPoint("CENTER", frame, "TOPLEFT",
+                                M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
+                            valueButton:SetSize(column.width, M.metrics.rowHeight)
+                            valueButton.__cell = cell
+                            valueButton.__section = section.key
+                            valueButton.__row = row
+                        end
                     elseif cell.state == "items" then
                         for slot, item in ipairs(cell.items) do
                             local icon = nextItemButton()
@@ -756,7 +809,7 @@ function M.Draw(layout)
                         -- A currency value with a confirmed id gets a hover
                         -- surface so its caps can surface as a tooltip without
                         -- crowding the cell body.
-                        if type(cell.currencyId) == "number" then
+                        if type(cell.currencyId) == "number" or cell.difficulties or cell.encounters then
                             local valueButton = nextValueButton()
                             valueButton:SetPoint("CENTER", frame, "TOPLEFT",
                                 M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))

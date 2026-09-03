@@ -121,6 +121,35 @@ return function(test)
     test.eq(retailCells.DR.state, "complete", "a labelled retail raid is still complete")
     test.eq(retailCells.DR.difficultyLabel, "M", "the raid cell carries its difficulty letter")
 
+    -- A retail raid cell also carries its per-difficulty and per-boss breakdown
+    -- so the hover surface can list them.
+    local breakdownView = View.project(input({
+        family = "retail",
+        catalog = Catalog.forFamily("retail"),
+        snapshots = { snapshot({
+            raidStates = {
+                DR = {
+                    completed = true, resetsAt = 9000, difficultyLabel = "M",
+                    difficulties = {
+                        { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6, resetsAt = 9000 },
+                        { difficulty = 16, difficultyLabel = "M", completedParts = 6, totalParts = 6, resetsAt = 9000 },
+                    },
+                    encounters = {
+                        { id = 1001, name = "首王", done = true },
+                        { id = 1002, name = "次王", done = false },
+                    },
+                },
+            },
+        }) },
+        visibility = { raid = { DR = true } },
+    }))
+    local breakdownCells = {}
+    for _, cell in ipairs(breakdownView.raid.rows[1].cells) do breakdownCells[cell.columnId] = cell end
+    test.eq(type(breakdownCells.DR.difficulties), "table", "the raid cell surfaces its difficulties")
+    test.eq(#breakdownCells.DR.difficulties, 2, "both difficulties reach the cell")
+    test.eq(type(breakdownCells.DR.encounters), "table", "the raid cell surfaces its encounters")
+    test.eq(#breakdownCells.DR.encounters, 2, "both bosses reach the cell")
+
     -- Real reset countdown, surfaced as a section-level hint.
     test.eq(View.formatCountdown(1000, 1000 + 2 * 86400 + 3 * 3600), "2天3小时", "countdown spans days and hours")
     test.eq(View.formatCountdown(1000, 1000 + 3 * 3600 + 20 * 60), "3小时20分", "countdown spans hours and minutes")

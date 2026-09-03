@@ -185,6 +185,12 @@ local function raidCell(column, snapshot, now)
     if type(state) ~= "table" then return cell end
     if type(state.resetsAt) == "number" then cell.resetsAt = state.resetsAt end
     if type(state.difficultyLabel) == "string" then cell.difficultyLabel = state.difficultyLabel end
+    if type(state.difficulties) == "table" and #state.difficulties > 0 then
+        cell.difficulties = state.difficulties
+    end
+    if type(state.encounters) == "table" and #state.encounters > 0 then
+        cell.encounters = state.encounters
+    end
     if type(state.resetsAt) == "number" and type(now) == "number" and now >= state.resetsAt then
         return cell
     end

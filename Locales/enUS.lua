@@ -3023,6 +3023,7 @@ do -- BGNext current-raid trade and mail reconciliation
     L["方向"] = "Direction"
     L["寄出"] = "Sent"
     L["已完成"] = "Done"
+    L["未完成"] = "Not done"
     L["已取消"] = "Cancelled"
     L["已寄出"] = "Mailed"
     L["待核对"] = "To reconcile"

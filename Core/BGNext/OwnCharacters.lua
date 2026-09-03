@@ -42,6 +42,20 @@ local RAID_STATE_FIELDS = {
     completed = "boolean", progress = "number", total = "number",
     completedParts = "number", totalParts = "number",
     difficulty = "number", difficultyLabel = "string", resetsAt = "number",
+    difficulties = "table", encounters = "table",
+}
+
+-- A retail lockout's per-difficulty breakdown. Every difficulty keeps only its
+-- own killed/total boss counts, so Normal/Heroic/Mythic stay isolated.
+local DIFFICULTY_STATE_FIELDS = {
+    difficulty = "number", difficultyLabel = "string",
+    completedParts = "number", totalParts = "number", resetsAt = "number",
+}
+
+-- A retail lockout's per-boss list: a stable encounter id, an optional
+-- localized name and a best-effort done flag. Nothing else is retained.
+local ENCOUNTER_FIELDS = {
+    id = "number", name = "string", done = "boolean",
 }
 
 local PROFESSION_FIELDS = {
@@ -102,6 +116,20 @@ local function copyRecordMap(source, fields)
     return copy
 end
 
+-- Arrays of whitelisted records, preserving order. Unknown keys and wrong-typed
+-- values are dropped, so a corrupted save can never smuggle in extra fields.
+local function copyArray(source, fields)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for index, record in ipairs(source) do
+        local entry = copyRecord(record, fields)
+        if entry and next(entry) ~= nil then
+            copy[#copy + 1] = entry
+        end
+    end
+    return copy
+end
+
 -- Maps of key -> plain count/amount. Non-numeric values are discarded rather
 -- than carried through as opaque data.
 local function copyNumberMap(source)
@@ -137,6 +165,25 @@ local function copyCurrencyMap(source)
     return copy
 end
 
+-- Raid states get a nested whitelist: the flat fields plus sanitized
+-- `difficulties` and `encounters` arrays. This replaces copyRecordMap so the
+-- arrays are copied deeply rather than carried by reference.
+local function sanitizeRaidStates(source)
+    if type(source) ~= "table" then return {} end
+    local copy = {}
+    for key, record in pairs(source) do
+        if isKey(key) then
+            local entry = copyRecord(record, RAID_STATE_FIELDS)
+            if entry and next(entry) ~= nil then
+                entry.difficulties = copyArray(record.difficulties, DIFFICULTY_STATE_FIELDS)
+                entry.encounters = copyArray(record.encounters, ENCOUNTER_FIELDS)
+                copy[key] = entry
+            end
+        end
+    end
+    return copy
+end
+
 local function sanitize(snapshot)
     if type(snapshot) ~= "table" then return nil end
     if not isKey(snapshot.realmId) then return nil end
@@ -151,7 +198,7 @@ local function sanitize(snapshot)
     end
 
     clean.equipment = copyRecordMap(snapshot.equipment, EQUIPMENT_FIELDS)
-    clean.raidStates = copyRecordMap(snapshot.raidStates, RAID_STATE_FIELDS) or {}
+    clean.raidStates = sanitizeRaidStates(snapshot.raidStates)
     clean.professions = copyRecordMap(snapshot.professions, PROFESSION_FIELDS)
     clean.currencies = copyCurrencyMap(snapshot.currencies)
     clean.items = copyNumberMap(snapshot.items)
