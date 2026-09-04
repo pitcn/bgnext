@@ -1478,25 +1478,6 @@ t:SetText("|cff" .. "00BFFF" .. "BGLite-金团表格纯净版" .. "|r")
 
         O.CreateLine(biaoge, height - h)
         h = h + 15
-        -- 进本自动清空表格
-        do
-            local name = "autoQingKong"
-            BG.options[name .. "reset"] = 1
-            BiaoGe.options[name] = BiaoGe.options[name] or BG.options[name .. "reset"]
-            local ontext = {
-                L["进本自动清空表格"],
-                L["当你进入一个新CD团本时，表格会自动清空。"],
-                -- " ",
-                -- L[""],
-            }
-            local f = O.CreateCheckButton(name, L["进本自动清空表格"], biaoge, 15, height - h, ontext)
-            BG.options["button" .. name] = f
-            -- 删除旧设置
-            if BiaoGe.options["showQingKong"] then
-                BiaoGe.options["showQingKong"] = nil
-            end
-        end
-        h = h + 30
         -- 清空表格时保留支出补贴名称
         do
             local name = "retainExpenses"

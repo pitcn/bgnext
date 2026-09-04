@@ -13,6 +13,7 @@ do --英语说明书
         "This edition has been security-cleaned and streamlined by the World of Warcraft China operations team. It retains only essential auction features; no new feature modules will be added, and maintenance is limited to security and stability.",
         "Features and content unrelated to core auctions, together with all non-compliant and risky code, have been removed to provide a safer, cleaner, and lighter addon experience.",
         "BGLite Pure Edition is a basic transitional option. Developers are encouraged to build safe and stable enhancements on this edition, giving players richer and more capable choices.",
+        "Supports the standard BiaoGe auction protocol and its collaboration method.",
         "World of Warcraft China Operations Team",
         " ",
         "|cff00BFFFCommands:|r",
@@ -568,9 +569,6 @@ do
     L["记录"] = "Records"
     L["拍卖成功的聊天消息后面增加[出价记录]"] = "Added [Bid Record] to the chat messages after successful auctions."
     L["鼠标悬停在[出价记录]时会显示该装备的出价记录。"] = "When hovering over [Bid Record], it will show the bid record of the Gear."
-    L["自动清空表格时保存表格"] = "Save Forms when Auto Clearing Forms"
-    L["进本自动清空表格时，把表格保存至历史表格1。"] = "When you enter this Auto Clear Form, the form will be saved to History Form 1."
-    L["取消勾选则不会保存表格。"] = "Unchecking this box will not save the form."
     L["不显示低于该装等的角色："] = "Do not show Characters below this level:"
     L["|cffFFFFFF安装WA：|r此WA是团员端，用于接收团长发出的拍卖消息，没安装的团员显示不了拍卖UI。请团长安装该WA字符串后发给团员安装。如果团员已经安装了BGLite插件，可以不用安装该WA。"] = "|cffFFFFFFInstall WA:|rThis WA is the member's side, used to receive the auction message from the leader, without installing it, the member can not display the auction UI. please ask the leader to install this WA string and send it to the members to install. If you have already installed BGLite plugin, you don't need to install this WA."
     L["v2.5：拍卖金额超过1万时会进行缩写。ALT+点击折叠时，会对全部拍卖窗口折叠"] = "v2.5: Auctions are abbreviated when they exceed 10k. ALT+click to collapse will collapse the entire auction window."
@@ -1144,8 +1142,6 @@ do
     L["拍卖聊天记录框"] = "Auction Chat"
     L["自动记录全团跟拍卖有关的聊天。"] = "Automatically logs auction-related chat for the entire group."
     L["当你点击买家或金额时会显示拍卖聊天记录。"] = "When you click on a buyer or an amount, the auction chat log is displayed."
-    L["进本自动清空表格"] = "Auto Empty Form"
-    L["当你进入一个新CD团本时，表格会自动清空。"] = "When you enter a new CD group, the form is automatically cleared."
     L["清空表格时保留支出补贴名称"] = "Keeping Expense Allowance Names When Emptying Forms"
     L["只保留补贴名称（例如XX补贴），支出玩家和支出金额正常清空。"] = "Only the name of the subsidy is retained (e.g. XX Subsidy), the spending player and spending amount are cleared normally."
     L["这样就不用每次都重复填写补贴名称。"] = "This eliminates the need to repeat the subsidy name each time."
@@ -1346,7 +1342,6 @@ do
     L["队长模式一键自动分配"] = "One-click auto-assign in Captain Mode"
     L["队长分配模式时，在战利品界面增加一键分配按钮。"] = "Added a one-click assign button to the loot screen when in captain assign mode."
     L["点击按钮后会把全部掉落分配给自己，只对史诗装备或套装兑换物生效，其他分类的物品不会生效（例如橙片、任务物品等不会自动分配）。"] = "Clicking the button will assign all drops to yourself, and will only work on Epic Gear or Set Exchange items, but not other categories (e.g. Orange Slices, Quests items, etc. will not be automatically assigned)."
-    L["|cffffffff< 进本自动清空表格 >|r\n\n当你进入一个新CD团本时，表格会自动清空，原表格数据会保存至历史表格1"] = "|cffffffff< Auto Clear Form >|r\n\nWhen you enter a new CD group, the form will be automatically cleared and the original form data will be saved to the history form1"
     L["<BGLite> 已自动清空表格< %s >，分钱人数已改为%s人。原表格数据已保存至历史表格1。"] = "<BGLite> has automatically cleared the form < %s >, the number of split has been changed to %s people. The original form data has been saved to History Form 1."
     L["撤回清空"] = "Withdraw clearing"
     L["<BGLite> 已撤回清空，还原了表格数据，并删除了历史表格1。"] = "<BGLite> has withdrawn the clearing, restored the form data and deleted the history form 1."
@@ -1769,6 +1764,7 @@ do
     L["表格里没找到此次交易的装备"] = "The Gear of this transaction is not found in the table"
     L["该BOSS格子已满"] = "This BOSS Grid is full"
     L["欠款："] = "Amount owed:"
+    L["总欠款："] = "Total amount owed:"
     L["记账效果预览"] = "Accounting Preview"
     L["次"] = "times"
     L["打断"] = "Flame Protection"

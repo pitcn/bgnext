@@ -12,7 +12,6 @@ local GetItemID = ns.GetItemID
 
 
 BG.Init(function()
-    BiaoGe.auctionMSGhistory = BiaoGe.auctionMSGhistory or {}
 
 
     local maxLine = 1000
@@ -117,26 +116,6 @@ BG.Init(function()
             self.UpdateButtonItem()
         end)
 
-        local t = GetServerTime()
-        for i = #BiaoGe.auctionMSGhistory, 1, -1 do
-            if type(BiaoGe.auctionMSGhistory[i]) == "table" then
-                if t - BiaoGe.auctionMSGhistory[i].time > 60 * 60 * 12 then
-                    tremove(BiaoGe.auctionMSGhistory, i)
-                end
-            end
-        end
-
-        for i, v in ipairs(BiaoGe.auctionMSGhistory) do
-            if type(v) == "table" then
-                local info = date("*t", v.time)
-                local hour, min = info.hour, info.min
-                hour = string.format("%02d", hour)
-                min = string.format("%02d", min)
-                local _time = "|cff" .. "808080" .. hour .. ":" .. min .. "|r"
-                local msg = _time .. " |cff" .. v.textColor .. v.nameLink .. L["："] .. v.text .. RN
-                BG.FrameAuctionMSG:AddMessage(msg)
-            end
-        end
     end
 
     -- 滚动按钮
@@ -367,19 +346,6 @@ BG.Init(function()
                     msg = _time .. " " .. "|cffFF7F50" .. nameLink .. L["："] .. text .. RN -- 团员聊天
                 end
                 BG.FrameAuctionMSG:AddMessage(msg)
-
-                tinsert(BiaoGe.auctionMSGhistory, {
-                    time = GetServerTime(),
-                    textColor = ML and "FF4500" or "FF7F50",
-                    nameLink = nameLink,
-                    text = text,
-                })
-                for i, v in ipairs(BiaoGe.auctionMSGhistory) do
-                    if #BiaoGe.auctionMSGhistory <= maxLine then
-                        break
-                    end
-                    tremove(BiaoGe.auctionMSGhistory, 1)
-                end
 
                 if not BG.FrameAuctionMSG:AtBottom() then
                     BG.FrameAuctionMSG.hilighttexture:Show()
