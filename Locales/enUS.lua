@@ -9,6 +9,15 @@ local L = ns.L
 local c1 = ns.c1
 
 do -- BGNext release text
+    L["新增基础模式、完整模式和自定义模式；可按功能组关闭增强功能，已保存数据不会被删除。"] = "Added Basic, Full, and Custom modes. Enhancement groups can be disabled without deleting saved data."
+    L["新增游戏内说明书，集中介绍主要功能、快捷键、命令、权限限制和隐私边界。"] = "Added an in-game guide covering major features, shortcuts, commands, permission limits, and privacy boundaries."
+    L["重做待拍队列的布局、关闭与清空交互，窗口尺寸变化时会自动重排。"] = "Redesigned the auction queue layout, close and clear actions, with automatic reflow when the window changes size."
+    L["有团长或拾取职责时，Boss 拾取窗口新增可见拍卖入口，并复用统一的开拍安全检查。"] = "Added a visible auction entry to boss loot windows for raid leaders and loot-responsible players, using the shared pre-auction safety checks."
+    L["修复混合使用 BGNext 与 BGLite 时同物品拍卖计时不同步、卡片误隐藏及拍卖结果缺失。"] = "Fixed desynchronized timers, incorrectly hidden cards, and missing results for identical-item auctions in mixed BGNext and BGLite groups."
+    L["修复部分成功交易和邮件记录遗漏；交易记录继续区分已交易与待核对，不把未知金额伪造为零。"] = "Fixed missing successful trade and mail records. Records still distinguish delivery from reconciliation and never invent zero for unknown amounts."
+    L["当前团账单可标记退货待处理并在结算前提醒，不会自动退款或改写原买家与金额。"] = "Current-raid bill rows can be marked as pending returns and surfaced before settlement without issuing refunds or rewriting the original buyer and amount."
+    L["熊猫人角色总览新增天神首胜、农场收菜、四天神和斡耳朵斯追踪；证据不足时显示未知。"] = "Mists character overview can track the first Celestial win, Sunsong Ranch harvest, August Celestials, and Ordos; insufficient evidence remains unknown."
+    L["上游基础升级到官方 BGLite 2.4.2 纯净版，并保留 BGNext 的隐私与发送前安全保护。"] = "Updated the upstream foundation to official BGLite 2.4.2 Pure Edition while retaining BGNext privacy and pre-send safeguards."
     L["新增团长待拍队列：逐件确认价格后开拍，不会自动连拍；离团、切表或重载即清空。"] = "Added a leader auction queue. Confirm each item's price before starting; it never auto-starts the next auction and clears when leaving the raid, switching tables, or reloading."
     L["拍卖结束后，侧边卡片会短暂显示买家和成交金额；流拍或取消也有明确状态。"] = "Auction cards now briefly show the buyer and final amount after completion, with clear unsold and cancelled states."
     L["交易记录改进：保留同物品多件数量，确认时采集双方物品与金币，并区分已交易和待核对。"] = "Trade records now preserve quantities for identical items, capture both sides' items and gold at confirmation, and distinguish delivery from reconciliation."
@@ -33,7 +42,7 @@ do -- BGNext release text
     L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"] = "Character overview records only characters you log into yourself. Current-raid trade and mail reconciliation lasts at most seven days, without mail bodies or other-player history profiles."
     L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"] = "Legacy history cleanup in Storage & Privacy cannot be undone: back up WTF first. Updating or reloading does not delete it. Do not enable BGLite, BiaoGe or their dependent extensions alongside BGNext."
     L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"] = "Clients other than Simplified or Traditional Chinese fall back to English. See the release notes for tested client coverage; not all client features have been verified."
-    L["BGNext 基于 BGLite 2.4.1 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.1 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
+    L["BGNext 基于 BGLite 2.4.2 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.2 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
 end
 
 do -- BGNext return markers
@@ -62,15 +71,19 @@ do --英语说明书
         L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"],
         L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"],
         L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"],
-        L["BGNext 基于 BGLite 2.4.1 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
+        L["BGNext 基于 BGLite 2.4.2 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
     }
     ns.updateText_now = {
-        "BGNext 0.6.0",
-        L["新增团长待拍队列：逐件确认价格后开拍，不会自动连拍；离团、切表或重载即清空。"],
-        L["拍卖结束后，侧边卡片会短暂显示买家和成交金额；流拍或取消也有明确状态。"],
-        L["交易记录改进：保留同物品多件数量，确认时采集双方物品与金币，并区分已交易和待核对。"],
-        L["修复交易成功或失败通报；同一交易只通报一次，不记录聊天内容或跨团历史。"],
-        L["上游基础升级到官方 BGLite 纯净版 2.4.1；拍卖聊天不再跨重载保存，并补充拍卖记录空数据容错。"],
+        "BGNext 0.7.0",
+        L["新增基础模式、完整模式和自定义模式；可按功能组关闭增强功能，已保存数据不会被删除。"],
+        L["新增游戏内说明书，集中介绍主要功能、快捷键、命令、权限限制和隐私边界。"],
+        L["重做待拍队列的布局、关闭与清空交互，窗口尺寸变化时会自动重排。"],
+        L["有团长或拾取职责时，Boss 拾取窗口新增可见拍卖入口，并复用统一的开拍安全检查。"],
+        L["修复混合使用 BGNext 与 BGLite 时同物品拍卖计时不同步、卡片误隐藏及拍卖结果缺失。"],
+        L["修复部分成功交易和邮件记录遗漏；交易记录继续区分已交易与待核对，不把未知金额伪造为零。"],
+        L["当前团账单可标记退货待处理并在结算前提醒，不会自动退款或改写原买家与金额。"],
+        L["熊猫人角色总览新增天神首胜、农场收菜、四天神和斡耳朵斯追踪；证据不足时显示未知。"],
+        L["上游基础升级到官方 BGLite 2.4.2 纯净版，并保留 BGNext 的隐私与发送前安全保护。"],
     }
     ns.updateText_before = {
 
