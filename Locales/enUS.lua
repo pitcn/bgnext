@@ -3272,4 +3272,5 @@ do -- BGNext in-game guide
     L["已启用"] = "Enabled"
     L["命令："] = "Command: "
     L["BGNext 说明书"] = "BGNext Guide"
+    L["待拍队列已在功能管理中关闭。"] = "The auction queue is disabled in Feature Management."
 end

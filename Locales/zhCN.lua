@@ -3278,4 +3278,5 @@ do -- BGNext in-game guide
     L["已启用"] = true
     L["命令："] = true
     L["BGNext 说明书"] = true
+    L["待拍队列已在功能管理中关闭。"] = true
 end

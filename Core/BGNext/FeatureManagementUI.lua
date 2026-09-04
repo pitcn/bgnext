@@ -53,6 +53,13 @@ function M.toggleFeature(root, family, id, value)
     return BG.BGNext.FeatureSettings.setEnabled(root, id, value)
 end
 
+local function refreshRuntimes()
+    for _, name in ipairs({ "AuctionPriceUI", "AuctionQueueRuntime", "LootAuctionEntry", "WishlistUI", "OwnCharactersRuntime", "EquipmentFilterRuntime", "EquipmentFilterUI", "CurrentSettlementUI", "UIThemeSettings" }) do
+        local runtime = BG.BGNext[name]
+        if runtime and type(runtime.refreshFeatureState) == "function" then runtime.refreshFeatureState() end
+    end
+end
+
 function M.buildPanel()
     if type(CreateFrame) ~= "function" or type(BG.OptionsCreateTab) ~= "function"
         or type(BG.CreateButton) ~= "function" or type(BG.BGNext.DB) ~= "table"
@@ -115,6 +122,7 @@ function M.buildPanel()
                     check:SetChecked(row.enabled)
                     check:SetScript("OnClick", function(self)
                         M.toggleFeature(BG.BGNext.DB, family, row.id, self:GetChecked() and true or false)
+                        refreshRuntimes()
                         render()
                     end)
                     local name = line:CreateFontString()
@@ -136,8 +144,8 @@ function M.buildPanel()
         panel:SetSize(650, math.max(1, -y + 20))
     end
 
-    fullButton:SetScript("OnClick", function() M.applyMode(BG.BGNext.DB, family, "full"); render() end)
-    basicButton:SetScript("OnClick", function() M.applyMode(BG.BGNext.DB, family, "basic"); render() end)
+    fullButton:SetScript("OnClick", function() M.applyMode(BG.BGNext.DB, family, "full"); refreshRuntimes(); render() end)
+    basicButton:SetScript("OnClick", function() M.applyMode(BG.BGNext.DB, family, "basic"); refreshRuntimes(); render() end)
     render()
     return panel
 end

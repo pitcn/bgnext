@@ -320,6 +320,9 @@ BG.BGNext.EquipmentFilter = M
 
 function BG.BGNext.GetActiveEquipmentFilterProfile()
     if not BG.BGNext.DB then return nil end
+    local featureSettings = BG.BGNext.FeatureSettings
+    if featureSettings and type(featureSettings.isCurrentEnabled) == "function"
+        and not featureSettings.isCurrentEnabled("equipment_filter", BG, BG.BGNext.DB) then return nil end
     return M.getActiveProfile(BG.BGNext.DB, BG.realmID or GetRealmID(), BG.playerName)
 end
 

@@ -500,6 +500,22 @@ return function(test)
     test.eq(entry.point[2], tradeEntry,
         "a late footer relayout moves the queue left of the record buttons and keeps role overview far right")
 
+    local queueFeatureEnabled = false
+    BG.BGNext.FeatureSettings = { isEnabled = function() return queueFeatureEnabled end }
+    test.eq(M.refreshFeatureState(), false, "disabled queue reports its feature state")
+    test.eq(entry.shown, false, "disabled queue hides the main-window entry")
+    local preservedId = M.add({ itemId = 1004, link = "item:1004" })
+    local preservedCount = M.state().queueSize
+    local opened, disabledReason = M.openFrame()
+    test.eq(opened, nil, "disabled queue cannot open its window")
+    test.eq(disabledReason, "feature-disabled", "disabled queue returns an explicit reason")
+    test.eq(M.state().queueSize, preservedCount, "disabling never deletes queued data")
+    queueFeatureEnabled = true
+    test.eq(M.refreshFeatureState(), true, "queue can be enabled again")
+    test.eq(entry.shown, true, "re-enabling restores the main-window entry")
+    test.eq(M.project()[preservedCount].id, preservedId, "re-enabling keeps the prior queue row")
+    BG.BGNext.FeatureSettings = nil
+
     local mainFile = assert(io.open("Core/BiaoGe.lua", "rb"))
     local mainSource = mainFile:read("*a")
     mainFile:close()

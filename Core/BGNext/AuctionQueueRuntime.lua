@@ -76,6 +76,16 @@ local function storageRoot()
     return BG.BGNext and BG.BGNext.DB
 end
 
+local function featureEnabled()
+    local settings = BG.BGNext and BG.BGNext.FeatureSettings
+    if not settings then return true end
+    if type(settings.isCurrentEnabled) == "function" then
+        return settings.isCurrentEnabled("auction_queue", BG, storageRoot())
+    end
+    if type(settings.isEnabled) ~= "function" then return true end
+    return settings.isEnabled(storageRoot(), "auction_queue", "wrath")
+end
+
 local function currentRaid()
     local raidId = BG.FB1
     return type(raidId) == "string" and raidId ~= "" and raidId or nil
@@ -654,6 +664,7 @@ local function createRow(parent)
 end
 
 function M.openFrame()
+    if not featureEnabled() then return nil, "feature-disabled" end
     local frame = state.frame
     if not frame then
         frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
@@ -742,6 +753,11 @@ function M.openFrame()
 end
 
 function M.toggle()
+    if not featureEnabled() then
+        if state.frame then state.frame:Hide() end
+        if type(BG.SendSystemMessage) == "function" then BG.SendSystemMessage(L["待拍队列已在功能管理中关闭。"] ) end
+        return false, "feature-disabled"
+    end
     if state.frame and state.frame:IsShown() then
         state.frame:Hide()
     else
@@ -763,6 +779,8 @@ end
 function M.installEntry(mainFrame)
     if entryButton then
         layoutEntry(entryButton, mainFrame)
+        if type(entryButton.SetShown) == "function" then entryButton:SetShown(featureEnabled())
+        elseif featureEnabled() then entryButton:Show() else entryButton:Hide() end
         return entryButton
     end
     if type(mainFrame) ~= "table" or type(CreateFrame) ~= "function" or type(BG.CreateButton) ~= "function" then
@@ -777,7 +795,18 @@ function M.installEntry(mainFrame)
         M.toggle()
     end)
     entryButton = button
+    if not featureEnabled() then button:Hide() end
     return button
+end
+
+function M.refreshFeatureState()
+    local enabled = featureEnabled()
+    if entryButton then
+        if type(entryButton.SetShown) == "function" then entryButton:SetShown(enabled)
+        elseif enabled then entryButton:Show() else entryButton:Hide() end
+    end
+    if not enabled and state.frame then state.frame:Hide() end
+    return enabled
 end
 
 -- --- Lifecycle -----------------------------------------------------------

@@ -47,4 +47,8 @@ return function(test)
 
     test.eq(settings.setEnabled(root, "missing", false), false, "unknown feature is rejected")
     test.eq(settings.applyMode(root, "missing", "titan"), false, "unknown mode is rejected")
+    test.eq(settings.currentFamily({ IsWLK = true, IsTitan = true }), "titan",
+        "specific overlapping client family wins")
+    test.eq(settings.isCurrentEnabled("wishlist", { IsTitan = true }, root), false,
+        "current-client helper uses the same feature state")
 end

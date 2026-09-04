@@ -49,6 +49,9 @@ function M.markNotified(seenEvents, key)
 end
 
 function M.notify(kind, itemId, raidId, eventId, itemLink, level)
+    local featureSettings = BG.BGNext.FeatureSettings
+    if featureSettings and type(featureSettings.isCurrentEnabled) == "function"
+        and not featureSettings.isCurrentEnabled("wishlist", BG, BG.BGNext.DB) then return false end
     local wishlist = BG.BGNext.Wishlist
     local root = BG.BGNext.DB
     -- One allocation-free scan decides both "is this a wish" and its priority.

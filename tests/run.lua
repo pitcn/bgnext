@@ -11,6 +11,7 @@ local suites = {
     "tests/test_feature_settings.lua",
     "tests/test_feature_management_ui.lua",
     "tests/test_guide_ui.lua",
+    "tests/test_feature_runtime_gates.lua",
     "tests/test_conflict_guard.lua",
     "tests/test_data_lifecycle.lua",
     "tests/test_legacy_history_cleanup.lua",

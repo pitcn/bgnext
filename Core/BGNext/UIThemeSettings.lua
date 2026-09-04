@@ -4,6 +4,23 @@ BG.BGNext = BG.BGNext or {}
 local UITheme = BG.BGNext.UITheme
 
 local M = {}
+local featurePanel
+
+function M.isFeatureEnabled(root)
+    local settings = BG.BGNext.FeatureSettings
+    return not settings or type(settings.isCurrentEnabled) ~= "function"
+        or settings.isCurrentEnabled("appearance", BG, root or BG.BGNext.DB)
+end
+
+function M.refreshFeatureState()
+    local enabled = M.isFeatureEnabled(BG.BGNext.DB)
+    if featurePanel then
+        featurePanel:SetShown(enabled)
+        local tab = featurePanel:GetParent()
+        if tab and type(tab.SetShown) == "function" then tab:SetShown(enabled) end
+    end
+    return enabled
+end
 
 -- read resolves the saved theme choice to a normalized value without writing.
 function M.read(root)
@@ -54,6 +71,7 @@ function M.buildPanel()
     if type(panel) ~= "table" then
         return
     end
+    featurePanel = panel
 
     local y = 0
 
@@ -118,6 +136,7 @@ function M.buildPanel()
     note:SetPoint("TOPLEFT", panel, 15, y - 72)
 
     refresh()
+    M.refreshFeatureState()
 end
 
 if type(BG) == "table" and type(BG.Init) == "function" then
