@@ -63,6 +63,7 @@ return function(test)
 
         -- --- Fake frame factory ------------------------------------------------
 
+        local useUserdataFrames = false
         local function makeFrame()
             local frame = {
                 points = {}, scripts = {}, children = {}, hooks = {},
@@ -218,6 +219,13 @@ return function(test)
                 return self.disabledTexture
             end
             function frame:SetDisabledTexture() end
+            if useUserdataFrames then
+                local proxy = newproxy(true)
+                local mt = getmetatable(proxy)
+                mt.__index = frame
+                mt.__newindex = frame
+                return proxy
+            end
             return frame
         end
 
@@ -543,6 +551,18 @@ return function(test)
         test.eq(s.sends[1].money, 500, "single-item override price wins")
         test.eq(s.sends[1].itemID, 1001, "the correct item is sent")
         test.eq(s.frame.shown, false, "direct start hides the dialog")
+
+        -- WoW UI objects may be userdata while still exposing Frame methods and
+        -- writable custom fields. The direct-start wrapper must use the object
+        -- contract instead of rejecting the frame solely because type() is not
+        -- "table"; otherwise the price is prefilled but the reused start button
+        -- is never clicked (the live #86 symptom).
+        resetAuction()
+        useUserdataFrames = true
+        s = runDirect("item:1001", { source = "table", raidId = "ULD" })
+        useUserdataFrames = false
+        test.eq(#s.sends, 1, "userdata-shaped WoW frames still direct-start")
+        test.eq(s.sends[1].money, 500, "userdata-shaped frame keeps the approved price")
 
         -- --- (2) A loot source proves the current raid without an explicit raidId.
 
