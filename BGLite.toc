@@ -27,6 +27,7 @@ Core\BGNext\Identity.lua
 Core\BGNext\FeatureCatalog.lua
 Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
+Core\BGNext\FeatureSettings.lua
 Core\BGNext\AutoClearGuard.lua
 Core\BGNext\AuctionPriceStore.lua
 Core\BGNext\AuctionPriceCatalog.lua
