@@ -3027,6 +3027,8 @@ do -- BGNext current-raid trade and mail reconciliation
     L["已寄出"] = "Mailed"
     L["待核对"] = "To reconcile"
     L["左键切换待核对/已完成"] = "Left-click to toggle To reconcile / Done"
+    L["交易已完成"] = "Trade completed"
+    L["核对状态"] = "Reconciliation"
     L["失败"] = "Failed"
     L["当前团还没有交易记录。"] = "No trades recorded for the current raid yet."
     L["当前团还没有邮件记录。"] = "No mails recorded for the current raid yet."

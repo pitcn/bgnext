@@ -34,13 +34,16 @@ return function(test)
 
     -- appended out of chronological order on purpose
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "乙", itemId = 22, amount = 200, time = 1300, status = "pending",
+        raidId = "raid-a", player = "乙", completed = true, status = "pending",
+        myGold = 0, theirGold = 200, myItems = { { itemId = 22, quantity = 1 } }, time = 1300,
     }), true, "second trade accepted")
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "甲", itemId = 11, amount = 100, time = 1100, status = "complete",
+        raidId = "raid-a", player = "甲", completed = true, status = "complete",
+        myGold = 0, theirGold = 100, myItems = { { itemId = 11, quantity = 1 } }, time = 1100,
     }), true, "first trade accepted")
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "甲", itemId = 33, amount = 300, time = 1100, status = "cancelled",
+        raidId = "raid-a", player = "甲", completed = true, status = "cancelled",
+        myGold = 0, theirGold = 300, myItems = { { itemId = 33, quantity = 1 } }, time = 1100,
     }), true, "same-second trade accepted")
 
     rows, isEmpty = view.trades(root, { now = 1400, dateFn = stubDate })
@@ -49,8 +52,8 @@ return function(test)
 
     -- chronological, and equal timestamps keep their stored order (stable sort)
     test.eq(rows[1].time, 1100, "earliest trade first")
-    test.eq(rows[1].itemId, 11, "equal timestamps keep insertion order")
-    test.eq(rows[2].itemId, 33, "equal timestamps are not reordered")
+    test.eq(rows[1].myItems[1].itemId, 11, "equal timestamps keep insertion order")
+    test.eq(rows[2].myItems[1].itemId, 33, "equal timestamps are not reordered")
     test.eq(rows[3].time, 1300, "latest trade last")
 
     -- the same player appears once per event; no per-player totals or ranking
@@ -60,10 +63,41 @@ return function(test)
     test.eq(rows[1].count, nil, "no per-player event count")
     test.eq(rows[1].rank, nil, "no ranking field")
 
-    -- formatting and status presentation
-    test.eq(rows[1].amountText, "100", "amount formatted for display")
+    -- the grouped transaction carries its facts through the projection
+    test.eq(rows[1].theirGold, 100, "received gold carried through the projection")
+    test.eq(rows[1].myGold, 0, "paid gold carried through the projection")
+    test.eq(rows[1].completedKey, true, "completed fact carried through the projection")
     test.eq(rows[1].timeText, "t1100", "time formatted through the injected formatter")
     test.eq(rows[1].statusKey, "complete", "status key preserved for the UI")
+
+    -- quantity is carried through the projection so the visible table can show
+    -- that two of the same item were delivered; a grouped record has no legacy
+    -- quantity field, so nothing is invented.
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "乙", completed = true, status = "complete",
+        myGold = 0, theirGold = 400, myItems = { { itemId = 22, quantity = 2 } }, time = 1400,
+    }), true, "a quantity-aware trade is stored")
+    rows, isEmpty = view.trades(root, { now = 1500, dateFn = stubDate })
+    test.eq(#rows, 4, "the quantity-aware trade adds one projected row")
+    local qtyRow = rows[4]
+    test.eq(qtyRow.myItems[1].quantity, 2, "the projected row carries the delivered count")
+    test.eq(qtyRow.myItems[1].itemId, 22, "the quantity-aware row still names the item")
+    local groupedRow = rows[1]
+    test.eq(groupedRow.quantity, nil, "a grouped record has no legacy quantity field")
+
+    -- a legacy flat record (written before the grouped model) still projects
+    -- through its legacy passthrough fields without being rewritten.
+    table.insert(root.currentSettlement.trades, {
+        raidId = "raid-a", player = "甲", itemId = 55, amount = 500,
+        time = 1500, status = "complete", direction = "outgoing", quantity = 1,
+    })
+    rows, isEmpty = view.trades(root, { now = 1600, dateFn = stubDate })
+    test.eq(#rows, 5, "a legacy record adds one projected row")
+    local legacyFlat = rows[5]
+    test.eq(legacyFlat.itemId, 55, "legacy item passthrough survives")
+    test.eq(legacyFlat.amount, 500, "legacy amount passthrough survives")
+    test.eq(legacyFlat.directionKey, "outgoing", "legacy direction passthrough survives")
+    test.eq(legacyFlat.quantity, 1, "legacy quantity passthrough survives")
     local r, g, b = view.statusColor("trade", "complete")
     test.eq(r == 0 and g == 1 and b == 0, true, "success status is green")
     r, g, b = view.statusColor("trade", "pending")

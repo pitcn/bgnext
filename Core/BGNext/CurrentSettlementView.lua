@@ -79,11 +79,21 @@ local function project(records, dateFn)
             index = index,
             sortKey = type(record.time) == "number" and record.time or 0,
             player = record.player,
+            -- Legacy flat passthrough (records written before the grouped model).
             itemId = record.itemId,
+            quantity = record.quantity,
             amount = record.amount,
+            directionKey = record.direction,
+            -- Grouped transaction passthrough.
+            completedKey = record.completed,
+            myGold = record.myGold,
+            theirGold = record.theirGold,
+            myItems = record.myItems,
+            theirItems = record.theirItems,
             time = record.time,
             statusKey = record.status,
-            directionKey = record.direction,
+            -- Legacy records show their single stored amount; a grouped record
+            -- keeps its gold on the two explicit sides and the UI composes it.
             amountText = M.formatAmount(record.amount),
             timeText = M.formatTime(record.time, dateFn),
         }

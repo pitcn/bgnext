@@ -134,22 +134,42 @@ local function resolveItemId(item, itemIdOf)
     return nil
 end
 
+-- Aggregates a trade slot list into one entry per distinct item id, summing
+-- the slot quantities. `quantity` becomes nil when any contributing slot has
+-- an unknown or invalid count, so a partially-known delivery is never read as
+-- a specific count. `singleUnits` stays true only when every slot resolves to
+-- exactly one unit, which preserves the existing proof rule (a stack or
+-- unknown count can never prove a single sale).
 local function itemIds(value, itemIdOf)
-    local ids = {}
+    local entries = {}
+    local byIndex = {}
     local singleUnits = true
     if type(value) ~= "table" then
-        return ids
+        return entries, singleUnits
     end
     for _, item in ipairs(value) do
         local id = resolveItemId(item, itemIdOf)
-        if id then
-            ids[#ids + 1] = id
+        local count = type(item) == "table" and tonumber(item.count) or nil
+        if count ~= nil and (count < 1 or count % 1 ~= 0) then
+            count = nil
         end
-        if not id or type(item) ~= "table" or item.count ~= 1 then
+        if not id or count ~= 1 then
             singleUnits = false
         end
+        if id then
+            local slot = byIndex[id]
+            if not slot then
+                slot = { itemId = id, quantity = count }
+                byIndex[id] = slot
+                entries[#entries + 1] = slot
+            elseif slot.quantity ~= nil and count ~= nil then
+                slot.quantity = slot.quantity + count
+            else
+                slot.quantity = nil
+            end
+        end
     end
-    return ids, singleUnits
+    return entries, singleUnits
 end
 
 local function normalizedName(context, name)
@@ -191,12 +211,14 @@ local function isRosterMember(root, context, player)
     return false
 end
 
--- Turns one confirmed trade into the rows that describe it. Direction records
--- the item movement the runtime actually observed, never a guessed buyer: gold
--- on exactly one side fixes the direction (the items travel the other way),
--- while gold on both sides or neither side cannot name a buyer and stays
--- direction-less with no amount. When both sides put up items and neither put
--- up gold, a single row is produced for manual reconciliation.
+-- Turns one confirmed trade into a single grouped transaction record that
+-- keeps the actual paid/received facts: both gold directions, both item
+-- directions, the counterparty and time, plus two independent dimensions — the
+-- trade-completed fact (`completed`) and the reconciliation state (`status`).
+-- Gold is never netted and never invented: an explicit 0 stays 0, an unknown
+-- side stays nil. A shared total is stored once on the transaction, never
+-- duplicated per item. A completed trade stays completed even while its
+-- reconciliation is still pending.
 function M.tradeRows(trade, itemIdOf)
     if type(trade) ~= "table" or trade.completed ~= true then
         return {}
@@ -206,74 +228,43 @@ function M.tradeRows(trade, itemIdOf)
         return {}
     end
 
-    local theirs = tonumber(trade.targetmoney) or 0
-    local mine = tonumber(trade.playermoney) or 0
-    local theirItems, theirSingleUnits = itemIds(trade.targetitems, itemIdOf)
+    local myGold = type(trade.playermoney) == "number" and trade.playermoney or nil
+    local theirGold = type(trade.targetmoney) == "number" and trade.targetmoney or nil
     local myItems, mySingleUnits = itemIds(trade.playeritems, itemIdOf)
-    local anyItems = #theirItems > 0 or #myItems > 0
+    local theirItems, theirSingleUnits = itemIds(trade.targetitems, itemIdOf)
 
-    -- Only the gold one side actually put up counts as the settlement amount;
-    -- it is never derived from a bill row, a previous trade or a guess. Gold
-    -- on both sides cannot name the buyer, so no amount is asserted either.
-    local amount, direction
-    if theirs > 0 and mine > 0 then
-        amount, direction = nil, nil
-    elseif theirs > 0 then
-        amount, direction = theirs, "outgoing"
-    elseif mine > 0 then
-        amount, direction = mine, "incoming"
-    end
+    local mine = myGold or 0
+    local theirs = theirGold or 0
+    local anyGold = (myGold ~= nil and myGold ~= 0) or (theirGold ~= nil and theirGold ~= 0)
+    local anyItems = #myItems > 0 or #theirItems > 0
 
-    -- The settled items travel the other way from the gold; without a provable
-    -- direction, whatever item side exists is kept for manual reconciliation.
-    local items = {}
-    if direction == "outgoing" then
-        items = myItems
-    elseif direction == "incoming" then
-        items = theirItems
-    elseif #theirItems > 0 and #myItems > 0 then
-        items = {}
-    elseif #theirItems > 0 then
-        items = theirItems
-    elseif #myItems > 0 then
-        items = myItems
-    end
-
-    -- One-sided gold without an item on the other side cannot describe a
-    -- delivery; keep only the amount, direction-less, for manual review.
-    if amount ~= nil and #items == 0 then
-        direction = nil
-    end
-
-    -- Neither provable gold nor an identifiable item: no event at all.
-    if amount == nil and not anyItems then
+    -- Neither gold nor an identifiable item: no event at all.
+    if not anyGold and not anyItems then
         return {}
     end
 
-    local status = amount ~= nil and "complete" or "pending"
-    -- The record has no quantity field: a stack, unknown quantity, or barter
-    -- must stay unconfirmed rather than masquerading as a single sold item.
-    -- Retain the observed gold/direction for manual reconciliation only.
-    if (direction == "outgoing" and not mySingleUnits)
-        or (direction == "incoming" and not theirSingleUnits)
-        or (#theirItems > 0 and #myItems > 0) then
-        status = "pending"
+    -- Reconciliation state. Only a clean single-direction delivery proves a
+    -- settled sale: exactly one gold side, no barter, and every delivered unit
+    -- a known single item. Everything else stays pending for manual review — a
+    -- completed trade is never auto-settled, and a pending reconcile state
+    -- never negates the completed fact.
+    local status = "pending"
+    if theirs > 0 and mine == 0 and #theirItems == 0 and #myItems > 0 and mySingleUnits then
+        status = "complete"
+    elseif mine > 0 and theirs == 0 and #myItems == 0 and #theirItems > 0 and theirSingleUnits then
+        status = "complete"
     end
+
     local rows = {}
-    if #items == 0 then
-        rows[1] = { player = player, itemId = nil, amount = amount, status = status, direction = direction }
-    else
-        for index, itemId in ipairs(items) do
-            rows[index] = {
-                player = player,
-                itemId = itemId,
-                -- The gold belongs to the trade, not to each packed item.
-                amount = index == 1 and amount or nil,
-                status = status,
-                direction = direction,
-            }
-        end
-    end
+    rows[1] = {
+        player = player,
+        completed = true,
+        status = status,
+        myGold = myGold,
+        theirGold = theirGold,
+        myItems = myItems,
+        theirItems = theirItems,
+    }
     return rows
 end
 
@@ -283,25 +274,27 @@ function M.recordTrade(root, context, trade)
     if not raidId or not store or not isRosterMember(root, context, trade and trade.target) then
         return 0
     end
-    local now = context.now
-    local written = 0
-    for _, row in ipairs(M.tradeRows(trade, context.itemIdOf)) do
-        if store.append(root, {
-            raidId = raidId,
-            player = row.player,
-            itemId = row.itemId,
-            amount = row.amount,
-            time = now,
-            status = row.status,
-            direction = row.direction,
-        }) then
-            written = written + 1
-        end
+    local rows = M.tradeRows(trade, context.itemIdOf)
+    if #rows == 0 then
+        return 0
     end
-    if written > 0 then
+    local row = rows[1]
+    local written = store.append(root, {
+        raidId = raidId,
+        player = row.player,
+        time = context.now,
+        completed = row.completed,
+        status = row.status,
+        myGold = row.myGold,
+        theirGold = row.theirGold,
+        myItems = row.myItems,
+        theirItems = row.theirItems,
+    })
+    if written then
         refreshUI("trade")
+        return 1
     end
-    return written
+    return 0
 end
 
 function M.recordMail(root, context, mail)
@@ -406,14 +399,6 @@ end
 
 if BG.Init then
     BG.Init(function()
-        -- Memory-only guard so one trade cannot be booked twice if the client
-        -- repeats the completion message.
-        local booked = false
-
-        BG.RegisterEvent("TRADE_SHOW", function()
-            booked = false
-        end)
-
         -- At encounter start the player is confirmed inside the detected
         -- instance and BGLite has not yet replaced the table roster with the
         -- just-finished boss roster. This is the safe moment to distinguish a
@@ -428,22 +413,29 @@ if BG.Init then
         end)
 
         BG.RegisterEvent("UI_INFO_MESSAGE", function(_, _, _, text)
-            if text ~= ERR_TRADE_COMPLETE or booked then
+            if text ~= ERR_TRADE_COMPLETE then
                 return
             end
-            booked = true
-            local root = BG.BGNext.DB
-            local trade = BG.trade
-            if not root or type(trade) ~= "table" then
+            local root = BG.BGNext and BG.BGNext.DB
+            local capture = BG.BGNext and BG.BGNext.TradeCapture
+            if not root or not capture then
+                return
+            end
+            -- TradeCapture registered its completion handler first, so by the
+            -- time this handler runs the frozen snapshot is committed and
+            -- published. Reading committed() (never the mutable BG.trade) keeps
+            -- the settlement record identical to the bill and auction mark.
+            local snap = capture.committed()
+            if not snap then
                 return
             end
             M.recordTrade(root, liveContext(), {
                 completed = true,
-                target = trade.target,
-                targetmoney = trade.targetmoney,
-                playermoney = trade.playermoney,
-                targetitems = trade.targetitems,
-                playeritems = trade.playeritems,
+                target = snap.target,
+                targetmoney = snap.targetmoney,
+                playermoney = snap.playermoney,
+                targetitems = snap.targetitems,
+                playeritems = snap.playeritems,
             })
         end)
 

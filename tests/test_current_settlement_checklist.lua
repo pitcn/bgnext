@@ -17,12 +17,18 @@ return function(test)
     end
 
     -- Straight through the real whitelist stores so the checklist sees the
-    -- exact record shapes the runtime writes.
+    -- exact grouped record shape the runtime writes.
     local function addTrade(root, player, itemId, amount, status, time, raidId)
         return trade.append(root, {
             raidId = raidId or root.currentSettlement.raidId,
-            player = player, itemId = itemId, amount = amount,
-            time = time or NOW, status = status,
+            player = player,
+            completed = true,
+            status = status,
+            myGold = 0,
+            theirGold = amount,
+            myItems = { { itemId = itemId, quantity = 1 } },
+            theirItems = {},
+            time = time or NOW,
         })
     end
 
@@ -302,7 +308,7 @@ return function(test)
     test.eq(#sold, 2, "the shared amount and the uncovered delivery are flagged")
     test.eq(sold[1].reasonKey, "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）",
         "the duplicate sale cannot be proven against the packed trade")
-    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记",
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记",
         "the surplus finding names the uncovered delivery")
 
     -- 7g. an unidentifiable bill item cannot use trade evidence
@@ -320,7 +326,7 @@ return function(test)
     test.eq(#sold, 2, "an unidentifiable item and its uncovered delivery are flagged")
     test.eq(sold[1].reasonKey, "账单装备无法识别，无法核对交易证据（第%s个Boss 第%s件）",
         "the unidentifiable row is flagged")
-    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记",
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记",
         "the delivered item cannot be matched to any bill row")
 
     -- 7h. gold on both sides is ambiguous and can never prove a bill sale
@@ -337,6 +343,42 @@ return function(test)
     test.eq(report.status ~= "ready", true, "a both-gold trade blocks readiness")
     sold = entries(report, "pending", "sold")
     test.eq(#sold, 1, "the both-gold delivery has no sale evidence")
+
+    -- 7i. a single record with a known quantity above one is a shared delivery
+    --     and can never prove a single bill row on its own.
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    report = checklist.evaluate({
+        settlement = { trades = { {
+            player = "买家甲", itemId = 7001, amount = 1000, time = NOW,
+            status = "complete", direction = "outgoing", quantity = 2,
+        } }, mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
+    })
+    test.eq(report.status ~= "ready", true, "a two-item delivery cannot prove a single sale")
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 2, "the shared delivery and its uncovered second item are flagged")
+    test.eq(sold[1].reasonKey, "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）",
+        "a quantity above one is treated as a shared delivery")
+    test.eq(sold[2].reasonKey, "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记",
+        "the uncovered second item is surfaced as surplus")
+
+    -- 7j. a legacy record without a quantity cannot masquerade as one settled item
+    root = newRoot()
+    beginSettlement(root, "ICC")
+    report = checklist.evaluate({
+        settlement = { trades = { {
+            player = "买家甲", itemId = 7001, amount = 1000, time = NOW,
+            status = "complete", direction = "outgoing",
+        } }, mails = {} },
+        bill = bill({ saleRow(1, 1, 7001, "[装备一]", "买家甲", "1000") },
+            { splitCount = "1", netIncome = "1000", wage = "1000.00" }),
+    })
+    test.eq(report.status ~= "ready", true, "an unknown-quantity record cannot prove a settled sale")
+    sold = entries(report, "pending", "sold")
+    test.eq(#sold, 1, "the unknown-quantity delivery is flagged for review")
+
     -- 8. mail records are judged by status and direction, never by buyer身份
     root = newRoot()
     beginSettlement(root, "ICC")
@@ -374,7 +416,12 @@ return function(test)
     -- 10. an anomaly wins over pending, both are counted
     root = newRoot()
     beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
+    -- A legacy flat record without a direction: it proves nothing and adds no
+    -- surplus, matching the historical shape the checklist still reads safely.
+    table.insert(root.currentSettlement.trades, {
+        raidId = root.currentSettlement.raidId, player = "买家甲", itemId = 7001, amount = 100,
+        time = NOW, status = "complete",
+    })
     report = checklist.evaluate({
         settlement = root.currentSettlement,
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "", "", 500) },

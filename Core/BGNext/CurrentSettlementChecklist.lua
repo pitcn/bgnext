@@ -70,28 +70,85 @@ end
 -- and its payment. Direction-less legacy records, incoming purchases, short
 -- payments and packed shared amounts all stay pending, and each evidence row
 -- is consumed at most once. Amounts are never apportioned across items.
+-- Normalizes one stored trade record into the delivery candidates the bill
+-- matcher consumes. A grouped transaction record (the current shape) yields one
+-- candidate per delivered item — outgoing from myItems, incoming from theirItems
+-- — with the recorded gold on the matching side, but only when the trade is
+-- reconciled. A legacy flat record keeps its single item/amount/direction/
+-- quantity. A reconcile-pending grouped trade yields no evidence, so its
+-- completed fact is never silently treated as a settled sale.
+local function recordEvidence(record)
+    local evidence = {}
+    if type(record) ~= "table" then
+        return evidence
+    end
+    if type(record.completed) == "boolean" or type(record.myItems) == "table"
+        or type(record.myGold) == "number" then
+        if record.status ~= "complete" then
+            return evidence
+        end
+        if type(record.myItems) == "table" then
+            for _, entry in ipairs(record.myItems) do
+                evidence[#evidence + 1] = {
+                    itemId = entry.itemId,
+                    quantity = entry.quantity,
+                    direction = "outgoing",
+                    amount = record.theirGold,
+                }
+            end
+        end
+        if type(record.theirItems) == "table" then
+            for _, entry in ipairs(record.theirItems) do
+                evidence[#evidence + 1] = {
+                    itemId = entry.itemId,
+                    quantity = entry.quantity,
+                    direction = "incoming",
+                    amount = record.myGold,
+                }
+            end
+        end
+        return evidence
+    end
+    if record.status == "complete" and type(record.itemId) == "number" then
+        evidence[#evidence + 1] = {
+            itemId = record.itemId,
+            quantity = record.quantity,
+            direction = record.direction,
+            amount = tonumber(record.amount),
+        }
+    end
+    return evidence
+end
+
 local function evaluateSoldRows(input, addPending)
-    -- Group complete trade rows by trade (player + time) so a packed trade
+    -- Group outgoing candidates by trade (player + time) so a packed trade
     -- (several delivered items sharing one gold amount) can be recognised:
-    -- its per-row amount is the trade total and can never prove a single
-    -- bill row's price.
-    local packedTrades, candidates = {}, {}
+    -- the gold is the trade total and can never prove a single bill row's
+    -- price.
+    local candidates, outgoingByTrade = {}, {}
     for _, record in ipairs(input.settlement.trades or {}) do
-        if record.status == "complete" and type(record.itemId) == "number" then
-            local player = normalize(input, record.player)
-            if player then
-                local tradeKey = player .. "|" .. tostring(record.time)
-                packedTrades[tradeKey] = (packedTrades[tradeKey] or 0) + 1
-                local key = tostring(record.itemId) .. "|" .. player
+        local player = normalize(input, record.player)
+        if player then
+            local tradeKey = player .. "|" .. tostring(record.time)
+            for _, entry in ipairs(recordEvidence(record)) do
+                if entry.direction == "outgoing" then
+                    outgoingByTrade[tradeKey] = (outgoingByTrade[tradeKey] or 0) + 1
+                end
+                local key = tostring(entry.itemId) .. "|" .. player
                 local list = candidates[key]
                 if not list then
                     list = {}
                     candidates[key] = list
                 end
+                local quantity = type(entry.quantity) == "number"
+                    and entry.quantity >= 1 and entry.quantity % 1 == 0
+                    and entry.quantity or nil
                 list[#list + 1] = {
-                    amount = tonumber(record.amount),
-                    direction = record.direction,
+                    amount = entry.amount,
+                    direction = entry.direction,
                     tradeKey = tradeKey,
+                    quantity = quantity,
+                    remaining = quantity,
                     consumed = false,
                 }
             end
@@ -99,7 +156,9 @@ local function evaluateSoldRows(input, addPending)
     end
     for _, list in pairs(candidates) do
         for _, candidate in ipairs(list) do
-            candidate.packed = (packedTrades[candidate.tradeKey] or 0) > 1
+            candidate.packed = (outgoingByTrade[candidate.tradeKey] or 0) > 1
+                or candidate.quantity == nil
+                or (candidate.quantity ~= nil and candidate.quantity > 1)
         end
     end
     for _, row in ipairs(input.bill.rows) do
@@ -167,7 +226,18 @@ local function evaluateSoldRows(input, addPending)
                         { tostring(pick.candidate.amount), tostring(amount), location[1], location[2] })
                 elseif pick.reason == "packed" then
                     if pick.candidate then
-                        pick.candidate.consumed = true
+                        -- One bill row can account for at most one delivered
+                        -- unit of a shared/ambiguous delivery; the rest stays
+                        -- uncovered. A legacy record of unknown quantity is
+                        -- treated as fully accounted once it is flagged.
+                        if pick.candidate.remaining ~= nil then
+                            pick.candidate.remaining = pick.candidate.remaining - 1
+                            if pick.candidate.remaining < 0 then
+                                pick.candidate.remaining = 0
+                            end
+                        else
+                            pick.candidate.consumed = true
+                        end
                     end
                     addPending("sold", "对应交易为多件共享金额或对应关系不唯一，无法确认该件实收（第%s个Boss 第%s件）", location)
                 elseif pick.reason == "unknown" then
@@ -183,11 +253,11 @@ local function evaluateSoldRows(input, addPending)
         local leftover = 0
         for _, candidate in ipairs(list) do
             if not candidate.consumed and candidate.direction == "outgoing" then
-                leftover = leftover + 1
+                leftover = leftover + (candidate.remaining or 1)
             end
         end
         if leftover > 0 then
-            addPending("sold", "存在未被账单核对的已完成交易记录（共%s笔），请人工核对是否漏记", { tostring(leftover) })
+            addPending("sold", "存在未被账单核对的已完成交易记录（共%s件），请人工核对是否漏记", { tostring(leftover) })
         end
     end
 end
