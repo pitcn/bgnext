@@ -36,6 +36,21 @@ do -- BGNext release text
     L["BGNext 基于 BGLite 2.4.1 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.1 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
 end
 
+do -- BGNext return markers
+    L["退"] = "R"
+    L["退货"] = "Returns"
+    L["退货待处理"] = "Return pending"
+    L["可标退货"] = "Return available"
+    L["右键：标记退货 / 清除退货提醒"] = "Right-click: mark return / clear return reminder"
+    L["确认将这件装备标记为退货待处理吗？\n不会自动清空买家、金额或执行退款。"] = "Mark this item as a pending return?\nThis will not clear the buyer or amount, or issue a refund."
+    L["确认已处理该退货并清除提醒吗？"] = "Confirm that this return is resolved and clear its reminder?"
+    L["选择退货对应账单行"] = "Select the bill row for this return"
+    L["第%s个Boss 第%s件 · 原买家 %s · 原金额 %s"] = "Boss %s, item %s · original buyer %s · original amount %s"
+    L["只有团长或物品分配者可以标记退货。"] = "Only the raid leader or master looter can mark returns."
+    L["没有找到匹配的当前团账单行。"] = "No matching bill row was found for the current raid."
+    L["退货装备尚未处理：%s（第%s个Boss 第%s件），请核对买家、金额与退款"] = "Pending returned item from %s (boss %s, item %s): verify the buyer, amount, and refund."
+end
+
 do --英语说明书
     ns.instructionsText = {
         "|cff00BFFF<BGNext Guide>|r",

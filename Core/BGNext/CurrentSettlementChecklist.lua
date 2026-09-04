@@ -64,6 +64,17 @@ local function evaluateTradesAndMails(input, addIssue, addPending)
     end
 end
 
+local function evaluateReturns(input, addIssue)
+    for _, marker in ipairs(input.settlement.returns or {}) do
+        if marker.status == "pending" then
+            addIssue("return", "退货装备尚未处理：%s（第%s个Boss 第%s件），请核对买家、金额与退款",
+                { tostring(marker.player), tostring(marker.boss), tostring(marker.slot) },
+                { type = "table", fb = input.settlement.sourceFb,
+                    boss = marker.boss, slot = marker.slot })
+        end
+    end
+end
+
 -- Reconciles sold bill rows against confirmed trade deliveries. An item/name
 -- match alone is never proof: only an outgoing record (the runtime stamps the
 -- direction it observed) whose gold equals the bill amount proves the delivery
@@ -373,6 +384,7 @@ function M.evaluate(input)
         addPending("settlement", "当前没有进行中的团结算记录，无法核对交易与邮件")
     else
         evaluateTradesAndMails(input, addIssue, addPending)
+        evaluateReturns(input, addIssue)
         if hasBillData then
             evaluateSoldRows(input, addPending)
         end

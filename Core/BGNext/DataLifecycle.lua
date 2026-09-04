@@ -20,6 +20,7 @@ local function emptySettlement()
         expiresAt = nil,
         trades = {},
         mails = {},
+        returns = {},
     }
 end
 
@@ -35,6 +36,7 @@ function M.ensureRoot(saved)
     root.personalAuctionExpectations = root.personalAuctionExpectations or {}
     root.currentRaid = root.currentRaid or {}
     root.currentSettlement = root.currentSettlement or emptySettlement()
+    root.currentSettlement.returns = root.currentSettlement.returns or {}
     return root
 end
 
