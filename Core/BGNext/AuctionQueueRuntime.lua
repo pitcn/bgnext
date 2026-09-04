@@ -26,6 +26,14 @@ local TIMEOUT_SECONDS = 10
 
 local state = { queue = nil, frame = nil, pending = nil, gen = 0 }
 
+-- Native WoW UI objects can be userdata while still exposing Frame methods and
+-- writable addon fields. Runtime gates therefore validate object capability,
+-- not only the Lua table representation used by the test harness.
+local function isFrameObject(value)
+    local kind = type(value)
+    return kind == "table" or kind == "userdata"
+end
+
 -- Screen-relative viewport height: rows are bound into a fixed pool whose
 -- visible count never exceeds what actually fits, so the queue window stays
 -- on-screen at any UIParent height instead of growing to 40*26 + header.
@@ -256,11 +264,11 @@ function M.armTimeout(pending)
 end
 
 local function installSecondGate(frame, pending)
-    if type(frame) ~= "table" or type(frame.bt) ~= "table" then return end
+    if not isFrameObject(frame) or not isFrameObject(frame.bt) then return end
 
     -- One item per confirmation: force the legacy quantity box to 1 and lock it
     -- so the existing start handler can never run its multi-send path.
-    if type(frame.Edit3) == "table" then
+    if isFrameObject(frame.Edit3) then
         if type(frame.Edit3.SetText) == "function" then frame.Edit3:SetText("1") end
         if type(frame.Edit3.SetEnabled) == "function" then frame.Edit3:SetEnabled(false) end
     end
@@ -275,7 +283,7 @@ local function installSecondGate(frame, pending)
 
     -- Show the approved amount in Edit2 without writing back to the saved preset
     -- (the legacy OnTextChanged stores whatever is typed into BiaoGe.Auction).
-    if type(frame.Edit2) == "table" and type(frame.Edit2.SetText) == "function" then
+    if isFrameObject(frame.Edit2) and type(frame.Edit2.SetText) == "function" then
         local edit2 = frame.Edit2
         local onChanged
         if type(edit2.GetScript) == "function" then
@@ -305,7 +313,7 @@ local function installSecondGate(frame, pending)
         end
         -- Editing the price box after confirmation invalidates the approval;
         -- require a fresh confirm instead of silently sending a changed amount.
-        if approved ~= nil and type(frame.Edit2) == "table"
+        if approved ~= nil and isFrameObject(frame.Edit2)
             and type(frame.Edit2.GetText) == "function" then
             local edited = tonumber(frame.Edit2:GetText())
             if edited ~= approved then
@@ -316,7 +324,7 @@ local function installSecondGate(frame, pending)
                 return false
             end
         end
-        if type(frame.Edit3) == "table" and type(frame.Edit3.SetText) == "function" then
+        if isFrameObject(frame.Edit3) and type(frame.Edit3.SetText) == "function" then
             frame.Edit3:SetText("1")
         end
         pending.fired = true
@@ -353,13 +361,13 @@ end
 -- Start_OnClick (the same closure every other entry path funnels through), so a
 -- direct start can never bypass BG.SendStartAuctionMsg or the pre-send checks.
 local function installDirectGate(frame)
-    if type(frame) ~= "table" or type(frame.bt) ~= "table" then return end
+    if not isFrameObject(frame) or not isFrameObject(frame.bt) then return end
     local approval = frame.bgnextDirectApproval
     if type(approval) ~= "table" then return end
 
     -- One item per direct start: force the legacy quantity box to 1 and lock it
     -- so the reused handler runs its single-send path.
-    if type(frame.Edit3) == "table" then
+    if isFrameObject(frame.Edit3) then
         if type(frame.Edit3.SetText) == "function" then frame.Edit3:SetText("1") end
         if type(frame.Edit3.SetEnabled) == "function" then frame.Edit3:SetEnabled(false) end
     end
@@ -465,7 +473,7 @@ local function onLoopback(frame)
     local pending = state.pending
     if not pending then return end
     if not pending.fired or pending.auctionID == nil then return end
-    if type(frame) ~= "table" or frame.auctionID ~= pending.auctionID then return end
+    if not isFrameObject(frame) or frame.auctionID ~= pending.auctionID then return end
     local q = M.ensureQueue()
     Queue.decrement(q, pending.id)
     state.pending = nil

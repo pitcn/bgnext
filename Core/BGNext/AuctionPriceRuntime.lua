@@ -9,6 +9,14 @@ BG.BGNext = BG.BGNext or {}
 -- BG entry point below it.
 local M = {}
 
+-- WoW UI objects expose methods and writable addon fields but are represented as
+-- userdata on some client builds. Treat both Lua tables and native UI userdata
+-- as frame-like objects; callers still validate the exact methods they use.
+local function isFrameObject(value)
+    local kind = type(value)
+    return kind == "table" or kind == "userdata"
+end
+
 -- Returns the single price only when every resolved price is an identical
 -- number; any nil (unresolved) or differing value blocks the prefill.
 function M.chooseLeaderPrefill(prices)
@@ -83,8 +91,8 @@ end
 -- Touches only `myMoneyEdit:SetText`; it never clicks a send button, toggles
 -- auto-bid, starts a timer, or writes the value back to storage.
 function M.prefillPersonalText(frame, savedMoney, floor)
-    if type(frame) ~= "table" then return false end
-    if type(frame.myMoneyEdit) ~= "table" then return false end
+    if not isFrameObject(frame) then return false end
+    if not isFrameObject(frame.myMoneyEdit) or type(frame.myMoneyEdit.SetText) ~= "function" then return false end
     local value = M.choosePersonalPrefill(savedMoney, floor)
     if value == nil then return false end
     frame.myMoneyEdit:SetText(tostring(value))
@@ -98,10 +106,10 @@ end
 -- wrapper arms the shared pre-send gate and clicks only after both wrappers have
 -- returned.
 function M.applyLeaderPrefill(frame, money, bindMoney)
-    if type(frame) ~= "table" or type(money) ~= "number" then return false end
-    if type(frame.Edit2) ~= "table" or type(frame.Edit2.SetText) ~= "function" then return false end
+    if not isFrameObject(frame) or type(money) ~= "number" then return false end
+    if not isFrameObject(frame.Edit2) or type(frame.Edit2.SetText) ~= "function" then return false end
     if bindMoney then
-        if type(frame.bt) ~= "table" then return false end
+        if not isFrameObject(frame.bt) then return false end
         frame.bt.money = money
     end
     frame.Edit2:SetText(tostring(money))
