@@ -896,6 +896,177 @@ function M.readResources(api, family, resourceColumns, selection)
     return result
 end
 
+local MOP_FARM_SUBZONES = {
+    ["Sunsong Ranch"] = true,
+    ["日歌农场"] = true,
+    ["日歌農莊"] = true,
+}
+
+-- These are the ten ordinary Sunsong crops plus the seven special-plot
+-- harvest items. They are stable Blizzard item ids, not copied UI or source.
+local MOP_FARM_HARVEST_ITEMS = {
+    [74840] = true, [74841] = true, [74842] = true, [74843] = true, [74844] = true,
+    [74846] = true, [74847] = true, [74848] = true, [74849] = true, [74850] = true,
+    [72092] = true, [72093] = true, [72094] = true, [72096] = true, [72120] = true,
+    [72988] = true, [89112] = true,
+}
+
+local function globalStringPattern(template)
+    if type(template) ~= "string" or template == "" then return nil end
+    local stringMarker, numberMarker = string.char(1), string.char(2)
+    local pattern = string.gsub(template, "%%s", stringMarker)
+    pattern = string.gsub(pattern, "%%d", numberMarker)
+    pattern = string.gsub(pattern, "([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
+    pattern = string.gsub(pattern, stringMarker, "(.+)")
+    -- A function replacement is inserted literally by string.gsub, so the
+    -- Lua pattern needs one percent sign here (not the doubled form used in a
+    -- replacement string).
+    pattern = string.gsub(pattern, numberMarker, function() return "(%d+)" end)
+    return "^" .. pattern .. "$"
+end
+
+local function selfLootLink(api, message)
+    for _, key in ipairs({
+        "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_PUSHED_SELF_MULTIPLE",
+        "LOOT_ITEM_SELF", "LOOT_ITEM_PUSHED_SELF",
+    }) do
+        local pattern = globalStringPattern(api and api[key])
+        if pattern then
+            local link = string.match(message, pattern)
+            if type(link) == "string" then return link end
+        end
+    end
+    return nil
+end
+
+-- CHAT_MSG_LOOT contains nearby players' loot as well as the local player's.
+-- Accept only Blizzard's localized SELF formats, discard the message
+-- immediately, and retain no item, quantity, location or raw chat content.
+function M.isFarmHarvestLoot(api, family, message)
+    if family ~= "mop" or type(api) ~= "table" or type(message) ~= "string" then return false end
+    local subzone = M.safeCall(api.GetSubZoneText)
+    if not MOP_FARM_SUBZONES[subzone] then return false end
+    local link = selfLootLink(api, message)
+    local itemId = type(link) == "string" and tonumber(string.match(link, "|Hitem:(%d+):")) or nil
+    return type(itemId) == "number" and MOP_FARM_HARVEST_ITEMS[itemId] == true
+end
+
+local function activityColumns(resourceColumns)
+    local columns = {}
+    for _, column in ipairs(resourceColumns or {}) do
+        local source = type(column) == "table" and column.source or nil
+        if type(source) == "table" and source.kind == "activity" and type(column.id) == "string" then
+            columns[#columns + 1] = column
+        end
+    end
+    return columns
+end
+
+local function resetAt(api, cadence, nowValue)
+    local seconds
+    if cadence == "daily" then
+        seconds = M.safeCall(api and api.GetQuestResetTime)
+    elseif cadence == "weekly" then
+        local dateApi = api and api.C_DateAndTime
+        local getWeekly = type(dateApi) == "table" and dateApi.GetSecondsUntilWeeklyReset or nil
+        seconds = M.safeCall(getWeekly)
+    end
+    if type(nowValue) ~= "number" or type(seconds) ~= "number" or seconds < 0 then return nil end
+    return nowValue + seconds
+end
+
+local function containsToken(name, tokens)
+    if type(name) ~= "string" or type(tokens) ~= "table" then return false end
+    local folded = string.lower(name)
+    for _, token in ipairs(tokens) do
+        if type(token) == "string" and token ~= ""
+            and string.find(folded, string.lower(token), 1, true) then return true end
+    end
+    return false
+end
+
+-- Reads a deliberately small MoP-only activity catalog. World-boss completion
+-- uses BGLite's official quest ids, and the daily dungeon uses Blizzard's own
+-- random-dungeon `doneToday` result. The farm starts unknown and becomes
+-- complete only after the runtime observes the current player's localized
+-- self-loot line for a known crop at Sunsong Ranch.
+function M.readActivityStates(api, family, resourceColumns)
+    if family ~= "mop" or type(api) ~= "table" then return nil end
+    local columns = activityColumns(resourceColumns)
+    if #columns == 0 then return nil end
+    local nowValue = M.safeCall(api.time or api.GetServerTime)
+    local states = {}
+
+    for _, column in ipairs(columns) do
+        local source = column.source
+        local key = source.key or column.id
+        if source.detector == "farm-loot" then
+            states[key] = {
+                status = "unknown",
+                observedAt = type(nowValue) == "number" and nowValue or nil,
+                reason = "farm-observation-required",
+            }
+        elseif source.detector == "quest-flag" and type(source.questId) == "number" then
+            local questApi = api.C_QuestLog
+            local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted
+                or api.IsQuestFlaggedCompleted
+            local expires = resetAt(api, source.cadence, nowValue)
+            local completed = M.safeCall(isComplete, source.questId)
+            if type(completed) == "boolean" and type(expires) == "number" then
+                states[key] = {
+                    status = completed and "completed" or "incomplete",
+                    observedAt = nowValue,
+                    resetsAt = expires,
+                }
+            end
+        elseif source.detector == "lfg-daily" then
+            local getCount = api.GetNumRandomDungeons
+            local getInfo = api.GetLFGRandomDungeonInfo
+            local getRewards = api.GetLFGDungeonRewards
+            local expires = resetAt(api, source.cadence, nowValue)
+            local count = M.safeCall(getCount)
+            if type(count) == "number" and count >= 0 and type(getInfo) == "function"
+                and type(getRewards) == "function" and type(expires) == "number" then
+                local matched, observed, completed = false, false, false
+                for index = 1, count do
+                    local ok, dungeonId, dungeonName = callAll(getInfo, index)
+                    if ok and type(dungeonId) == "number" and containsToken(dungeonName, source.nameTokens) then
+                        matched = true
+                        local rewardOk, doneToday = callAll(getRewards, dungeonId)
+                        if rewardOk and type(doneToday) == "boolean" then
+                            observed = true
+                            if doneToday then completed = true end
+                        end
+                    end
+                end
+                if matched and observed then
+                    states[key] = {
+                        status = completed and "completed" or "incomplete",
+                        observedAt = nowValue,
+                        resetsAt = expires,
+                    }
+                elseif matched then
+                    states[key] = {
+                        status = "unknown",
+                        observedAt = nowValue,
+                        resetsAt = expires,
+                        reason = "unreadable-lfg-reward",
+                    }
+                else
+                    states[key] = {
+                        status = "unknown",
+                        observedAt = nowValue,
+                        resetsAt = expires,
+                        reason = "no-matching-dungeon",
+                    }
+                end
+            end
+        end
+    end
+    if next(states) == nil then return nil end
+    return states
+end
+
 -- Builds the environment the collector consumes. Every entry is a zero-argument
 -- reader so the collector can treat missing APIs and protected values uniformly.
 function M.readers(family, api, raidColumns, resourceColumns)
@@ -913,6 +1084,7 @@ function M.readers(family, api, raidColumns, resourceColumns)
         raidStates = function() return M.readRaidStates(api, raidColumns, family) end,
         professions = function() return M.readProfessions(api) end,
         resources = function(selection) return M.readResources(api, family, resourceColumns, selection) end,
+        activities = function() return M.readActivityStates(api, family, resourceColumns) end,
     }
 end
 
@@ -969,6 +1141,32 @@ function M.canReadColumn(family, api, column)
             and (type(api.GetSpellCooldown) == "function"
                 or (type(api.C_Spell) == "table" and type(api.C_Spell.GetSpellCooldown) == "function"))
             and resolveSpellName(api, source.spellId) ~= nil
+    end
+    if source.kind == "activity" then
+        if family ~= "mop" then return false end
+        if source.detector == "farm-loot" then
+            local hasSelfLootFormat = type(api.LOOT_ITEM_SELF) == "string"
+                or type(api.LOOT_ITEM_SELF_MULTIPLE) == "string"
+                or type(api.LOOT_ITEM_PUSHED_SELF) == "string"
+                or type(api.LOOT_ITEM_PUSHED_SELF_MULTIPLE) == "string"
+            return type(api.GetSubZoneText) == "function"
+                and type(api.GetQuestResetTime) == "function" and hasSelfLootFormat
+        end
+        if source.detector == "quest-flag" then
+            local questApi = api.C_QuestLog
+            local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted
+                or api.IsQuestFlaggedCompleted
+            local dateApi = api.C_DateAndTime
+            return type(source.questId) == "number" and type(isComplete) == "function"
+                and type(dateApi) == "table" and type(dateApi.GetSecondsUntilWeeklyReset) == "function"
+        end
+        if source.detector == "lfg-daily" then
+            return type(api.GetNumRandomDungeons) == "function"
+                and type(api.GetLFGRandomDungeonInfo) == "function"
+                and type(api.GetLFGDungeonRewards) == "function"
+                and type(api.GetQuestResetTime) == "function"
+        end
+        return false
     end
     if source.kind == "tracked-items" then return type(api.GetItemCount) == "function" end
     return false

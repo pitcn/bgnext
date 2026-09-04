@@ -7,8 +7,9 @@
 --              -> OwnCharacters.expireRaidStates -> OwnCharactersUI.Refresh
 --
 -- It also owns refresh, the per-family and global clears and the module-disable
--- switch. It never reads another player, never registers a chat/combat/inspect
--- event and never sends a message.
+-- switch. It never reads another player, combat or inspect data and never sends
+-- a message. On MoP it may reduce one verified current-player Sunsong Ranch
+-- self-loot line to a daily completed flag; no raw loot text is retained.
 
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}
@@ -105,6 +106,10 @@ function M.setEnabled(deps, value)
     if value then
         M.collectAndStore(deps)
     else
+        -- A transient harvest observation belongs only to the currently
+        -- enabled session. Do not let it survive a disable/re-enable cycle
+        -- and become a false completion after the daily reset.
+        deps._farmHarvestObservedAt = nil
         M.setVisible(deps, false)
     end
 end
@@ -196,12 +201,35 @@ function M.collectAndStore(deps, sections)
 
     local scoped = type(sections) == "table" and sections.full ~= true
     local snapshot = collector.collect(env, sections)
+    local existing = snapshot and type(model.get) == "function"
+        and model.get(root, family, snapshot.realmId, snapshot.player) or nil
     if snapshot and scoped then
-        local existing = type(model.get) == "function"
-            and model.get(root, family, snapshot.realmId, snapshot.player) or nil
         if not existing then
             snapshot = collector.collect(env)
             scoped = false
+        end
+    end
+
+    local appliedFarmObservation = false
+    if snapshot and family == "mop" and type(snapshot.activityStates) == "table" then
+        local pendingAt = deps._farmHarvestObservedAt
+        local getDailyReset = api and api.GetQuestResetTime
+        local resetSeconds = type(getDailyReset) == "function"
+            and adapters.safeCall(getDailyReset) or nil
+        if type(pendingAt) == "number" and type(resetSeconds) == "number" and resetSeconds >= 0 then
+            snapshot.activityStates.farmHarvest = {
+                status = "completed",
+                observedAt = pendingAt,
+                resetsAt = stamp + resetSeconds,
+            }
+            appliedFarmObservation = true
+        else
+            local previous = type(existing) == "table" and type(existing.activityStates) == "table"
+                and existing.activityStates.farmHarvest or nil
+            if type(previous) == "table" and previous.status == "completed"
+                and type(previous.resetsAt) == "number" and stamp < previous.resetsAt then
+                snapshot.activityStates.farmHarvest = previous
+            end
         end
     end
     if snapshot then
@@ -210,6 +238,7 @@ function M.collectAndStore(deps, sections)
         else
             model.upsert(root, family, snapshot)
         end
+        if appliedFarmObservation then deps._farmHarvestObservedAt = nil end
     end
     model.expireRaidStates(root, stamp)
 
@@ -221,6 +250,30 @@ function M.requestRaidInfo(deps)
     deps = deps or M.deps()
     local api = deps.api or _G
     if type(api.RequestRaidInfo) == "function" then pcall(api.RequestRaidInfo) end
+end
+
+-- Converts one allowlisted live event into a scoped own-character refresh.
+-- CHAT_MSG_LOOT is accepted only when the adapter proves that the localized
+-- line belongs to the current player and contains a Sunsong Ranch harvest.
+-- The raw message is discarded here and never reaches the snapshot model.
+function M.observeEvent(deps, event, ...)
+    deps = deps or M.deps()
+    if not M.isEnabled(deps) or event ~= "CHAT_MSG_LOOT" or deps.family ~= "mop" then return nil end
+    local settings = deps.settings or BG.BGNext.RoleOverviewSettings
+    if settings and type(settings.isVisible) == "function"
+        and settings.isVisible(deps.root, deps.family, "resource", "farmHarvest", deps.catalog) ~= true then
+        return nil
+    end
+    local adapters = deps.adapters
+    local isHarvest = adapters and adapters.isFarmHarvestLoot
+    if type(isHarvest) ~= "function" then return nil end
+    local ok, accepted = pcall(isHarvest, deps.api or _G, deps.family, ...)
+    if not ok or accepted ~= true then return nil end
+    local now = (type(deps.now) == "function" and deps.now) or defaultNow
+    local observedAt = now()
+    if type(observedAt) ~= "number" then return nil end
+    deps._farmHarvestObservedAt = observedAt
+    return { activities = true }
 end
 
 -- User refresh asks Blizzard for fresh saved-instance data once, then reads the
@@ -267,6 +320,9 @@ function M.install(deps)
             frame = frame,
             family = deps.family,
             after = deps.after,
+            observeEvent = function(event, ...)
+                return M.observeEvent(deps, event, ...)
+            end,
         }, function(sections)
             M.collectAndStore(deps, sections)
         end)

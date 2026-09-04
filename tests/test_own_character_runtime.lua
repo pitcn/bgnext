@@ -75,6 +75,73 @@ return function(test)
     test.eq(Model.get(root, "titan", 123, "Piti") ~= nil, true, "the snapshot reached storage")
     test.eq(apiCalls.raidInfo, 0, "ordinary event collection never requests raid data")
 
+    -- A MoP farm harvest is observed from the current player's localized
+    -- self-loot line, then stored only as a daily completion fact. A later
+    -- full collection preserves it until Blizzard's daily reset boundary.
+    local mopRoot = { settings = {} }
+    local mopNow = 5000
+    local mopApi = {
+        time = function() return mopNow end,
+        UnitName = function() return "Piti" end,
+        GetRealmID = function() return 123 end,
+        GetRealmName = function() return "时光II" end,
+        UnitFactionGroup = function() return "Alliance" end,
+        UnitClass = function() return "猎人", "HUNTER" end,
+        UnitLevel = function() return 90 end,
+        GetAverageItemLevel = function() return 540 end,
+        GetMoney = function() return 50000 end,
+        GetSubZoneText = function() return "日歌农场" end,
+        GetQuestResetTime = function() return 3600 end,
+        GetNumRandomDungeons = function() return 0 end,
+        GetLFGRandomDungeonInfo = function() end,
+        GetLFGDungeonRewards = function() end,
+        C_DateAndTime = { GetSecondsUntilWeeklyReset = function() return 7200 end },
+        C_QuestLog = { IsQuestFlaggedCompleted = function() return false end },
+        LOOT_ITEM_SELF = "你获得了物品：%s。",
+        LOOT_ITEM_SELF_MULTIPLE = "你获得了物品：%sx%d。",
+        LOOT_ITEM_PUSHED_SELF = "你获得了物品：%s。",
+        LOOT_ITEM_PUSHED_SELF_MULTIPLE = "你获得了物品：%sx%d。",
+    }
+    local mopDeps = {
+        globals = { IsMOP = true }, family = "mop", catalog = Catalog.forFamily("mop"),
+        root = mopRoot, api = mopApi, adapters = Adapters, collector = Collector, model = Model,
+        now = function() return mopNow end,
+        ui = { IsVisible = function() return false end, Refresh = function() end },
+    }
+    Runtime.collectAndStore(mopDeps)
+    local cabbage = "|cff1eff00|Hitem:74840::::::::90:::::|h[绿色卷心菜]|h|r"
+    test.eq(Runtime.observeEvent(mopDeps, "CHAT_MSG_LOOT", "你获得了物品：" .. cabbage .. "x5。"), nil,
+        "the default-hidden farm column does not inspect loot messages")
+    Settings.setVisible(mopRoot, "mop", "resource", "farmHarvest", true)
+    local farmSections = Runtime.observeEvent(mopDeps, "CHAT_MSG_LOOT", "你获得了物品：" .. cabbage .. "x5。")
+    test.eq(farmSections.activities, true, "a verified self harvest requests an activity refresh")
+    Runtime.collectAndStore(mopDeps, farmSections)
+    local farmState = Model.get(mopRoot, "mop", 123, "Piti").activityStates.farmHarvest
+    test.eq(farmState.status, "completed", "the current character is marked as harvested today")
+    test.eq(farmState.observedAt, 5000, "only the harvest observation time is retained")
+    test.eq(farmState.resetsAt, 8600, "the harvest completion expires at the daily reset")
+    Runtime.collectAndStore(mopDeps)
+    test.eq(Model.get(mopRoot, "mop", 123, "Piti").activityStates.farmHarvest.status, "completed",
+        "a later full collection preserves today's verified harvest")
+    mopNow = 8600
+    Runtime.collectAndStore(mopDeps)
+    test.eq(Model.get(mopRoot, "mop", 123, "Piti").activityStates.farmHarvest.status, "unknown",
+        "the prior day's harvest is not carried across the reset")
+
+    -- Disabling the overview must discard any not-yet-stored harvest signal.
+    -- Otherwise an observation from before a daily reset could be replayed as
+    -- a false completion when the feature is enabled on a later day.
+    mopNow = 9000
+    test.eq(Runtime.observeEvent(mopDeps, "CHAT_MSG_LOOT", "你获得了物品：" .. cabbage .. "x5。").activities,
+        true, "an enabled overview may stage a verified harvest")
+    Runtime.setEnabled(mopDeps, false)
+    test.eq(mopDeps._farmHarvestObservedAt, nil, "disabling discards a staged harvest observation")
+    test.eq(Runtime.observeEvent(mopDeps, "CHAT_MSG_LOOT", "你获得了物品：" .. cabbage .. "x5。"), nil,
+        "a disabled overview ignores later harvest messages")
+    Runtime.setEnabled(mopDeps, true)
+    test.eq(Model.get(mopRoot, "mop", 123, "Piti").activityStates.farmHarvest.status, "unknown",
+        "re-enabling cannot replay a harvest observed while disabled")
+
     local hiddenDeps, hiddenRoot, _, hiddenUi = build()
     hiddenDeps.ui.IsVisible = function() return false end
     Runtime.collectAndStore(hiddenDeps)

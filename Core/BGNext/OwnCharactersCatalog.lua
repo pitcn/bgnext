@@ -44,11 +44,12 @@ local function raid(id, zoneId, title, fullTitle, variant, instanceIds, defaultV
     }
 end
 
-local function resource(id, title, kind, width, total, source, defaultVisible, color)
+local function resource(id, title, kind, width, total, source, defaultVisible, color, fullTitle)
     return {
         id = id,
         section = "resource",
         title = title,
+        fullTitle = fullTitle,
         color = color,
         kind = kind,
         width = width,
@@ -243,6 +244,18 @@ local CATALOG = {
                 { kind = "equipment", slots = { 16, 17, 18 } }, true, "C084FC"),
             resource("trinkets", "饰品", "items", "dynamic-items", false,
                 { kind = "equipment", slots = { 13, 14 } }, true, "C084FC"),
+            resource("celestialFirst", "天神首胜", "status", "normal", false,
+                { kind = "activity", key = "celestialFirst", detector = "lfg-daily",
+                    cadence = "daily", nameTokens = { "天神", "Celestial" } }, false, "99CCFF"),
+            resource("farmHarvest", "农场收菜", "status", "normal", false,
+                { kind = "activity", key = "farmHarvest", detector = "farm-loot",
+                    cadence = "daily" }, false, "99CCFF"),
+            resource("augustCelestials", "四天神", "status", "normal", false,
+                { kind = "activity", key = "augustCelestials", detector = "quest-flag",
+                    cadence = "weekly", questId = 33117 }, false, "99CCFF"),
+            resource("ordos", "火牛", "status", "normal", false,
+                { kind = "activity", key = "ordos", detector = "quest-flag",
+                    cadence = "weekly", questId = 33118 }, false, "99CCFF", "野牛人火神斡耳朵斯"),
             resource("valor", "勇气", "number", "narrow", false,
                 { kind = "currency", key = "valor", currencyId = 396, showHeaderIcon = true }, true, "FFFFFF"),
             resource("justice", "正义", "number", "narrow", false,

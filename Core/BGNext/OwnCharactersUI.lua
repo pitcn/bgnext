@@ -537,6 +537,17 @@ local function showValueTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     local shown = M.showRaidTooltip(GameTooltip, self.__cell)
     if not shown then shown = M.showCurrencyTooltip(GameTooltip, self.__cell) end
+    if not shown and self.__cell and self.__cell.activity then
+        GameTooltip:SetText(L["角色活动进度"])
+        if self.__cell.reason == "farm-observation-required" then
+            GameTooltip:AddLine(L["仅在当前角色于日歌农场实际收获作物后标记完成；未捕获到收获时显示未知。"], 1, 1, 1, true)
+        elseif self.__cell.state == "unknown" then
+            GameTooltip:AddLine(L["记录已过期或暂时无法读取，请登录该角色刷新。"], 1, 1, 1, true)
+        else
+            GameTooltip:AddLine(L["仅显示该角色最近一次登录时读取到的状态。"], 1, 1, 1, true)
+        end
+        shown = true
+    end
     if shown and type(GameTooltip.Show) == "function" then
         GameTooltip:Show()
     end
@@ -771,7 +782,7 @@ function M.Draw(layout)
                             label:SetTextColor(M.colors.complete.r, M.colors.complete.g, M.colors.complete.b)
                             label:SetText(cell.difficultyLabel)
                         end
-                        if cell.difficulties then
+                        if cell.difficulties or cell.activity then
                             local valueButton = nextValueButton()
                             valueButton:SetPoint("CENTER", frame, "TOPLEFT",
                                 M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
@@ -832,7 +843,7 @@ function M.Draw(layout)
                         -- A currency value with a confirmed id gets a hover
                         -- surface so its caps can surface as a tooltip without
                         -- crowding the cell body.
-                        if type(cell.currencyId) == "number" or cell.difficulties then
+                        if type(cell.currencyId) == "number" or cell.difficulties or cell.activity then
                             local valueButton = nextValueButton()
                             valueButton:SetPoint("CENTER", frame, "TOPLEFT",
                                 M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
