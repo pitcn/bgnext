@@ -27,11 +27,11 @@ local KNOWN_FILTERS = { all = true, pending = true, complete = true }
 
 local COLUMNS = {
     trade = {
-        { key = "item", label = L["物品"], width = 190, justify = "LEFT" },
+        { key = "item", label = L["物品"], width = 166, justify = "LEFT" },
         { key = "player", label = L["交易对象"], width = 110, justify = "LEFT" },
         { key = "amount", label = L["金额"], width = 80, justify = "RIGHT" },
         { key = "time", label = L["时间"], width = 80, justify = "CENTER" },
-        { key = "status", label = L["状态"], width = 80, justify = "CENTER" },
+        { key = "status", label = L["状态"], width = 104, justify = "CENTER" },
     },
     mail = {
         { key = "item", label = L["物品"], width = 190, justify = "LEFT" },
@@ -294,6 +294,81 @@ function M.quantityText(quantity)
         return ""
     end
     return "×" .. string.format("%d", quantity)
+end
+
+-- Trade facts and reconciliation state are two independent dimensions. A
+-- grouped trade that actually completed (completedKey = true) is labelled with
+-- the trade fact "已交易" in front of its reconciliation state, so a completed
+-- trade that is still pending shows both instead of only "待核对". Legacy rows
+-- never fabricate the trade fact and show only the reconciliation state.
+function M.statusText(kind, statusKey, completedKey)
+    local label = M.statusLabel(kind, statusKey)
+    if kind == "trade" and completedKey == true then
+        return L["已交易"] .. " · " .. label
+    end
+    return label
+end
+
+-- The status tooltip explains the two independent dimensions (the trade fact
+-- and the reconciliation state) so a clipped narrow column never hides which
+-- fact is which, then repeats the toggle hint.
+function M.statusTooltipLines(kind, statusKey, completedKey)
+    local lines = {}
+    if kind == "trade" and completedKey == true then
+        lines[#lines + 1] = { text = L["交易已完成"], r = 0, g = 1, b = 0 }
+    end
+    local r, g, b = M.statusColor(kind, statusKey)
+    lines[#lines + 1] = {
+        text = L["核对状态"] .. "：" .. M.statusLabel(kind, statusKey),
+        r = r, g = g, b = b,
+    }
+    lines[#lines + 1] = { text = L["左键切换待核对/已完成"], r = 1, g = 0.82, b = 0 }
+    return lines
+end
+
+-- Every delivered item in a row, in display order: a legacy row contributes its
+-- single stored item, a grouped trade contributes each outgoing item then each
+-- incoming item. The item tooltip iterates these so a grouped row never points
+-- only at its first item.
+function M.itemEntries(row)
+    local entries = {}
+    if type(row) ~= "table" then
+        return entries
+    end
+    if type(row.itemId) == "number" then
+        entries[#entries + 1] = { itemId = row.itemId, quantity = row.quantity }
+        return entries
+    end
+    if type(row.myItems) == "table" then
+        for _, item in ipairs(row.myItems) do
+            entries[#entries + 1] = { itemId = item.itemId, quantity = item.quantity, direction = "outgoing" }
+        end
+    end
+    if type(row.theirItems) == "table" then
+        for _, item in ipairs(row.theirItems) do
+            entries[#entries + 1] = { itemId = item.itemId, quantity = item.quantity, direction = "incoming" }
+        end
+    end
+    return entries
+end
+
+-- A human-readable line per delivered item, used when a grouped row packs
+-- several items into one cell. Each line keeps its direction and count so the
+-- player can inspect every item rather than only the first.
+function M.itemTooltipLines(row)
+    local lines = {}
+    for _, entry in ipairs(M.itemEntries(row)) do
+        if type(entry.itemId) == "number" then
+            local prefix = ""
+            if entry.direction == "outgoing" then
+                prefix = L["寄出"] .. " "
+            elseif entry.direction == "incoming" then
+                prefix = L["收到"] .. " "
+            end
+            lines[#lines + 1] = prefix .. itemDisplay(entry.itemId) .. M.quantityText(entry.quantity)
+        end
+    end
+    return lines
 end
 
 ------------------------------------------------------------------------
@@ -787,13 +862,19 @@ local function acquireRow(win, index)
         itemCell.text:SetPoint("RIGHT", 0, 0)
         itemCell:SetScript("OnEnter", function(self)
             row.stripe:Show()
-            local itemId = M.tooltipTarget(row.data)
-            if not itemId or type(GameTooltip) ~= "table" then
+            if type(GameTooltip) ~= "table" then
                 return
             end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
             GameTooltip:ClearLines()
-            M.showItemTooltip(GameTooltip, itemId)
+            local entries = M.itemEntries(row.data)
+            if #entries == 1 then
+                M.showItemTooltip(GameTooltip, entries[1].itemId)
+            elseif #entries > 1 then
+                for _, line in ipairs(M.itemTooltipLines(row.data)) do
+                    GameTooltip:AddLine(line, 1, 1, 1, true)
+                end
+            end
             GameTooltip:Show()
         end)
         itemCell:SetScript("OnLeave", function()
@@ -822,7 +903,10 @@ local function acquireRow(win, index)
             if type(GameTooltip) ~= "table" then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
             GameTooltip:ClearLines()
-            GameTooltip:AddLine(L["左键切换待核对/已完成"], 1, 0.82, 0, true)
+            local lines = M.statusTooltipLines(win.kind, row.data and row.data.statusKey, row.data and row.data.completedKey)
+            for _, line in ipairs(lines) do
+                GameTooltip:AddLine(line.text, line.r or 1, line.g or 1, line.b or 1, true)
+            end
             GameTooltip:Show()
         end)
         statusCell:SetScript("OnLeave", function()
@@ -896,7 +980,7 @@ local function fillRow(win, row, data)
         cells.direction.text:SetTextColor(0.8, 0.8, 0.8)
     end
     if cells.status then
-        cells.status.text:SetText(M.statusLabel(win.kind, data.statusKey))
+        cells.status.text:SetText(M.statusText(win.kind, data.statusKey, data.completedKey))
         cells.status.text:SetTextColor(M.statusColor(win.kind, data.statusKey))
     end
     row:Show()

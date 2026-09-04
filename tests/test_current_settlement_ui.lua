@@ -97,6 +97,76 @@ return function(test)
     test.eq(ui.tooltipTarget({ myItems = { { itemId = 22 } } }), 22, "tooltip uses a grouped outgoing item")
     test.eq(ui.tooltipTarget({ theirItems = { { itemId = 33 } } }), 33, "tooltip uses a grouped incoming item")
 
+    -- 5b. trade facts and reconciliation state are two independently visible
+    --     dimensions. A grouped trade whose exchange actually completed is
+    --     labelled with its trade fact in front of its reconciliation state, so
+    --     "completed but still pending" reads as both instead of only 待核对.
+    local grouped = {
+        completedKey = true, statusKey = "pending",
+        myGold = 0, theirGold = 0,
+        myItems = { { itemId = 11, quantity = 2 }, { itemId = 22, quantity = 1 } },
+        theirItems = { { itemId = 33, quantity = 1 } },
+    }
+    local dual = ui.statusText("trade", grouped.statusKey, grouped.completedKey)
+    test.eq(dual:find("已交易", 1, true) ~= nil, true,
+        "a completed trade is labelled with its trade fact")
+    test.eq(dual:find("待核对", 1, true) ~= nil, true,
+        "a completed-but-pending trade still shows its reconciliation state")
+    test.eq(ui.statusText("trade", "complete", true):find("已交易", 1, true) ~= nil, true,
+        "the trade fact stays explicit even after reconciliation completes")
+    test.eq(ui.statusText("trade", "pending", nil), ui.statusLabel("trade", "pending"),
+        "a legacy row without a trade fact shows only its reconciliation state")
+    test.eq(ui.statusText("trade", "pending", false), ui.statusLabel("trade", "pending"),
+        "an unconfirmed grouped row shows only its reconciliation state")
+    test.eq(ui.statusText("mail", "sent", true), ui.statusLabel("mail", "sent"),
+        "mail rows never gain a trade fact")
+
+    -- narrow-column text: the two dimensions stay two short, distinct labels
+    -- rather than one ambiguous word, so they survive a compact status column.
+    test.eq(dual ~= ui.statusLabel("trade", "pending"), true,
+        "the combined label is distinct from the bare reconciliation label")
+
+    -- explicit 0 and two-way gold are never collapsed or netted
+    test.eq(ui.goldText({ theirGold = 0, myGold = 0 }), "收到 0 / 寄出 0",
+        "two-way gold renders both directions even when both sides are zero")
+    test.eq(ui.goldText({ theirGold = 200, myGold = 50 }), "收到 200 / 寄出 50",
+        "two-way gold keeps both amounts and is never netted")
+    test.eq(ui.goldText({ theirGold = 100 }), "收到 100",
+        "an unknown side is omitted instead of invented")
+
+    -- every delivered item in a grouped row is reachable from the tooltip, not
+    -- only the first.
+    local entries = ui.itemEntries(grouped)
+    test.eq(#entries, 3, "a grouped row exposes every delivered item")
+    test.eq(entries[1].itemId, 11, "the first outgoing item is listed first")
+    test.eq(entries[1].direction, "outgoing", "outgoing items keep their direction")
+    test.eq(entries[3].itemId, 33, "incoming items follow outgoing items")
+    test.eq(entries[3].direction, "incoming", "incoming items keep their direction")
+    local legacyEntries = ui.itemEntries({ itemId = 44, quantity = 1 })
+    test.eq(#legacyEntries, 1, "a legacy row contributes its single item")
+    test.eq(legacyEntries[1].itemId, 44, "a legacy row names its item")
+    test.eq(legacyEntries[1].direction, nil, "a legacy row has no direction")
+    local lines = ui.itemTooltipLines(grouped)
+    test.eq(#lines, 3, "the item tooltip has one line per delivered item")
+    test.eq(lines[1]:find("寄出", 1, true) ~= nil, true, "outgoing lines are prefixed")
+    test.eq(lines[1]:find("item:11", 1, true) ~= nil, true, "the first item id is named")
+    test.eq(lines[3]:find("收到", 1, true) ~= nil, true, "incoming lines are prefixed")
+    test.eq(lines[3]:find("item:33", 1, true) ~= nil, true, "the last item id is named")
+
+    -- the status tooltip explains each dimension, then the toggle hint
+    local statusLines = ui.statusTooltipLines("trade", "pending", true)
+    test.eq(#statusLines, 3, "the trade status tooltip explains both dimensions")
+    test.eq(statusLines[1].text:find("交易已完成", 1, true) ~= nil, true,
+        "the trade fact is explained first")
+    test.eq(statusLines[2].text:find("核对状态", 1, true) ~= nil, true,
+        "the reconciliation dimension is labelled")
+    test.eq(statusLines[2].text:find("待核对", 1, true) ~= nil, true,
+        "the reconciliation state is named")
+    test.eq(statusLines[3].text:find("左键切换待核对/已完成", 1, true) ~= nil, true,
+        "the toggle hint remains")
+    test.eq(#ui.statusTooltipLines("trade", "pending", nil), 2,
+        "a legacy row drops the trade-fact tooltip line")
+
     -- 6. filtering and reconciliation are explicit, local and reversible.
     test.eq(#ui.filterRows(rows, "all"), 1, "all filter keeps every row")
     test.eq(#ui.filterRows(rows, "pending"), 0, "pending filter excludes completed rows")

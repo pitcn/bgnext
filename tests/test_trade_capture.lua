@@ -446,8 +446,8 @@ return function(test)
         fire("TRADE_CLOSED")
 
         test.eq(#root.currentSettlement.trades, 1, "a stale shared table at accept still records from the live API")
-        test.eq(root.currentSettlement.trades[1].itemId, 55, "the API item is captured at accept")
-        test.eq(root.currentSettlement.trades[1].amount, 55, "the API money is captured at accept")
+        test.eq(root.currentSettlement.trades[1].myItems[1].itemId, 55, "the API item is captured at accept")
+        test.eq(root.currentSettlement.trades[1].theirGold, 55, "the API money is captured at accept")
 
         GetUnitName = nil
         GetTargetTradeMoney = nil
@@ -498,6 +498,6 @@ return function(test)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
 
         test.eq(#root.currentSettlement.trades, 1, "a late legitimate success commits exactly once")
-        test.eq(root.currentSettlement.trades[1].itemId, 14, "the late success keeps the frozen item")
+        test.eq(root.currentSettlement.trades[1].myItems[1].itemId, 14, "the late success keeps the frozen item")
     end
 end
