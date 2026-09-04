@@ -16,6 +16,12 @@ local M = {}
 local MAX_AGE = 7 * 86400
 local pendingMail
 
+function M.isFeatureEnabled()
+    local settings = BG.BGNext.FeatureSettings
+    return not settings or type(settings.isCurrentEnabled) ~= "function"
+        or settings.isCurrentEnabled("settlement_tools", BG, BG.BGNext.DB)
+end
+
 local function serverNow()
     if type(GetServerTime) == "function" then
         return GetServerTime()
@@ -270,6 +276,7 @@ function M.tradeRows(trade, itemIdOf)
 end
 
 function M.recordTrade(root, context, trade)
+    if not M.isFeatureEnabled() then return 0 end
     local raidId = activeSettlement(root, context)
     local store = tradeStore()
     if not raidId or not store or not isRosterMember(root, context, trade and trade.target) then
@@ -299,6 +306,7 @@ function M.recordTrade(root, context, trade)
 end
 
 function M.recordMail(root, context, mail)
+    if not M.isFeatureEnabled() then return false end
     if type(mail) ~= "table" or mail.sent ~= true or mail.scope ~= "raid" then
         return false
     end
@@ -392,6 +400,7 @@ end
 
 -- Called by the batch mail flow at its own confirmed send result.
 function M.notifyMailAttempt(player, amount, scope)
+    if not M.isFeatureEnabled() then pendingMail = nil; return false end
     if scope ~= "raid" or type(player) ~= "string" or not player:find("%S") then
         pendingMail = nil
         return false

@@ -9,6 +9,23 @@ BG.BGNext = BG.BGNext or {}
 -- lives below the guard and reads prices only through the store/catalog/codec
 -- modules, never from BiaoGe or a third-party source.
 local M = {}
+local featureTab
+
+function M.isFeatureEnabled()
+    local settings = BG.BGNext.FeatureSettings
+    return not settings or type(settings.isCurrentEnabled) ~= "function"
+        or settings.isCurrentEnabled("auction_prices", BG, BG.BGNext.DB)
+end
+
+function M.refreshFeatureState()
+    local enabled = M.isFeatureEnabled()
+    if featureTab then
+        if type(featureTab.SetShown) == "function" then featureTab:SetShown(enabled)
+        elseif enabled then featureTab:Show() else featureTab:Hide() end
+    end
+    if not enabled and BG.PricePresetMainFrame then BG.PricePresetMainFrame:Hide() end
+    return enabled
+end
 
 M.tabNumber = 2
 M.COLUMN_COUNT = 2
@@ -1719,7 +1736,8 @@ if runtimeReady() then
             wireRow(main.rows[i])
         end
 
-        BG.Create_TabButton(M.tabNumber, L["价格预设"], main)
+        featureTab = BG.Create_TabButton(M.tabNumber, L["价格预设"], main)
+        M.refreshFeatureState()
         main:SetScript("OnShow", function()
             -- This page owns a compact raid selector because changing raids
             -- also resets its local boss/search state. Hide the global ledger

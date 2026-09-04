@@ -14,6 +14,12 @@ BG.BGNext = BG.BGNext or {}
 -- dashboard: one stored event is one table row, for the current raid only.
 local M = {}
 
+function M.isFeatureEnabled()
+    local settings = BG.BGNext.FeatureSettings
+    return not settings or type(settings.isCurrentEnabled) ~= "function"
+        or settings.isCurrentEnabled("settlement_tools", BG, BG.BGNext.DB)
+end
+
 local ROW_HEIGHT = 20
 local ROW_GAP = 2
 local HEADER_HEIGHT = 22
@@ -1365,6 +1371,7 @@ local function ensureWindow(kind)
 end
 
 function M.Show(kind, filter)
+    if not M.isFeatureEnabled() then return false end
     local win = ensureWindow(kind)
     if not win then
         return false
@@ -1383,6 +1390,7 @@ function M.Show(kind, filter)
 end
 
 function M.Toggle(kind)
+    if not M.isFeatureEnabled() then return false end
     local win = ensureWindow(kind)
     if not win then
         return false
@@ -1431,6 +1439,7 @@ end
 -- familiar bottom-right control row keeps its habit.
 function M.installEntry(mainFrame)
     if entryButtons then
+        M.refreshFeatureState()
         return entryButtons
     end
     if not mainFrame or type(CreateFrame) ~= "function" or type(BG.CreateButton) ~= "function" then
@@ -1467,7 +1476,21 @@ function M.installEntry(mainFrame)
     BG.ButtonCurrentMailRecord = created.mail
     BG.ButtonSettlementChecklist = created.checklist
     entryButtons = created
+    M.refreshFeatureState()
     return created
+end
+
+function M.refreshFeatureState()
+    local enabled = M.isFeatureEnabled()
+    for _, button in pairs(entryButtons or {}) do
+        if type(button.SetShown) == "function" then button:SetShown(enabled)
+        elseif enabled then button:Show() else button:Hide() end
+    end
+    if not enabled then
+        for _, win in pairs(windows) do if win.frame then win.frame:Hide() end end
+        if returnSelector then returnSelector:Hide() end
+    end
+    return enabled
 end
 
 BG.BGNext.CurrentSettlementUI = M

@@ -79,6 +79,7 @@ function M.new(deps)
     function c:flush()
         if not self.pending then return end
         self.pending = false
+        if self.deps.enabled and not self.deps.enabled() then return end
         local builtInId, family, classToken = resolveNow()
         local model = self.deps.model
         local state = self.deps.getState and self.deps.getState()
@@ -149,6 +150,11 @@ if BG.Init then
                 end,
                 refresh = function()
                     if BG.UpdateAllFilter then BG.UpdateAllFilter() end
+                end,
+                enabled = function()
+                    local settings = BG.BGNext.FeatureSettings
+                    return not settings or type(settings.isCurrentEnabled) ~= "function"
+                        or settings.isCurrentEnabled("equipment_filter", BG, BG.BGNext.DB)
                 end,
                 api = _G,
             })

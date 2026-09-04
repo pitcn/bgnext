@@ -17,6 +17,12 @@ BG.BGNext = BG.BGNext or {}
 -- broadcast, and nothing is stored or archived.
 local M = {}
 
+function M.isFeatureEnabled()
+    local settings = BG.BGNext.FeatureSettings
+    return not settings or type(settings.isCurrentEnabled) ~= "function"
+        or settings.isCurrentEnabled("trade_announcement", BG, BG.BGNext.DB)
+end
+
 -- Resolves the configured channel preference into the concrete chat channel
 -- for the current group, or nil when there is nowhere to send. The settings UI
 -- accepts only WHISPER and RAID.
@@ -107,6 +113,7 @@ if BG.Init then
         local tradeTarget = nil
 
         local function announce(kind)
+            if not M.isFeatureEnabled() then return end
             local target = tradeTarget
             local options = BiaoGe and BiaoGe.options or {}
             local decision = M.decide({

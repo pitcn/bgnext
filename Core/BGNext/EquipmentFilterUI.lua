@@ -13,6 +13,24 @@ local sectionTitles = {}
 local openProfileMenu
 local updateRuleButtons
 
+function M.isFeatureEnabled()
+    local settings = BG.BGNext.FeatureSettings
+    if not settings or type(settings.isCurrentEnabled) ~= "function" then return true end
+    return settings.isCurrentEnabled("equipment_filter", BG, BG.BGNext.DB)
+end
+
+function M.refreshFeatureState()
+    local enabled = M.isFeatureEnabled()
+    local shortcuts = BG.EquipmentFilterShortcutFrame
+    if shortcuts then
+        if type(shortcuts.SetShown) == "function" then shortcuts:SetShown(enabled)
+        elseif enabled then shortcuts:Show() else shortcuts:Hide() end
+    end
+    if not enabled and BG.FilterClassItemMainFrame then BG.FilterClassItemMainFrame:Hide() end
+    if type(BG.UpdateAllFilter) == "function" then BG.UpdateAllFilter() end
+    return enabled
+end
+
 local sectionOrder = {
     { key = "weapon", title = "武器类型过滤" },
     { key = "armor", title = "护甲类型过滤" },
@@ -544,6 +562,7 @@ local function createUI()
     main.SettingsButton = settings
     updateProfileRows()
     refreshItems()
+    M.refreshFeatureState()
 end
 
 BG.FilterClassItemUI = function()
