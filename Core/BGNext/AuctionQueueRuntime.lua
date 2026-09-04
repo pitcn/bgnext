@@ -665,20 +665,26 @@ function M.openFrame()
         frame:SetScript("OnMouseDown", function(self) self:StartMoving() end)
         frame:SetScript("OnMouseUp", function(self) self:StopMovingOrSizing() end)
 
-        frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        frame.title:SetPoint("TOP", 0, -6)
+        frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        frame.title:SetPoint("TOPLEFT", 10, -7)
         frame.title:SetText(L["待拍队列"])
 
-        frame.input = CreateFrame("EditBox", nil, frame)
+        frame.closeButton = BG.CreateButton(frame)
+        frame.closeButton:SetSize(24, 20)
+        frame.closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+        frame.closeButton:SetText("×")
+        frame.closeButton:SetScript("OnClick", function() frame:Hide() end)
+
+        frame.input = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
         frame.input:SetSize(150, 20)
-        frame.input:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -22)
+        frame.input:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -28)
         frame.input:SetAutoFocus(false)
         frame.input:SetScript("OnEnterPressed", function(self)
             M.addFromText(self:GetText())
             self:SetText("")
         end)
 
-        frame.addButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        frame.addButton = BG.CreateButton(frame)
         frame.addButton:SetSize(44, 20)
         frame.addButton:SetPoint("LEFT", frame.input, "RIGHT", 4, 0)
         frame.addButton:SetText(L["添加"])
@@ -687,7 +693,7 @@ function M.openFrame()
             frame.input:SetText("")
         end)
 
-        frame.clearButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        frame.clearButton = BG.CreateButton(frame)
         frame.clearButton:SetSize(44, 20)
         frame.clearButton:SetPoint("LEFT", frame.addButton, "RIGHT", 4, 0)
         frame.clearButton:SetText(L["清空"])
@@ -696,13 +702,13 @@ function M.openFrame()
             M.refreshUI()
         end)
 
-        frame.scrollUp = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        frame.scrollUp = BG.CreateButton(frame)
         frame.scrollUp:SetSize(20, 20)
         frame.scrollUp:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 3)
         frame.scrollUp:SetText("^")
         frame.scrollUp:SetScript("OnClick", function() M.scrollBy(-1) end)
 
-        frame.scrollDown = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        frame.scrollDown = BG.CreateButton(frame)
         frame.scrollDown:SetSize(20, 20)
         frame.scrollDown:SetPoint("RIGHT", frame.scrollUp, "LEFT", -2, 0)
         frame.scrollDown:SetText("v")
@@ -736,19 +742,27 @@ function M.toggle()
 end
 
 local entryButton = nil
-function M.installEntry(mainFrame)
-    if entryButton then return entryButton end
-    if type(mainFrame) ~= "table" or type(CreateFrame) ~= "function" or type(BG.CreateButton) ~= "function" then
-        return nil
-    end
-    local button = BG.CreateButton(mainFrame)
-    button:SetSize(100, 20)
+local function layoutEntry(button, mainFrame)
+    if type(button.ClearAllPoints) == "function" then button:ClearAllPoints() end
     local anchor = BG.ButtonCurrentTradeRecord or BG.ButtonRoleOverview
     if anchor then
         button:SetPoint("RIGHT", anchor, "LEFT", -8, 0)
     else
         button:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -10, 8)
     end
+end
+
+function M.installEntry(mainFrame)
+    if entryButton then
+        layoutEntry(entryButton, mainFrame)
+        return entryButton
+    end
+    if type(mainFrame) ~= "table" or type(CreateFrame) ~= "function" or type(BG.CreateButton) ~= "function" then
+        return nil
+    end
+    local button = BG.CreateButton(mainFrame)
+    button:SetSize(100, 20)
+    layoutEntry(button, mainFrame)
     button:SetText(L["待拍队列"])
     button:SetScript("OnClick", function()
         if type(BG.PlaySound) == "function" then BG.PlaySound(1) end

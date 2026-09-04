@@ -131,10 +131,16 @@ end
 function M.shortcutAction(isMasterLooter, button, altDown, controlDown, shiftDown)
     if altDown then
         if button == "LeftButton" then return "wishlist" end
-        if isMasterLooter and button == "RightButton" then return "auction" end
+        -- Always consume Alt+right-click through the guarded auction path.
+        -- BG.StartAuction performs the authoritative permission check; falling
+        -- through here would let the legacy plain-right-click branch delete the
+        -- bill item for solo players or while leadership state is refreshing.
+        if button == "RightButton" then return "auction" end
         return nil
     end
-    if isMasterLooter and controlDown and not shiftDown and button == "RightButton" then
+    -- Editing a local preset is safe outside a group. Consume the shortcut
+    -- before the legacy delete branch regardless of current loot authority.
+    if controlDown and not shiftDown and button == "RightButton" then
         return "leader-price"
     end
     return nil

@@ -97,9 +97,9 @@ return function(test)
     local presentation = Entry.entryPresentation("HUNTER")
     test.eq(presentation.point, "BOTTOMRIGHT", "entry anchors from the bottom-right")
     test.eq(presentation.relativePoint, "BOTTOMRIGHT", "entry uses the main frame bottom-right")
-    test.eq(presentation.x, -20, "entry keeps the original right inset")
-    test.eq(presentation.y, 1, "entry sits on the original bottom bar")
-    test.eq(presentation.height, 25, "entry matches the bottom-bar height")
+    test.eq(presentation.x, -10, "role overview stays at the far-right footer inset")
+    test.eq(presentation.y, 8, "role overview aligns with the shared footer row")
+    test.eq(presentation.height, 20, "role overview matches the shared footer button height")
     test.eq(string.find(presentation.text, "GarrMission_ClassIcon-hunter", 1, true) ~= nil, true,
         "entry includes the current class icon")
     test.eq(string.find(presentation.text, "角色总览", 1, true) ~= nil, true,

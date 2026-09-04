@@ -80,7 +80,8 @@ return function(test)
         function f:GetText() return self.text end
         function f:SetEnabled(v) self.enabled = v end
         function f:GetParent() return self.parent end
-        function f:SetPoint() end
+        function f:SetPoint(...) self.point = { ... } end
+        function f:ClearAllPoints() self.point = nil end
         function f:SetBackdrop() end
         function f:SetBackdropColor() end
         function f:SetBackdropBorderColor() end
@@ -454,6 +455,10 @@ return function(test)
     test.eq(#frame.rows, 40, "row pool is fixed")
     test.eq(frame.rows[1].shown, true, "the first row is bound and shown")
     test.eq(frame.rows[2].shown, false, "the second pooled row stays hidden")
+    test.eq(type(frame.closeButton), "table", "the queue window exposes an obvious close button")
+    frame.closeButton.scripts.OnClick(frame.closeButton)
+    test.eq(frame.shown, false, "the close button hides the queue window")
+    M.openFrame()
 
     frame.rows[1].plus.scripts.OnClick(frame.rows[1].plus)
     test.eq(M.project()[1].quantity, 2, "the plus button increments quantity")
@@ -481,9 +486,25 @@ return function(test)
 
     test.eq(type(SlashCmdList["BGNQUEUE"]), "function", "slash command is registered")
     test.eq(_G.SLASH_BGNQUEUE1, "/bgnqueue", "slash trigger is installed")
-    local entry = M.installEntry(fakeFrame("MainFrame"))
+    local mainFrame = fakeFrame("MainFrame")
+    BG.ButtonCurrentTradeRecord = nil
+    BG.ButtonRoleOverview = nil
+    local entry = M.installEntry(mainFrame)
     test.eq(type(entry), "table", "the main-tab entry button is built")
     test.eq(entry.text, "待拍队列", "the entry is labelled with the queue title")
+    local roleEntry = fakeFrame("RoleOverview")
+    local tradeEntry = fakeFrame("TradeRecord")
+    BG.ButtonRoleOverview = roleEntry
+    BG.ButtonCurrentTradeRecord = tradeEntry
+    test.eq(M.installEntry(mainFrame), entry, "reinstall reuses the queue entry")
+    test.eq(entry.point[2], tradeEntry,
+        "a late footer relayout moves the queue left of the record buttons and keeps role overview far right")
+
+    local mainFile = assert(io.open("Core/BiaoGe.lua", "rb"))
+    local mainSource = mainFile:read("*a")
+    mainFile:close()
+    test.eq(mainSource:find("AuctionQueueRuntime.installEntry", 1, true) ~= nil, true,
+        "main footer asks the queue to relayout after role and settlement entries exist")
 
     -- --- Finding 7: exact loopback binding (auctionID, not itemID) ---------
 

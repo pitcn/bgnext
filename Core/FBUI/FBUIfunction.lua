@@ -442,7 +442,24 @@ function BG.FBZhuangBeiUI(FB, t, b, bb, i, ii, scrollFrame)
             self:ClearFocus()
             return
         end
-        if button == "RightButton" and not IsAltKeyDown() and self ~= BG.Frame[FB]["boss" .. Maxb[FB] + 2]["zhuangbei" .. i] then
+        if shortcut == "auction" or shortcut == "wishlist" then
+            if self ~= BG.Frame[FB]["boss" .. Maxb[FB] + 1]["zhuangbei" .. i]
+                and self ~= BG.Frame[FB]["boss" .. Maxb[FB] + 2]["zhuangbei" .. i]
+                and self:GetText() ~= "" then
+                self:SetEnabled(false)
+                self:ClearFocus()
+                if BG.lastfocus then BG.lastfocus:ClearFocus() end
+                if shortcut == "auction" then
+                    BG.StartAuction(self:GetText(), self, nil, nil, button == "RightButton", nil, nil,
+                        { source = "table", raidId = FB })
+                elseif BG.ToggleCurrentWish then
+                    BG.ToggleCurrentWish(self:GetText())
+                end
+            end
+            return
+        end
+        if button == "RightButton" and not IsAltKeyDown() and not IsControlKeyDown()
+            and not IsShiftKeyDown() and self ~= BG.Frame[FB]["boss" .. Maxb[FB] + 2]["zhuangbei" .. i] then
             UpdateCancelDelete(self, FB, bossnum, i, self.type)
             self:SetEnabled(false)
             self:SetText("")
@@ -467,23 +484,6 @@ function BG.FBZhuangBeiUI(FB, t, b, bb, i, ii, scrollFrame)
                 self:SetEnabled(false)
                 bt:ClearFocus()
                 BG.InsertLink(self:GetText())
-            end
-            return
-        end
-        if IsAltKeyDown() and self ~= BG.Frame[FB]["boss" .. Maxb[FB] + 1]["zhuangbei" .. i] and self ~= BG.Frame[FB]["boss" .. Maxb[FB] + 2]["zhuangbei" .. i] then
-            if self:GetText() ~= "" then
-                self:SetEnabled(false)
-                bt:ClearFocus()
-                if BG.lastfocus then
-                    BG.lastfocus:ClearFocus()
-                end
-                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
-                if action == "auction" then
-                    local link = self:GetText()
-                    BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "table", raidId = FB })
-                elseif action == "wishlist" and BG.ToggleCurrentWish then
-                    BG.ToggleCurrentWish(self:GetText())
-                end
             end
             return
         end
