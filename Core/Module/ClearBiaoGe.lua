@@ -192,6 +192,46 @@ function BG.ClearBiaoGeUI()
 
     -- 自动清空表格
     do
+        -- 判定当前团队是否与表格的历史成员名单不同（原版自动清空守卫之二，参考 reference/BGLite）
+        local teamText = ''
+        local function IsNotSameTeam(FB)
+            FB = FB or BG.FB1
+            if not IsInRaid(1) then
+                teamText = L['不在团队里。']
+                return true
+            end
+            -- 没有历史成员名单
+            if not BiaoGe[FB].raidRoster then
+                teamText = L['表格没有历史成员名单。']
+                return true
+            end
+            -- 超过1天
+            if GetServerTime() - BiaoGe[FB].raidRoster.time >= 86400 * 1 then
+                teamText = L['表格的历史成员名单的创建时间已超过1天，判断为现在是新团队。']
+                return true
+            end
+            -- 服务器不同
+            if BG.realmName ~= BiaoGe[FB].raidRoster.realm then
+                teamText = L['表格的历史成员名单服务器是[%s]，与当前服务器[%s]不同，判断为现在是新团队。']:format(BiaoGe[FB].raidRoster.realm or '', BG.realmName or '')
+                return true
+            end
+            local maxCount = max(#BG.raidRosterInfo, #BiaoGe[FB].raidRoster.roster)
+            local sameCount = 0
+            for _, vv in ipairs(BG.raidRosterInfo) do
+                for _, name in ipairs(BiaoGe[FB].raidRoster.roster) do
+                    if vv.name == name then
+                        sameCount = sameCount + 1
+                    end
+                end
+            end
+            if sameCount / maxCount < 0.6 then
+                teamText = L['表格的历史成员人数为%s，当前团队人数为%s，相同成员的占比低于60%%，判断为现在是新团队。']:format(#BiaoGe[FB].raidRoster.roster, #BG.raidRosterInfo)
+                return true
+            end
+            return false
+        end
+        BG.IsNotSameTeam = IsNotSameTeam
+
         local function SendTips(FB)
             if (FB == "ZUG" or FB == "ZUGsod") and BG.IsVanilla and IsInRaid(1) and UnitIsGroupLeader("player") then
                 BG.SendSystemMessage(L["提醒团长：如果你没有物品分配权，将会导致交易的相关功能失效。"])
@@ -222,11 +262,32 @@ function BG.ClearBiaoGeUI()
                 -- 如果是新CD
                 if newCD then
                     BG.ClickFBbutton(FB)                    -- 先设 BG.FB1=FB，确保 UI 刷新读到正确副本
-                    -- 决策②(A)：newCD 无条件整表全清（网格 + auctionLog :73 + leaderInfo :74），
-                    -- 消除"只清 auctionLog、主账本留"的分裂；autoQingKong 已强制=1
-                    local num = BG.ClearBiaoGe("biaoge", FB)
-                    BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
-                    BG.PlaySound("qingkong")
+                    -- 原版守卫（reference/BGLite）：仅当"当前副本boss区间已有旧记录"(clearType=1)
+                    -- 或"其它boss区有数据且团队不同"(clearType=2) 才整表清空。
+                    -- 这样同一张合并表（如祖阿曼+太阳井=SWtitan）里另一副本的数据不会被误清。
+                    local range = BG.bossPositionStartEnd[instanceID]
+                    local startB, endB
+                    if type(range) == "table" then
+                        startB, endB = range[1], range[2]
+                    end
+                    local clearType
+                    if type(range) == "table" and BG.BiaoGeHavedItem(FB, "autoQingKong", instanceID) then
+                        clearType = 1
+                    end
+                    if not clearType and BG.BiaoGeHavedItem(FB, "onlyboss") and IsNotSameTeam(FB) then
+                        clearType = 2
+                    end
+                    if clearType then
+                        local num = BG.ClearBiaoGe("biaoge", FB)
+                        BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
+                        if clearType == 1 then
+                            BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
+                                L['当前副本所在的表格BOSS编号（%s-%s）格子中存在旧记录。']:format(startB, endB)))
+                        elseif clearType == 2 then
+                            BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(teamText))
+                        end
+                        BG.PlaySound("qingkong")
+                    end
                 end
             end)
         end
