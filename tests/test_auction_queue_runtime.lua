@@ -36,6 +36,7 @@ return function(test)
             GetStringWidth = function() return 10 end,
             Show = function() end,
             Hide = function() end,
+            SetShown = function(self, value) self.shown = value end,
         }
     end
 
@@ -214,7 +215,19 @@ return function(test)
     end
     BG.HookCreateAuction = function(frame) end
     BG.ClearBiaoGe = function(_type, FB) clearCalls = clearCalls + 1; return true end
-    BG.CreateButton = function(parent) return fakeFrame("CreateButton") end
+    BG.CreateButton = function(parent)
+        local button = fakeFrame("CreateButton")
+        button.parent = parent
+        return button
+    end
+    BG.CreateMainFrame = function()
+        local frame = fakeFrame("MainFrameShell")
+        frame.titleText = fakeRegion()
+        frame.CloseButton = fakeFrame("CloseButton")
+        frame.CloseButton.parent = frame
+        frame.CloseButton:SetScript("OnClick", function() frame:Hide() end)
+        return frame
+    end
     BG.PlaySound = function() end
     BG.IsML = true
     BG.FB1 = "ULD"
@@ -229,8 +242,18 @@ return function(test)
     InCombatLockdown = function() return false end
     IsInRaid = function() return true end
     SlashCmdList = {}
+    StaticPopupDialogs = {}
+    local shownPopup
+    StaticPopup_Show = function(key) shownPopup = key end
 
     local M = dofile("Core/BGNext/AuctionQueueRuntime.lua")
+
+    local compact = M.windowLayout(768, 0)
+    test.eq(compact.width, 420, "queue window uses the compact reviewed width")
+    test.eq(compact.height, compact.emptyHeight, "empty queue has a deliberate empty-state height")
+    local filled = M.windowLayout(768, 40)
+    test.eq(filled.visibleRows < 40, true, "large queues stay bounded by the viewport")
+    test.eq(filled.height <= 668, true, "queue leaves a screen-edge safety margin")
 
     -- Wire the runtime (wraps StartAuction / HookCreateAuction / ClearBiaoGe,
     -- registers events, installs the slash command and main-tab entry).
@@ -482,7 +505,18 @@ return function(test)
     test.eq(M.project()[2].source, "manual", "manual source is preserved")
 
     frame.clearButton.scripts.OnClick(frame.clearButton)
-    test.eq(M.state().queueSize, 0, "the clear button empties the queue")
+    test.eq(M.state().queueSize, 2, "the clear button never clears before confirmation")
+    test.eq(shownPopup, "BGNextAuctionQueueClear", "clear opens the danger confirmation")
+    StaticPopupDialogs[shownPopup].OnAccept()
+    test.eq(M.state().queueSize, 0, "confirming the danger action empties the queue")
+
+    local queueSourceFile = assert(io.open("Core/BGNext/AuctionQueueRuntime.lua", "rb"))
+    local queueSource = queueSourceFile:read("*a")
+    queueSourceFile:close()
+    test.eq(queueSource:find("BG.CreateMainFrame", 1, true) ~= nil, true,
+        "queue window uses the shared BGNext frame shell")
+    test.eq(queueSource:find("frame.CloseButton", 1, true) ~= nil, true,
+        "queue uses the shared always-visible close button")
 
     test.eq(type(SlashCmdList["BGNQUEUE"]), "function", "slash command is registered")
     test.eq(_G.SLASH_BGNQUEUE1, "/bgnqueue", "slash trigger is installed")
