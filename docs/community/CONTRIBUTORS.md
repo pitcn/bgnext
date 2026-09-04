@@ -11,7 +11,7 @@ BGNext 感谢每一项可核验的实际贡献。名单按贡献类型分类，�
 
 ## 社区维护
 
-- **Yuke Huang ([@pitcn](https://github.com/pitcn))** — 发起 BGNext 社区维护仓库，建立原版基线、公开治理与合规框架。
+- **Pit ([@pitcn](https://github.com/pitcn))** — 发起 BGNext 社区维护仓库，建立原版基线、公开治理与合规框架。
 
 ## 代码与架构
 
