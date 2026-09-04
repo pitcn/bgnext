@@ -823,7 +823,7 @@ do
                                 if BG.IsML then -- 开始拍卖
                                     local link = self.link
                                     self.owner:ClearFocus()
-                                    BG.StartAuction(link, self, nil, nil, button == "RightButton")
+                                    BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "table", raidId = FB })
                                 else
                                     if not self.owner.hopenandu then
                                         BiaoGe[FB]["boss" .. self.owner.bossnum]["guanzhu" .. self.owner.i] = true

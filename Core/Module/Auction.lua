@@ -234,9 +234,11 @@ BG.Init(function()
         local errorMsg = L['错误：同时拍卖的数量不能超过%s个']:format(maxCount)
 
         function BG.SendStartAuctionMsg(itemID, money, duration, link)
+            local auctionID = GetTime()
             local text = format("StartAuction,%s,%s,%s,%s,,%s,%s",
-                GetTime(), itemID, money, duration, "normal", link)
+                auctionID, itemID, money, duration, "normal", link)
             C_ChatInfo.SendAddonMessage("BiaoGeAuction", text, "RAID")
+            return auctionID
         end
 
         local function OverAuctionMaxCount(i)
@@ -279,6 +281,9 @@ BG.Init(function()
             end
         end
         local function Start_OnClick(self)
+            if self.onPreSend and not self.onPreSend(self) then
+                return
+            end
             if not self.noSound then
                 BG.PlaySound(1)
             end
@@ -292,7 +297,10 @@ BG.Init(function()
                     local itemID = v.id
                     local link = v.link
                     BG.After(delay, function()
-                        BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        local auctionID = BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        if self.onAuctionSent then
+                            self.onAuctionSent(auctionID, itemID, money, link)
+                        end
                     end)
                     delay = delay + 1
                 end
@@ -302,7 +310,10 @@ BG.Init(function()
                     local itemID = self.items[1].id
                     local link = self.items[1].link
                     BG.After(delay, function()
-                        BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        local auctionID = BG.SendStartAuctionMsg(itemID, money, duration, link)
+                        if self.onAuctionSent then
+                            self.onAuctionSent(auctionID, itemID, money, link)
+                        end
                     end)
                     delay = delay + 1
                 end
@@ -729,7 +740,7 @@ BG.Init(function()
         local function func(self, button)
             if not IsAltKeyDown() then return end
             local link = C_Container.GetContainerItemLink(self:GetParent():GetID(), self:GetID())
-            BG.StartAuction(link, self, nil, nil, button == "RightButton")
+            BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "backpack" })
         end
         if BG.IsRetail then
             hooksecurefunc("ContainerFrameItemButton_OnClick", func)

@@ -1212,7 +1212,7 @@ BG.Init(function()
             if IsAltKeyDown() then
                 local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
                 if action == "auction" then
-                    BG.StartAuction(link, nil, nil, nil, button == "RightButton")
+                    BG.StartAuction(link, nil, nil, nil, button == "RightButton", nil, nil, { source = "chat" })
                 elseif action == "wishlist" and BG.ToggleCurrentWish then
                     BG.ToggleCurrentWish(link)
                 end

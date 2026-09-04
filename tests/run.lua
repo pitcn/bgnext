@@ -57,6 +57,10 @@ local suites = {
     "tests/test_auction_sender.lua",
     "tests/test_auction_timer_sync.lua",
     "tests/test_auction_readiness.lua",
+    "tests/test_auction_queue.lua",
+    "tests/test_auction_queue_runtime.lua",
+    "tests/test_auction_start_hook.lua",
+    "tests/test_direct_preset_auction.lua",
     "tests/test_ledger_capture.lua",
     "tests/test_ledger_runtime_privacy.lua",
     "tests/test_chat_yy_copy.lua",
@@ -71,6 +75,8 @@ local suites = {
     "tests/test_trade_facts.lua",
     "tests/test_auto_clear_guard.lua",
     "tests/test_auto_clear_popup.lua",
+    "tests/test_auction_end_result.lua",
+    "tests/test_auction_cancel_event.lua",
 }
 
 for _, path in ipairs(suites) do

@@ -480,7 +480,7 @@ function BG.FBZhuangBeiUI(FB, t, b, bb, i, ii, scrollFrame)
                 local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
                 if action == "auction" then
                     local link = self:GetText()
-                    BG.StartAuction(link, self, nil, nil, button == "RightButton")
+                    BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "table", raidId = FB })
                 elseif action == "wishlist" and BG.ToggleCurrentWish then
                     BG.ToggleCurrentWish(self:GetText())
                 end

@@ -1470,7 +1470,7 @@ BG.Init(function()
                     end
                     UpdateButtonStartAuction()
                 end
-                BG.StartAuction(link, f, true, nil, button == "RightButton", nil, (v.type == 1 or v.type == 2) and DeleteLiuPaiAuctionLog)
+                BG.StartAuction(link, f, true, nil, button == "RightButton", nil, (v.type == 1 or v.type == 2) and DeleteLiuPaiAuctionLog, { source = "auctionlog", raidId = BG.FB1 })
                 return
             end
             if IsCanChooseList() then
