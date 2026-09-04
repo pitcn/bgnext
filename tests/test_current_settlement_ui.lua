@@ -17,6 +17,7 @@ return function(test)
     BG = { BGNext = {} }
     local life = dofile("Core/BGNext/DataLifecycle.lua")
     local trade = dofile("Core/BGNext/CurrentTrade.lua")
+    dofile("Core/BGNext/ReturnMarker.lua")
     local mail = dofile("Core/BGNext/CurrentMail.lua")
     dofile("Core/BGNext/CurrentSettlementView.lua")
     local ui = dofile("Core/BGNext/CurrentSettlementUI.lua")
@@ -120,6 +121,12 @@ return function(test)
         "an unconfirmed grouped row shows only its reconciliation state")
     test.eq(ui.statusText("mail", "sent", true), ui.statusLabel("mail", "sent"),
         "mail rows never gain a trade fact")
+    test.eq(ui.returnActionAvailable(root, {
+        index = 1, completedKey = true, myItems = { { itemId = 11 } }, theirItems = {},
+    }), false, "an outgoing delivery never offers the return action")
+    test.eq(ui.returnActionAvailable(root, {
+        index = 1, completedKey = true, myItems = {}, theirItems = { { itemId = 11 } },
+    }), true, "a completed incoming item offers the return action")
 
     -- narrow-column text: the two dimensions stay two short, distinct labels
     -- rather than one ambiguous word, so they survive a compact status column.
@@ -235,7 +242,7 @@ return function(test)
     --     real frames (mocked), and every swapped global comes back
     local watchedGlobals = {
         "BG", "CreateFrame", "BIAOGE_TEXT_FONT", "GetServerTime", "BiaoGe",
-        "GameTooltip", "C_Timer", "hooksecurefunc",
+        "GameTooltip", "C_Timer", "hooksecurefunc", "StaticPopupDialogs", "StaticPopup_Show",
     }
     local originalValues = {}
     for _, name in ipairs(watchedGlobals) do
@@ -249,6 +256,7 @@ return function(test)
         BG = { BGNext = {} }
         local checklistLife = dofile("Core/BGNext/DataLifecycle.lua")
         local checklistTrade = dofile("Core/BGNext/CurrentTrade.lua")
+        dofile("Core/BGNext/ReturnMarker.lua")
         dofile("Core/BGNext/CurrentMail.lua")
         dofile("Core/BGNext/CurrentSettlementView.lua")
         dofile("Core/BGNext/CurrentSettlementChecklist.lua")
@@ -363,6 +371,12 @@ return function(test)
                 hook(...)
             end
         end)
+        local shownPopup
+        setGlobal("StaticPopupDialogs", {})
+        setGlobal("StaticPopup_Show", function(which, _, _, data)
+            shownPopup = { which = which, data = data }
+            return shownPopup
+        end)
 
         BG.CreateMainFrame = function()
             local frame = makeFrame()
@@ -432,7 +446,6 @@ return function(test)
             raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
             myGold = 0, theirGold = 100, myItems = { { itemId = 7001, quantity = 1 } }, time = nowValue,
         })
-
         local chunk = assert(loadfile("Core/BGNext/CurrentSettlementUI.lua"))
         local ui2 = chunk("BGNEXT", {
             Maxb = { ICC = 2 },
@@ -474,6 +487,60 @@ return function(test)
         ui2.Show("trade", "all")
         test.eq(refreshTradeCalls, 1, "changing a visible window filter refreshes its rows once")
         ui2.Refresh = originalRefresh
+
+        -- 10aa. the real return-action entry enforces permission, then routes
+        --       one match through the confirmation popup.
+        checklistTrade.append(BG.BGNext.DB, {
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 0, myItems = {},
+            theirItems = { { itemId = 7001, quantity = 1 } }, time = nowValue + 1,
+        })
+        checklistTrade.append(BG.BGNext.DB, {
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 0, myItems = {},
+            theirItems = { { itemId = 7001, quantity = 1 } }, time = nowValue + 2,
+        })
+        ui2.Refresh("trade")
+        local actionRows = ui2.windowState("trade").rows
+        actionRows[1].cells.status.scripts.OnEnter(actionRows[1].cells.status)
+        test.eq(tooltipLines[#tooltipLines] == "右键：标记退货 / 清除退货提醒", false,
+            "an outgoing delivery does not advertise the return action")
+        actionRows[2].cells.status.scripts.OnEnter(actionRows[2].cells.status)
+        test.eq(tooltipLines[#tooltipLines], "右键：标记退货 / 清除退货提醒",
+            "an incoming item advertises the return action")
+        BG.IsML = false
+        test.eq(ui2.OpenReturnAction(2), false, "a non-leader cannot open the return action")
+        test.eq(shownPopup, nil, "permission rejection shows no confirmation")
+        BG.IsML = true
+        test.eq(ui2.OpenReturnAction(2), true, "one matching bill row opens return confirmation")
+        test.eq(shownPopup.which, "BGNextMarkReturn", "single match uses the explicit mark popup")
+        test.eq(shownPopup.data.selection.boss, 1, "single match confirms the matching boss")
+        test.eq(shownPopup.data.selection.slot, 1, "single match confirms the matching row")
+        StaticPopupDialogs[shownPopup.which].OnAccept(nil, shownPopup.data)
+        local tradeWindow = ui2.windowState("trade")
+        test.eq(tradeWindow.rows[2].cells.status.text:GetText():find("退货待处理", 1, true) ~= nil, true,
+            "confirmed return is visible in the trade status")
+        test.eq(BG.Frame.ICC.boss1.zhuangbei1.bgnextReturnBadge:GetText(), "退",
+            "confirmed return creates the red bill-row badge")
+        test.eq(BG.Frame.ICC.boss1.zhuangbei1.bgnextReturnBadge:IsShown(), true,
+            "the return badge is visible while pending")
+
+        -- A second row with the same item and buyer turns a later incoming
+        -- trade into an explicit selection step instead of auto-picking.
+        BiaoGe.ICC.boss1.zhuangbei2 = "[装备一]"
+        BiaoGe.ICC.boss1.maijia2 = "买家甲"
+        BiaoGe.ICC.boss1.jine2 = "120"
+        test.eq(ui2.OpenReturnAction(3), true, "duplicate bill rows open the selector")
+        local returnState = ui2.returnActionState()
+        test.eq(returnState.selectorShown, true, "duplicate match selector is visible")
+        test.eq(#returnState.selectorButtons, 2, "duplicate match exposes both bill rows")
+        BG.BGNext.DB.currentSettlement.trades[3] = nil
+        BG.BGNext.DB.currentSettlement.trades[2] = nil
+        BG.BGNext.DB.currentSettlement.returns = {}
+        BiaoGe.ICC.boss1.zhuangbei2 = "[装备二]"
+        BiaoGe.ICC.boss1.maijia2 = "买家乙"
+        BiaoGe.ICC.boss1.jine2 = ""
+        ui2.Refresh("trade")
 
         -- 10b. the full reason is available through the row tooltip
         local entryRow = state.rows[2]

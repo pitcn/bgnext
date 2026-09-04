@@ -22,6 +22,8 @@ local COLUMN_GAP = 4
 local WINDOW_HEIGHT = 380
 local CHECKLIST_HEIGHT = 360
 local CLEAR_POPUP = "BGNextClearCurrentSettlement"
+local RETURN_POPUP = "BGNextMarkReturn"
+local RETURN_CLEAR_POPUP = "BGNextClearReturn"
 local CHECKLIST_KIND = "checklist"
 local KNOWN_FILTERS = { all = true, pending = true, complete = true }
 
@@ -31,7 +33,7 @@ local COLUMNS = {
         { key = "player", label = L["交易对象"], width = 110, justify = "LEFT" },
         { key = "amount", label = L["金额"], width = 80, justify = "RIGHT" },
         { key = "time", label = L["时间"], width = 80, justify = "CENTER" },
-        { key = "status", label = L["状态"], width = 104, justify = "CENTER" },
+        { key = "status", label = L["状态"], width = 150, justify = "CENTER" },
     },
     mail = {
         { key = "item", label = L["物品"], width = 190, justify = "LEFT" },
@@ -309,6 +311,32 @@ function M.statusText(kind, statusKey, completedKey)
     return label
 end
 
+-- Only a completed trade where this player received at least one identifiable
+-- item may offer the return action. A previously marked trade keeps the action
+-- so the leader can clear its reminder even after the bill changes.
+function M.returnActionAvailable(root, row)
+    if type(row) ~= "table" then return false end
+    local R = BG.BGNext and BG.BGNext.ReturnMarker
+    if R and type(R.pendingForTrade) == "function" and type(row.index) == "number"
+        and R.pendingForTrade(root, row.index) then
+        return true
+    end
+    return row.completedKey == true and type(row.theirItems) == "table"
+        and #row.theirItems > 0
+end
+
+function M.tradeStatusText(root, row)
+    local text = M.statusText("trade", row and row.statusKey, row and row.completedKey)
+    local R = BG.BGNext and BG.BGNext.ReturnMarker
+    if R and row and R.pendingForTrade(root, row.index) then
+        return text .. " · " .. L["退货待处理"]
+    end
+    if M.returnActionAvailable(root, row) then
+        return text .. " · " .. L["可标退货"]
+    end
+    return text
+end
+
 -- The status tooltip explains the two independent dimensions (the trade fact
 -- and the reconciliation state) so a clipped narrow column never hides which
 -- fact is which, then repeats the toggle hint.
@@ -377,6 +405,8 @@ end
 
 local windows = {}
 local entryButtons
+local returnSelector
+local returnBadges = {}
 
 function M.checklistTitle()
     return L["结算前检查（当前团）"]
@@ -421,8 +451,9 @@ local function checklistOptions(now)
     }
 end
 
-local CATEGORY_ORDER = { "settlement", "trade", "sold", "debt", "bill", "summary", "mail" }
+local CATEGORY_ORDER = { "settlement", "return", "trade", "sold", "debt", "bill", "summary", "mail" }
 local CATEGORY_LABELS = {
+    ["return"] = "退货",
     settlement = "结算状态",
     trade = "未核对交易",
     sold = "销售交付核对",
@@ -631,6 +662,158 @@ requestChecklistRefresh = function()
     else
         processChecklistRefresh()
     end
+end
+
+local function returnMarker()
+    return BG.BGNext and BG.BGNext.ReturnMarker
+end
+
+local function authorisedReturnAction()
+    if BG.IsML == true then return true end
+    if type(BG.ImMLorLeader) == "function" then
+        local ok, allowed = pcall(BG.ImMLorLeader)
+        return ok and allowed and true or false
+    end
+    return false
+end
+
+local function currentBillRows(now)
+    local C = checklist()
+    if not C or type(C.collect) ~= "function" then return {} end
+    local input = C.collect(checklistOptions(now))
+    return input.bill and input.bill.rows or {}
+end
+
+local function refreshReturnBadges()
+    for _, badge in ipairs(returnBadges) do badge:Hide() end
+    local root = database()
+    local settlement = root and root.currentSettlement
+    local fb = settlement and settlement.sourceFb
+    if not fb or type(BG.Frame) ~= "table" or type(BG.Frame[fb]) ~= "table" then return end
+    for _, marker in ipairs(settlement.returns or {}) do
+        if marker.status == "pending" then
+            local boss = BG.Frame[fb]["boss" .. tostring(marker.boss)]
+            local field = boss and boss["zhuangbei" .. tostring(marker.slot)]
+            if field and type(field.CreateFontString) == "function" then
+                local badge = field.bgnextReturnBadge
+                if not badge then
+                    badge = field:CreateFontString(nil, "OVERLAY")
+                    badge:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
+                    badge:SetPoint("RIGHT", field, "RIGHT", -2, 0)
+                    badge:SetTextColor(1, 0.25, 0.1)
+                    badge:SetText(L["退"])
+                    field.bgnextReturnBadge = badge
+                    returnBadges[#returnBadges + 1] = badge
+                end
+                badge:Show()
+            end
+        end
+    end
+end
+
+local function refreshAfterReturn()
+    refreshReturnBadges()
+    M.Refresh("trade")
+    requestChecklistRefresh()
+end
+
+local function ensureReturnPopups()
+    if type(StaticPopupDialogs) ~= "table" then return false end
+    StaticPopupDialogs[RETURN_POPUP] = StaticPopupDialogs[RETURN_POPUP] or {
+        text = L["确认将这件装备标记为退货待处理吗？\n不会自动清空买家、金额或执行退款。"],
+        button1 = L["是"], button2 = L["否"],
+        OnAccept = function(_, data)
+            local R = returnMarker()
+            if not R or not data then return end
+            local ok = R.mark(database(), data.tradeIndex, data.selection,
+                currentBillRows(serverNow()), serverNow(), authorisedReturnAction(), BG.GSN)
+            if ok then refreshAfterReturn() end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, showAlert = true,
+    }
+    StaticPopupDialogs[RETURN_CLEAR_POPUP] = StaticPopupDialogs[RETURN_CLEAR_POPUP] or {
+        text = L["确认已处理该退货并清除提醒吗？"],
+        button1 = L["是"], button2 = L["否"],
+        OnAccept = function(_, data)
+            local R = returnMarker()
+            if R and data and R.clear(database(), data.markerIndex, authorisedReturnAction()) then
+                refreshAfterReturn()
+            end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, showAlert = true,
+    }
+    return true
+end
+
+local function confirmReturn(tradeIndex, candidate)
+    if ensureReturnPopups() and type(StaticPopup_Show) == "function" then
+        StaticPopup_Show(RETURN_POPUP, nil, nil, {
+            tradeIndex = tradeIndex,
+            selection = { boss = candidate.boss, slot = candidate.slot },
+        })
+    end
+end
+
+local function showReturnSelector(tradeIndex, candidates)
+    if not returnSelector then
+        if type(BG.CreateMainFrame) ~= "function" or type(BG.CreateButton) ~= "function" then return false end
+        local frame = BG.CreateMainFrame()
+        frame:SetSize(330, 110)
+        frame:SetPoint("CENTER")
+        frame:Hide()
+        frame.buttons = {}
+        if frame.titleText then frame.titleText:SetText(L["选择退货对应账单行"]) end
+        returnSelector = frame
+    end
+    for _, button in ipairs(returnSelector.buttons) do button:Hide() end
+    for index, candidate in ipairs(candidates) do
+        local button = returnSelector.buttons[index]
+        if not button then
+            button = BG.CreateButton(returnSelector)
+            button:SetSize(290, 22)
+            returnSelector.buttons[index] = button
+        end
+        button:ClearAllPoints()
+        button:SetPoint("TOP", 0, -30 - (index - 1) * 25)
+        button:SetText(string.format(L["第%s个Boss 第%s件 · 原买家 %s · 原金额 %s"],
+            candidate.boss, candidate.slot, candidate.buyer, candidate.amount or L["未知"]))
+        local selected = candidate
+        button:SetScript("OnClick", function()
+            returnSelector:Hide()
+            confirmReturn(tradeIndex, selected)
+        end)
+        button:Show()
+    end
+    returnSelector:SetHeight(math.max(85, 55 + #candidates * 25))
+    returnSelector:Show()
+    return true
+end
+
+function M.OpenReturnAction(tradeIndex)
+    if not authorisedReturnAction() then
+        if BG.SendSystemMessage then BG.SendSystemMessage(L["只有团长或物品分配者可以标记退货。"] ) end
+        return false, "not-authorised"
+    end
+    local R = returnMarker()
+    local root = database()
+    if not R or not root then return false, "unavailable" end
+    local pending, markerIndex = R.pendingForTrade(root, tradeIndex)
+    if pending then
+        if ensureReturnPopups() and type(StaticPopup_Show) == "function" then
+            StaticPopup_Show(RETURN_CLEAR_POPUP, nil, nil, { markerIndex = markerIndex })
+            return true
+        end
+        return false, "unavailable"
+    end
+    local candidates = R.candidates(root, tradeIndex, currentBillRows(serverNow()), BG.GSN)
+    if #candidates == 0 then
+        if BG.SendSystemMessage then BG.SendSystemMessage(L["没有找到匹配的当前团账单行。"] ) end
+        return false, "no-match"
+    elseif #candidates == 1 then
+        confirmReturn(tradeIndex, candidates[1])
+        return true
+    end
+    return showReturnSelector(tradeIndex, candidates), "selection-required"
 end
 
 -- Bill edits (item, buyer, amount, debt, summary) live in baseline inline
@@ -890,6 +1073,11 @@ local function acquireRow(win, index)
     if statusCell and win.kind == "trade" then
         statusCell:EnableMouse(true)
         statusCell:SetScript("OnMouseUp", function(_, mouseButton)
+            if mouseButton == "RightButton" and row.data
+                and M.returnActionAvailable(database(), row.data) then
+                M.OpenReturnAction(row.data.index)
+                return
+            end
             if mouseButton ~= "LeftButton" or not row.data then
                 return
             end
@@ -904,6 +1092,9 @@ local function acquireRow(win, index)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
             GameTooltip:ClearLines()
             local lines = M.statusTooltipLines(win.kind, row.data and row.data.statusKey, row.data and row.data.completedKey)
+            if M.returnActionAvailable(database(), row.data) then
+                lines[#lines + 1] = { text = L["右键：标记退货 / 清除退货提醒"], r = 1, g = 0.35, b = 0.15 }
+            end
             for _, line in ipairs(lines) do
                 GameTooltip:AddLine(line.text, line.r or 1, line.g or 1, line.b or 1, true)
             end
@@ -980,7 +1171,9 @@ local function fillRow(win, row, data)
         cells.direction.text:SetTextColor(0.8, 0.8, 0.8)
     end
     if cells.status then
-        cells.status.text:SetText(M.statusText(win.kind, data.statusKey, data.completedKey))
+        local statusText = win.kind == "trade" and M.tradeStatusText(database(), data)
+            or M.statusText(win.kind, data.statusKey, data.completedKey)
+        cells.status.text:SetText(statusText)
         cells.status.text:SetTextColor(M.statusColor(win.kind, data.statusKey))
     end
     row:Show()
@@ -990,6 +1183,7 @@ function M.Refresh(kind)
     -- Any record or window refresh also updates a visible checklist; bursts
     -- coalesce into one recompute via the deferred refresh request.
     requestChecklistRefresh()
+    refreshReturnBadges()
     if kind == CHECKLIST_KIND then
         return
     end
@@ -1222,7 +1416,15 @@ function M.windowState(kind)
     if not win then
         return { shown = false, filter = nil }
     end
-    return { shown = win.frame:IsShown() and true or false, filter = win.filter }
+    return { shown = win.frame:IsShown() and true or false, filter = win.filter, rows = win.rowPool }
+end
+
+
+function M.returnActionState()
+    return {
+        selectorShown = returnSelector and returnSelector:IsShown() and true or false,
+        selectorButtons = returnSelector and returnSelector.buttons or {},
+    }
 end
 
 -- Entry buttons on the main window, next to the character overview entry so the
