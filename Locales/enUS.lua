@@ -3124,6 +3124,7 @@ do -- BGNext auction price presets
     L["物品无效"] = "Invalid item"
     L["请手动输入起拍价"] = "Enter the starting price manually"
     L["已有拍卖进行中"] = "An auction is already in progress"
+    L["无法确定该装备所属副本，已保留确认窗口。"] = "Cannot determine the raid for this item; the confirm window stays open."
     L["添加"] = "Add"
     L["已有待确认的拍卖"] = "A queued auction is already pending confirmation"
     L["团队或表格已变更"] = "The raid or table has changed"

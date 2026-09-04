@@ -740,7 +740,7 @@ BG.Init(function()
         local function func(self, button)
             if not IsAltKeyDown() then return end
             local link = C_Container.GetContainerItemLink(self:GetParent():GetID(), self:GetID())
-            BG.StartAuction(link, self, nil, nil, button == "RightButton")
+            BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "backpack" })
         end
         if BG.IsRetail then
             hooksecurefunc("ContainerFrameItemButton_OnClick", func)

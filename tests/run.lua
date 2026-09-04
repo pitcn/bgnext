@@ -60,6 +60,7 @@ local suites = {
     "tests/test_auction_queue.lua",
     "tests/test_auction_queue_runtime.lua",
     "tests/test_auction_start_hook.lua",
+    "tests/test_direct_preset_auction.lua",
     "tests/test_ledger_capture.lua",
     "tests/test_ledger_runtime_privacy.lua",
     "tests/test_chat_yy_copy.lua",

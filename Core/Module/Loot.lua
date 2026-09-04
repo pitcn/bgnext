@@ -137,7 +137,7 @@ BG.Init(function()
                         BG.InsertLink(text)
                     elseif IsAltKeyDown() then
                         if BG.IsML then -- 开始拍卖
-                            BG.StartAuction(link, nil, nil, nil, button == "RightButton")
+                            BG.StartAuction(link, nil, nil, nil, button == "RightButton", nil, nil, { source = "loot", raidId = BG.FB1 })
                         else            -- 关注装备
                             if button ~= "RightButton" then
                                 BG.AddGuanZhu(link)
@@ -1594,7 +1594,7 @@ BG.Init2(function()
             if IsAltKeyDown() and BG.IsML and LootSlotHasItem(self.slot) then
                 local link = GetLootSlotLink(self.slot)
                 if link then
-                    BG.StartAuction(link, self, nil, nil, button == "RightButton")
+                    BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "loot", raidId = BG.FB1 })
                 end
             end
         end
