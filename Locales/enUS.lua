@@ -3152,3 +3152,8 @@ do -- BGNext character overview
     L["确认删除角色 %s（%s）的记录？此操作不可撤销。"] = "Delete the record for %s (%s)? This cannot be undone."
     L["该版本角色总览适配中。"] = "Character overview support for this client is in progress."
 end
+
+do -- BGNext auto-clear confirmation
+    L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"] = "A new raid lockout was detected and table <%s> still has unsettled content. Clearing also removes the table content and this raid's settlement records. Clear now?"
+    L["自动清空保护模块未加载，已跳过自动清空以避免误删；如需清空请手动操作。"] = "The auto-clear protection module failed to load, so auto-clear was skipped to avoid accidental deletion. Clear the table manually if needed."
+end

@@ -226,6 +226,75 @@ function BG.ClearBiaoGeUI()
             end
         end
 
+        -- Re-checks whether the captured table still holds old content. A table
+        -- that was emptied or cleared meanwhile must not be cleared again.
+        local function StillHasContent(pending)
+            if not pending then return false end
+            if pending.clearType == 2 then
+                return BG.BiaoGeHavedItem(pending.fb, "onlyboss")
+            end
+            return BG.BiaoGeHavedItem(pending.fb, "autoQingKong", pending.instanceID)
+        end
+
+        local function DoAutoClear(FB, clearType, startB, endB, teamText)
+            local num = BG.ClearBiaoGe("biaoge", FB)
+            BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
+            if clearType == 1 then
+                BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
+                    L['当前副本所在的表格BOSS编号（%s-%s）格子中存在旧记录。']:format(startB, endB)))
+            elseif clearType == 2 then
+                BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
+                    teamText))
+            end
+            BG.PlaySound("qingkong")
+        end
+
+        -- Instead of clearing directly, asks the user first. The request is
+        -- memory-only; nothing is cleared on refuse, Esc or cancel.
+        local function ShowAutoClearConfirm(FB, clearType, startB, endB, teamText, instanceID)
+            local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
+            if not Guard then
+                -- Guard failed to load: fail closed. Never auto-clear without
+                -- the confirmation gate; warn and leave the table and settlement intact.
+                BG.SendSystemMessage(L["自动清空保护模块未加载，已跳过自动清空以避免误删；如需清空请手动操作。"])
+                return
+            end
+            local pending = Guard.createPending(FB, clearType)
+            if not pending then return end
+            pending.startB = startB
+            pending.endB = endB
+            pending.teamText = teamText
+            pending.instanceID = instanceID
+            StaticPopup_Show("AUTO_QINGKONG_CONFIRM", BG.GetFBinfo(FB, "shortName"), nil, pending)
+        end
+
+        StaticPopupDialogs["AUTO_QINGKONG_CONFIRM"] = {
+            text = L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"],
+            button1 = L["清空表格"],
+            button2 = L["取消"],
+            OnAccept = function(self, data)
+                local pending = data
+                if not pending then return end
+                local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
+                local hasContent = StillHasContent(pending)
+                local decision = Guard and Guard.accept(pending, hasContent) or (hasContent and "clear" or "skip")
+                if decision == "clear" then
+                    DoAutoClear(pending.fb, pending.clearType, pending.startB, pending.endB, pending.teamText)
+                end
+            end,
+            OnCancel = function(self, data)
+                local pending = data
+                local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
+                if Guard and pending then
+                    Guard.refuse(pending)
+                end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            showAlert = true,
+        }
+
         local notCheckMaxPlayer = BG.verOver4
         local notCheckDiff = not BG.IsRetail
         local needCheck
@@ -265,16 +334,11 @@ function BG.ClearBiaoGeUI()
                     end
 
                     if clearType then
-                        local num = BG.ClearBiaoGe("biaoge", FB)
-                        BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
-                        if clearType == 1 then
-                            BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
-                                L['当前副本所在的表格BOSS编号（%s-%s）格子中存在旧记录。']:format(startB, endB)))
-                        elseif clearType == 2 then
-                            BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
-                                teamText))
+                        local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
+                        local enabled = BiaoGe.options["autoQingKong"] == 1
+                        if not Guard or Guard.needsConfirmation(enabled, newCD, true) then
+                            ShowAutoClearConfirm(FB, clearType, startB, endB, teamText, instanceID)
                         end
-                        BG.PlaySound("qingkong")
                     end
                 end
             end)

@@ -3163,3 +3163,8 @@ do -- BGNext character overview
     L["确认删除角色 %s（%s）的记录？此操作不可撤销。"] = true
     L["该版本角色总览适配中。"] = true
 end
+
+do -- BGNext auto-clear confirmation
+    L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"] = true
+    L["自动清空保护模块未加载，已跳过自动清空以避免误删；如需清空请手动操作。"] = true
+end
