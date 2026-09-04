@@ -25,12 +25,13 @@ return function(test)
     test.eq(ui.shortcutAction(false, "LeftButton", true), "wishlist", "member alt-left sets wishlist")
     test.eq(ui.shortcutAction(true, "LeftButton", true), "wishlist", "master looter alt-left sets wishlist")
     test.eq(ui.shortcutAction(true, "RightButton", true), "auction", "master looter alt-right starts auction")
-    test.eq(ui.shortcutAction(false, "RightButton", true), nil, "member alt-right has no privileged action")
+    test.eq(ui.shortcutAction(false, "RightButton", true), "auction",
+        "solo alt-right is consumed by the guarded auction path instead of deleting the item")
     test.eq(ui.shortcutAction(false, "LeftButton", false), nil, "no modifier does not set wishlist")
     test.eq(ui.shortcutAction(true, "RightButton", false, true, false), "leader-price",
         "ctrl-right edits the saved leader price")
-    test.eq(ui.shortcutAction(false, "RightButton", false, true, false), nil,
-        "member ctrl-right cannot edit the leader price")
+    test.eq(ui.shortcutAction(false, "RightButton", false, true, false), "leader-price",
+        "solo ctrl-right edits the local leader-price scheme instead of deleting the item")
     test.eq(ui.shortcutAction(true, "RightButton", true, true, false), "auction",
         "alt-right keeps priority over ctrl-right")
     test.eq(ui.shortcutAction(true, "RightButton", false, true, true), nil,
@@ -120,8 +121,10 @@ return function(test)
     local billFile = assert(io.open("Core/FBUI/FBUIfunction.lua", "rb"))
     local billSource = billFile:read("*a")
     billFile:close()
-    test.eq(billSource:find("shortcutAction(BG.IsML, button, true)", 1, true) ~= nil, true,
-        "bill-table alt-click call site passes the explicit modifier state")
+    test.eq(billSource:find("IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()", 1, true) ~= nil, true,
+        "bill-table shortcut call site passes every explicit modifier state")
     test.eq(billSource:find('shortcut == "leader-price"', 1, true) ~= nil, true,
         "bill table routes ctrl-right to the leader-price editor")
+    test.eq(billSource:find('shortcut == "auction"', 1, true) ~= nil, true,
+        "bill table handles alt-right before the ordinary right-click delete path")
 end

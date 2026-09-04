@@ -8,7 +8,16 @@ ns.enUS = true
 local L = ns.L
 local c1 = ns.c1
 
-do -- BGNext 0.5.0 release text
+do -- BGNext release text
+    L["新增团长待拍队列：逐件确认价格后开拍，不会自动连拍；离团、切表或重载即清空。"] = "Added a leader auction queue. Confirm each item's price before starting; it never auto-starts the next auction and clears when leaving the raid, switching tables, or reloading."
+    L["拍卖结束后，侧边卡片会短暂显示买家和成交金额；流拍或取消也有明确状态。"] = "Auction cards now briefly show the buyer and final amount after completion, with clear unsold and cancelled states."
+    L["交易记录改进：保留同物品多件数量，确认时采集双方物品与金币，并区分已交易和待核对。"] = "Trade records now preserve quantities for identical items, capture both sides' items and gold at confirmation, and distinguish delivery from reconciliation."
+    L["修复交易成功或失败通报；同一交易只通报一次，不记录聊天内容或跨团历史。"] = "Fixed successful and failed trade announcements. Each trade is announced at most once, without storing chat content or cross-raid history."
+    L["价格预设快捷开拍统一进行权限、战斗、活动拍卖、方案和价格检查；价格列表会随窗口自动重排。"] = "Preset quick-start now consistently checks permissions, combat, active auctions, the selected scheme and price. Price lists reflow with the window."
+    L["进入新进度时，如旧表仍有未结算内容，自动清空前会先确认；取消不会删除。"] = "When entering a new lockout, automatic clearing asks first if the previous table still has unsettled content. Cancelling preserves it."
+    L["正式服角色总览按 Boss 和难度统计团本进度；证据不足时留空，不显示错误完成状态。"] = "Retail character overview now tracks raid progress per boss and difficulty. Missing evidence stays blank instead of showing a false completion."
+    L["修复底栏按钮重叠及表格组合键误删装备；待拍窗口新增关闭按钮并统一外观。"] = "Fixed overlapping footer buttons and modified table clicks deleting items. The auction queue now has a close button and consistent styling."
+    L["上游基础升级到官方 BGLite 纯净版 2.4.1；拍卖聊天不再跨重载保存，并补充拍卖记录空数据容错。"] = "Updated the upstream foundation to official BGLite Pure Edition 2.4.1. Auction chat no longer persists across reloads, and auction-log actions now tolerate missing data."
     L["心愿清单：新选装备默认备选，可用滚轮按备选、次 BIS、BIS 切换；已有优先级保持不变。"] = "Wishlist: new selections start as Backup. Use the mouse wheel to cycle Backup, 2nd BiS and BiS; existing priorities are preserved."
     L["心愿优先级改用独立文字徽标，不遮挡装备名称与装等；长列表可以滚动。"] = "Wishlist priorities now use separate text badges without covering item names or levels; long lists can be scrolled."
     L["修复价格预设失焦保存、Alt+右键按预设开拍、Ctrl+右键改价；支持旧价格和心愿字符串导入。"] = "Fixed preset saving on focus loss, Alt+right-click auction starts using presets, and Ctrl+right-click price editing. Legacy price and wishlist imports remain available."
@@ -24,7 +33,7 @@ do -- BGNext 0.5.0 release text
     L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"] = "Character overview records only characters you log into yourself. Current-raid trade and mail reconciliation lasts at most seven days, without mail bodies or other-player history profiles."
     L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"] = "Legacy history cleanup in Storage & Privacy cannot be undone: back up WTF first. Updating or reloading does not delete it. Do not enable BGLite, BiaoGe or their dependent extensions alongside BGNext."
     L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"] = "Clients other than Simplified or Traditional Chinese fall back to English. See the release notes for tested client coverage; not all client features have been verified."
-    L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.0 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
+    L["BGNext 基于 BGLite 2.4.1 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.1 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
 end
 
 do --英语说明书
@@ -38,10 +47,15 @@ do --英语说明书
         L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"],
         L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"],
         L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"],
-        L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
+        L["BGNext 基于 BGLite 2.4.1 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
     }
     ns.updateText_now = {
-
+        "BGNext 0.6.0",
+        L["新增团长待拍队列：逐件确认价格后开拍，不会自动连拍；离团、切表或重载即清空。"],
+        L["拍卖结束后，侧边卡片会短暂显示买家和成交金额；流拍或取消也有明确状态。"],
+        L["交易记录改进：保留同物品多件数量，确认时采集双方物品与金币，并区分已交易和待核对。"],
+        L["修复交易成功或失败通报；同一交易只通报一次，不记录聊天内容或跨团历史。"],
+        L["上游基础升级到官方 BGLite 纯净版 2.4.1；拍卖聊天不再跨重载保存，并补充拍卖记录空数据容错。"],
     }
     ns.updateText_before = {
 
@@ -86,6 +100,7 @@ do -- BGNext wish priorities
 end
 
 do
+    L["总欠款："] = "Total debt:"
     L["战斗的奖励"] = "Rewards of Battle"
     L["删除该站位图"] = "Delete This Positioning Map"
     L["错误！禁止清除欠款"] = "Error! Clearing debts is prohibited"
@@ -3023,10 +3038,13 @@ do -- BGNext current-raid trade and mail reconciliation
     L["方向"] = "Direction"
     L["寄出"] = "Sent"
     L["已完成"] = "Done"
+    L["未完成"] = "Not done"
     L["已取消"] = "Cancelled"
     L["已寄出"] = "Mailed"
     L["待核对"] = "To reconcile"
     L["左键切换待核对/已完成"] = "Left-click to toggle To reconcile / Done"
+    L["交易已完成"] = "Trade completed"
+    L["核对状态"] = "Reconciliation"
     L["失败"] = "Failed"
     L["当前团还没有交易记录。"] = "No trades recorded for the current raid yet."
     L["当前团还没有邮件记录。"] = "No mails recorded for the current raid yet."
@@ -3113,6 +3131,25 @@ do -- BGNext auction price presets
     L["当前方案"] = "Current preset"
     L["当前没有可导出的价格。"] = "No prices are available to export."
     L["导出范围"] = "Export scope"
+    L["待拍队列"] = "Pending auctions"
+    L["单件价"] = "Per-item"
+    L["手动输入"] = "Manual"
+    L["移除"] = "Remove"
+    L["上移"] = "Up"
+    L["下移"] = "Down"
+    L["无权限发起拍卖"] = "You don't have permission to start an auction"
+    L["战斗状态下无法发起拍卖"] = "Cannot start an auction in combat"
+    L["物品无效"] = "Invalid item"
+    L["请手动输入起拍价"] = "Enter the starting price manually"
+    L["已有拍卖进行中"] = "An auction is already in progress"
+    L["无法确定该装备所属副本，已保留确认窗口。"] = "Cannot determine the raid for this item; the confirm window stays open."
+    L["添加"] = "Add"
+    L["已有待确认的拍卖"] = "A queued auction is already pending confirmation"
+    L["团队或表格已变更"] = "The raid or table has changed"
+    L["起拍价已变更，请重新确认"] = "The starting price changed, please confirm again"
+    L["起拍价方案已变更，请重新确认"] = "The starting-price scheme changed, please confirm again"
+    L["客户端版本已变更，请重新确认"] = "The client version changed, please confirm again"
+    L["待拍队列已满（最多40项）"] = "Pending auction queue is full (max 40 items)"
     L["导出价格"] = "Export Prices"
     L["导入"] = "Import"
     L["导入成功。"] = "Import complete."
@@ -3149,4 +3186,9 @@ do -- BGNext character overview
     L["确认清空全部版本的角色数据？此操作不可撤销。"] = "Clear character data for all clients? This cannot be undone."
     L["确认删除角色 %s（%s）的记录？此操作不可撤销。"] = "Delete the record for %s (%s)? This cannot be undone."
     L["该版本角色总览适配中。"] = "Character overview support for this client is in progress."
+end
+
+do -- BGNext auto-clear confirmation
+    L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"] = "A new raid lockout was detected and table <%s> still has unsettled content. Clearing also removes the table content and this raid's settlement records. Clear now?"
+    L["自动清空保护模块未加载，已跳过自动清空以避免误删；如需清空请手动操作。"] = "The auto-clear protection module failed to load, so auto-clear was skipped to avoid accidental deletion. Clear the table manually if needed."
 end

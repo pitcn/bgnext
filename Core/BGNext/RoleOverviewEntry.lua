@@ -97,9 +97,9 @@ function M.entryPresentation(classFile)
     return {
         point = "BOTTOMRIGHT",
         relativePoint = "BOTTOMRIGHT",
-        x = -20,
-        y = 1,
-        height = 25,
+        x = -10,
+        y = 8,
+        height = 20,
         text = "|A:GarrMission_ClassIcon-" .. classKey .. ":0:0|a" .. L["角色总览"],
     }
 end
@@ -575,7 +575,7 @@ end
 -- chain. Uses only BGLite's own helpers and Blizzard textures.
 function M.installEntry(mainFrame)
     if type(mainFrame) ~= "table" then return end
-    if type(CreateFrame) ~= "function" then return end
+    if type(BG.CreateButton) ~= "function" then return end
     if not M.canOpen() then return end
 
     if entryButton then return entryButton end
@@ -585,16 +585,14 @@ function M.installEntry(mainFrame)
         classFile = detected
     end
     local presentation = M.entryPresentation(classFile)
-    local button = CreateFrame("Button", nil, mainFrame)
+    local button = BG.CreateButton(mainFrame)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
-    button:SetSize(20, presentation.height)
+    button:SetSize(100, presentation.height)
     button:SetPoint(presentation.point, mainFrame, presentation.relativePoint,
         presentation.x, presentation.y)
-    if BG.FontYellow13 then button:SetNormalFontObject(BG.FontYellow13) end
-    if BG.FontWhite13 then button:SetHighlightFontObject(BG.FontWhite13) end
     button:SetText(presentation.text)
     if button.GetFontString and button:GetFontString() then
-        button:SetWidth(button:GetFontString():GetStringWidth())
+        button:SetWidth(math.max(100, button:GetFontString():GetStringWidth() + 16))
     end
     BG.ButtonRoleOverview = button
     entryButton = button

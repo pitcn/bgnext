@@ -1,14 +1,16 @@
 [CmdletBinding()]
 param(
-    [string]$ManifestPath = "docs/baseline/BGLite-2.4.0.sha256",
-    [string]$OverrideManifestPath = "docs/baseline/BGNext-overrides.sha256"
+    [string]$ManifestPath = "docs/baseline/BGLite-2.4.1.sha256",
+    [string]$OverrideManifestPath = "docs/baseline/BGNext-overrides.sha256",
+    [string]$ExclusionPath = "docs/baseline/BGLite-2.4.1-exclusions.txt"
 )
 
 $ErrorActionPreference = "Stop"
-$baselineCommit = "9e0b119c66a644cce0083b5ffe4e59c6c946d0f1"
+$baselineCommit = "31b4942e3251d8bba5c6e6be56fc427da2ae045f"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $manifestFullPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $ManifestPath))
 $overrideManifestFullPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OverrideManifestPath))
+$exclusionFullPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $ExclusionPath))
 
 if (-not (Test-Path -LiteralPath $manifestFullPath -PathType Leaf)) {
     throw "Baseline manifest not found: $ManifestPath"
@@ -88,10 +90,26 @@ if ($unknownOverrides.Count -gt 0) {
     throw "Override manifest contains unknown paths."
 }
 
+$excludedPaths = @{}
+if (Test-Path -LiteralPath $exclusionFullPath -PathType Leaf) {
+    foreach ($line in Get-Content -LiteralPath $exclusionFullPath) {
+        $relativePath = $line.Trim().Replace("\", "/")
+        if ($relativePath -and -not $relativePath.StartsWith("#")) {
+            if (-not $manifestEntries.ContainsKey($relativePath)) {
+                throw "Baseline exclusion is not an upstream file: $relativePath"
+            }
+            $excludedPaths[$relativePath] = $true
+        }
+    }
+}
+
 $failures = 0
 $rootPrefix = $repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 
 foreach ($relativePath in $expectedPaths) {
+    if ($excludedPaths.ContainsKey($relativePath)) {
+        continue
+    }
     $nativeRelativePath = $relativePath.Replace("/", [IO.Path]::DirectorySeparatorChar)
     $fullPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $nativeRelativePath))
 
@@ -122,4 +140,4 @@ if ($failures -gt 0) {
     throw "Baseline integrity check failed for $failures file(s)."
 }
 
-Write-Output "Baseline integrity verified: $($expectedPaths.Count) files, including $($overrideEntries.Count) explicit BGNext override(s)."
+Write-Output "Baseline integrity verified: $($expectedPaths.Count) upstream files, $($excludedPaths.Count) explicit repository exclusion(s), and $($overrideEntries.Count) BGNext override(s)."

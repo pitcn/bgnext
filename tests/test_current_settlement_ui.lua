@@ -49,7 +49,8 @@ return function(test)
     -- 3. rows come only from the current settlement
     life.beginSettlement(root, "raid-a", 1000)
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "甲", itemId = 11, amount = 100, time = 1100, status = "complete",
+        raidId = "raid-a", player = "甲", completed = true, status = "complete",
+        myGold = 0, theirGold = 100, myItems = { { itemId = 11, quantity = 1 } }, time = 1100,
     }), true, "trade stored")
     test.eq(mail.append(root, {
         raidId = "raid-a", player = "乙", amount = 200, time = 1200, status = "sent", direction = "outgoing",
@@ -59,7 +60,8 @@ return function(test)
     test.eq(isEmpty, false, "trade table is populated")
     test.eq(#rows, 1, "only the settlement trade is listed")
     test.eq(rows[1].player, "甲", "trade row shows the counterparty")
-    test.eq(rows[1].amountText, "100", "trade row shows the amount")
+    test.eq(rows[1].theirGold, 100, "trade row carries the received gold")
+    test.eq(ui.goldText(rows[1]), "收到 100 / 寄出 0", "gold shows both directions, an explicit 0 included")
     test.eq(rows[1].timeText, "t1100", "trade row shows the time")
 
     local mailRows = ui.rows(root, "mail", { now = 1300, dateFn = stubDate })
@@ -76,6 +78,11 @@ return function(test)
     test.eq(type(ui.statusLabel("mail", "sent")), "string", "mail sent status has a label")
     test.eq(ui.directionLabel("outgoing") ~= ui.directionLabel("incoming"), true,
         "mail directions are distinguishable")
+    test.eq(ui.quantityText(2), "×2", "a delivered count renders as a compact suffix")
+    test.eq(ui.quantityText(1), "×1", "a single delivered item still shows its count")
+    test.eq(ui.quantityText(nil), "", "a legacy record without quantity shows no suffix")
+    test.eq(ui.quantityText(0), "", "a zero quantity shows no suffix")
+    test.eq(ui.quantityText(1.5), "", "a fractional quantity shows no suffix")
     local r, g, b = ui.statusColor("trade", "complete")
     test.eq(r == 0 and g == 1 and b == 0, true, "success is green in the table")
     r, g, b = ui.statusColor("trade", "pending")
@@ -87,6 +94,78 @@ return function(test)
     test.eq(ui.tooltipTarget({ itemId = 11 }), 11, "tooltip uses the stored item id")
     test.eq(ui.tooltipTarget({ itemId = "11" }), nil, "tooltip refuses a non-numeric item id")
     test.eq(ui.tooltipTarget({}), nil, "a row without an item has no tooltip")
+    test.eq(ui.tooltipTarget({ myItems = { { itemId = 22 } } }), 22, "tooltip uses a grouped outgoing item")
+    test.eq(ui.tooltipTarget({ theirItems = { { itemId = 33 } } }), 33, "tooltip uses a grouped incoming item")
+
+    -- 5b. trade facts and reconciliation state are two independently visible
+    --     dimensions. A grouped trade whose exchange actually completed is
+    --     labelled with its trade fact in front of its reconciliation state, so
+    --     "completed but still pending" reads as both instead of only 待核对.
+    local grouped = {
+        completedKey = true, statusKey = "pending",
+        myGold = 0, theirGold = 0,
+        myItems = { { itemId = 11, quantity = 2 }, { itemId = 22, quantity = 1 } },
+        theirItems = { { itemId = 33, quantity = 1 } },
+    }
+    local dual = ui.statusText("trade", grouped.statusKey, grouped.completedKey)
+    test.eq(dual:find("已交易", 1, true) ~= nil, true,
+        "a completed trade is labelled with its trade fact")
+    test.eq(dual:find("待核对", 1, true) ~= nil, true,
+        "a completed-but-pending trade still shows its reconciliation state")
+    test.eq(ui.statusText("trade", "complete", true):find("已交易", 1, true) ~= nil, true,
+        "the trade fact stays explicit even after reconciliation completes")
+    test.eq(ui.statusText("trade", "pending", nil), ui.statusLabel("trade", "pending"),
+        "a legacy row without a trade fact shows only its reconciliation state")
+    test.eq(ui.statusText("trade", "pending", false), ui.statusLabel("trade", "pending"),
+        "an unconfirmed grouped row shows only its reconciliation state")
+    test.eq(ui.statusText("mail", "sent", true), ui.statusLabel("mail", "sent"),
+        "mail rows never gain a trade fact")
+
+    -- narrow-column text: the two dimensions stay two short, distinct labels
+    -- rather than one ambiguous word, so they survive a compact status column.
+    test.eq(dual ~= ui.statusLabel("trade", "pending"), true,
+        "the combined label is distinct from the bare reconciliation label")
+
+    -- explicit 0 and two-way gold are never collapsed or netted
+    test.eq(ui.goldText({ theirGold = 0, myGold = 0 }), "收到 0 / 寄出 0",
+        "two-way gold renders both directions even when both sides are zero")
+    test.eq(ui.goldText({ theirGold = 200, myGold = 50 }), "收到 200 / 寄出 50",
+        "two-way gold keeps both amounts and is never netted")
+    test.eq(ui.goldText({ theirGold = 100 }), "收到 100",
+        "an unknown side is omitted instead of invented")
+
+    -- every delivered item in a grouped row is reachable from the tooltip, not
+    -- only the first.
+    local entries = ui.itemEntries(grouped)
+    test.eq(#entries, 3, "a grouped row exposes every delivered item")
+    test.eq(entries[1].itemId, 11, "the first outgoing item is listed first")
+    test.eq(entries[1].direction, "outgoing", "outgoing items keep their direction")
+    test.eq(entries[3].itemId, 33, "incoming items follow outgoing items")
+    test.eq(entries[3].direction, "incoming", "incoming items keep their direction")
+    local legacyEntries = ui.itemEntries({ itemId = 44, quantity = 1 })
+    test.eq(#legacyEntries, 1, "a legacy row contributes its single item")
+    test.eq(legacyEntries[1].itemId, 44, "a legacy row names its item")
+    test.eq(legacyEntries[1].direction, nil, "a legacy row has no direction")
+    local lines = ui.itemTooltipLines(grouped)
+    test.eq(#lines, 3, "the item tooltip has one line per delivered item")
+    test.eq(lines[1]:find("寄出", 1, true) ~= nil, true, "outgoing lines are prefixed")
+    test.eq(lines[1]:find("item:11", 1, true) ~= nil, true, "the first item id is named")
+    test.eq(lines[3]:find("收到", 1, true) ~= nil, true, "incoming lines are prefixed")
+    test.eq(lines[3]:find("item:33", 1, true) ~= nil, true, "the last item id is named")
+
+    -- the status tooltip explains each dimension, then the toggle hint
+    local statusLines = ui.statusTooltipLines("trade", "pending", true)
+    test.eq(#statusLines, 3, "the trade status tooltip explains both dimensions")
+    test.eq(statusLines[1].text:find("交易已完成", 1, true) ~= nil, true,
+        "the trade fact is explained first")
+    test.eq(statusLines[2].text:find("核对状态", 1, true) ~= nil, true,
+        "the reconciliation dimension is labelled")
+    test.eq(statusLines[2].text:find("待核对", 1, true) ~= nil, true,
+        "the reconciliation state is named")
+    test.eq(statusLines[3].text:find("左键切换待核对/已完成", 1, true) ~= nil, true,
+        "the toggle hint remains")
+    test.eq(#ui.statusTooltipLines("trade", "pending", nil), 2,
+        "a legacy row drops the trade-fact tooltip line")
 
     -- 6. filtering and reconciliation are explicit, local and reversible.
     test.eq(#ui.filterRows(rows, "all"), 1, "all filter keeps every row")
@@ -124,7 +203,8 @@ return function(test)
     -- 8. an expired settlement is purged before the table is shown
     life.beginSettlement(root, "raid-b", 2000)
     test.eq(trade.append(root, {
-        raidId = "raid-b", player = "丙", itemId = 22, amount = 300, time = 2100, status = "complete",
+        raidId = "raid-b", player = "丙", completed = true, status = "complete",
+        myGold = 0, theirGold = 300, myItems = { { itemId = 22, quantity = 1 } }, time = 2100,
     }), true, "second settlement trade stored")
     test.eq(ui.prepare(root, 2000 + 7 * 86400), true, "opening the page purges an expired settlement")
     test.eq(root.currentSettlement.raidId, nil, "expired settlement identity removed")
@@ -349,8 +429,8 @@ return function(test)
 
         checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
         checklistTrade.append(BG.BGNext.DB, {
-            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
-            time = nowValue, status = "pending",
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 100, myItems = { { itemId = 7001, quantity = 1 } }, time = nowValue,
         })
 
         local chunk = assert(loadfile("Core/BGNext/CurrentSettlementUI.lua"))
@@ -438,8 +518,8 @@ return function(test)
         BiaoGe.ICC.boss1.qiankuan1 = nil
         checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
         checklistTrade.append(BG.BGNext.DB, {
-            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
-            time = nowValue, status = "pending",
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 100, myItems = { { itemId = 7001, quantity = 1 } }, time = nowValue,
         })
         ui2.Refresh("trade")
         state = ui2.checklistState()
@@ -479,8 +559,8 @@ return function(test)
         -- 10i. clearing the active raid table invalidates the scope at once
         checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
         checklistTrade.append(BG.BGNext.DB, {
-            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
-            time = nowValue, status = "pending",
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 100, myItems = { { itemId = 7001, quantity = 1 } }, time = nowValue,
         })
         ui2.Refresh("checklist")
         test.eq(ui2.checklistState().report.status, "issues", "the re-established scope is checked")

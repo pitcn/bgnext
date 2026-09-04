@@ -10,6 +10,7 @@ return function(test)
     local main = readAll("Core/BiaoGe.lua")
     local database = readAll("Core/DB/DB.lua")
     local auction = readAll("Core/Module/Auction.lua")
+    local auctionLog = readAll("Core/Module/AuctionLog.lua")
     local auctionWA = readAll("Core/Module/AuctionWA.lua")
     local wishlistReminder = readAll("Core/BGNext/WishlistReminder.lua")
     local helpers = readAll("Core/function2.lua")
@@ -49,6 +50,12 @@ return function(test)
     test.eq(main:find("BG.CreateBossModel", 1, true), nil, "startup does not create decorative boss models")
     test.eq(options:find('local name = "model"', 1, true), nil, "boss model setting is removed")
     test.eq(options:find("显示BOSS模型", 1, true), nil, "boss model setting has no dead label")
+    test.eq(auctionLog:find("if db and db[index] and db[index].type == 2 then", 1, true) ~= nil, true,
+        "auction-log cleanup tolerates records disappearing during refresh")
+    test.eq(auctionLog:find("for index, v in ipairs(tbl or {}) do", 1, true) ~= nil, true,
+        "auction-log validation tolerates a missing log table")
+    test.eq(auctionLog:find("if not BiaoGe[FB].auctionLog then return end", 1, true) ~= nil, true,
+        "auction-log actions stop safely after the log is cleared")
     test.eq(database:find("BiaoGe.Hope", 1, true), nil, "legacy wishlist data is not initialized or migrated")
     test.eq(auction:find("BG.HopeFrame", 1, true), nil, "auction does not scan the removed legacy wishlist UI")
     test.eq(auction:find('WishlistReminder.notify("auction"', 1, true) ~= nil, true,

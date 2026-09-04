@@ -413,6 +413,12 @@ BG.Init(function()
             if BG.BGNext and BG.BGNext.CurrentSettlementUI then
                 BG.BGNext.CurrentSettlementUI.installEntry(BG.MainFrame)
             end
+            -- Queue runtime registers earlier than the footer entries above.
+            -- Ask it to re-anchor now so role overview remains the far-right
+            -- button and every other entry forms one non-overlapping chain.
+            if BG.BGNext and BG.BGNext.AuctionQueueRuntime then
+                BG.BGNext.AuctionQueueRuntime.installEntry(BG.MainFrame)
+            end
         end)
 
         if BG.DuiZhangUI then securecall(BG.DuiZhangUI) end
@@ -1212,7 +1218,7 @@ BG.Init(function()
             if IsAltKeyDown() then
                 local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
                 if action == "auction" then
-                    BG.StartAuction(link, nil, nil, nil, button == "RightButton")
+                    BG.StartAuction(link, nil, nil, nil, button == "RightButton", nil, nil, { source = "chat" })
                 elseif action == "wishlist" and BG.ToggleCurrentWish then
                     BG.ToggleCurrentWish(link)
                 end

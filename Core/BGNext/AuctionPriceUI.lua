@@ -19,16 +19,34 @@ M.ROW_CAPACITY = M.COLUMN_COUNT * M.MAX_ROWS_PER_COLUMN
 M.DECORATIVE_REGION_COUNT = 1
 M.ITEM_FONT_SIZE = 13
 M.PRICE_FONT_SIZE = 13
+-- Vertical space reserved at the bottom of the main frame for the fixed
+-- bottom-right entries (角色总览, 交易记录, 邮件记录, 结算前检查) plus a small
+-- margin, so the item list never covers those buttons.
+M.BOTTOM_RESERVE = 34
 
--- Computes the reusable viewport once from the existing main-frame size. The
--- fixed deductions cover the left margin, 230px Boss picker, inter-panel gap,
--- slim slider/right margin, and the controls above/below the item rows.
-function M.viewportLayout(width, height)
+-- Height of the fixed controls above the item rows (raid bar, mode bar,
+-- description, toolbar, boss picker, filter bar and their gaps). Combined with
+-- BOTTOM_RESERVE it separates the reusable list from the frame's fixed chrome.
+M.TOP_CHROME = 190
+
+-- Available vertical space for the item list: the main frame height minus the
+-- fixed controls above and the fixed bottom entries below.
+function M.contentHeight(mainHeight)
+    mainHeight = math.max(tonumber(mainHeight) or 0, 0)
+    return math.max(mainHeight - M.TOP_CHROME - M.BOTTOM_RESERVE, 0)
+end
+
+-- Computes the reusable viewport from the content area. The left margin, 230px
+-- Boss picker, inter-panel gap and slim slider/right margin are fixed
+-- deductions; the row count derives from the actual content height, so a
+-- shorter main frame or a taller locale/tooltip line yields fewer rows instead
+-- of overflowing the bottom of the frame.
+function M.viewportLayout(width, contentHeight)
     width = math.max(tonumber(width) or 0, 0)
-    height = math.max(tonumber(height) or 0, 0)
+    contentHeight = math.max(tonumber(contentHeight) or 0, 0)
     local availableWidth = math.max(width - 292, 652)
     local columnWidth = math.max(math.floor((availableWidth - 12) / M.COLUMN_COUNT), 320)
-    local rows = math.floor((height - 190) / M.ROW_HEIGHT)
+    local rows = math.floor(contentHeight / M.ROW_HEIGHT)
     if rows < M.MIN_ROWS_PER_COLUMN then rows = M.MIN_ROWS_PER_COLUMN end
     if rows > M.MAX_ROWS_PER_COLUMN then rows = M.MAX_ROWS_PER_COLUMN end
     return {
@@ -229,6 +247,27 @@ function M.visibleWindow(items, offset, capacity)
     return visible, offset, maxOffset
 end
 
+-- Settles the visibility of a reusable row pool against a target capacity and
+-- returns how many rows are left visible. Rows beyond the capacity are hidden
+-- so a shrinking viewport never leaves stale rows interactive outside the
+-- scrolled region; rows that do not exist are not invented, so a caller that
+-- grows the capacity must create those rows first. The pool is expected to be
+-- dense from 1 upwards, but a nil slot is skipped safely.
+function M.poolShown(pool, capacity)
+    local rows = type(pool) == "table" and pool or {}
+    capacity = math.max(math.floor(tonumber(capacity) or 0), 0)
+    local shown = 0
+    for index, row in ipairs(rows) do
+        if index <= capacity then
+            if row and row.Show then row:Show() end
+            shown = shown + 1
+        else
+            if row and row.Hide then row:Hide() end
+        end
+    end
+    return shown
+end
+
 -- Ordered toolbar action keys for a mode. Leader keeps the full scheme toolbar;
 -- personal has a single set of prices and only import/export/clear.
 function M.toolbarActions(mode)
@@ -373,6 +412,7 @@ if runtimeReady() then
         local refreshRows, refreshRaidBar, refreshModeBar, refreshToolbar
         local refreshBossBar, refreshFilterBar, refreshAll
         local clearRow, cyclePreset
+        local createRow, wireRow
         local newScheme, copyScheme, renameScheme, deleteScheme, confirmClearPersonal
         local showExportPanel, showImportPanel, refreshImportPreview, exportText, applyImport
 
@@ -381,7 +421,7 @@ if runtimeReady() then
         main:SetAllPoints(BG.MainFrame)
         main:Hide()
         BG.PricePresetMainFrame = main
-        local layout = M.viewportLayout(BG.MainFrame:GetWidth(), BG.MainFrame:GetHeight())
+        local layout = M.viewportLayout(BG.MainFrame:GetWidth(), M.contentHeight(BG.MainFrame:GetHeight()))
         local pageCapacity = layout.capacity
 
         main.raidBar = CreateFrame("Frame", nil, main)
@@ -404,7 +444,8 @@ if runtimeReady() then
 
         main.bossScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")
         main.bossScroll:SetPoint("TOPLEFT", main.toolbar, "BOTTOMLEFT", 0, -8)
-        main.bossScroll:SetSize(230, layout.itemHeight + 32)
+        main.bossScroll:SetPoint("BOTTOMLEFT", main, "BOTTOMLEFT", 0, M.BOTTOM_RESERVE)
+        main.bossScroll:SetWidth(230)
         Style.applySurface(main.bossScroll, "surface", 0.44)
 
         main.filterBar = CreateFrame("Frame", nil, main)
@@ -413,10 +454,8 @@ if runtimeReady() then
 
         main.itemScroll = CreateFrame("Frame", nil, main, "BackdropTemplate")
         main.itemScroll:SetPoint("TOPLEFT", main.filterBar, "BOTTOMLEFT", 0, -8)
-        main.itemScroll:SetSize(
-            layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1),
-            layout.itemHeight
-        )
+        main.itemScroll:SetPoint("BOTTOMLEFT", main, "BOTTOMLEFT", 0, M.BOTTOM_RESERVE)
+        main.itemScroll:SetWidth(layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1))
         main.itemScroll:EnableMouseWheel(true)
         Style.applySurface(main.itemScroll, "surface", 0.44)
 
@@ -448,20 +487,33 @@ if runtimeReady() then
         sliderThumb:SetSize(10, 28)
         sliderThumb:SetVertexColor(0.15, 0.75, 0.95, 0.9)
 
-        -- Reusable rows fill two columns and are calculated once when this page
-        -- is created. Even the largest layout is capped at sixty row objects.
-        main.rows = {}
-        for i = 1, pageCapacity do
+        -- Reusable rows fill two columns and are created once. Even the largest
+        -- layout is capped at sixty row objects; their position is (re)applied by
+        -- positionRows whenever the content area changes, so a resize never
+        -- leaves rows stranded outside the scrolled region.
+        local function positionRows()
+            for i = 1, pageCapacity do
+                local row = main.rows[i]
+                if not row then return end
+                local column = math.floor((i - 1) / layout.rowsPerColumn)
+                local rowInColumn = (i - 1) % layout.rowsPerColumn
+                row:ClearAllPoints()
+                row:SetPoint(
+                    "TOPLEFT",
+                    main.itemScroll,
+                    "TOPLEFT",
+                    column * (layout.columnWidth + layout.columnGap),
+                    -rowInColumn * layout.rowHeight
+                )
+                row:SetWidth(layout.columnWidth)
+            end
+        end
+
+        -- Creates one reusable row with its fixed child controls and the
+        -- mouse-wheel/tooltip scripts. Edit-box and clear-button scripts are
+        -- wired separately (below) because they close over the edit handlers.
+        createRow = function(i)
             local row = CreateFrame("Frame", nil, main.itemScroll)
-            local column = math.floor((i - 1) / layout.rowsPerColumn)
-            local rowInColumn = (i - 1) % layout.rowsPerColumn
-            row:SetPoint(
-                "TOPLEFT",
-                main.itemScroll,
-                "TOPLEFT",
-                column * (layout.columnWidth + layout.columnGap),
-                -rowInColumn * layout.rowHeight
-            )
             row:SetSize(layout.columnWidth, 22)
             row.index = i
             row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -506,8 +558,14 @@ if runtimeReady() then
             row:SetScript("OnLeave", function()
                 if GameTooltip then GameTooltip:Hide() end
             end)
-            main.rows[i] = row
+            return row
         end
+
+        main.rows = {}
+        for i = 1, pageCapacity do
+            main.rows[i] = createRow(i)
+        end
+        positionRows()
 
         -- Mode buttons.
         local leaderButton = BG.CreateButton(main.modeBar)
@@ -623,26 +681,45 @@ if runtimeReady() then
             return Store.getPersonalPrice(root, family, realmId, player, pageState.raidId, itemId) ~= nil
         end
 
+        -- The filtered catalog is cached and rebuilt only when a data input
+        -- changes (search, mode, raid, boss, scheme, or price data). Size and
+        -- geometry changes never rebuild it, so a resize animation performs
+        -- zero catalog scans; refreshRows and the stable commit only consume
+        -- this cached list.
+        local filteredCache = nil
+        local filterDirty = true
+
+        local function invalidateFilter()
+            filterDirty = true
+        end
+
         local function filteredItems()
+            if not filterDirty then return filteredCache end
             local model = models[pageState.raidId]
-            if not model then return {} end
-            local results = Catalog.filter(model, {
-                text = pageState.filters.text,
-                equipLoc = pageState.filters.equipLoc,
-                quality = pageState.filters.quality,
-                state = pageState.filters.state,
-                hasPrice = hasPriceFor,
-            })
-            local searching = pageState.filters.text and pageState.filters.text ~= ""
-            local bossId = pageState.bossId
-            if not searching and bossId and bossId ~= "all" then
-                local scoped = {}
-                for _, item in ipairs(results) do
-                    if item.groupId == bossId then scoped[#scoped + 1] = item end
+            local results
+            if not model then
+                results = {}
+            else
+                results = Catalog.filter(model, {
+                    text = pageState.filters.text,
+                    equipLoc = pageState.filters.equipLoc,
+                    quality = pageState.filters.quality,
+                    state = pageState.filters.state,
+                    hasPrice = hasPriceFor,
+                })
+                local searching = pageState.filters.text and pageState.filters.text ~= ""
+                local bossId = pageState.bossId
+                if not searching and bossId and bossId ~= "all" then
+                    local scoped = {}
+                    for _, item in ipairs(results) do
+                        if item.groupId == bossId then scoped[#scoped + 1] = item end
+                    end
+                    results = scoped
                 end
-                return scoped
             end
-            return results
+            filteredCache = results
+            filterDirty = false
+            return filteredCache
         end
 
         local function validateEdit(row)
@@ -731,6 +808,7 @@ if runtimeReady() then
             if index < 1 then index = #ids end
             local root, family = context(pageState.raidId)
             if Store.selectPreset(root, family, pageState.raidId, ids[index]) then
+                invalidateFilter()
                 refreshToolbar()
                 refreshRows()
             end
@@ -749,6 +827,7 @@ if runtimeReady() then
                     localMessage(L["无法创建方案。"] or "无法创建方案。")
                 else
                     Store.selectPreset(root, family, pageState.raidId, id)
+                    invalidateFilter()
                     refreshToolbar()
                     refreshRows()
                 end
@@ -766,6 +845,7 @@ if runtimeReady() then
             local id = Store.copyPreset(root, family, pageState.raidId, presetId, nil)
             if id then
                 Store.selectPreset(root, family, pageState.raidId, id)
+                invalidateFilter()
                 refreshToolbar()
                 refreshRows()
             else
@@ -810,6 +890,7 @@ if runtimeReady() then
                 end
                 if Store.setLeaderItemPrice(root, family, raidId, presetId, itemId, money) then
                     if pageState.raidId == raidId then
+                        invalidateFilter()
                         refreshToolbar()
                         refreshRows()
                     end
@@ -844,6 +925,7 @@ if runtimeReady() then
             dialog.text = L["确定删除当前方案？"] or "确定删除当前方案？"
             dialog.OnAccept = function()
                 if Store.deletePreset(root, family, pageState.raidId, presetId, fallback) then
+                    invalidateFilter()
                     refreshToolbar()
                     refreshRows()
                 end
@@ -865,6 +947,7 @@ if runtimeReady() then
             dialog.OnAccept = function()
                 local root, family, realmId, player = context(pageState.raidId)
                 Store.clearPersonalRaid(root, family, realmId, player, pageState.raidId)
+                invalidateFilter()
                 refreshToolbar()
                 refreshRows()
             end
@@ -881,7 +964,12 @@ if runtimeReady() then
             main.itemSlider:SetValue(offset)
             main.itemSlider._refreshing = nil
             main.itemSlider:SetShown(maxOffset > 0)
-            for i = 1, pageCapacity do
+            -- Hide any pool rows that now fall outside the capacity, then walk
+            -- the whole dense pool so a shrinking viewport cannot leave stale
+            -- rows visible or interactive. `items` is capped at pageCapacity,
+            -- so a pool row above it reads a nil item and is hidden here too.
+            M.poolShown(main.rows, pageCapacity)
+            for i = 1, #main.rows do
                 local row = main.rows[i]
                 local item = items[i]
                 if item then
@@ -945,6 +1033,7 @@ if runtimeReady() then
             else
                 Store.clearPersonalPrice(root, family, realmId, player, pageState.raidId, itemId)
             end
+            invalidateFilter()
             refreshRows()
             refreshToolbar()
         end
@@ -959,6 +1048,7 @@ if runtimeReady() then
                     bt = BG.CreateButton(main.raidBar)
                     bt:SetScript("OnClick", function(self)
                         M.selectRaid(pageState, self.raidId)
+                        invalidateFilter()
                         refreshAll()
                     end)
                     raidButtons[idx] = bt
@@ -1053,6 +1143,7 @@ if runtimeReady() then
                     bt = BG.CreateButton(main.bossScroll)
                     bt:SetScript("OnClick", function(self)
                         M.selectBoss(pageState, self.nodeId)
+                        invalidateFilter()
                         refreshBossBar()
                         refreshRows()
                     end)
@@ -1087,6 +1178,79 @@ if runtimeReady() then
             refreshBossBar()
             refreshFilterBar()
             refreshRows()
+        end
+
+        -- Applies the current content-area geometry to the reusable pool:
+        -- re-derives the viewport from the actual content area (the itemScroll
+        -- region between the filter bar and the fixed bottom reserve), repositions
+        -- the rows and hides any row beyond the new capacity. This is the cheap,
+        -- synchronous half of a resize and never touches the store, catalog, or
+        -- item info, so it is safe to run on every size event (at most sixty
+        -- rows). On shrink it keeps out-of-bounds rows non-interactive before the
+        -- debounced commit, so the fixed bottom entries stay clickable.
+        local function applyGeometry()
+            local contentHeight = main.itemScroll and main.itemScroll:GetHeight()
+            if type(contentHeight) ~= "number" or contentHeight <= 0 then return end
+            local w = BG.MainFrame and BG.MainFrame:GetWidth()
+            layout = M.viewportLayout(type(w) == "number" and w or layout.columnWidth, contentHeight)
+            pageCapacity = layout.capacity
+            main.itemScroll:SetWidth(layout.columnWidth * layout.columns + layout.columnGap * (layout.columns - 1))
+            -- A wider/taller content area can raise the capacity after the pool
+            -- was first built. Create and wire the missing rows before anyone
+            -- reads main.rows[i], so refreshRows and positionRows never touch a
+            -- nil slot (a shrink only hides rows, it never removes them).
+            for i = #main.rows + 1, pageCapacity do
+                main.rows[i] = createRow(i)
+                wireRow(main.rows[i])
+            end
+            positionRows()
+            M.poolShown(main.rows, pageCapacity)
+        end
+
+        -- The stable commit: applies the final geometry and populates the visible
+        -- rows from the cached filtered list. refreshRows reuses the cache, so
+        -- this never re-filters the catalog.
+        local function relayout()
+            applyGeometry()
+            refreshRows()
+        end
+
+        -- The main frame animates between table heights and a mode switch can
+        -- wrap the localized description (moving the item list), both of which
+        -- fire size changes every frame. Geometry safety is applied synchronously
+        -- by the OnSizeChanged handler (see applyGeometry), and only the stable
+        -- commit is deferred behind a single cancellable one-shot timer.
+        -- settlePending records the generation that owns the pending settle, so
+        -- at most one timer is alive per burst; the generation counter plus the
+        -- ownership check invalidates a stale callback after OnHide before it
+        -- can clear a newer generation's pending record.
+        -- Without C_Timer.After the page degrades to geometry-only handling and
+        -- never re-filters per event.
+        local RELAYOUT_DEBOUNCE = 0.05
+        local settleGeneration = 0
+        local settlePending = nil
+
+        local function cancelSettle()
+            settleGeneration = settleGeneration + 1
+            settlePending = nil
+        end
+
+        local function scheduleRelayout()
+            if settlePending ~= nil then return end
+            local gen = settleGeneration
+            settlePending = gen
+            if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+                C_Timer.After(RELAYOUT_DEBOUNCE, function()
+                    if gen ~= settleGeneration then return end
+                    settlePending = nil
+                    if main:IsShown() then relayout() end
+                end)
+            else
+                settlePending = nil
+                -- No timer API: the synchronous geometry already applied by the
+                -- size handler keeps the bottom region safe. Never fall back to
+                -- per-event catalog filtering.
+            end
         end
 
         -- ---- Import/export panels ----
@@ -1379,6 +1543,7 @@ if runtimeReady() then
                 if apply() then
                     localMessage(L["导入成功。"] or "导入成功。")
                     panel:Hide()
+                    invalidateFilter()
                     refreshAll()
                 else
                     localMessage(L["导入失败。"] or "导入失败。")
@@ -1429,11 +1594,15 @@ if runtimeReady() then
         -- ---- Wire scripts now that every function is defined ----
         leaderButton:SetScript("OnClick", function()
             M.setMode(pageState, "leader")
+            invalidateFilter()
             refreshAll()
+            scheduleRelayout()
         end)
         personalButton:SetScript("OnClick", function()
             M.setMode(pageState, "personal")
+            invalidateFilter()
             refreshAll()
+            scheduleRelayout()
         end)
         presetButton:SetScript("OnClick", function() cyclePreset(1) end)
         newButton:SetScript("OnClick", newScheme)
@@ -1455,6 +1624,7 @@ if runtimeReady() then
             if not presetId then return false end
             local root, family = context(pageState.raidId)
             if not Store.setBasePrice(root, family, pageState.raidId, presetId, money) then return false end
+            invalidateFilter()
             refreshToolbar()
             refreshRows()
             return true
@@ -1466,6 +1636,7 @@ if runtimeReady() then
         searchBox:SetScript("OnTextChanged", function(self)
             if self._refreshing then return end
             M.setFilter(pageState, "text", self:GetText())
+            invalidateFilter()
             refreshRows()
             refreshBossBar()
         end)
@@ -1474,11 +1645,13 @@ if runtimeReady() then
             if s == nil or s == "all" then M.setFilter(pageState, "state", "set")
             elseif s == "set" then M.setFilter(pageState, "state", "unset")
             else M.setFilter(pageState, "state", nil) end
+            invalidateFilter()
             refreshFilterBar()
             refreshRows()
         end)
         clearFiltersButton:SetScript("OnClick", function()
             M.clearFilters(pageState)
+            invalidateFilter()
             refreshFilterBar()
             refreshBossBar()
             refreshRows()
@@ -1494,8 +1667,10 @@ if runtimeReady() then
             main.itemSlider:SetValue(offset - (tonumber(delta) or 0) * 3)
         end)
 
-        for i = 1, pageCapacity do
-            local row = main.rows[i]
+        -- Wires the edit-box and clear-button scripts for one row. Kept as a
+        -- named function so relayout can wire rows it creates when the capacity
+        -- grows; the initial pool and any later growth share the same handlers.
+        wireRow = function(row)
             row.edit:SetScript("OnTextChanged", function(self)
                 if self:GetParent().edit._refreshing then return end
                 validateEdit(self:GetParent())
@@ -1503,6 +1678,7 @@ if runtimeReady() then
             row.edit:SetScript("OnEnterPressed", function(self)
                 local r = self:GetParent()
                 if validateEdit(r) and saveEdit(r) then
+                    invalidateFilter()
                     refreshToolbar()
                     local items = filteredItems()
                     local next = M.nextVisibleIndex(items, r.absoluteIndex)
@@ -1527,6 +1703,7 @@ if runtimeReady() then
                 end
                 local r = self:GetParent()
                 if validateEdit(r) and saveEdit(r) then
+                    invalidateFilter()
                     refreshToolbar()
                     refreshRows()
                 end
@@ -1538,17 +1715,40 @@ if runtimeReady() then
             row.clear:SetScript("OnClick", function(self) clearRow(self:GetParent()) end)
         end
 
+        for i = 1, #main.rows do
+            wireRow(main.rows[i])
+        end
+
         BG.Create_TabButton(M.tabNumber, L["价格预设"], main)
         main:SetScript("OnShow", function()
             -- This page owns a compact raid selector because changing raids
             -- also resets its local boss/search state. Hide the global ledger
             -- selector while the page is visible so the two bars never overlap.
             if BG.TabButtonsFB then BG.TabButtonsFB:Hide() end
+            cancelSettle()
+            -- A reopen refreshes the cache in case prices changed while hidden;
+            -- the layout then commits from the cached list without re-filtering.
+            invalidateFilter()
+            relayout()
             refreshAll()
         end)
         main:SetScript("OnHide", function()
+            -- Drop any pending debounced settle: a hidden page must never
+            -- re-filter the catalog, even if a size change was still coalescing.
+            cancelSettle()
             if BG.TabButtonsFB then BG.TabButtonsFB:Show() end
         end)
+        -- The main frame animates between table heights and responds to UI scale
+        -- and locale-driven description height changes. Each size event applies
+        -- geometry synchronously (hiding/reflowing out-of-bounds rows at once so
+        -- the fixed bottom entries stay clickable) and defers only the stable
+        -- commit, so the catalog is never re-filtered during an animation burst.
+        main:SetScript("OnSizeChanged", function()
+            if not main:IsShown() then return end
+            applyGeometry()
+            scheduleRelayout()
+        end)
+        relayout()
         refreshAll()
     end)
 end

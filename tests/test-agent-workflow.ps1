@@ -21,6 +21,11 @@ function Assert-True {
 
 $rules = Read-BGNRiskRules (Join-Path $repo 'tools\agent-risk-rules.json')
 
+$baselineVerifier = Get-Content -LiteralPath (Join-Path $repo 'tools\verify-baseline.ps1') -Raw
+Assert-True ($baselineVerifier.Contains('BGLite-2.4.1.sha256')) 'baseline verifier uses official BGLite 2.4.1 manifest'
+Assert-True ($baselineVerifier.Contains('31b4942e3251d8bba5c6e6be56fc427da2ae045f')) 'baseline verifier pins official BGLite 2.4.1 commit'
+Assert-True (Test-Path -LiteralPath (Join-Path $repo 'docs\baseline\BGLite-2.4.1-exclusions.txt')) 'baseline exclusions are explicit'
+
 Assert-True (Test-Path -LiteralPath $powerShellExe) 'PowerShell interpreter resolves to an existing executable'
 Assert-True (($powerShellExe -match 'pwsh\.exe$') -or ($powerShellExe -match 'powershell\.exe$')) 'resolves pwsh.exe or powershell.exe'
 

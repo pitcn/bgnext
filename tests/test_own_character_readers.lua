@@ -130,7 +130,7 @@ return function(test)
         retailCatalog.raidColumns, retailCatalog.resourceColumns).raidStates()
     test.eq(retailStates.DR.difficultyLabel, "M", "retail keeps the highest cleared difficulty")
     test.eq(retailStates.DR.difficulty, 16, "retail records the mythic difficulty ID")
-    test.eq(retailStates.DR.completed, true, "the mythic lockout completes the raid")
+    test.eq(retailStates.DR.completed, nil, "without a per-boss list the aggregate never claims completion")
 
     -- A retail lockout with an unknown difficulty ID stays numeric and unlabelled
     -- rather than guessing a letter.

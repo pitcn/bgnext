@@ -77,6 +77,14 @@ function M.fitTextWidth(region, value, maximumWidth)
     return measured
 end
 
+-- The difficulty abbreviation lives in the width remaining after the completion
+-- checkmark and its 2px inset, so a three-character "LFR" label fits without
+-- clipping or wrapping.
+function M.difficultyLabelWidth(columnWidth)
+    return math.max(0, (type(columnWidth) == "number" and columnWidth or 0)
+        - M.metrics.iconSize - 2)
+end
+
 M.textures = {
     complete = "Interface\\RaidFrame\\ReadyCheck-Ready",
     settings = "Interface\\GossipFrame\\BinderGossipIcon",
@@ -214,6 +222,64 @@ function M.showCurrencyTooltip(tooltip, cell, currencyInfo)
     local info = M.currencyTooltip(cell, currencyInfo)
     if not info or not tooltip or type(tooltip.SetText) ~= "function" then return false end
     tooltip:SetText(info.name or L["货币"])
+    if type(tooltip.AddLine) == "function" then
+        for _, line in ipairs(info.lines) do
+            tooltip:AddLine(line)
+        end
+    end
+    return true
+end
+
+-- Builds the localized tooltip lines for a raid cell that carries per-difficulty
+-- detail. Each line names its difficulty and shows only the real Blizzard count
+-- pair; a difficulty without a usable count is skipped rather than rendered as a
+-- fabricated 0/N. When a difficulty carries its own per-boss list, each boss is
+-- listed under that difficulty with its own killed flag. A cell without a
+-- breakdown surfaces nothing.
+function M.raidTooltip(cell)
+    if type(cell) ~= "table" then return nil end
+    local difficulties = type(cell.difficulties) == "table" and cell.difficulties or nil
+    local lines = {}
+    if difficulties then
+        for _, difficulty in ipairs(difficulties) do
+            local parts = type(difficulty.completedParts) == "number" and difficulty.completedParts or nil
+            local total = type(difficulty.totalParts) == "number" and difficulty.totalParts or nil
+            if total ~= nil then
+                local label = (type(difficulty.difficultyLabel) == "string" and difficulty.difficultyLabel ~= "")
+                    and difficulty.difficultyLabel or tostring(difficulty.difficulty or "")
+                if parts ~= nil then
+                    lines[#lines + 1] = label .. " " .. tostring(parts) .. "/" .. tostring(total)
+                else
+                    -- A degraded difficulty keeps its reliable total but no
+                    -- killed count, so the numerator renders as unknown rather
+                    -- than a fabricated kill count.
+                    lines[#lines + 1] = label .. " " .. L["未知"] .. "/" .. tostring(total)
+                end
+                local bosses = type(difficulty.encounters) == "table" and difficulty.encounters or nil
+                if bosses then
+                    for _, boss in ipairs(bosses) do
+                        if type(boss) == "table" then
+                            local name, killed = boss.name, boss.killed
+                            if type(name) == "string" and name ~= "" and type(killed) == "boolean" then
+                                lines[#lines + 1] = "    " .. name .. " " .. (killed and "✓" or "✗")
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if #lines == 0 then return nil end
+    return { lines = lines }
+end
+
+-- Populates a Blizzard tooltip with a raid cell's per-boss or per-difficulty
+-- detail. Returns false when there is nothing to show or the tooltip cannot
+-- take text.
+function M.showRaidTooltip(tooltip, cell)
+    local info = M.raidTooltip(cell)
+    if not info or not tooltip or type(tooltip.SetText) ~= "function" then return false end
+    tooltip:SetText(info.name or "")
     if type(tooltip.AddLine) == "function" then
         for _, line in ipairs(info.lines) do
             tooltip:AddLine(line)
@@ -469,8 +535,9 @@ end
 local function showValueTooltip(self)
     if not GameTooltip or type(GameTooltip.SetOwner) ~= "function" then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    if M.showCurrencyTooltip(GameTooltip, self.__cell)
-        and type(GameTooltip.Show) == "function" then
+    local shown = M.showRaidTooltip(GameTooltip, self.__cell)
+    if not shown then shown = M.showCurrencyTooltip(GameTooltip, self.__cell) end
+    if shown and type(GameTooltip.Show) == "function" then
         GameTooltip:Show()
     end
 end
@@ -699,10 +766,19 @@ function M.Draw(layout)
                         if cell.difficultyLabel then
                             local label = nextText()
                             label:SetPoint("LEFT", check, "RIGHT", 2, 0)
-                            label:SetSize(M.metrics.columnGap, M.metrics.iconSize)
+                            label:SetSize(M.difficultyLabelWidth(column.width), M.metrics.iconSize)
                             label:SetJustifyH("LEFT")
                             label:SetTextColor(M.colors.complete.r, M.colors.complete.g, M.colors.complete.b)
                             label:SetText(cell.difficultyLabel)
+                        end
+                        if cell.difficulties then
+                            local valueButton = nextValueButton()
+                            valueButton:SetPoint("CENTER", frame, "TOPLEFT",
+                                M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))
+                            valueButton:SetSize(column.width, M.metrics.rowHeight)
+                            valueButton.__cell = cell
+                            valueButton.__section = section.key
+                            valueButton.__row = row
                         end
                     elseif cell.state == "items" then
                         for slot, item in ipairs(cell.items) do
@@ -756,7 +832,7 @@ function M.Draw(layout)
                         -- A currency value with a confirmed id gets a hover
                         -- surface so its caps can surface as a tooltip without
                         -- crowding the cell body.
-                        if type(cell.currencyId) == "number" then
+                        if type(cell.currencyId) == "number" or cell.difficulties then
                             local valueButton = nextValueButton()
                             valueButton:SetPoint("CENTER", frame, "TOPLEFT",
                                 M.metrics.padding + column.x + column.width / 2, M.rowCenterY(row.y))

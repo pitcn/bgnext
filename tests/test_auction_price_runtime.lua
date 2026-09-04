@@ -17,6 +17,23 @@ return function(test)
     test.eq(runtime.resolveRaid("ULD", {}, nil), nil, "unrecognized raid is unresolved")
     test.eq(runtime.resolveRaid("ULD", { ULD = true, ICC = true }, "ICC"), nil, "cross-raid override blocks prefill")
 
+    -- resolveEntryRaid: the entry's explicit provenance wins over the catalog so
+    -- a cross-raid-duplicate item still resolves; unproven sources fall back to a
+    -- catalog-unique raid only.
+    local function uniqueRaid(itemId)
+        if itemId == 1001 then return nil end -- duplicated across raids
+        if itemId == 2001 then return "ULD" end
+        return nil
+    end
+    test.eq(runtime.resolveEntryRaid({ source = "table", raidId = "ULD" }, "ULD", { ULD = true, ICC = true }, 1001, uniqueRaid), "ULD", "explicit raid wins for a duplicate item")
+    test.eq(runtime.resolveEntryRaid({ source = "loot" }, "ULD", { ULD = true }, 1001, uniqueRaid), "ULD", "loot source proves the current raid")
+    test.eq(runtime.resolveEntryRaid({ source = "auctionlog" }, "ULD", { ULD = true }, 1001, uniqueRaid), "ULD", "auctionlog source proves the current raid")
+    local _, reason = runtime.resolveEntryRaid({ source = "backpack" }, "ULD", { ULD = true }, 1001, uniqueRaid)
+    test.eq(reason, "no-raid", "unproven duplicate source is refused, not guessed")
+    test.eq(runtime.resolveEntryRaid({ source = "backpack" }, "ULD", { ULD = true }, 2001, uniqueRaid), "ULD", "catalog-unique item still resolves")
+    test.eq(runtime.resolveEntryRaid({ source = "table", raidId = "NAXX" }, "ULD", { ULD = true }, 1001, uniqueRaid), nil, "inactive explicit raid is refused")
+    test.eq(runtime.resolveEntryRaid({ source = "table", raidId = "ICC" }, "ULD", { ULD = true }, 2001, uniqueRaid), nil, "explicit raid outside the active set is refused")
+
     -- choosePersonalPrefill: only a saved price at or above the current auction
     -- floor is allowed to fill the bid box.
     test.eq(runtime.choosePersonalPrefill(150, 100), 150, "saved price above floor prefills")
@@ -74,11 +91,13 @@ return function(test)
     test.eq(runtime.applyLeaderPrefill(leaderEdit, 500, false), true, "resolved price fills the auction editor")
     test.eq(leaderEdit.Edit2.text, "500", "leader editor receives the saved price")
     test.eq(leaderEdit.starts, 0, "ordinary open remains manual")
+    test.eq(leaderEdit.bt.money, nil, "ordinary open does not bind money")
 
     local leaderDirect = fakeLeaderFrame("1000")
     test.eq(runtime.applyLeaderPrefill(leaderDirect, 500, true), true, "direct start accepts a resolved price")
     test.eq(leaderDirect.Edit2.text, "500", "direct start writes the preset before starting")
-    test.eq(leaderDirect.starts, 1, "direct start invokes the existing start action once")
+    test.eq(leaderDirect.starts, 0, "direct start never clicks from the inner wrapper")
+    test.eq(leaderDirect.bt.money, 500, "direct start binds the approved amount to the send button")
 
     local unresolvedDirect = fakeLeaderFrame("1000")
     test.eq(runtime.applyLeaderPrefill(unresolvedDirect, nil, true), false, "unresolved price cannot direct start")
@@ -94,8 +113,10 @@ return function(test)
         "BG.StartAuction",
         "prefillLeaderFrame",
         "Edit2",
-        "resolveLeaderPrice",
-        "if price == nil then return",
+        "resolveLeaderApproval",
+        "bgnextDirectApproval",
+        "resolveEntryRaid",
+        "AuctionPreSend",
         "prefillPersonalFrame",
         "HookCreateAuction",
         "myMoneyEdit",

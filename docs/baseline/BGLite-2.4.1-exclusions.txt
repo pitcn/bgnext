@@ -1,0 +1,2 @@
+# NetEase DD package signature belongs to the official BGLite distribution and is not reused by BGNext.
+dd_author.toc

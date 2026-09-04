@@ -3,12 +3,13 @@
 ## Recorded upstream
 
 - Product: BGLite
-- Reported upstream version: 2.4.0
-- Snapshot date: 2026-08-26
+- Reported upstream version: 2.4.1
+- Snapshot date: 2026-09-03
 - File count: 188
-- Integrity manifest: `BGLite-2.4.0.sha256`
+- Integrity manifest: `BGLite-2.4.1.sha256`
+- Git baseline: `31b4942e3251d8bba5c6e6be56fc427da2ae045f`
 
-The manifest matches the independently downloaded BGLite 2.4.0 distribution snapshot supplied by the maintainer. It records provenance and byte identity; it does **not** certify that every upstream file or behavior satisfies BGNext policy.
+The manifest matches the official BGLite 2.4.1 Pure Edition downloaded through NetEase DD and supplied by the maintainer. It records provenance and byte identity; it does **not** certify that every upstream file or behavior satisfies BGNext policy. `dd_author.toc` is retained in the immutable upstream commit and manifest but explicitly excluded from the BGNext working tree and release because that package signature belongs to the official BGLite distribution.
 
 ## Safety interpretation
 

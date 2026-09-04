@@ -53,8 +53,9 @@ return function(test)
     test.eq(root.currentSettlement.raidId, "ICC@5000", "settlement established from the raid roster")
     local first = root.currentSettlement.trades[1]
     test.eq(first.player, "甲", "counterparty stored")
-    test.eq(first.itemId, 11, "item stored")
-    test.eq(first.amount, 100, "amount stored")
+    test.eq(first.myItems[1].itemId, 11, "delivered item stored")
+    test.eq(first.theirGold, 100, "received gold stored")
+    test.eq(first.completed, true, "trade-completed fact is explicit")
     test.eq(first.status, "complete", "completed trade stored as complete")
     test.eq(first.raidId, nil, "raidId is not copied into the record")
 
@@ -81,7 +82,10 @@ return function(test)
     }), 1, "item-only trade recorded for manual reconciliation")
     local pending = root.currentSettlement.trades[2]
     test.eq(pending.status, "pending", "item-only trade is pending, not complete")
-    test.eq(pending.amount, nil, "no amount is invented for an item-only trade")
+    test.eq(pending.myGold, 0, "my gold 0 stays an explicit 0")
+    test.eq(pending.theirGold, 0, "their gold 0 stays an explicit 0")
+    test.eq(pending.myItems[1].itemId, 44, "my delivered item stored")
+    test.eq(pending.theirItems[1].itemId, 33, "their delivered item stored")
 
     -- 6. a trade with neither items nor money is not an event at all
     test.eq(runtime.recordTrade(root, context(5400, 5000), {
@@ -96,9 +100,9 @@ return function(test)
         playeritems = { { itemId = 7001 } },
     })
     test.eq(#ambiguous, 1, "both-gold trade projects one pending row")
-    test.eq(ambiguous[1].itemId, 7001, "the delivered item is kept")
-    test.eq(ambiguous[1].amount, nil, "no amount is invented for a both-gold trade")
-    test.eq(ambiguous[1].direction, nil, "both-gold direction is not guessed")
+    test.eq(ambiguous[1].myItems[1].itemId, 7001, "the delivered item is kept")
+    test.eq(ambiguous[1].myGold, 50, "my gold is kept on its own side")
+    test.eq(ambiguous[1].theirGold, 100, "their gold is kept on its own side")
     test.eq(ambiguous[1].status, "pending", "both-gold trade stays pending")
     local ambiguousRoot = life.ensureRoot({})
     test.eq(runtime.recordTrade(ambiguousRoot, context(5450, 5000), {
@@ -106,8 +110,8 @@ return function(test)
         playeritems = { { itemId = 7001 } },
     }), 1, "both-gold trade is recorded as pending")
     local ambiguousRecord = ambiguousRoot.currentSettlement.trades[1]
-    test.eq(ambiguousRecord.direction, nil, "stored both-gold direction stays nil")
-    test.eq(ambiguousRecord.amount, nil, "stored both-gold amount stays nil")
+    test.eq(ambiguousRecord.myGold, 50, "stored my gold is preserved")
+    test.eq(ambiguousRecord.theirGold, 100, "stored their gold is preserved")
     test.eq(ambiguousRecord.status, "pending", "stored both-gold status is pending")
 
     -- 6c. quantity and barter ambiguity must not become a proven bill sale.
@@ -117,7 +121,7 @@ return function(test)
             playeritems = { { itemId = 7001, count = count or nil } },
         })
         test.eq(rows[1].status, "pending", "stacked or unknown quantity cannot prove a single sale")
-        test.eq(rows[1].amount, 100, "observed gold is retained for manual reconciliation")
+        test.eq(rows[1].theirGold, 100, "observed gold is retained for manual reconciliation")
     end
     local mixed = runtime.tradeRows({
         completed = true, target = "甲", targetmoney = 100,
@@ -299,4 +303,44 @@ return function(test)
         "leaving an instance cannot race a delayed team-boundary check")
     test.eq(source:find('BG.RegisterEvent("ENCOUNTER_START"', 1, true) ~= nil, true,
         "same-instance team boundary is checked before BGLite replaces the boss roster")
+
+    -- 14. two identical items delivered in one trade collapse into one
+    --     quantity-aware record instead of being deduplicated into a loss.
+    local dupRows = runtime.tradeRows({
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    })
+    test.eq(#dupRows, 1, "two identical items aggregate to one quantity-aware row")
+    test.eq(dupRows[1].myItems[1].itemId, 11, "aggregated row keeps the item id")
+    test.eq(dupRows[1].myItems[1].quantity, 2, "aggregated row preserves the delivered count")
+
+    local qtyRoot = life.ensureRoot({})
+    test.eq(runtime.recordTrade(qtyRoot, context(14000, 13900), {
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    }), 1, "two identical items in one trade write one quantity-aware record")
+    test.eq(#qtyRoot.currentSettlement.trades, 1, "the second identical item is not dropped")
+    test.eq(qtyRoot.currentSettlement.trades[1].myItems[1].quantity, 2, "the record preserves the delivered count")
+
+    -- A stack of two expresses the same count and is preserved too.
+    local stackRoot = life.ensureRoot({})
+    test.eq(runtime.recordTrade(stackRoot, context(14000, 13900), {
+        completed = true, target = "乙", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 22, count = 2 } },
+    }), 1, "a stack of two writes one record")
+    test.eq(stackRoot.currentSettlement.trades[1].myItems[1].quantity, 2, "the stack count is preserved")
+
+    -- A repeated completion event for the same two-item trade still writes nothing.
+    test.eq(runtime.recordTrade(qtyRoot, context(14000, 13900), {
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    }), 0, "a repeated completion event is still deduplicated")
+    test.eq(#qtyRoot.currentSettlement.trades, 1, "no second record from the repeated event")
+
+    -- Two distinct identical trades at different times are never merged.
+    test.eq(runtime.recordTrade(qtyRoot, context(14002, 13900), {
+        completed = true, target = "甲", targetmoney = 0, playermoney = 0,
+        playeritems = { { itemId = 11, count = 1 }, { itemId = 11, count = 1 } },
+    }), 1, "a distinct later trade is recorded")
+    test.eq(#qtyRoot.currentSettlement.trades, 2, "two distinct trades stay separate")
 end

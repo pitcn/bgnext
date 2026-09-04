@@ -5,11 +5,11 @@
 ## Author: 国服社区共创
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
-## X-Upstream: BGLite 2.4.0
-## X-BGNext-Version: 0.5.0
+## X-Upstream: BGLite 2.4.1
+## X-BGNext-Version: 0.6.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
-## Version: 2.4.0
+## Version: 2.4.1
 
 Locales\zhCN.lua
 Locales\zhTW.lua
@@ -26,6 +26,7 @@ Core\BGNext\ChatYYCopy.lua
 Core\BGNext\Identity.lua
 Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
+Core\BGNext\AutoClearGuard.lua
 Core\BGNext\AuctionPriceStore.lua
 Core\BGNext\AuctionPriceCatalog.lua
 Core\BGNext\AuctionPriceCodec.lua
@@ -34,7 +35,9 @@ Core\BGNext\CurrentTrade.lua
 Core\BGNext\CurrentMail.lua
 Core\BGNext\CurrentSettlementView.lua
 Core\BGNext\CurrentSettlementChecklist.lua
+Core\BGNext\TradeCapture.lua
 Core\BGNext\CurrentSettlementRuntime.lua
+Core\BGNext\TradeAnnouncement.lua
 Core\BGNext\ReleaseInfo.lua
 Core\BGNext\Wishlist.lua
 Core\BGNext\WishlistReminder.lua
@@ -93,7 +96,10 @@ Core\Module\Auction.lua
 Core\Module\AuctionLog.lua
 Core\Module\AuctionWA.lua
 Core\Module\AuctionWAEvent.lua
+Core\BGNext\AuctionPreSend.lua
 Core\BGNext\AuctionPriceRuntime.lua
+Core\BGNext\AuctionQueue.lua
+Core\BGNext\AuctionQueueRuntime.lua
 Core\Module\Trade.lua
 Core\Module\SendMail.lua
 Core\Module\QuickAccounting.lua

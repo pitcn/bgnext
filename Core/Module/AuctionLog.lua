@@ -315,7 +315,7 @@ BG.Init(function()
                         return a > b
                     end)
                     for _, index in ipairs(indexs) do
-                        if db[index].type == 2 then
+                        if db and db[index] and db[index].type == 2 then
                             tremove(db, index)
                         end
                     end
@@ -417,7 +417,7 @@ BG.Init(function()
                 local FB = BG.FB1
                 tbl = tbl or BiaoGe[FB].auctionLog
                 local items = {}
-                for index, v in ipairs(tbl) do
+                for index, v in ipairs(tbl or {}) do
                     if v.type == 1 then
                         local itemID = GetItemID(v.zhuangbei)
                         if not items[itemID] then
@@ -605,6 +605,7 @@ BG.Init(function()
             bt:SetScript("OnClick", function(self)
                 BG.PlaySound(2)
                 local FB = BG.FB1
+                if not BiaoGe[FB].auctionLog then return end
                 local duizhang = {}
                 duizhang.addons = "biaoge"
                 duizhang.FB = FB
@@ -961,6 +962,7 @@ BG.Init(function()
                 local FB = BG.FB1
                 if BG.auctionLogFrame.changeFrame.type == "change" then
                     local i = BG.auctionLogFrame.changeFrame.info.num
+                    if not BiaoGe[FB].auctionLog or not BiaoGe[FB].auctionLog[i] then return end
                     if not (BG.auctionLogFrame.changeFrame.info.maijia or BG.auctionLogFrame.changeFrame.info.jine) then
                         BiaoGe[FB].auctionLog[i].type = 2
                         BiaoGe[FB].auctionLog[i].maijia = nil
@@ -1246,6 +1248,7 @@ BG.Init(function()
                         notCheckable = true,
                         func = function()
                             BG.auctionLogFrame.changeFrame:Hide()
+                            if not BiaoGe[FB].auctionLog then return end
                             tremove(BiaoGe[FB].auctionLog, index)
                             BG.UpdateAuctionLogFrame(true, true)
                         end
@@ -1470,7 +1473,7 @@ BG.Init(function()
                     end
                     UpdateButtonStartAuction()
                 end
-                BG.StartAuction(link, f, true, nil, button == "RightButton", nil, (v.type == 1 or v.type == 2) and DeleteLiuPaiAuctionLog)
+                BG.StartAuction(link, f, true, nil, button == "RightButton", nil, (v.type == 1 or v.type == 2) and DeleteLiuPaiAuctionLog, { source = "auctionlog", raidId = BG.FB1 })
                 return
             end
             if IsCanChooseList() then

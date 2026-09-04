@@ -437,16 +437,58 @@ function M.readEquipment(api)
 end
 
 -- Verified retail difficulty IDs from BGLite's BG.diffIDTbl (Core/DB/DB.lua):
--- the modern client reports Normal/Heroic/Mythic as 14/15/16. Any other
--- difficulty ID stays numeric and renders without a letter, so a classic or
--- private-server lockout can never be mislabelled as Mythic.
-local DIFFICULTY_LABELS = { [14] = "N", [15] = "H", [16] = "M" }
+-- the modern client reports Raid Finder/Normal/Heroic/Mythic as 17/14/15/16.
+-- Any other difficulty ID stays numeric and renders without a letter, so a
+-- classic or private-server lockout can never be mislabelled as Mythic.
+local DIFFICULTY_LABELS = { [14] = "N", [15] = "H", [16] = "M", [17] = "LFR" }
 
 local function difficultyRank(label)
-    if label == "M" then return 3 end
-    if label == "H" then return 2 end
-    if label == "N" then return 1 end
+    if label == "M" then return 4 end
+    if label == "H" then return 3 end
+    if label == "N" then return 2 end
+    if label == "LFR" then return 1 end
     return 0
+end
+
+-- A saved-instance boss count is usable only as a whole number of at least one
+-- boss, and its kill count must be a whole number inside that total. The two
+-- values are validated together as one pair so a missing, protected or
+-- wrong-typed progress can never fabricate a "0/N" state.
+local function validEncounterPair(numEncounters, encounterProgress)
+    if type(numEncounters) ~= "number" or numEncounters < 1
+        or math.floor(numEncounters) ~= numEncounters then
+        return false
+    end
+    if type(encounterProgress) ~= "number" or encounterProgress < 0
+        or encounterProgress > numEncounters
+        or math.floor(encounterProgress) ~= encounterProgress then
+        return false
+    end
+    return true
+end
+
+-- Reads the real saved-instance per-boss status. GetSavedInstanceEncounterInfo
+-- returns (bossName, fileDataID, isKilled, unknown4) for a locked instance; only
+-- the localized name and the boss's own killed flag are kept, never the texture
+-- id or the unknown fourth return. The whole list is dropped (nil) when the API
+-- is missing or any boss tuple is abnormal, so a missing name or a non-boolean
+-- kill flag can never be fabricated into a boss state.
+local function readBossEncounters(api, instanceIndex, numEncounters)
+    local getEncounter = api and api.GetSavedInstanceEncounterInfo
+    if type(getEncounter) ~= "function" or type(instanceIndex) ~= "number"
+        or type(numEncounters) ~= "number" or numEncounters < 1 then
+        return nil
+    end
+    local bosses = {}
+    for encounterIndex = 1, numEncounters do
+        local ok, bossName, _, isKilled = callAll(getEncounter, instanceIndex, encounterIndex)
+        if not ok or type(isKilled) ~= "boolean"
+            or type(bossName) ~= "string" or bossName == "" then
+            return nil
+        end
+        bosses[#bosses + 1] = { name = bossName, killed = isKilled }
+    end
+    return bosses
 end
 
 -- Reads the saved-instance lockouts for the raids this family renders. Only
@@ -454,9 +496,20 @@ end
 -- no reset time still records progress/completion but not a countdown.
 --
 -- Retail raids are locked separately per difficulty, so a retail column keeps
--- the highest cleared difficulty (M > H > N) as one cell carrying a difficulty
--- letter. Every other family keeps the first matching lockout per instance, so
--- classic and private-server behaviour is unchanged.
+-- one cell whose flat fields (difficulty, completedParts, totalParts, completed)
+-- describe the highest difficulty carrying progress (M > H > N > LFR), and whose
+-- `difficulties` array carries every difficulty's own killed/total boss count and
+-- reset timestamp so no two difficulties ever merge or share an expiry. A retail
+-- difficulty is published only when its numEncounters and encounterProgress form
+-- one valid pair, so a missing, protected or out-of-range progress leaves the
+-- difficulty absent instead of a fabricated 0/N. Each retail difficulty also
+-- carries its own `encounters` array of {name, killed} records read from the real
+-- GetSavedInstanceEncounterInfo API; the whole list fails closed to nil when the
+-- API is missing or any boss tuple is abnormal, so per-boss completion is never
+-- reconstructed from the aggregate kill count or the encounter-journal ordering.
+-- Every other family keeps the first
+-- matching lockout per instance, so classic and private-server behaviour is
+-- unchanged.
 function M.readRaidStates(api, raidColumns, family)
     local getNum = api and api.GetNumSavedInstances
     local getInfo = api and api.GetSavedInstanceInfo
@@ -491,32 +544,56 @@ function M.readRaidStates(api, raidColumns, family)
         if ok and locked == true and isRaid == true and mapping then
             local label = type(difficulty) == "number" and DIFFICULTY_LABELS[difficulty] or nil
             if family == "retail" and label then
-                local rank = difficultyRank(label)
-                local ranked = byDifficulty[mapping.columnId]
-                if not ranked then
-                    ranked = {}
-                    byDifficulty[mapping.columnId] = ranked
-                end
-                local state = ranked[rank] or {
-                    progress = 0,
-                    total = 0,
-                    completedParts = 0,
-                    totalParts = mapping.totalParts,
-                    difficulty = type(difficulty) == "number" and difficulty or nil,
-                    difficultyLabel = label,
-                }
-                if type(numEncounters) == "number" and type(encounterProgress) == "number" then
-                    state.total = state.total + numEncounters
-                    state.progress = state.progress + encounterProgress
-                    if numEncounters > 0 and encounterProgress >= numEncounters then
-                        state.completedParts = state.completedParts + 1
+                -- Publish a difficulty only when its boss total and kill count are
+                -- one valid pair; otherwise the difficulty is absent, never a
+                -- fabricated 0/N.
+                if validEncounterPair(numEncounters, encounterProgress) then
+                    local rank = difficultyRank(label)
+                    local ranked = byDifficulty[mapping.columnId]
+                    if not ranked then
+                        ranked = {}
+                        byDifficulty[mapping.columnId] = ranked
+                    end
+                    local state = ranked[rank]
+                    if not state then
+                        local encounters = readBossEncounters(api, index, numEncounters)
+                        -- Fail closed: the killed count exists only when the real
+                        -- per-boss list was read. Without it the aggregate farthest
+                        -- index is never exposed as a killed count, so a degraded
+                        -- difficulty keeps its reliable total but a blank numerator.
+                        local completedParts
+                        local completed
+                        if encounters then
+                            -- The real per-boss list is authoritative. Progress is
+                            -- the number of bosses whose own isKilled flag is true,
+                            -- never the farthest-reached encounter index.
+                            local killedCount = 0
+                            for _, boss in ipairs(encounters) do
+                                if boss.killed == true then killedCount = killedCount + 1 end
+                            end
+                            completedParts = killedCount
+                            if killedCount == numEncounters then completed = true end
+                        end
+                        state = {
+                            completedParts = completedParts,
+                            totalParts = numEncounters,
+                            difficulty = type(difficulty) == "number" and difficulty or nil,
+                            difficultyLabel = label,
+                            encounters = encounters,
+                            -- Only a reliable per-boss list can prove a full clear;
+                            -- the aggregate farthest index is never a killed count.
+                            completed = completed,
+                        }
+                        ranked[rank] = state
+                    end
+                    -- A retail lockout is reported once per difficulty; taking the
+                    -- max guards against any duplicate row without over-counting.
+                    if numEncounters > state.totalParts then state.totalParts = numEncounters end
+                    if type(reset) == "number" and reset >= 0 and type(nowValue) == "number" then
+                        local resetsAt = nowValue + reset
+                        if state.resetsAt == nil or resetsAt < state.resetsAt then state.resetsAt = resetsAt end
                     end
                 end
-                if type(reset) == "number" and reset >= 0 and type(nowValue) == "number" then
-                    local resetsAt = nowValue + reset
-                    if state.resetsAt == nil or resetsAt < state.resetsAt then state.resetsAt = resetsAt end
-                end
-                ranked[rank] = state
             elseif not seenInstances[instanceId] then
                 seenInstances[instanceId] = true
                 local state = states[mapping.columnId] or {
@@ -542,20 +619,63 @@ function M.readRaidStates(api, raidColumns, family)
         end
     end
 
-    -- Collapse each retail column to its highest cleared difficulty.
+    -- Collapse each retail column to its representative difficulty while keeping
+    -- every difficulty's own count in a sorted `difficulties` array. The
+    -- representative is the highest difficulty carrying progress; when none has
+    -- any kills yet it falls back to the highest difficulty so a fresh lockout
+    -- still renders as 0/N instead of disappearing. The column keeps the nearest
+    -- difficulty reset, so each difficulty still expires on its own timestamp.
     for columnId, ranked in pairs(byDifficulty) do
+        local difficulties = {}
         local best
         for _, entry in pairs(ranked) do
-            if not best or difficultyRank(entry.difficultyLabel) > difficultyRank(best.difficultyLabel) then
+            difficulties[#difficulties + 1] = entry
+            if not best then
                 best = entry
+            else
+                local entryProgress = type(entry.completedParts) == "number" and entry.completedParts > 0
+                local bestProgress = type(best.completedParts) == "number" and best.completedParts > 0
+                local entryRank = difficultyRank(entry.difficultyLabel)
+                local bestRank = difficultyRank(best.difficultyLabel)
+                if entryProgress and not bestProgress then
+                    best = entry
+                elseif entryProgress == bestProgress and entryRank > bestRank then
+                    best = entry
+                end
             end
         end
-        if best then states[columnId] = best end
+        table.sort(difficulties, function(a, b)
+            return difficultyRank(a.difficultyLabel) < difficultyRank(b.difficultyLabel)
+        end)
+        if best then
+            local resetsAt
+            for _, entry in ipairs(difficulties) do
+                if type(entry.resetsAt) == "number" and (resetsAt == nil or entry.resetsAt < resetsAt) then
+                    resetsAt = entry.resetsAt
+                end
+            end
+            states[columnId] = {
+                difficulty = best.difficulty,
+                difficultyLabel = best.difficultyLabel,
+                completedParts = best.completedParts,
+                totalParts = best.totalParts,
+                progress = best.completedParts,
+                total = best.totalParts,
+                resetsAt = resetsAt,
+                difficulties = difficulties,
+                completed = best.completed,
+            }
+        end
     end
 
     for _, state in pairs(states) do
-        if state.totalParts > 0 and state.completedParts == state.totalParts then
-            state.completed = true
+        -- Retail (per-difficulty) states already carry their representative's
+        -- reliable completion above; this flat aggregate is the classic family's
+        -- "every mapped instance cleared" check.
+        if type(state.difficulties) ~= "table" then
+            if state.totalParts > 0 and state.completedParts == state.totalParts then
+                state.completed = true
+            end
         end
     end
     if next(states) == nil then return nil end

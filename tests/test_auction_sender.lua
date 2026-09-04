@@ -143,7 +143,7 @@ return function(test)
         'C_ChatInfo.SendAddonMessage("BiaoGeAuction", text, "RAID")', 1, true) ~= nil, true,
         "outgoing auctions use the legacy-compatible prefix")
     test.eq(auctionModuleSource:find(
-        'GetTime(), itemID, money, duration, "normal", link', 1, true) ~= nil, true,
+        'auctionID, itemID, money, duration, "normal", link', 1, true) ~= nil, true,
         "outgoing auctions always use normal mode")
     test.eq(auctionModuleSource:find("BG.SendStartAuctionMsg(isGen2", 1, true), nil,
         "the direct start path does not select a protocol generation")
