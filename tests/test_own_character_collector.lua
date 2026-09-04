@@ -136,6 +136,9 @@ return function(test)
 
     local allowed = {}
     for _, event in ipairs(Collector.allowedEvents) do allowed[event] = true end
+    local registeredSet = {}
+    for _, event in ipairs(registered) do registeredSet[event] = true end
+    test.eq(registeredSet.CHAT_MSG_LOOT, nil, "non-MoP clients do not register the farm loot observer")
     local forbidden = {
         "CHAT_MSG_SAY", "CHAT_MSG_WHISPER", "CHAT_MSG_ADDON", "COMBAT_LOG_EVENT",
         "COMBAT_LOG_EVENT_UNFILTERED", "GROUP_ROSTER_UPDATE", "RAID_ROSTER_UPDATE",
@@ -182,4 +185,29 @@ return function(test)
         test.eq(dirty.items, true, "bag bursts dirty only the bag-item section")
         test.eq(dirty.equipment, nil, "a later bag burst does not retain old dirty sections")
     end
+
+    -- A reviewed local observation may opt one event into a scoped refresh.
+    -- Raw loot text is never forwarded to storage; the observer returns only
+    -- the section that became dirty.
+    local observedRegistered = {}
+    local observedFrame = { RegisterEvent = function(_, event) observedRegistered[event] = true end }
+    local observedHandler, observedTick, observedDirty
+    observedFrame.SetScript = function(_, _, fn) observedHandler = fn end
+    Collector.installEvents({
+        frame = observedFrame,
+        family = "mop",
+        after = function(_, fn) observedTick = fn end,
+        observeEvent = function(event, message)
+            if event == "CHAT_MSG_LOOT" and message == "self-farm-harvest" then
+                return { activities = true }
+            end
+        end,
+    }, function(sections) observedDirty = sections end)
+    test.eq(observedRegistered.CHAT_MSG_LOOT, true, "MoP registers the reviewed farm loot observer")
+    observedHandler(observedFrame, "CHAT_MSG_LOOT", "other-loot")
+    test.eq(observedTick, nil, "unaccepted loot schedules no character refresh")
+    observedHandler(observedFrame, "CHAT_MSG_LOOT", "self-farm-harvest")
+    test.eq(type(observedTick), "function", "an accepted farm observation schedules one refresh")
+    observedTick()
+    test.eq(observedDirty.activities, true, "farm observation dirties only activity state")
 end

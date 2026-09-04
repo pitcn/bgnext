@@ -5,9 +5,11 @@
 -- so there is no parameter through which another player's name or a unit token
 -- could be supplied.
 --
--- This module never inspects another player, never registers a chat, combat
--- log, group roster, trade, mail, inspect or target event, and never sends an
--- addon or chat message.
+-- This module never inspects another player, combat log, group roster, trade,
+-- mail, inspect or target data, and never sends an addon or chat message. Its
+-- sole chat-event exception is MoP CHAT_MSG_LOOT: a caller-supplied observer
+-- accepts only the current player's localized self-loot format and returns a
+-- section flag; raw text is discarded before collection or storage.
 
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}
@@ -33,6 +35,7 @@ M.allowedEvents = {
     "QUEST_TURNED_IN",
     "QUEST_LOG_UPDATE",
     "LFG_UPDATE_RANDOM_INFO",
+    "CHAT_MSG_LOOT",
 }
 
 local DEBOUNCE_SECONDS = 1
@@ -149,7 +152,8 @@ function M.installEvents(env, onSnapshot)
     for _, event in ipairs(M.allowedEvents) do allowed[event] = true end
 
     for _, event in ipairs(M.allowedEvents) do
-        if type(frame.RegisterEvent) == "function" then
+        local relevant = event ~= "CHAT_MSG_LOOT" or env.family == "mop"
+        if relevant and type(frame.RegisterEvent) == "function" then
             -- Blizzard's client families do not expose an identical event set.
             -- An unsupported allowlisted event must not abort the remaining
             -- registrations or the immediate own-character collection.
@@ -169,11 +173,17 @@ function M.installEvents(env, onSnapshot)
     end
 
     if type(frame.SetScript) == "function" then
-        frame:SetScript("OnEvent", function(_, event)
+        frame:SetScript("OnEvent", function(_, event, ...)
             if not allowed[event] then return end
+            local observedSections = safeCall(env.observeEvent, event, ...)
+            if EVENT_SECTIONS[event] == nil and type(observedSections) ~= "table" then return end
             for section in pairs(EVENT_SECTIONS[event] or {}) do
                 dirty[section] = true
             end
+            for section, changed in pairs(type(observedSections) == "table" and observedSections or {}) do
+                if changed == true then dirty[section] = true end
+            end
+            if next(dirty) == nil then return end
             if pending then return end
             pending = true
             if after then

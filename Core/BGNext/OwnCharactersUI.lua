@@ -540,7 +540,7 @@ local function showValueTooltip(self)
     if not shown and self.__cell and self.__cell.activity then
         GameTooltip:SetText(L["角色活动进度"])
         if self.__cell.reason == "farm-observation-required" then
-            GameTooltip:AddLine(L["当前客户端没有可靠方式判断四风农场是否已收完，暂显示未知。"], 1, 1, 1, true)
+            GameTooltip:AddLine(L["仅在当前角色于日歌农场实际收获作物后标记完成；未捕获到收获时显示未知。"], 1, 1, 1, true)
         elseif self.__cell.state == "unknown" then
             GameTooltip:AddLine(L["记录已过期或暂时无法读取，请登录该角色刷新。"], 1, 1, 1, true)
         else

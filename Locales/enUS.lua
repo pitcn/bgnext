@@ -3160,7 +3160,7 @@ do -- BGNext auction price presets
     L["未解锁"] = "Locked"
     L["不适用"] = "Not applicable"
     L["角色活动进度"] = "Character activity progress"
-    L["当前客户端没有可靠方式判断四风农场是否已收完，暂显示未知。"] = "The client has no reliable way to determine whether the Sunsong Ranch harvest is complete, so this remains unknown."
+    L["仅在当前角色于日歌农场实际收获作物后标记完成；未捕获到收获时显示未知。"] = "Marked complete only after this character actually harvests a crop at Sunsong Ranch; it remains unknown when no harvest was observed."
     L["记录已过期或暂时无法读取，请登录该角色刷新。"] = "This observation expired or is currently unavailable. Log into this character to refresh it."
     L["仅显示该角色最近一次登录时读取到的状态。"] = "Shows only the status last read while logged into this character."
     L["单件价"] = "Per-item"

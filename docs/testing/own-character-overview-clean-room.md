@@ -1,6 +1,6 @@
 # Own-character overview — clean-room verification
 
-This feature is a clean-room reimplementation of the BiaoGe-visible table workflow. It stores only last-seen snapshots of the locally logged-in player and renders the approved two-section horizontal table. It reads no other player, registers no chat/combat/inspect/addon-message event, and sends nothing.
+This feature is a clean-room reimplementation of the BiaoGe-visible table workflow. It stores only last-seen snapshots of the locally logged-in player and renders the approved two-section horizontal table. It reads no other player, combat, inspect or addon-message data and sends nothing. Its only chat-event input is MoP `CHAT_MSG_LOOT`, reduced immediately from a Blizzard-localized current-player self-loot line to a Sunsong Ranch daily completion flag; raw text and item details are never stored.
 
 ## Client-family compatibility status
 
@@ -26,7 +26,7 @@ Six unverified MoP candidate currencies/items (currency 3350/3407/3414/3416, ite
 - `tools/run-lua-tests.ps1` — all suites report `failed=0` (`passed=27` at last run).
 - `tools/verify-baseline.ps1` — 188-file upstream manifest intact, with explicit BGNext override hashes for only the files changed here.
 - `git diff --check` — no whitespace errors.
-- Privacy scan (`SendAddonMessage|SendChatMessage|C_ChatInfo|INSPECT_READY|COMBAT_LOG_EVENT|CHAT_MSG` across `Core/BGNext/OwnCharacters*.lua` and `Core/BGNext/RoleOverview*.lua`) — no matches.
+- Privacy scan: no `SendAddonMessage|SendChatMessage|C_ChatInfo|INSPECT_READY|COMBAT_LOG_EVENT` matches across `Core/BGNext/OwnCharacters*.lua` and `Core/BGNext/RoleOverview*.lua`; the only `CHAT_MSG` match must be the reviewed MoP self-loot observer and its tests.
 
 ## Items requiring in-game validation
 

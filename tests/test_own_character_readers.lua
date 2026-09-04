@@ -340,6 +340,35 @@ return function(test)
     test.eq(mopActivities.farmHarvest.status, "unknown", "farm harvest is explicit unknown")
     test.eq(mopActivities.farmHarvest.reason, "farm-observation-required", "farm unknown explains the evidence gap")
 
+    local farmLootApi = api({
+        GetSubZoneText = function() return "日歌农场" end,
+        LOOT_ITEM_SELF = "你获得了物品：%s。",
+        LOOT_ITEM_SELF_MULTIPLE = "你获得了物品：%sx%d。",
+        LOOT_ITEM_PUSHED_SELF = "你获得了物品：%s。",
+        LOOT_ITEM_PUSHED_SELF_MULTIPLE = "你获得了物品：%sx%d。",
+    })
+    local cabbage = "|cff1eff00|Hitem:74840::::::::90:::::|h[绿色卷心菜]|h|r"
+    test.eq(Adapters.isFarmHarvestLoot(farmLootApi, "mop", "你获得了物品：" .. cabbage .. "x5。"), true,
+        "the current character's crop loot at Sunsong Ranch is a harvest observation")
+    local multipleOnlyApi = api({
+        GetSubZoneText = function() return "日歌农场" end,
+        LOOT_ITEM_SELF = false,
+        LOOT_ITEM_PUSHED_SELF = false,
+        LOOT_ITEM_SELF_MULTIPLE = "你获得了物品：%sx%d。",
+        LOOT_ITEM_PUSHED_SELF_MULTIPLE = false,
+    })
+    test.eq(Adapters.isFarmHarvestLoot(multipleOnlyApi, "mop", "你获得了物品：" .. cabbage .. "x5。"), true,
+        "the localized multiple-loot format works without relying on the single-item fallback")
+    test.eq(Adapters.isFarmHarvestLoot(farmLootApi, "mop", "玩家甲获得了物品：" .. cabbage .. "x5。"), false,
+        "another player's loot never marks the current character's farm")
+    farmLootApi.GetSubZoneText = function() return "半山" end
+    test.eq(Adapters.isFarmHarvestLoot(farmLootApi, "mop", "你获得了物品：" .. cabbage .. "x5。"), false,
+        "crop loot outside Sunsong Ranch is not treated as a harvest")
+    farmLootApi.GetSubZoneText = function() return "日歌农场" end
+    local ordinaryItem = "|cff1eff00|Hitem:99999::::::::90:::::|h[普通物品]|h|r"
+    test.eq(Adapters.isFarmHarvestLoot(farmLootApi, "mop", "你获得了物品：" .. ordinaryItem .. "x5。"), false,
+        "unrelated self loot at the farm is ignored")
+
     local missingActivities = Adapters.readers("mop", api({
         GetNumRandomDungeons = false, GetLFGRandomDungeonInfo = false,
         GetLFGDungeonRewards = false, GetQuestResetTime = false,

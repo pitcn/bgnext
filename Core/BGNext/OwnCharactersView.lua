@@ -450,7 +450,15 @@ local function resourceCell(column, snapshot, now)
         local key = source.key or column.id
         local activities = type(snapshot.activityStates) == "table" and snapshot.activityStates or nil
         local entry = activities and activities[key] or nil
-        if type(entry) ~= "table" then return cell end
+        if type(entry) ~= "table" then
+            if source.detector == "farm-loot" then
+                cell.state = "unknown"
+                cell.text = "?"
+                cell.reason = "farm-observation-required"
+                cell.activity = true
+            end
+            return cell
+        end
         cell.observedAt = entry.observedAt
         cell.resetsAt = entry.resetsAt
         cell.reason = entry.reason

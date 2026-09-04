@@ -896,6 +896,61 @@ function M.readResources(api, family, resourceColumns, selection)
     return result
 end
 
+local MOP_FARM_SUBZONES = {
+    ["Sunsong Ranch"] = true,
+    ["日歌农场"] = true,
+    ["日歌農莊"] = true,
+}
+
+-- These are the ten ordinary Sunsong crops plus the seven special-plot
+-- harvest items. They are stable Blizzard item ids, not copied UI or source.
+local MOP_FARM_HARVEST_ITEMS = {
+    [74840] = true, [74841] = true, [74842] = true, [74843] = true, [74844] = true,
+    [74846] = true, [74847] = true, [74848] = true, [74849] = true, [74850] = true,
+    [72092] = true, [72093] = true, [72094] = true, [72096] = true, [72120] = true,
+    [72988] = true, [89112] = true,
+}
+
+local function globalStringPattern(template)
+    if type(template) ~= "string" or template == "" then return nil end
+    local stringMarker, numberMarker = string.char(1), string.char(2)
+    local pattern = string.gsub(template, "%%s", stringMarker)
+    pattern = string.gsub(pattern, "%%d", numberMarker)
+    pattern = string.gsub(pattern, "([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
+    pattern = string.gsub(pattern, stringMarker, "(.+)")
+    -- A function replacement is inserted literally by string.gsub, so the
+    -- Lua pattern needs one percent sign here (not the doubled form used in a
+    -- replacement string).
+    pattern = string.gsub(pattern, numberMarker, function() return "(%d+)" end)
+    return "^" .. pattern .. "$"
+end
+
+local function selfLootLink(api, message)
+    for _, key in ipairs({
+        "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_PUSHED_SELF_MULTIPLE",
+        "LOOT_ITEM_SELF", "LOOT_ITEM_PUSHED_SELF",
+    }) do
+        local pattern = globalStringPattern(api and api[key])
+        if pattern then
+            local link = string.match(message, pattern)
+            if type(link) == "string" then return link end
+        end
+    end
+    return nil
+end
+
+-- CHAT_MSG_LOOT contains nearby players' loot as well as the local player's.
+-- Accept only Blizzard's localized SELF formats, discard the message
+-- immediately, and retain no item, quantity, location or raw chat content.
+function M.isFarmHarvestLoot(api, family, message)
+    if family ~= "mop" or type(api) ~= "table" or type(message) ~= "string" then return false end
+    local subzone = M.safeCall(api.GetSubZoneText)
+    if not MOP_FARM_SUBZONES[subzone] then return false end
+    local link = selfLootLink(api, message)
+    local itemId = type(link) == "string" and tonumber(string.match(link, "|Hitem:(%d+):")) or nil
+    return type(itemId) == "number" and MOP_FARM_HARVEST_ITEMS[itemId] == true
+end
+
 local function activityColumns(resourceColumns)
     local columns = {}
     for _, column in ipairs(resourceColumns or {}) do
@@ -932,9 +987,9 @@ end
 
 -- Reads a deliberately small MoP-only activity catalog. World-boss completion
 -- uses BGLite's official quest ids, and the daily dungeon uses Blizzard's own
--- random-dungeon `doneToday` result. The farm has no verified public completion
--- API, so its selectable column reports unknown instead of guessing from login,
--- inventory changes, map position or elapsed time.
+-- random-dungeon `doneToday` result. The farm starts unknown and becomes
+-- complete only after the runtime observes the current player's localized
+-- self-loot line for a known crop at Sunsong Ranch.
 function M.readActivityStates(api, family, resourceColumns)
     if family ~= "mop" or type(api) ~= "table" then return nil end
     local columns = activityColumns(resourceColumns)
@@ -945,7 +1000,7 @@ function M.readActivityStates(api, family, resourceColumns)
     for _, column in ipairs(columns) do
         local source = column.source
         local key = source.key or column.id
-        if source.detector == "unavailable" then
+        if source.detector == "farm-loot" then
             states[key] = {
                 status = "unknown",
                 observedAt = type(nowValue) == "number" and nowValue or nil,
@@ -1089,7 +1144,14 @@ function M.canReadColumn(family, api, column)
     end
     if source.kind == "activity" then
         if family ~= "mop" then return false end
-        if source.detector == "unavailable" then return true end
+        if source.detector == "farm-loot" then
+            local hasSelfLootFormat = type(api.LOOT_ITEM_SELF) == "string"
+                or type(api.LOOT_ITEM_SELF_MULTIPLE) == "string"
+                or type(api.LOOT_ITEM_PUSHED_SELF) == "string"
+                or type(api.LOOT_ITEM_PUSHED_SELF_MULTIPLE) == "string"
+            return type(api.GetSubZoneText) == "function"
+                and type(api.GetQuestResetTime) == "function" and hasSelfLootFormat
+        end
         if source.detector == "quest-flag" then
             local questApi = api.C_QuestLog
             local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted
