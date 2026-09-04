@@ -14,7 +14,7 @@ BG.BGNext = BG.BGNext or {}
 -- dropped and never promoted into a buyer, amount or delivered state.
 local M = {}
 
-local frozen, committed, outcome, fullyAccepted
+local frozen, committed, outcome, fullyAccepted, playerAcceptedSeen, targetAcceptedSeen
 
 -- TRADE_ACCEPT_UPDATE supplies numeric 0/1 (WoW never sends Lua booleans), and
 -- 0 is truthy in Lua, so the handler must never test the raw event args with
@@ -188,6 +188,8 @@ function M.beginTrade()
     committed = nil
     outcome = nil
     fullyAccepted = nil
+    playerAcceptedSeen = nil
+    targetAcceptedSeen = nil
 end
 
 function M.onAcceptUpdate(playerAccepted, targetAccepted)
@@ -196,7 +198,13 @@ function M.onAcceptUpdate(playerAccepted, targetAccepted)
     if not (playerOk or targetOk) then
         return false
     end
-    if playerOk and targetOk then
+    if playerOk then playerAcceptedSeen = true end
+    if targetOk then targetAcceptedSeen = true end
+    -- Client families do not all report the final acceptance transition in one
+    -- (1,1) event. Treat two positive transitions within the same TRADE_SHOW
+    -- lifecycle as complete; beginTrade resets both flags, and a close without
+    -- both still discards the candidate.
+    if playerAcceptedSeen and targetAcceptedSeen then
         fullyAccepted = true
     end
     local snap = collectSnapshot()

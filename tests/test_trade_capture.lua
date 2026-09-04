@@ -256,7 +256,32 @@ return function(test)
     end
 
     -- =====================================================================
-    -- 5. Integration: item link/quantity temporarily empty at an early change
+    -- 5. Integration: clients may report the two acceptance changes in separate
+    --    events before closing the trade window. The explicit success result must
+    --    still commit the frozen trade exactly once.
+    -- =====================================================================
+    do
+        local BG, fire = newHarness()
+        local root = settle(BG, 22500, 22600, { "甲" })
+
+        fire("TRADE_SHOW")
+        BG.trade = {
+            target = "甲", targetmoney = 80, playermoney = 0, targetitems = {},
+            playeritems = { { itemId = 34, link = "item:34", count = 1 } },
+        }
+        fire("TRADE_ACCEPT_UPDATE", 1, 0)
+        fire("TRADE_ACCEPT_UPDATE", 0, 1)
+        fire("TRADE_CLOSED")
+        fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
+
+        test.eq(#root.currentSettlement.trades, 1,
+            "separate acceptance updates followed by success record the trade")
+        test.eq(root.currentSettlement.trades[1].myItems[1].itemId, 34,
+            "the separately accepted trade keeps its item")
+    end
+
+    -- =====================================================================
+    -- 6. Integration: item link/quantity temporarily empty at an early change
     --    event becomes available around confirm and is captured at accept.
     -- =====================================================================
     do
@@ -276,7 +301,7 @@ return function(test)
     end
 
     -- =====================================================================
-    -- 6. Integration: item-shape matrix (two identical, one stack, multiple
+    -- 7. Integration: item-shape matrix (two identical, one stack, multiple
     --    distinct, 0 gold, with gold) through the same event chain.
     -- =====================================================================
     do
@@ -351,7 +376,7 @@ return function(test)
     end
 
     -- =====================================================================
-    -- 7. Integration: fail-closed — cancel, no-confirm, and a target outside
+    -- 8. Integration: fail-closed — cancel, no-confirm, and a target outside
     --    the current raid write nothing and mark nothing.
     -- =====================================================================
     do
@@ -394,7 +419,7 @@ return function(test)
     end
 
     -- =====================================================================
-    -- 8. In-combat recording uses the same event chain; the capture module
+    -- 9. In-combat recording uses the same event chain; the capture module
     --    adds no polling, no timers, no protected actions and no messaging.
     -- =====================================================================
     do
@@ -422,7 +447,7 @@ return function(test)
     end
 
     -- =====================================================================
-    -- 9. Integration: the shared BG.trade is still empty/stale at accept
+    -- 10. Integration: the shared BG.trade is still empty/stale at accept
     --    (BGLite's deferred BG.After(0, BG.TradeUpdate) has not run), but the
     --    live trade API already returns the final items and money. The accept
     --    handler must read the API synchronously, not the stale table.
@@ -459,7 +484,7 @@ return function(test)
     end
 
     -- =====================================================================
-    -- 10. Integration: a cancelled trade (one side accepted, never both)
+    -- 11. Integration: a cancelled trade (one side accepted, never both)
     --     followed by a stale success message commits nothing.
     -- =====================================================================
     do
@@ -480,7 +505,7 @@ return function(test)
     end
 
     -- =====================================================================
-    -- 11. Integration: a late legitimate success (close arrives first) commits
+    -- 12. Integration: a late legitimate success (close arrives first) commits
     --     exactly once and is idempotent across duplicate success messages.
     -- =====================================================================
     do
