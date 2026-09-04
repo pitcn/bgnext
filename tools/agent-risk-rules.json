@@ -1,0 +1,40 @@
+{
+  "defaultRisk": "normal",
+  "lowPaths": [
+    "README.md",
+    "CHANGELOG.md",
+    "docs/**",
+    "Locales/**"
+  ],
+  "normalPaths": [
+    "tests/**",
+    "Core/**"
+  ],
+  "highPaths": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "SECURITY.md",
+    "BGLite.toc",
+    ".github/workflows/**",
+    "docs/adr/**",
+    "docs/policies/**",
+    "docs/security/**",
+    "docs/baseline/**",
+    "tools/build-release.ps1",
+    "Core/Module/Trade.lua",
+    "Core/Module/Auction.lua",
+    "Core/BGNext/CurrentTrade.lua",
+    "Core/BGNext/DataLifecycle.lua",
+    "Core/BGNext/AuctionSender.lua"
+  ],
+  "sensitiveDiffPatterns": [
+    "SavedVariables",
+    "schemaVersion",
+    "SendAddonMessage",
+    "SendChatMessage",
+    "C_ChatInfo.SendAddonMessage",
+    "currentSettlement",
+    "BG.trade",
+    "BG.SendStartAuctionMsg"
+  ]
+}
