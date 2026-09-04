@@ -1,12 +1,12 @@
 [CmdletBinding()]
 param(
-    [string]$ManifestPath = "docs/baseline/BGLite-2.4.1.sha256",
+    [string]$ManifestPath = "docs/baseline/BGLite-2.4.2.sha256",
     [string]$OverrideManifestPath = "docs/baseline/BGNext-overrides.sha256",
-    [string]$ExclusionPath = "docs/baseline/BGLite-2.4.1-exclusions.txt"
+    [string]$ExclusionPath = "docs/baseline/BGLite-2.4.2-exclusions.txt"
 )
 
 $ErrorActionPreference = "Stop"
-$baselineCommit = "31b4942e3251d8bba5c6e6be56fc427da2ae045f"
+$baselineCommit = "5649f58ac2d7d57d3906c97f0aa679bbe5b3da44"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $manifestFullPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $ManifestPath))
 $overrideManifestFullPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OverrideManifestPath))

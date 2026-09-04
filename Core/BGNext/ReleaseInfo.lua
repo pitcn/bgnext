@@ -29,7 +29,7 @@ local info = {
     },
     credits = {
         upstream = {
-            "CQZS (Lite) — BGLite 2.4.1 上游作者",
+            "CQZS (Lite) — BGLite 2.4.2 上游作者",
         },
         contributors = {
             "Yuke Huang (@pitcn) — BGNext 发起与社区维护",

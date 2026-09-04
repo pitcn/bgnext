@@ -3,17 +3,17 @@
 ## Recorded upstream
 
 - Product: BGLite
-- Reported upstream version: 2.4.1
-- Snapshot date: 2026-09-03
-- File count: 188
-- Integrity manifest: `BGLite-2.4.1.sha256`
-- Git baseline: `31b4942e3251d8bba5c6e6be56fc427da2ae045f`
+- Reported upstream version: 2.4.2
+- Snapshot date: 2026-09-04
+- File count: 186
+- Integrity manifest: `BGLite-2.4.2.sha256`
+- Git baseline: `5649f58ac2d7d57d3906c97f0aa679bbe5b3da44`
 
-The manifest matches the official BGLite 2.4.1 Pure Edition downloaded through NetEase DD and supplied by the maintainer. It records provenance and byte identity; it does **not** certify that every upstream file or behavior satisfies BGNext policy. `dd_author.toc` is retained in the immutable upstream commit and manifest but explicitly excluded from the BGNext working tree and release because that package signature belongs to the official BGLite distribution.
+The manifest matches the official BGLite 2.4.2 Pure Edition downloaded through NetEase DD and supplied by the maintainer. It records provenance and byte identity; it does **not** certify that every upstream file or behavior satisfies BGNext policy. `dd_author.toc` is retained in the immutable upstream commit and manifest but explicitly excluded from the BGNext working tree and release because that package signature belongs to the official BGLite distribution.
 
 ## Safety interpretation
 
-The distributed snapshot loads legacy trade and mail history modules by default and contains restoration notes referring to historical BiaoGe behavior. BGNext therefore treats it as the authorized development upstream, not as an already audited safety baseline.
+The distributed snapshot still loads legacy trade and mail history modules by default. BGLite 2.4.2 removes the separate generic History module and UI helper, but that does not change BGNext's current-settlement-only privacy boundary. BGNext therefore treats the snapshot as the authorized development upstream, not as an already audited safety baseline.
 
 BGNext establishes its safety baseline through reviewed overrides, automated tests, the override manifest, and the quarantine rules below. Public documentation must preserve this distinction.
 
@@ -23,7 +23,6 @@ The following upstream files are retained for provenance review but must not be 
 
 - `Core/Module/TradeHistory.lua`
 - `Core/Module/MailHistory.lua`
-- `Core/Module/History.lua`
 - `Core/Module/Receive.lua`
 - `Core/FBUI/ReceiveUIfunction.lua`
 

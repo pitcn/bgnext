@@ -5,11 +5,11 @@
 ## Author: 国服社区共创
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
-## X-Upstream: BGLite 2.4.1
+## X-Upstream: BGLite 2.4.2
 ## X-BGNext-Version: 0.6.0
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
-## Version: 2.4.1
+## Version: 2.4.2
 
 Locales\zhCN.lua
 Locales\zhTW.lua
