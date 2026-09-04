@@ -37,7 +37,14 @@ function M.buildText(kind, info)
             "项目地址：" .. info.repositoryUrl,
         }, "\n\n")
     elseif kind == "changelog" then
-        return info.projectName .. " " .. info.version .. " 更新内容\n\n" .. bulletList(info.changelog)
+        local releases = {
+            info.projectName .. " " .. info.version .. " 更新内容\n\n" .. bulletList(info.changelog),
+        }
+        for _, release in ipairs(info.history or {}) do
+            releases[#releases + 1] = info.projectName .. " " .. release.version .. "\n\n"
+                .. bulletList(release.changelog)
+        end
+        return table.concat(releases, "\n\n------------------------------\n\n")
     elseif kind == "credits" then
         return table.concat({
             "上游致谢",

@@ -11,6 +11,9 @@ return function(test)
         Hide = function() end,
     }
     UIParent = { GetHeight = function() return 768 end }
+    local secureHooks = {}
+    ChatEdit_InsertLink = function() return false end
+    hooksecurefunc = function(name, fn) secureHooks[name] = fn end
 
     -- Core queue must load first.
     local Queue = dofile("Core/BGNext/AuctionQueue.lua")
@@ -97,7 +100,9 @@ return function(test)
         function f:SetNumeric() end
         function f:SetMaxLetters() end
         function f:SetTextColor() end
-        function f:ClearFocus() end
+        function f:ClearFocus() self.focused = false end
+        function f:SetFocus() self.focused = true end
+        function f:HasFocus() return self.focused == true end
         function f:StartMoving() end
         function f:StopMovingOrSizing() end
         function f:CreateFontString()
@@ -479,6 +484,16 @@ return function(test)
     test.eq(frame.rows[1].shown, true, "the first row is bound and shown")
     test.eq(frame.rows[2].shown, false, "the second pooled row stays hidden")
     test.eq(type(frame.closeButton), "table", "the queue window exposes an obvious close button")
+    test.eq(type(secureHooks.ChatEdit_InsertLink), "function", "the queue installs a Shift-click item-link hook")
+    frame.input:SetFocus()
+    secureHooks.ChatEdit_InsertLink("|cff0070dd|Hitem:7001:0:0|h[Shift Item]|h|r")
+    test.eq(frame.input:GetText():find("item:7001", 1, true) ~= nil, true,
+        "Shift-click inserts the item link while the queue input has focus")
+    frame.input:ClearFocus()
+    secureHooks.ChatEdit_InsertLink("|cff0070dd|Hitem:7002:0:0|h[Ignored Item]|h|r")
+    test.eq(frame.input:GetText():find("item:7002", 1, true), nil,
+        "Shift-click does not capture links when the queue input is unfocused")
+    test.eq(type(frame.input.scripts.OnEnter), "function", "the queue input explains accepted item sources")
     frame.closeButton.scripts.OnClick(frame.closeButton)
     test.eq(frame.shown, false, "the close button hides the queue window")
     M.openFrame()

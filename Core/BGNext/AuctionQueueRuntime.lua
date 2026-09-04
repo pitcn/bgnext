@@ -26,7 +26,7 @@ local BOTTOM_PADDING = 44
 local EMPTY_HEIGHT = 170
 local TIMEOUT_SECONDS = 10
 
-local state = { queue = nil, frame = nil, pending = nil, gen = 0 }
+local state = { queue = nil, frame = nil, pending = nil, gen = 0, itemLinkHooked = false }
 
 -- Native WoW UI objects can be userdata while still exposing Frame methods and
 -- writable addon fields. Runtime gates therefore validate object capability,
@@ -176,6 +176,26 @@ function M.parseItemText(text)
     id = text:match("^(%d+)$")
     if id then return tonumber(id) end
     return nil
+end
+
+function M.captureFocusedItemLink(link)
+    local input = state.frame and state.frame.input
+    if not isFrameObject(input) or type(input.HasFocus) ~= "function" or not input:HasFocus() then
+        return false
+    end
+    if not M.parseItemText(link) or type(input.SetText) ~= "function" then return false end
+    input:SetText(link)
+    return true
+end
+
+local function installItemLinkHook()
+    if state.itemLinkHooked then return true end
+    if type(hooksecurefunc) ~= "function" or type(ChatEdit_InsertLink) ~= "function" then return false end
+    hooksecurefunc("ChatEdit_InsertLink", function(link)
+        M.captureFocusedItemLink(link)
+    end)
+    state.itemLinkHooked = true
+    return true
 end
 
 function M.addFromText(text, quantity)
@@ -740,6 +760,17 @@ function M.openFrame()
             M.addFromText(self:GetText())
             self:SetText("")
         end)
+        frame.input:SetScript("OnEnter", function(self)
+            if not GameTooltip then return end
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT", 0, 0)
+            GameTooltip:ClearLines()
+            GameTooltip:AddLine(L["点击输入框后 Shift+点击背包中的装备；也可粘贴物品链接或输入物品ID。"], 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        frame.input:SetScript("OnLeave", function()
+            if GameTooltip then GameTooltip:Hide() end
+        end)
+        installItemLinkHook()
 
         frame.addButton = BG.CreateButton(frame)
         frame.addButton:SetSize(76, 24)

@@ -122,7 +122,7 @@ return function(test)
         BG = { BGNext = {} }
         dofile("Core/BGNext/Identity.lua")
         local releaseInfo = assert(loadfile("Core/BGNext/ReleaseInfo.lua"))("BGNext", localized)
-        test.eq(releaseInfo.changelog[1], localized.L["新增团长待拍队列：逐件确认价格后开拍，不会自动连拍；离团、切表或重载即清空。"],
+        test.eq(releaseInfo.changelog[1], localized.L["新增基础模式、完整模式和自定义模式；可按功能组关闭增强功能，已保存数据不会被删除。"],
             "in-game release notes use the selected locale")
         BG = previousBG
     end
