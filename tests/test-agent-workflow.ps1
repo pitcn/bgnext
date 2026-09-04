@@ -66,16 +66,45 @@ $highHandoff = New-BGNHandoffText $highContext
 Assert-True ($highHandoff.Contains('high_risk_review:')) 'high handoff includes high review block'
 Assert-True ($highHandoff.Contains('security/privacy: unverified')) 'high handoff preserves manual uncertainty'
 
-$verifyScript = Join-Path $repo 'tools\agent-verify.ps1'
-$lowOutput = & pwsh -NoProfile -File $verifyScript -Risk low -Base origin/main -PlanOnly 2>&1
-$lowExit = $LASTEXITCODE
-Assert-True ($lowExit -ne 0) 'CLI refuses an explicit downgrade'
-Assert-True (($lowOutput -join "`n").Contains('below detected minimum')) 'downgrade explains the detected minimum'
+$sandboxParent = Join-Path ([System.IO.Path]::GetTempPath()) ("bgn-agent-workflow-" + [guid]::NewGuid().ToString('N'))
+$sandboxRepo = Join-Path $sandboxParent 'BGN'
+try {
+    New-Item -ItemType Directory -Force -Path (Join-Path $sandboxRepo 'tools') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repo 'tools\agent-verify.ps1') -Destination (Join-Path $sandboxRepo 'tools\agent-verify.ps1')
+    Copy-Item -LiteralPath (Join-Path $repo 'tools\AgentWorkflow.psm1') -Destination (Join-Path $sandboxRepo 'tools\AgentWorkflow.psm1')
+    Copy-Item -LiteralPath (Join-Path $repo 'tools\agent-risk-rules.json') -Destination (Join-Path $sandboxRepo 'tools\agent-risk-rules.json')
+    Push-Location $sandboxRepo
+    git init -q
+    git config user.email 'agent-workflow-test@example.invalid'
+    git config user.name 'Agent Workflow Test'
+    git remote add origin 'https://github.com/pitcn/bgnext.git'
+    Set-Content -LiteralPath 'README.md' -Value 'seed' -Encoding utf8
+    git add README.md
+    git commit -q -m 'seed'
+    New-Item -ItemType Directory -Force -Path 'Core\Module' | Out-Null
+    Set-Content -LiteralPath 'Core\Module\Trade.lua' -Value '-- high-risk fixture' -Encoding utf8
 
-$highOutput = & pwsh -NoProfile -File $verifyScript -Risk high -Base origin/main -PlanOnly 2>&1
-$highExit = $LASTEXITCODE
-Assert-Equal 0 $highExit 'CLI permits an explicit upgrade'
-Assert-True (($highOutput -join "`n").Contains('PLAN lua-tests,baseline,diff-check,high-review')) 'CLI prints a compact high-risk plan'
+    $verifyScript = Join-Path $sandboxRepo 'tools\agent-verify.ps1'
+    $lowOutput = & pwsh -NoProfile -File $verifyScript -Risk low -Base HEAD -PlanOnly 2>&1
+    $lowExit = $LASTEXITCODE
+    Assert-True ($lowExit -ne 0) 'CLI refuses an explicit downgrade'
+    Assert-True (($lowOutput -join "`n").Contains('below detected minimum')) 'downgrade explains the detected minimum'
+
+    $highOutput = & pwsh -NoProfile -File $verifyScript -Risk high -Base HEAD -PlanOnly 2>&1
+    $highExit = $LASTEXITCODE
+    Assert-Equal 0 $highExit 'CLI permits an explicit upgrade'
+    Assert-True (($highOutput -join "`n").Contains('PLAN lua-tests,baseline,diff-check,luac,high-review')) 'CLI prints a compact high-risk plan'
+} finally {
+    Pop-Location
+    if (Test-Path -LiteralPath $sandboxParent) {
+        $resolvedSandbox = (Resolve-Path -LiteralPath $sandboxParent).Path
+        $resolvedTemp = (Resolve-Path -LiteralPath ([System.IO.Path]::GetTempPath())).Path
+        if (-not $resolvedSandbox.StartsWith($resolvedTemp, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to remove test sandbox outside temp: $resolvedSandbox"
+        }
+        Remove-Item -LiteralPath $resolvedSandbox -Recurse -Force
+    }
+}
 
 $agentRules = Get-Content -LiteralPath (Join-Path $repo 'AGENTS.md') -Raw
 $claudeRules = Get-Content -LiteralPath (Join-Path $repo 'CLAUDE.md') -Raw
