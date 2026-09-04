@@ -20,6 +20,8 @@ M.REASON_PENDING_START = "pending-start"
 M.REASON_SCOPE_CHANGED = "scope-changed"
 M.REASON_PRICE_CHANGED = "price-changed"
 M.REASON_QUEUE_FULL = "queue-full"
+M.REASON_SCHEME_CHANGED = "scheme-changed"
+M.REASON_FAMILY_CHANGED = "family-changed"
 
 -- The maximum auction price matches the existing money input / protocol bound
 -- (AuctionSender.M.MAX_MONEY); the queue is capped at one row per pooled row.

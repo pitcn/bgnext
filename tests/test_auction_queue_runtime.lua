@@ -16,6 +16,10 @@ return function(test)
     local Queue = dofile("Core/BGNext/AuctionQueue.lua")
     BG.BGNext.AuctionQueue = Queue
 
+    -- The runtime now delegates its shared environment checks and the pre-send
+    -- gate to this module, so it must load before the runtime.
+    dofile("Core/BGNext/AuctionPreSend.lua")
+
     -- --- Fake frame factory -------------------------------------------------
 
     local function fakeRegion()
@@ -131,6 +135,13 @@ return function(test)
         if itemId == 1002 then return { price = 500, source = "base" } end
         return nil
     end
+    -- The approval resolver carries the producing preset id so the shared
+    -- pre-send gate can re-validate scheme identity at the actual send.
+    local defaultApproval = function(root, family, raidId, itemId)
+        if itemId == 1001 then return { price = 900, source = "override", activePresetId = "p1" } end
+        if itemId == 1002 then return { price = 500, source = "base", activePresetId = "p1" } end
+        return nil
+    end
     BiaoGe = { Auction = { money = 100, duration = 40, fastMoney = { 300, 500, 1000, 2000, 3000 } } }
     BG.SendStartAuctionMsg = function(itemID, money, duration, link)
         auctionIdSeq = auctionIdSeq + 1
@@ -210,7 +221,10 @@ return function(test)
     BG.raidLeader = "Alice"
     BG.IsWLK = true
     BG.BGNext.DB = {}
-    BG.BGNext.AuctionPriceStore = { resolveLeaderPriceDetail = defaultResolve }
+    BG.BGNext.AuctionPriceStore = {
+        resolveLeaderPriceDetail = defaultResolve,
+        resolveLeaderApproval = defaultApproval,
+    }
     InCombatLockdown = function() return false end
     IsInRaid = function() return true end
     SlashCmdList = {}
@@ -353,8 +367,8 @@ return function(test)
         },
         {
             name = "price-snapshot",
-            setup = function() BG.BGNext.AuctionPriceStore.resolveLeaderPriceDetail = function() return { price = 999, source = "override" } end end,
-            teardown = function() BG.BGNext.AuctionPriceStore.resolveLeaderPriceDetail = defaultResolve end,
+            setup = function() BG.BGNext.AuctionPriceStore.resolveLeaderApproval = function() return { price = 999, source = "override", activePresetId = "p1" } end end,
+            teardown = function() BG.BGNext.AuctionPriceStore.resolveLeaderApproval = defaultApproval end,
         },
         {
             name = "scope",

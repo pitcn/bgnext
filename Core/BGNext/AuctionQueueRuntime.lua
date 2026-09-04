@@ -16,22 +16,13 @@ local M = {}
 
 local Queue = assert(BG.BGNext.AuctionQueue, "AuctionQueue must load before AuctionQueueRuntime")
 local Store = BG.BGNext.AuctionPriceStore
+local PreSend = assert(BG.BGNext.AuctionPreSend, "AuctionPreSend must load before AuctionQueueRuntime")
 
 local MAX_ROWS = Queue.MAX_ITEMS
 local ROW_HEIGHT = 26
 local HEADER_HEIGHT = 48
 local BOTTOM_PADDING = 26
 local TIMEOUT_SECONDS = 10
-
-local FAMILY_ORDER = {
-    { flag = "IsRetail", family = "retail" },
-    { flag = "IsMOP", family = "mop" },
-    { flag = "IsCTM", family = "cata" },
-    { flag = "IsTitan", family = "titan" },
-    { flag = "IsWLK", family = "wrath" },
-    { flag = "IsTBC", family = "tbc" },
-    { flag = "IsVanilla", family = "vanilla" },
-}
 
 local state = { queue = nil, frame = nil, pending = nil, gen = 0 }
 
@@ -63,6 +54,8 @@ local REASON_TEXT = {
     [Queue.REASON_SCOPE_CHANGED] = L["团队或表格已变更"],
     [Queue.REASON_PRICE_CHANGED] = L["起拍价已变更，请重新确认"],
     [Queue.REASON_QUEUE_FULL] = L["待拍队列已满（最多40项）"],
+    [Queue.REASON_SCHEME_CHANGED] = L["起拍价方案已变更，请重新确认"],
+    [Queue.REASON_FAMILY_CHANGED] = L["客户端版本已变更，请重新确认"],
 }
 
 local SOURCE_TEXT = {
@@ -70,13 +63,6 @@ local SOURCE_TEXT = {
     [Queue.SOURCE_BASE] = L["基础价"],
     [Queue.SOURCE_MANUAL] = L["手动输入"],
 }
-
-local function clientFamily()
-    for _, entry in ipairs(FAMILY_ORDER) do
-        if BG[entry.flag] then return entry.family end
-    end
-    return nil
-end
 
 local function storageRoot()
     return BG.BGNext and BG.BGNext.DB
@@ -91,7 +77,7 @@ end
 -- { price, source } or nil. Read-only; it never writes back to the scheme.
 local function resolvePrice(itemId)
     local root = storageRoot()
-    local family = clientFamily()
+    local family = PreSend.clientFamily()
     local raidId = currentRaid()
     if type(root) ~= "table" or type(family) ~= "string" or raidId == nil or not Store then
         return nil
@@ -99,47 +85,8 @@ local function resolvePrice(itemId)
     return Store.resolveLeaderPriceDetail(root, family, raidId, itemId)
 end
 
--- A short, non-reversible digest of the current raid roster so the scope key
--- distinguishes two different raid sessions even when the same table remains
--- selected. The roster is read transiently and never copied or stored.
-local function hashString(s)
-    local hash = 5381
-    for i = 1, #s do
-        hash = (hash * 33 + string.byte(s, i)) % 2147483647
-    end
-    return hash
-end
-
-local function raidSessionToken()
-    if type(IsInRaid) == "function" and not IsInRaid(1) then return nil end
-    local names = {}
-    local count = 0
-    if type(GetNumGroupMembers) == "function" then
-        count = GetNumGroupMembers()
-    end
-    if type(GetRaidRosterInfo) == "function" and count > 0 then
-        for i = 1, count do
-            local name = GetRaidRosterInfo(i)
-            if type(name) == "string" and name ~= "" then names[#names + 1] = name end
-        end
-    elseif type(BG.raidRosterInfo) == "table" then
-        for _, entry in ipairs(BG.raidRosterInfo) do
-            if type(entry) == "table" and type(entry.name) == "string" then names[#names + 1] = entry.name end
-        end
-        count = #names
-    end
-    table.sort(names)
-    return tostring(count) .. ":" .. tostring(hashString(table.concat(names, "\1")))
-end
-
 function M.scopeKey()
-    local tableKey = BG.FB1
-    tableKey = type(tableKey) == "string" and tableKey ~= "" and tableKey or ""
-    local token = raidSessionToken()
-    if token == nil then
-        return tableKey ~= "" and tableKey or ""
-    end
-    return tableKey .. "|" .. token
+    return PreSend.scopeKey()
 end
 
 function M.ensureQueue()
@@ -154,23 +101,19 @@ function M.queue()
     return M.ensureQueue()
 end
 
+-- The single shared pre-send gate owns the authoritative answers to these
+-- environment questions, so the queue runtime never drifts from the preset
+-- direct-start path. Delegated, not re-implemented.
 function M.isController()
-    if BG.IsML == true then return true end
-    if type(BG.ImMLorLeader) == "function" then return BG.ImMLorLeader() end
-    return false
+    return PreSend.isController()
 end
 
 function M.inCombat()
-    return InCombatLockdown and InCombatLockdown()
+    return PreSend.inCombat()
 end
 
--- Busy when ANY live auction card exists; ended (lingering) cards do not block.
 function M.auctionInProgress()
-    if type(BGA) ~= "table" or type(BGA.Frames) ~= "table" then return false end
-    for _, frame in pairs(BGA.Frames) do
-        if type(frame) == "table" and not frame.IsEnd then return true end
-    end
-    return false
+    return PreSend.auctionInProgress()
 end
 
 function M.gateContext()
@@ -265,25 +208,36 @@ local function findRow(q, id)
     return nil
 end
 
--- Re-runs every gate against a freshly projected row at the actual Start click.
--- Returns nil when the send may proceed, or the blocking reason. `pending` is
--- the single in-flight confirm this button belongs to.
+-- Re-resolves one queued item for the shared pre-send gate. The active scheme is
+-- authoritative; a manual row (no scheme) falls back to its stored manual price.
+-- Returns { price, source, activePresetId } or nil.
+local function resolveApproval(q, id, itemId, raidId)
+    if Store and type(Store.resolveLeaderApproval) == "function" then
+        local root = storageRoot()
+        local family = PreSend.clientFamily()
+        local resolved = Store.resolveLeaderApproval(root, family, raidId, itemId)
+        if resolved ~= nil and type(resolved.price) == "number" then
+            return resolved
+        end
+    end
+    local row = findRow(q, id)
+    if type(row) == "table" and row.source == Queue.SOURCE_MANUAL and type(row.price) == "number" then
+        return { price = row.price, source = Queue.SOURCE_MANUAL }
+    end
+    return nil
+end
+
+-- Re-runs the single shared pre-send gate against the approval snapshot captured
+-- at confirm time. Returns nil when the send may proceed, or the blocking reason.
+-- `pending` is the single in-flight confirm this button belongs to.
 local function secondGate(pending)
     if type(pending) ~= "table" then return Queue.REASON_INVALID_ITEM end
     if state.pending ~= pending then return Queue.REASON_SCOPE_CHANGED end
     if pending.fired then return Queue.REASON_PENDING_START end
     local q = M.ensureQueue()
-    local row = findRow(q, pending.id)
-    local ctx = M.gateContext()
-    ctx.scopeChanged = Queue.scopeChanged(q, M.scopeKey())
-    local reason = Queue.gate(row, ctx)
-    if reason then return reason end
-    if type(pending.snapshot) == "table" and row then
-        if row.price ~= pending.snapshot.price or row.source ~= pending.snapshot.source then
-            return Queue.REASON_PRICE_CHANGED
-        end
-    end
-    return nil
+    return PreSend.gate(pending.approval, function(itemId, raidId)
+        return resolveApproval(q, pending.id, itemId, raidId)
+    end)
 end
 
 -- Arms the one-shot stale-pending timeout. A matching round-trip clears the
@@ -391,6 +345,51 @@ local function installSecondGate(frame, pending)
     end
 end
 
+-- Installs the shared pre-send gate for a preset Alt+right-click direct start.
+-- The Price wrapper already pre-filled the price box and recorded
+-- `frame.bgnextDirectApproval`; it must NOT click on its own, because the queue
+-- wrapper is the outermost layer and only here is the gate guaranteed to be
+-- armed before the reused OnClick runs. We arm the gate, then invoke the real
+-- Start_OnClick (the same closure every other entry path funnels through), so a
+-- direct start can never bypass BG.SendStartAuctionMsg or the pre-send checks.
+local function installDirectGate(frame)
+    if type(frame) ~= "table" or type(frame.bt) ~= "table" then return end
+    local approval = frame.bgnextDirectApproval
+    if type(approval) ~= "table" then return end
+
+    -- One item per direct start: force the legacy quantity box to 1 and lock it
+    -- so the reused handler runs its single-send path.
+    if type(frame.Edit3) == "table" then
+        if type(frame.Edit3.SetText) == "function" then frame.Edit3:SetText("1") end
+        if type(frame.Edit3.SetEnabled) == "function" then frame.Edit3:SetEnabled(false) end
+    end
+
+    frame.bt.onPreSend = function()
+        local reason = PreSend.gate(approval, function(itemId, raidId)
+            if Store and type(Store.resolveLeaderApproval) == "function" then
+                return Store.resolveLeaderApproval(storageRoot(), PreSend.clientFamily(), raidId, itemId)
+            end
+            return nil
+        end)
+        if reason then
+            local text = M.reasonText(reason)
+            if text and type(BG.SendSystemMessage) == "function" then
+                BG.SendSystemMessage(text)
+            end
+            return false
+        end
+        return true
+    end
+
+    frame.bgnextDirectApproval = nil
+    if type(frame.bt.GetScript) == "function" then
+        local click = frame.bt:GetScript("OnClick")
+        if type(click) == "function" then
+            click(frame.bt)
+        end
+    end
+end
+
 -- Opens the existing confirm dialog for the queued row. Returns true only when
 -- the dialog opened; the row is never removed here.
 function M.confirm(id)
@@ -409,11 +408,41 @@ function M.confirm(id)
     end
 
     local link = row.link or ("item:" .. row.itemId)
+    local family = PreSend.clientFamily()
+    local raidId = currentRaid()
+    local approvalItem
+    if Store and type(Store.resolveLeaderApproval) == "function" then
+        local resolved = Store.resolveLeaderApproval(storageRoot(), family, raidId, row.itemId)
+        if resolved ~= nil and type(resolved.price) == "number" then
+            approvalItem = {
+                itemId = row.itemId,
+                raidId = raidId,
+                price = resolved.price,
+                source = resolved.source,
+                activePresetId = resolved.activePresetId,
+            }
+        end
+    end
+    if approvalItem == nil then
+        -- No scheme produced a price: snapshot the manual row so the shared gate
+        -- can still re-validate its stored manual price at the actual send.
+        approvalItem = {
+            itemId = row.itemId,
+            raidId = raidId,
+            price = row.price,
+            source = row.source,
+        }
+    end
     state.gen = state.gen + 1
     local pending = {
         id = row.id,
         itemId = row.itemId,
         snapshot = { price = row.price, source = row.source },
+        approval = {
+            clientFamily = family,
+            scopeKey = M.scopeKey(),
+            items = { approvalItem },
+        },
         fired = false,
         gen = state.gen,
     }
@@ -776,8 +805,13 @@ BG.Init(function()
         BG.StartAuction = function(...)
             local previous = BG.StartAucitonFrame
             local result = originalStart(...)
-            if BG.StartAucitonFrame ~= previous and state.pending then
-                installSecondGate(BG.StartAucitonFrame, state.pending)
+            if BG.StartAucitonFrame ~= previous then
+                local frame = BG.StartAucitonFrame
+                if state.pending then
+                    installSecondGate(frame, state.pending)
+                elseif type(frame.bgnextDirectApproval) == "table" then
+                    installDirectGate(frame)
+                end
             end
             return result
         end

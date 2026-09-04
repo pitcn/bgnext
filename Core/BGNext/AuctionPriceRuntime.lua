@@ -91,23 +91,20 @@ function M.prefillPersonalText(frame, savedMoney, floor)
     return true
 end
 
--- Applies a resolved leader price to the existing auction editor. Direct start
--- deliberately reuses that frame's original OnClick handler, so every existing
--- permission, validation, sound, message and close path remains authoritative.
-function M.applyLeaderPrefill(frame, money, directStart)
+-- Applies a resolved leader price to the existing auction editor. When
+-- `bindMoney` is true it also pins the approved amount onto the start button so
+-- the reused OnClick sends exactly this price, never a stale global default left
+-- in BiaoGe.Auction.money. It never invokes the start handler: the outer queue
+-- wrapper arms the shared pre-send gate and clicks only after both wrappers have
+-- returned.
+function M.applyLeaderPrefill(frame, money, bindMoney)
     if type(frame) ~= "table" or type(money) ~= "number" then return false end
     if type(frame.Edit2) ~= "table" or type(frame.Edit2.SetText) ~= "function" then return false end
-    local start
-    if directStart then
-        if type(frame.bt) ~= "table" or type(frame.bt.GetScript) ~= "function" then return false end
-        start = frame.bt:GetScript("OnClick")
-        if type(start) ~= "function" then return false end
-        -- Bind the approved amount so the reused OnClick sends exactly this
-        -- price, never a stale global default left in BiaoGe.Auction.money.
+    if bindMoney then
+        if type(frame.bt) ~= "table" then return false end
         frame.bt.money = money
     end
     frame.Edit2:SetText(tostring(money))
-    if start then start(frame.bt) end
     return true
 end
 
@@ -118,21 +115,27 @@ local function runtimeReady()
         and BG.Init ~= nil
         and BG.BGNext.AuctionPriceStore ~= nil
         and BG.BGNext.AuctionPriceCatalog ~= nil
+        and BG.BGNext.AuctionPreSend ~= nil
 end
 
 if runtimeReady() then
     local Store = BG.BGNext.AuctionPriceStore
     local Catalog = BG.BGNext.AuctionPriceCatalog
+    local PreSend = BG.BGNext.AuctionPreSend
     local L = ns and ns.L or setmetatable({}, { __index = function(_, key) return tostring(key) end })
 
     -- Short local reasons shown only when a direct start is refused; the dialog
-    -- is always left open for the leader to confirm manually.
+    -- is always left open for the leader to confirm manually. The gate reasons
+    -- reuse the shared pre-send reason codes.
     local DIRECT_REASON_TEXT = {
-        permission = L["无权限发起拍卖"],
-        combat = L["战斗状态下无法发起拍卖"],
-        ["auction-busy"] = L["已有拍卖进行中"],
-        ["no-price"] = L["请手动输入起拍价"],
-        scope = L["团队或表格已变更"],
+        [PreSend.REASON_NO_PERMISSION] = L["无权限发起拍卖"],
+        [PreSend.REASON_COMBAT] = L["战斗状态下无法发起拍卖"],
+        [PreSend.REASON_AUCTION_BUSY] = L["已有拍卖进行中"],
+        [PreSend.REASON_PRICE_UNRESOLVED] = L["请手动输入起拍价"],
+        [PreSend.REASON_SCOPE_CHANGED] = L["团队或表格已变更"],
+        [PreSend.REASON_PRICE_CHANGED] = L["起拍价已变更，请重新确认"],
+        [PreSend.REASON_SCHEME_CHANGED] = L["起拍价方案已变更，请重新确认"],
+        [PreSend.REASON_FAMILY_CHANGED] = L["客户端版本已变更，请重新确认"],
         ["no-raid"] = L["无法确定该装备所属副本，已保留确认窗口。"],
     }
 
@@ -144,44 +147,10 @@ if runtimeReady() then
         end
     end
 
-    -- Mirrors the queue's authoritative pre-send gate so a direct start is
-    -- re-checked for permission, combat and an in-progress auction at the exact
-    -- send moment, inside the reused OnClick closure.
-    local function directGate()
-        local isController = BG.IsML == true
-            or (type(BG.ImMLorLeader) == "function" and BG.ImMLorLeader())
-        if not isController then return "permission" end
-        if InCombatLockdown and InCombatLockdown() then return "combat" end
-        if type(BGA) == "table" and type(BGA.Frames) == "table" then
-            for _, f in pairs(BGA.Frames) do
-                if type(f) == "table" and not f.IsEnd then return "auction-busy" end
-            end
-        end
-        return nil
-    end
-
-    -- Canonical client families, strongest flag first (see AuctionPriceUI).
-    local FAMILY_ORDER = {
-        { flag = "IsRetail", family = "retail" },
-        { flag = "IsMOP", family = "mop" },
-        { flag = "IsCTM", family = "cata" },
-        { flag = "IsTitan", family = "titan" },
-        { flag = "IsWLK", family = "wrath" },
-        { flag = "IsTBC", family = "tbc" },
-        { flag = "IsVanilla", family = "vanilla" },
-    }
-
-    local function clientFamily()
-        for _, entry in ipairs(FAMILY_ORDER) do
-            if BG[entry.flag] then return entry.family end
-        end
-        return nil
-    end
-
     local function contextProvider()
         return {
             root = BG.BGNext and BG.BGNext.DB,
-            clientFamily = clientFamily(),
+            clientFamily = PreSend.clientFamily(),
             realmId = BG.realmID,
             player = BG.playerName,
             raidId = BG.FB1,
@@ -209,9 +178,11 @@ if runtimeReady() then
     -- proven recognized raid and to one unanimous price. `options` carries the
     -- entry's explicit source/raid contract; a proven source wins over the
     -- catalog so a cross-raid-duplicate item still resolves. On an Alt+right
-    -- direct start the resolved price is written and the existing OnClick is
-    -- reused under the authoritative pre-send gate; any unresolved item keeps
-    -- the window open with a short local reason instead of guessing.
+    -- direct start the resolved price is written and an approval snapshot is
+    -- recorded on the frame; the outer queue wrapper then arms the shared
+    -- pre-send gate (reading that snapshot) and only then invokes the reused
+    -- OnClick. Any unresolved item keeps the window open with a short local
+    -- reason instead of guessing.
     local function prefillLeaderFrame(frame, context, directStart, options)
         if not frame then return end
         local items = frame.bt and frame.bt.items
@@ -233,6 +204,7 @@ if runtimeReady() then
         end
 
         local prices = {}
+        local approvals = {}
         local reason
         local complete = true
         for _, item in ipairs(items) do
@@ -243,17 +215,24 @@ if runtimeReady() then
             end
             local raid, blocked = M.resolveEntryRaid(options, raidId, activeRaids, itemId, resolveItemRaid)
             if not raid then
-                reason = blocked
+                reason = blocked == "scope" and PreSend.REASON_SCOPE_CHANGED or blocked
                 complete = false
                 break
             end
-            local price = Store.resolveLeaderPrice(root, family, raid, itemId)
-            if price == nil then
-                reason = "no-price"
+            local approval = Store.resolveLeaderApproval(root, family, raid, itemId)
+            if approval == nil or type(approval.price) ~= "number" then
+                reason = PreSend.REASON_PRICE_UNRESOLVED
                 complete = false
                 break
             end
-            prices[#prices + 1] = price
+            prices[#prices + 1] = approval.price
+            approvals[#approvals + 1] = {
+                itemId = itemId,
+                raidId = raid,
+                price = approval.price,
+                source = approval.source,
+                activePresetId = approval.activePresetId,
+            }
         end
 
         if not complete then
@@ -263,21 +242,21 @@ if runtimeReady() then
 
         local common = M.chooseLeaderPrefill(prices)
         if common == nil then
-            if directStart then showReason(reason or "no-price") end
+            if directStart then showReason(reason or PreSend.REASON_PRICE_UNRESOLVED) end
             return
         end
 
         if directStart then
-            if type(frame.bt) == "table" then
-                frame.bt.onPreSend = function()
-                    local blocked = directGate()
-                    if blocked then
-                        showReason(blocked)
-                        return false
-                    end
-                    return true
-                end
-            end
+            -- Record the approval snapshot but defer the click. The outer queue
+            -- wrapper reads `bgnextDirectApproval`, arms the shared pre-send gate
+            -- and only then invokes the reused OnClick, so every direct start is
+            -- re-checked (permission, combat, auction, family, scope, scheme and
+            -- price) before any send.
+            frame.bgnextDirectApproval = {
+                clientFamily = family,
+                scopeKey = PreSend.scopeKey(),
+                items = approvals,
+            }
             M.applyLeaderPrefill(frame, common, true)
         else
             M.applyLeaderPrefill(frame, common, false)

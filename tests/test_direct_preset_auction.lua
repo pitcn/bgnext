@@ -1,11 +1,16 @@
 return function(test)
-    -- Loads the real Core/Module/Auction.lua baseline override plus the real
-    -- AuctionPriceStore / AuctionPriceCatalog / AuctionPriceRuntime modules and
-    -- drives the actual BG.StartAuction entry with the new explicit options
-    -- contract. This proves the Alt+right-click direct-start behaviour end to end:
-    -- a leader price preset with an explicit (or provable) raid source enters the
-    -- existing auction chain directly at the resolved price, and every direct
-    -- start still passes the reused OnClick send closure and its onPreSend gate.
+    -- Integration test for the leader price-preset direct start. It loads the
+    -- REAL wrapper chain end to end:
+    --   baseline Core/Module/Auction.lua (defines BG.StartAuction)
+    --   Core/BGNext/AuctionPriceRuntime.lua (inner wrapper: prefills + snapshot)
+    --   Core/BGNext/AuctionQueueRuntime.lua (outer wrapper: arms the shared gate)
+    -- plus the shared Core/BGNext/AuctionPreSend.lua gate and the real WoW entry
+    -- callers. Firing the Init callbacks in registration order proves the wrapper
+    -- install order (queue outermost, price inner, baseline innermost) and that an
+    -- Alt+right-click direct start only clicks after the outer wrapper has armed
+    -- the gate. In addition to the hand-invoked BG.StartAuction scenarios, three
+    -- real callers are driven: the backpack container click hook, the auction-msg
+    -- chat hyperlink handler, and the table equipment-list mouse-down handler.
     local watchedGlobals = {
         "BG", "C_Timer", "C_ChatInfo", "C_AddOns", "C_FriendList", "C_Container",
         "CreateFont", "CreateFrame", "BIAOGE_TEXT_FONT", "GetRealmName",
@@ -20,6 +25,25 @@ return function(test)
         "UpdateFrame", "ClearAllFocus", "wipe", "unpack", "random", "YES", "NO",
         "InCombatLockdown",
     }
+    -- WoW stat/item globals that function2.lua reads at load time, plus the extra
+    -- globals the real chat and table callers need. These are saved and restored
+    -- so the shared interpreter never leaks them into later suites.
+    for _, name in ipairs({
+        "ITEM_SOCKET_BONUS", "ITEM_MOD_FERAL_ATTACK_POWER", "ITEM_LIMIT_CATEGORY_MULTIPLE",
+        "ITEM_MOD_STRENGTH_SHORT", "ITEM_MOD_AGILITY_SHORT", "ITEM_MOD_INTELLECT_SHORT",
+        "ITEM_MOD_SPIRIT_SHORT", "ITEM_MOD_MANA_REGENERATION", "STAT_CATEGORY_DEFENSE",
+        "STAT_PARRY", "STAT_DODGE", "ITEM_MOD_BLOCK_RATING_SHORT", "ITEM_MOD_BLOCK_VALUE_SHORT",
+        "ITEM_MOD_ATTACK_POWER_SHORT", "HIT_LCD", "ITEM_MOD_HIT_RATING_SHORT",
+        "STAT_CRITICAL_STRIKE", "ITEM_MOD_CRIT_RATING_SHORT", "STAT_HASTE",
+        "ITEM_MOD_HASTE_RATING_SHORT", "STAT_EXPERTISE", "ITEM_MOD_ARMOR_PENETRATION_RATING",
+        "ITEM_MOD_SPELL_POWER_SHORT", "ITEM_MOD_MASTERY_RATING_SHORT", "STAT_MASTERY",
+        "ITEM_MOD_VERSATILITY", "RESILIENCE",
+        "strsub", "GetServerTime", "GetItemInfoInstant", "GetRaidDifficultyID", "UnitClass",
+        "IsShiftKeyDown", "IsControlKeyDown", "SetCursor", "date", "GetClassColor",
+        "GetItemStats", "Item", "C_Item", "GetGameTime", "CreateColor",
+    }) do
+        watchedGlobals[#watchedGlobals + 1] = name
+    end
     local originalValues = {}
     for _, name in ipairs(watchedGlobals) do
         originalValues[name] = rawget(_G, name)
@@ -31,6 +55,7 @@ return function(test)
     local ok, err = pcall(function()
         local initCallbacks = {}
         local afters = {}
+        local hookedFuncs = {}
         local nowValue = 1000
         local nextAuctionID = 0
         local sends = {}
@@ -70,6 +95,7 @@ return function(test)
             function frame:SetWordWrap() end
             function frame:SetColorTexture() end
             function frame:SetTexture() end
+            function frame:SetGradient() end
             function frame:SetTexCoord() end
             function frame:SetVertexColor() end
             function frame:SetShown(value) self.shown = value and true or false end
@@ -123,16 +149,34 @@ return function(test)
             function frame:GetLeft() return 0 end
             function frame:GetPoint() return "TOP" end
             function frame:SetHighlightTexture() end
+            function frame:GetHighlightTexture()
+                if not self.highlightTexture then self.highlightTexture = makeFrame() end
+                return self.highlightTexture
+            end
             function frame:SetHitRectInsets() end
             function frame:SetAutoFocus() end
             function frame:SetNumeric() end
             function frame:SetMaxLetters() end
+            function frame:SetTextInsets() end
+            function frame:SetCursorPosition() end
             function frame:ClearFocus() end
+            function frame:SetFocus() end
             function frame:SetChecked() end
             function frame:GetID() return 0 end
             function frame:GetStringWidth() return 60 end
             function frame:GetEffectiveScale() return 1 end
             function frame:GetParent() return self.parent end
+            function frame:SetSpacing() end
+            function frame:SetFading() end
+            function frame:SetMaxLines() end
+            function frame:SetHyperlinksEnabled() end
+            function frame:AtBottom() return true end
+            function frame:AddMessage() end
+            function frame:ScrollToTop() end
+            function frame:ScrollToBottom() end
+            function frame:ScrollUp() end
+            function frame:ScrollDown() end
+            function frame:UpdateButtonItem() end
             function frame:CreateFontString()
                 local label = makeFrame()
                 self.children[#self.children + 1] = label
@@ -142,6 +186,22 @@ return function(test)
                 local texture = makeFrame()
                 self.children[#self.children + 1] = texture
                 return texture
+            end
+            function frame:CreateAnimationGroup()
+                local function anim()
+                    return {
+                        SetChildKey = function() end,
+                        SetOrder = function() end,
+                        SetDuration = function() end,
+                        SetFromAlpha = function() end,
+                        SetToAlpha = function() end,
+                    }
+                end
+                return {
+                    CreateAnimation = function(_, _animType) return anim() end,
+                    Play = function() end,
+                    SetLooping = function() end,
+                }
             end
             function frame:GetNormalTexture()
                 if not self.normalTexture then self.normalTexture = makeFrame() end
@@ -211,6 +271,7 @@ return function(test)
             end,
             editTemplate = "template",
             g1 = { 1, 1, 1 },
+            b1 = "b1",
             MainFrame = makeFrame(),
             raidRosterInfo = { { name = "Alice" }, { name = "Bob" } },
             Tooltip_SetItemByID = function() end,
@@ -220,7 +281,7 @@ return function(test)
             GSN = function(s) return s end,
             STC_g1 = function(s) return s end,
             STC_b1 = function(s) return s end,
-            STC_r1 = function(s) return s end,
+            STC_w1 = function(s) return s end,
             GetAllFB = function() return {} end,
             GetLeiTingItem = function() return nil end,
             Frame = {},
@@ -238,6 +299,13 @@ return function(test)
             IsMOP = false,
             IsRetail = false,
             verLess2 = false,
+            -- function2.lua / AuctionMSG.lua load-time and table caller helpers.
+            SetButtonAtlas = function() end,
+            GameTooltip_Hide = function() end,
+            diffIDTbl = { ULD = { [3] = "normal" } },
+            difficultyTable = {},
+            onEnterAlpha = 0.4,
+            AddHText = function() return true end,
         }
 
         setGlobal("C_Timer", { After = function() end })
@@ -252,7 +320,9 @@ return function(test)
         setGlobal("GetRealmID", function() return 1 end)
         setGlobal("GetTime", function() return nowValue end)
         setGlobal("GetItemInfo", function(link)
-            return "测试装备", link, 4, 80, nil, "装备", "武器", nil, "INVTYPE_WEAPON",
+            local id = tostring(link):match("item:(%d+)") or tostring(link)
+            local itemLink = "item:" .. id
+            return "测试装备", itemLink, 4, 80, nil, "装备", "武器", nil, "INVTYPE_WEAPON",
                 "Interface/Icons/inv_weapon_1", nil, 2, 0, 2
         end)
         setGlobal("GetItemQualityColor", function() return 1, 0.5, 0 end)
@@ -260,10 +330,11 @@ return function(test)
         setGlobal("IsInRaid", function() return true end)
         setGlobal("IsAddOnLoaded", function() return false end)
         setGlobal("LoadAddOn", function() end)
-        setGlobal("BiaoGe", { options = { autoAuctionStart = 1, fastMoney = 1 }, Auction = { money = 500 } })
+        setGlobal("BiaoGe", { options = { autoAuctionStart = 1, fastMoney = 1 }, Auction = { money = 500 }, ULD = { boss1 = {} } })
         setGlobal("Locale", "zhCN")
         setGlobal("strlen", string.len)
         setGlobal("strfind", string.find)
+        setGlobal("strsub", string.sub)
         setGlobal("format", string.format)
         setGlobal("strsplit", function(delim, subject, maxPieces)
             maxPieces = maxPieces or 0
@@ -298,7 +369,18 @@ return function(test)
             AddDoubleLine = function() end, Show = function() end, Hide = function() end,
             SetHyperlink = function() end,
         })
-        setGlobal("BiaoGeTooltip", { NumLines = function() return 0 end })
+        setGlobal("BiaoGeTooltip", {
+            SetOwner = function() end,
+            ClearLines = function() end,
+            SetHyperlink = function() end,
+            SetItemByID = function() end,
+            NumLines = function() return 0 end,
+        })
+        for i = 1, 10 do
+            setGlobal("BiaoGeTooltipTextLeft" .. i, { GetText = function() return "" end })
+            setGlobal("BiaoGeTooltipTextRight" .. i, { GetText = function() return "" end })
+        end
+        setGlobal("WARDROBE_SETS", "WARDROBE_SETS")
         setGlobal("GameTooltip_Hide", function() end)
         setGlobal("UIErrorsFrame", { AddMessage = function() end })
         setGlobal("ITEM_CLASSES_ALLOWED", "item classes: %s")
@@ -308,16 +390,46 @@ return function(test)
         setGlobal("StaticPopup_Hide", function() end)
         setGlobal("StaticPopup_Show", function() end)
         setGlobal("StaticPopup_Visible", function() return nil end)
-        setGlobal("hooksecurefunc", function() end)
+        setGlobal("hooksecurefunc", function(name, func) hookedFuncs[#hookedFuncs + 1] = { name = name, func = func } end)
         setGlobal("LibStub", function()
             return { PixelGlow_Start = function() end, PixelGlow_Stop = function() end }
         end)
         setGlobal("UnitInRaid", function() return false end)
         setGlobal("IsAltKeyDown", function() return false end)
+        setGlobal("IsShiftKeyDown", function() return false end)
+        setGlobal("IsControlKeyDown", function() return false end)
         setGlobal("UpdateFrame", function() end)
         setGlobal("ClearAllFocus", function() end)
         setGlobal("YES", "YES")
         setGlobal("NO", "NO")
+        setGlobal("GetServerTime", function() return nowValue end)
+        setGlobal("GetItemInfoInstant", function() return nil end)
+        setGlobal("GetRaidDifficultyID", function() return 3 end)
+        setGlobal("UnitClass", function() return "WARRIOR", "WARRIOR" end)
+        setGlobal("SetCursor", function() end)
+        setGlobal("date", function() return "" end)
+        setGlobal("GetClassColor", function() return 1, 1, 1, 1 end)
+        setGlobal("GetItemStats", function() return nil end)
+        setGlobal("GetGameTime", function() return 0, 0 end)
+        setGlobal("CreateColor", function() return { r = 0, g = 0, b = 0, a = 1 } end)
+        setGlobal("Item", { CreateFromItemID = function() return { ContinueOnItemLoad = function(_, cb) cb() end } end })
+
+        -- WoW stat/item globals read by function2.lua at load time.
+        for _, name in ipairs({
+            "ITEM_MOD_STRENGTH_SHORT", "ITEM_MOD_AGILITY_SHORT", "ITEM_MOD_INTELLECT_SHORT",
+            "ITEM_MOD_SPIRIT_SHORT", "ITEM_MOD_MANA_REGENERATION", "STAT_CATEGORY_DEFENSE",
+            "STAT_PARRY", "STAT_DODGE", "ITEM_MOD_BLOCK_RATING_SHORT", "ITEM_MOD_BLOCK_VALUE_SHORT",
+            "ITEM_MOD_ATTACK_POWER_SHORT", "HIT_LCD", "ITEM_MOD_HIT_RATING_SHORT",
+            "STAT_CRITICAL_STRIKE", "ITEM_MOD_CRIT_RATING_SHORT", "STAT_HASTE",
+            "ITEM_MOD_HASTE_RATING_SHORT", "STAT_EXPERTISE", "ITEM_MOD_ARMOR_PENETRATION_RATING",
+            "ITEM_MOD_SPELL_POWER_SHORT", "ITEM_MOD_MASTERY_RATING_SHORT", "STAT_MASTERY",
+            "ITEM_MOD_VERSATILITY", "RESILIENCE",
+        }) do
+            setGlobal(name, "%s")
+        end
+        setGlobal("ITEM_SOCKET_BONUS", "镶孔奖励：%s")
+        setGlobal("ITEM_MOD_FERAL_ATTACK_POWER", "攻击强度提高%s点")
+        setGlobal("ITEM_LIMIT_CATEGORY_MULTIPLE", "最多%d件%s")
 
         local fallbackL = setmetatable({}, { __index = function(_, key) return tostring(key) end })
         local ns = {
@@ -328,25 +440,41 @@ return function(test)
             SetClassCFF = function(s) return s end,
             AddTexture = function() return "" end,
             GetItemID = function(link) return tonumber(tostring(link):match("item:(%d+)")) or 1001 end,
-            Maxb = {},
+            Maxb = { ULD = 2 },
             HopeMaxn = 0,
             HopeMaxb = 0,
             HopeMaxi = 0,
+            RN = function() return "" end,
+            GetText_T = function(s) return tostring(s) end,
+            BossNum = function() return 1 end,
         }
 
-        -- --- Load the real modules --------------------------------------------
-        -- Store/Catalog/Codec self-register on BG.BGNext and are pure.
+        -- --- Load the real modules (load order = TOC order) -------------------
+        -- Store/Catalog/Codec/PreSend/ItemPrimaryStats/HighlightManager are pure
+        -- and self-register on BG.BGNext.
         local Store = dofile("Core/BGNext/AuctionPriceStore.lua")
         local Catalog = dofile("Core/BGNext/AuctionPriceCatalog.lua")
         local Codec = dofile("Core/BGNext/AuctionPriceCodec.lua")
+        dofile("Core/BGNext/AuctionPreSend.lua")
+        dofile("Core/BGNext/ItemPrimaryStats.lua")
+        dofile("Core/BGNext/HighlightManager.lua")
 
         -- Auction.lua registers BG.StartAuction inside an Init callback; the
-        -- runtime then wraps it inside its own Init callback (registered later,
-        -- so it runs after the original is defined).
-        local auctionChunk = assert(loadfile("Core/Module/Auction.lua"))
-        auctionChunk("BGNEXT", ns)
-        local runtimeChunk = assert(loadfile("Core/BGNext/AuctionPriceRuntime.lua"))
-        runtimeChunk("BGNEXT", ns)
+        -- wrappers then wrap it inside their own Init callbacks (registered later,
+        -- so they run after the original is defined). AuctionQueueRuntime is the
+        -- outermost layer.
+        assert(loadfile("Core/Module/Auction.lua"))("BGNEXT", ns)
+        assert(loadfile("Core/BGNext/AuctionPriceRuntime.lua"))("BGNEXT", ns)
+        dofile("Core/BGNext/AuctionQueue.lua")
+        assert(loadfile("Core/BGNext/AuctionQueueRuntime.lua"))("BGNEXT", ns)
+
+        -- Real chat caller (AuctionMSG) and table caller (function2) register
+        -- their handlers in an Init callback / at load time respectively.
+        assert(loadfile("Core/Module/AuctionMSG.lua"))("BGNEXT", ns)
+        assert(loadfile("Core/function2.lua"))("BGNEXT", ns)
+
+        -- Firing in registration order: Auction.lua first, then the Price wrapper,
+        -- then the Queue wrapper, then the chat frame.
         for _, fn in ipairs(initCallbacks) do fn() end
 
         -- Replace the transport with a recording version (same signature) and
@@ -393,6 +521,9 @@ return function(test)
             BG.ImMLorLeader = function() return true end
             BGA.Frames = {}
             InCombatLockdown = nil
+            setGlobal("IsAltKeyDown", function() return false end)
+            setGlobal("IsShiftKeyDown", function() return false end)
+            setGlobal("C_Container", { GetContainerItemLink = function() end })
         end
 
         -- Runs the real entry as an Alt+right-click direct start (isRightButton
@@ -510,6 +641,62 @@ return function(test)
         test.eq(fileContains("Core/Module/Auction.lua", '{ source = "backpack" }'), true, "backpack caller passes source")
         test.eq(fileContains("Core/Module/Loot.lua", '{ source = "loot", raidId = BG.FB1 }'), true, "loot caller passes current raid")
         test.eq(fileContains("Core/Module/AuctionLog.lua", '{ source = "auctionlog", raidId = BG.FB1 }'), true, "auctionlog caller passes current raid")
+
+        -- --- Real caller: backpack container click hook -----------------------
+
+        resetAuction()
+        local backpackHook
+        for _, entry in ipairs(hookedFuncs) do
+            if entry.name == "ContainerFrameItemButton_OnModifiedClick" then
+                backpackHook = entry.func
+                break
+            end
+        end
+        test.eq(type(backpackHook), "function", "backpack container click hook is registered")
+        setGlobal("IsAltKeyDown", function() return true end)
+        setGlobal("C_Container", { GetContainerItemLink = function() return "item:2001" end })
+        local backpackParent = makeFrame()
+        local backpackButton = makeFrame()
+        backpackButton.parent = backpackParent
+        backpackHook(backpackButton, "RightButton")
+        flushZeroTimers()
+        test.eq(#sends, 1, "real backpack Alt+right-click direct-starts a unique item")
+        test.eq(sends[1].money, 1000, "backpack unique item uses the base price")
+
+        -- --- Real caller: auction-msg chat hyperlink handler ------------------
+
+        resetAuction()
+        local msgFrame = BG.FrameAuctionMSG
+        test.eq(type(msgFrame), "table", "auction message frame is built")
+        local click = msgFrame:GetScript("OnHyperlinkClick")
+        test.eq(type(click), "function", "chat hyperlink handler is registered")
+        setGlobal("IsAltKeyDown", function() return true end)
+        setGlobal("IsShiftKeyDown", function() return false end)
+        click(msgFrame, "item:2001", "item:2001", "RightButton")
+        flushZeroTimers()
+        test.eq(#sends, 1, "real chat Alt+right-click direct-starts a unique item")
+        test.eq(sends[1].money, 1000, "chat unique item uses the base price")
+
+        -- --- Real caller: table equipment-list mouse-down handler -------------
+
+        resetAuction()
+        setGlobal("IsAltKeyDown", function() return true end)
+        setGlobal("IsShiftKeyDown", function() return false end)
+        local slot = makeFrame()
+        slot.FB = "ULD"
+        slot.bossnum = 1
+        slot.hopenandu = nil
+        slot.i = 1
+        BG.SetListzhuangbei(slot)
+        local tableButton = BG.ZhuangbeiList and BG.ZhuangbeiList["button1"]
+        test.eq(type(tableButton), "table", "table equipment list creates a button")
+        test.eq(tableButton.link, "item:1001", "table button resolves its item link")
+        local onMouseDown = tableButton:GetScript("OnMouseDown")
+        test.eq(type(onMouseDown), "function", "table button registers a real mouse handler")
+        onMouseDown(tableButton, "RightButton")
+        flushZeroTimers()
+        test.eq(#sends, 1, "real table Alt+right-click direct-starts a duplicate item with explicit raid")
+        test.eq(sends[1].money, 500, "table caller honors the single-item override")
     end)
 
     for _, name in ipairs(watchedGlobals) do

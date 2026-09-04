@@ -96,7 +96,7 @@ return function(test)
     local leaderDirect = fakeLeaderFrame("1000")
     test.eq(runtime.applyLeaderPrefill(leaderDirect, 500, true), true, "direct start accepts a resolved price")
     test.eq(leaderDirect.Edit2.text, "500", "direct start writes the preset before starting")
-    test.eq(leaderDirect.starts, 1, "direct start invokes the existing start action once")
+    test.eq(leaderDirect.starts, 0, "direct start never clicks from the inner wrapper")
     test.eq(leaderDirect.bt.money, 500, "direct start binds the approved amount to the send button")
 
     local unresolvedDirect = fakeLeaderFrame("1000")
@@ -113,11 +113,10 @@ return function(test)
         "BG.StartAuction",
         "prefillLeaderFrame",
         "Edit2",
-        "resolveLeaderPrice",
-        "if price == nil then",
+        "resolveLeaderApproval",
+        "bgnextDirectApproval",
         "resolveEntryRaid",
-        "onPreSend",
-        "directGate",
+        "AuctionPreSend",
         "prefillPersonalFrame",
         "HookCreateAuction",
         "myMoneyEdit",
