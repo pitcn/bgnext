@@ -8,7 +8,14 @@ ns.enUS = true
 local L = ns.L
 local c1 = ns.c1
 
-do -- BGNext 0.5.0 release text
+do -- BGNext release text
+    L["新增团长待拍队列：逐件确认价格后开拍，不会自动连拍；离团、切表或重载即清空。"] = "Added a leader auction queue. Confirm each item's price before starting; it never auto-starts the next auction and clears when leaving the raid, switching tables, or reloading."
+    L["拍卖结束后，侧边卡片会短暂显示买家和成交金额；流拍或取消也有明确状态。"] = "Auction cards now briefly show the buyer and final amount after completion, with clear unsold and cancelled states."
+    L["交易记录改进：保留同物品多件数量，确认时采集双方物品与金币，并区分已交易和待核对。"] = "Trade records now preserve quantities for identical items, capture both sides' items and gold at confirmation, and distinguish delivery from reconciliation."
+    L["修复交易成功或失败通报；同一交易只通报一次，不记录聊天内容或跨团历史。"] = "Fixed successful and failed trade announcements. Each trade is announced at most once, without storing chat content or cross-raid history."
+    L["价格预设快捷开拍统一进行权限、战斗、活动拍卖、方案和价格检查；价格列表会随窗口自动重排。"] = "Preset quick-start now consistently checks permissions, combat, active auctions, the selected scheme and price. Price lists reflow with the window."
+    L["进入新进度时，如旧表仍有未结算内容，自动清空前会先确认；取消不会删除。"] = "When entering a new lockout, automatic clearing asks first if the previous table still has unsettled content. Cancelling preserves it."
+    L["正式服角色总览按 Boss 和难度统计团本进度；证据不足时留空，不显示错误完成状态。"] = "Retail character overview now tracks raid progress per boss and difficulty. Missing evidence stays blank instead of showing a false completion."
     L["心愿清单：新选装备默认备选，可用滚轮按备选、次 BIS、BIS 切换；已有优先级保持不变。"] = "Wishlist: new selections start as Backup. Use the mouse wheel to cycle Backup, 2nd BiS and BiS; existing priorities are preserved."
     L["心愿优先级改用独立文字徽标，不遮挡装备名称与装等；长列表可以滚动。"] = "Wishlist priorities now use separate text badges without covering item names or levels; long lists can be scrolled."
     L["修复价格预设失焦保存、Alt+右键按预设开拍、Ctrl+右键改价；支持旧价格和心愿字符串导入。"] = "Fixed preset saving on focus loss, Alt+right-click auction starts using presets, and Ctrl+right-click price editing. Legacy price and wishlist imports remain available."
@@ -41,7 +48,11 @@ do --英语说明书
         L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
     }
     ns.updateText_now = {
-
+        "BGNext 0.6.0",
+        L["新增团长待拍队列：逐件确认价格后开拍，不会自动连拍；离团、切表或重载即清空。"],
+        L["拍卖结束后，侧边卡片会短暂显示买家和成交金额；流拍或取消也有明确状态。"],
+        L["交易记录改进：保留同物品多件数量，确认时采集双方物品与金币，并区分已交易和待核对。"],
+        L["修复交易成功或失败通报；同一交易只通报一次，不记录聊天内容或跨团历史。"],
     }
     ns.updateText_before = {
 

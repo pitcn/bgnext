@@ -4,7 +4,7 @@ return function(test)
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
-    test.eq(info.version, "0.5.0", "BGNext version is independent")
+    test.eq(info.version, "0.6.0", "BGNext version is independent")
     test.eq(info.upstreamVersion, "2.4.0", "upstream version remains disclosed")
     test.eq(info.protocolVersion, "2.4.0", "mixed-group protocol version remains compatible")
     test.eq(info.author, "国服社区共创", "community author")
@@ -13,7 +13,7 @@ return function(test)
     local changelogItems = table.concat(info.changelog, "\n")
     test.eq(changelogItems:find("价格预设", 1, true) ~= nil, true,
         "in-game changelog includes price presets")
-    for _, text in ipairs({ "新选装备默认备选", "独立文字徽标", "截止时间", "重复刷新", "结算前检查", "存储与隐私", "回落英文" }) do
+    for _, text in ipairs({ "待拍队列", "买家和成交金额", "双方物品与金币", "交易成功或失败通报", "价格预设快捷开拍", "自动清空前", "按 Boss 和难度" }) do
         test.eq(changelogItems:find(text, 1, true) ~= nil, true, "in-game release notes cover " .. text)
     end
     test.eq(type(info.credits.upstream), "table", "upstream credits")
