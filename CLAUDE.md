@@ -17,28 +17,23 @@ This file intentionally mirrors the mandatory rules in `AGENTS.md`. Claude and C
 11. Never claim a client version is supported without evidence; mark unavailable real-client testing as unverified.
 12. Never publish private conversations, identities, screenshots, internal claims, or unverifiable authorization details, and never imply official status or endorsement.
 
-## Mandatory execution rules
+## Execution workflow
 
-- Before runtime work, read `AGENTS.md`, `SECURITY.md`, `docs/policies/PRIVACY.md`, `docs/policies/COMPLIANCE.md`, the approved design, and relevant ADR/data-inventory files.
-- Use test-first development for behavior changes: observe the expected failing test before production code.
-- Document every new persistent or communicated field in the data inventory before merging.
-- Review each modified baseline file and update only its explicit hash; never bulk-accept baseline drift.
-- Use an isolated worktree or feature branch. Never publish an unreviewed Release.
-- Run `pwsh -NoProfile -File tools/run-lua-tests.ps1`, `pwsh -NoProfile -File tools/verify-baseline.ps1`, and `git diff --check` before every runtime commit and Release.
-- Stop and report unclear provenance, undocumented authorization, privacy conflicts, unavailable required tests, or failed verification. Never bypass a stop condition through renaming, hidden code, hash changes, or weaker documentation.
+`AGENTS.md` is authoritative and defines low, normal, and high risk work. Determine the minimum tier from the repository rules; you may upgrade but must never downgrade it.
 
-## Mandatory local completion handoff
+- Low risk: read `AGENTS.md` and direct context.
+- Normal risk: also read `docs/agents/safety-summary.md`, relevant modules and relevant ADRs; use a focused RED/GREEN test for behavior changes.
+- High risk: read the complete security, privacy, compliance, data-inventory and relevant ADR set and perform the full audit required by `AGENTS.md`.
 
-Before reporting completion, write a Markdown handoff to the shared, gitignored inbox derived from the common Git directory:
+Before completion run the matching unified gate:
 
 ```powershell
-$commonGitDir = git rev-parse --path-format=absolute --git-common-dir
-$repositoryHome = Split-Path -Parent $commonGitDir
-$handoffInbox = Join-Path $repositoryHome ".local\handoffs\inbox"
-New-Item -ItemType Directory -Force -Path $handoffInbox | Out-Null
+pwsh -NoProfile -File tools/agent-verify.ps1 -Risk normal -Base origin/main -WriteHandoff
 ```
 
-Use filename `yyyyMMdd-HHmmss--<sanitized-branch>--<short-task>.md` and status `ready_for_codex_review`, `needs_game_validation`, or `blocked`. Include exact repository/worktree path, branch, HEAD, base and commit range, changed files, verification commands and observed output, security/privacy/provenance/baseline/compatibility evidence, game-install and SavedVariables state, limitations, and requested Codex review checks. Never commit or push `.local/`, and never claim an unrun or simulated check passed. This handoff is required even after a successful push so the user can say only “做好了” and Codex can locate and review the latest result.
+Use `-Risk low` or `-Risk high` only when appropriate. The command rejects risk downgrades, composes the existing Lua/baseline/diff checks, and creates the compact shared handoff for normal/high work. Complete emitted manual review items before claiming high-risk work is done.
+
+Always use an isolated worktree or feature branch. Stop and report unclear provenance, undocumented authorization, privacy conflicts, unavailable required tests, or failed verification. Never bypass a stop condition through renaming, hidden code, hash changes, weaker documentation, or a lower requested risk.
 
 ## Agent skills
 

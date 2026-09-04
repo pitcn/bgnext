@@ -77,6 +77,27 @@ $highExit = $LASTEXITCODE
 Assert-Equal 0 $highExit 'CLI permits an explicit upgrade'
 Assert-True (($highOutput -join "`n").Contains('PLAN lua-tests,baseline,diff-check,high-review')) 'CLI prints a compact high-risk plan'
 
+$agentRules = Get-Content -LiteralPath (Join-Path $repo 'AGENTS.md') -Raw
+$claudeRules = Get-Content -LiteralPath (Join-Path $repo 'CLAUDE.md') -Raw
+$safetySummaryPath = Join-Path $repo 'docs\agents\safety-summary.md'
+Assert-True (Test-Path -LiteralPath $safetySummaryPath) 'normal-risk safety summary exists'
+$safetySummary = if (Test-Path -LiteralPath $safetySummaryPath) {
+    Get-Content -LiteralPath $safetySummaryPath -Raw
+} else { '' }
+foreach ($tier in @('Low risk', 'Normal risk', 'High risk')) {
+    Assert-True ($agentRules.Contains($tier)) "AGENTS documents $tier"
+}
+Assert-True ($agentRules.Contains('may upgrade but must never downgrade')) 'AGENTS forbids risk downgrade'
+Assert-True ($agentRules.Contains('tools/agent-verify.ps1')) 'AGENTS points to unified verifier'
+Assert-True ($agentRules.Contains('Do not copy historical BiaoGe code or assets')) 'BiaoGe boundary remains'
+Assert-True ($agentRules.Contains('Never create player profiles')) 'player-profile boundary remains'
+Assert-True ($agentRules.Contains('No automatic external transmission')) 'external-transmission boundary remains'
+Assert-True ($agentRules.Contains('Do not claim unverified compatibility')) 'compatibility boundary remains'
+Assert-True ($claudeRules.Contains('tools/agent-verify.ps1')) 'CLAUDE points to unified verifier'
+foreach ($requiredLink in @('SECURITY.md', 'docs/policies/PRIVACY.md', 'docs/security/data-inventory.md', 'docs/adr/')) {
+    Assert-True ($safetySummary.Contains($requiredLink)) "safety summary links $requiredLink"
+}
+
 if ($script:failures -gt 0) {
     Write-Host "agent-workflow tests failed=$script:failures" -ForegroundColor Red
     exit 1
