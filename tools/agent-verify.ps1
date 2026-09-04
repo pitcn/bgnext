@@ -93,13 +93,14 @@ if ($PlanOnly) {
 }
 
 $results = @()
+$powerShellExe = Get-BGNPowerShellExe
 foreach ($step in $plan) {
     switch ($step.name) {
         'lua-tests' {
-            $results += Invoke-Checked 'lua-tests' { pwsh -NoProfile -File tools/run-lua-tests.ps1 }
+            $results += Invoke-Checked 'lua-tests' { & $powerShellExe -NoProfile -File tools/run-lua-tests.ps1 }
         }
         'baseline' {
-            $results += Invoke-Checked 'baseline' { pwsh -NoProfile -File tools/verify-baseline.ps1 }
+            $results += Invoke-Checked 'baseline' { & $powerShellExe -NoProfile -File tools/verify-baseline.ps1 }
         }
         'diff-check' {
             $results += Invoke-Checked 'diff-check' {

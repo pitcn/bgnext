@@ -61,6 +61,15 @@ function Test-BGNRiskAllowed {
     return $script:RiskRank[$Requested] -ge $script:RiskRank[$Minimum]
 }
 
+function Get-BGNPowerShellExe {
+    $exeName = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh.exe' } else { 'powershell.exe' }
+    $homeExe = Join-Path $PSHOME $exeName
+    if (Test-Path -LiteralPath $homeExe -PathType Leaf) { return $homeExe }
+    $fromPath = Get-Command $exeName -ErrorAction SilentlyContinue
+    if ($fromPath) { return $fromPath.Source }
+    throw "Cannot resolve the PowerShell interpreter '$exeName'. Install PowerShell 5.1 or PowerShell 7."
+}
+
 function Get-BGNVerificationPlan {
     param(
         [Parameter(Mandatory)][ValidateSet('low', 'normal', 'high')][string]$Risk,
@@ -68,8 +77,8 @@ function Get-BGNVerificationPlan {
     )
     $plan = @()
     if ($Risk -ne 'low') {
-        $plan += [pscustomobject]@{ name = 'lua-tests'; command = 'pwsh -NoProfile -File tools/run-lua-tests.ps1' }
-        $plan += [pscustomobject]@{ name = 'baseline'; command = 'pwsh -NoProfile -File tools/verify-baseline.ps1' }
+        $plan += [pscustomobject]@{ name = 'lua-tests'; command = 'tools/run-lua-tests.ps1' }
+        $plan += [pscustomobject]@{ name = 'baseline'; command = 'tools/verify-baseline.ps1' }
     }
     $plan += [pscustomobject]@{ name = 'diff-check'; command = 'git diff --check' }
     if ($HasLua) {
@@ -122,6 +131,7 @@ Export-ModuleMember -Function @(
     'Get-BGNPathRisk',
     'Get-BGNMinimumRisk',
     'Test-BGNRiskAllowed',
+    'Get-BGNPowerShellExe',
     'Get-BGNVerificationPlan',
     'New-BGNHandoffText'
 )

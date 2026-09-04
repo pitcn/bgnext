@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $repo = Split-Path -Parent $PSScriptRoot
 Import-Module (Join-Path $repo 'tools\AgentWorkflow.psm1') -Force
+$powerShellExe = Get-BGNPowerShellExe
 
 $script:failures = 0
 
@@ -19,6 +20,9 @@ function Assert-True {
 }
 
 $rules = Read-BGNRiskRules (Join-Path $repo 'tools\agent-risk-rules.json')
+
+Assert-True (Test-Path -LiteralPath $powerShellExe) 'PowerShell interpreter resolves to an existing executable'
+Assert-True (($powerShellExe -match 'pwsh\.exe$') -or ($powerShellExe -match 'powershell\.exe$')) 'resolves pwsh.exe or powershell.exe'
 
 Assert-Equal 'low' (Get-BGNMinimumRisk @('README.md') '' $rules) 'README is low'
 Assert-Equal 'low' (Get-BGNMinimumRisk @('Locales/zhCN.lua') '' $rules) 'Locale is low'
@@ -85,13 +89,27 @@ try {
     Set-Content -LiteralPath 'Core\Module\Trade.lua' -Value '-- high-risk fixture' -Encoding utf8
 
     $verifyScript = Join-Path $sandboxRepo 'tools\agent-verify.ps1'
-    $lowOutput = & pwsh -NoProfile -File $verifyScript -Risk low -Base HEAD -PlanOnly 2>&1
-    $lowExit = $LASTEXITCODE
+    # Native stderr is wrapped as NativeCommandError in Windows PowerShell 5.1;
+    # relax Stop so an expected non-zero child exit is observed via $LASTEXITCODE.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $lowOutput = & $powerShellExe -NoProfile -File $verifyScript -Risk low -Base HEAD -PlanOnly 2>&1
+        $lowExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
     Assert-True ($lowExit -ne 0) 'CLI refuses an explicit downgrade'
     Assert-True (($lowOutput -join "`n").Contains('below detected minimum')) 'downgrade explains the detected minimum'
 
-    $highOutput = & pwsh -NoProfile -File $verifyScript -Risk high -Base HEAD -PlanOnly 2>&1
-    $highExit = $LASTEXITCODE
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $highOutput = & $powerShellExe -NoProfile -File $verifyScript -Risk high -Base HEAD -PlanOnly 2>&1
+        $highExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
     Assert-Equal 0 $highExit 'CLI permits an explicit upgrade'
     Assert-True (($highOutput -join "`n").Contains('PLAN lua-tests,baseline,diff-check,luac,high-review')) 'CLI prints a compact high-risk plan'
 } finally {
