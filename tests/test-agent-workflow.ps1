@@ -66,6 +66,17 @@ $highHandoff = New-BGNHandoffText $highContext
 Assert-True ($highHandoff.Contains('high_risk_review:')) 'high handoff includes high review block'
 Assert-True ($highHandoff.Contains('security/privacy: unverified')) 'high handoff preserves manual uncertainty'
 
+$verifyScript = Join-Path $repo 'tools\agent-verify.ps1'
+$lowOutput = & pwsh -NoProfile -File $verifyScript -Risk low -Base origin/main -PlanOnly 2>&1
+$lowExit = $LASTEXITCODE
+Assert-True ($lowExit -ne 0) 'CLI refuses an explicit downgrade'
+Assert-True (($lowOutput -join "`n").Contains('below detected minimum')) 'downgrade explains the detected minimum'
+
+$highOutput = & pwsh -NoProfile -File $verifyScript -Risk high -Base origin/main -PlanOnly 2>&1
+$highExit = $LASTEXITCODE
+Assert-Equal 0 $highExit 'CLI permits an explicit upgrade'
+Assert-True (($highOutput -join "`n").Contains('PLAN lua-tests,baseline,diff-check,high-review')) 'CLI prints a compact high-risk plan'
+
 if ($script:failures -gt 0) {
     Write-Host "agent-workflow tests failed=$script:failures" -ForegroundColor Red
     exit 1
