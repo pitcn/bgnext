@@ -86,6 +86,7 @@ Core\TongBao\QianKuan.lua
 Core\TongBao\Channel.lua
 
 Core\BiaoGe.lua
+Core\BGNext\GuideUI.lua
 Core\BGNext\LegacyLedgerSkin.lua
 Core\BGNext\EquipmentFilterUI.lua
 Core\BGNext\WishlistUI.lua

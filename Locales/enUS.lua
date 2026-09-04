@@ -3253,3 +3253,23 @@ do -- BGNext feature management and guide catalog
     L["外观增强"] = "Appearance Enhancements"
     L["使用 BGNext 的主题、缩放和界面优化。"] = "Use BGNext themes, scaling and interface refinements."
 end
+
+do -- BGNext in-game guide
+    L["点击打开完整说明书"] = "Click to open the full guide"
+    L["包含功能、快捷键、命令与隐私说明。"] = "Includes features, shortcuts, commands and privacy information."
+    L["快速开始"] = "Quick Start"
+    L["输入 /bgn 或 /bgnext 打开主窗口；/bgo 打开设置；/bgm 解锁移动。"] = "Use /bgn or /bgnext to open the main window, /bgo for settings, and /bgm to unlock movement."
+    L["输入 /bgnqueue 或 /bgnq 打开待拍队列。"] = "Use /bgnqueue or /bgnq to open the auction queue."
+    L["完整模式启用全部可选功能；基础模式只保留原版流程和必需保护；单独改动后显示为自定义模式。"] = "Full Mode enables every optional feature. Basic Mode keeps the upstream workflow and required protections. Individual changes produce Custom Mode."
+    L["表格装备：右键删除该装备（不可撤销）。"] = "Bill item: right-click to delete it (cannot be undone)."
+    L["表格装备：Ctrl+右键编辑单件预设价格。"] = "Bill item: Ctrl+right-click to edit its preset price."
+    L["表格装备：Alt+右键按当前预设打开拍卖确认。"] = "Bill item: Alt+right-click to open auction confirmation with the active preset."
+    L["表格装备：Shift+右键执行原版快捷交互。"] = "Bill item: Shift+right-click to use the upstream shortcut."
+    L["心愿装备：滚轮切换备选、次 BIS、BIS。"] = "Wishlist item: use the mouse wheel to cycle Backup, 2nd BiS and BiS."
+    L["拾取窗口：有拾取职责时可把 Boss 掉落加入待拍队列。"] = "Loot window: players with loot responsibility can add boss drops to the auction queue."
+    L["必需，不能关闭"] = "Required; cannot be disabled"
+    L["已关闭"] = "Disabled"
+    L["已启用"] = "Enabled"
+    L["命令："] = "Command: "
+    L["BGNext 说明书"] = "BGNext Guide"
+end

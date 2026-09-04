@@ -3259,3 +3259,23 @@ do -- BGNext feature management and guide catalog
     L["外观增强"] = true
     L["使用 BGNext 的主题、缩放和界面优化。"] = true
 end
+
+do -- BGNext in-game guide
+    L["点击打开完整说明书"] = true
+    L["包含功能、快捷键、命令与隐私说明。"] = true
+    L["快速开始"] = true
+    L["输入 /bgn 或 /bgnext 打开主窗口；/bgo 打开设置；/bgm 解锁移动。"] = true
+    L["输入 /bgnqueue 或 /bgnq 打开待拍队列。"] = true
+    L["完整模式启用全部可选功能；基础模式只保留原版流程和必需保护；单独改动后显示为自定义模式。"] = true
+    L["表格装备：右键删除该装备（不可撤销）。"] = true
+    L["表格装备：Ctrl+右键编辑单件预设价格。"] = true
+    L["表格装备：Alt+右键按当前预设打开拍卖确认。"] = true
+    L["表格装备：Shift+右键执行原版快捷交互。"] = true
+    L["心愿装备：滚轮切换备选、次 BIS、BIS。"] = true
+    L["拾取窗口：有拾取职责时可把 Boss 掉落加入待拍队列。"] = true
+    L["必需，不能关闭"] = true
+    L["已关闭"] = true
+    L["已启用"] = true
+    L["命令："] = true
+    L["BGNext 说明书"] = true
+end
