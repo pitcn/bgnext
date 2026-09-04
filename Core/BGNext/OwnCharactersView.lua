@@ -446,6 +446,36 @@ local function resourceCell(column, snapshot, now)
         return cell
     end
 
+    if source.kind == "activity" then
+        local key = source.key or column.id
+        local activities = type(snapshot.activityStates) == "table" and snapshot.activityStates or nil
+        local entry = activities and activities[key] or nil
+        if type(entry) ~= "table" then return cell end
+        cell.observedAt = entry.observedAt
+        cell.resetsAt = entry.resetsAt
+        cell.reason = entry.reason
+        cell.activity = true
+        if type(entry.resetsAt) == "number" and type(now) == "number" and now >= entry.resetsAt then
+            cell.state = "unknown"
+            cell.text = "?"
+        elseif entry.status == "completed" then
+            cell.state = "complete"
+        elseif entry.status == "incomplete" then
+            cell.state = "value"
+            cell.text = L["未完成"]
+        elseif entry.status == "locked" then
+            cell.state = "value"
+            cell.text = L["未解锁"]
+        elseif entry.status == "not-applicable" then
+            cell.state = "value"
+            cell.text = L["不适用"]
+        else
+            cell.state = "unknown"
+            cell.text = "?"
+        end
+        return cell
+    end
+
     if source.kind == "currency" then
         local key = source.key or column.id
         local currencies = type(snapshot.currencies) == "table" and snapshot.currencies or nil

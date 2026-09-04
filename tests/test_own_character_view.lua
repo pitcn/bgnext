@@ -493,6 +493,28 @@ return function(test)
     test.eq(mopCurrencyCells.valor.quantityEarnedThisWeek, nil,
         "missing weekly earnings stay nil rather than a fabricated zero")
 
+    local mopActivityView = View.project({
+        family = "mop",
+        catalog = Catalog.forFamily("mop"),
+        snapshots = { snapshot({ activityStates = {
+            celestialFirst = { status = "completed", observedAt = 900, resetsAt = 2000 },
+            farmHarvest = { status = "unknown", observedAt = 900, reason = "farm-observation-required" },
+            augustCelestials = { status = "incomplete", observedAt = 900, resetsAt = 2000 },
+            ordos = { status = "completed", observedAt = 900, resetsAt = 500 },
+        } }) },
+        currentRealmId = 123, showAllRealms = false, now = 1000,
+        visibility = { resource = {
+            celestialFirst = true, farmHarvest = true, augustCelestials = true, ordos = true,
+        } },
+    })
+    local activityCells = {}
+    for _, cell in ipairs(mopActivityView.resource.rows[1].cells) do activityCells[cell.columnId] = cell end
+    test.eq(activityCells.celestialFirst.state, "complete", "completed activity renders with the completion mark")
+    test.eq(activityCells.augustCelestials.text, "未完成", "observed incomplete is explicit")
+    test.eq(activityCells.farmHarvest.text, "?", "unobservable farm state renders unknown")
+    test.eq(activityCells.farmHarvest.reason, "farm-observation-required", "unknown reason reaches the tooltip")
+    test.eq(activityCells.ordos.text, "?", "an expired weekly observation never remains completed")
+
     -- All four cap fields survive the projection untouched so the tooltip can
     -- show every real limit the API returned; the body still shows only the
     -- quantity. A wrong-typed cap is dropped, never coerced into a number.
@@ -661,6 +683,25 @@ return function(test)
     test.eq(unavailable("resource", "equipmentDetails"), false, "missing inventory APIs hide equipment")
     test.eq(unavailable("resource", "mainProfession"), false, "missing profession APIs hide professions")
     test.eq(unavailable("resource", "honor"), false, "missing honor API hides honor")
+
+    local mopCatalogForAvailability = Catalog.forFamily("mop")
+    local mopActivityApi = {
+        GetNumRandomDungeons = function() return 0 end,
+        GetLFGRandomDungeonInfo = function() end,
+        GetLFGDungeonRewards = function() return false end,
+        GetQuestResetTime = function() return 3600 end,
+        C_DateAndTime = { GetSecondsUntilWeeklyReset = function() return 7200 end },
+        C_QuestLog = { IsQuestFlaggedCompleted = function() return false end },
+    }
+    local mopAvailability = Settings.availableColumns("mop", mopCatalogForAvailability, mopActivityApi)
+    test.eq(mopAvailability("resource", "celestialFirst"), true, "daily first win is offered with the LFG APIs")
+    test.eq(mopAvailability("resource", "augustCelestials"), true, "Celestials are offered with quest and reset APIs")
+    test.eq(mopAvailability("resource", "ordos"), true, "Ordos is offered with quest and reset APIs")
+    test.eq(mopAvailability("resource", "farmHarvest"), true, "farm option is offered as an explicit unknown")
+    local missingMopAvailability = Settings.availableColumns("mop", mopCatalogForAvailability, {})
+    test.eq(missingMopAvailability("resource", "celestialFirst"), false, "missing LFG APIs hide the daily tracker")
+    test.eq(missingMopAvailability("resource", "augustCelestials"), false, "missing quest APIs hide world-boss trackers")
+    test.eq(missingMopAvailability("resource", "farmHarvest"), true, "farm evidence gap remains selectable and explained")
 
     -- That same predicate drives projection; verified values reach the table.
     local guarded = View.project(input({

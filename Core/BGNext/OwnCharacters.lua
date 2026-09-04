@@ -29,6 +29,7 @@ local SNAPSHOT_FIELDS = {
     raidStates = "table",
     professions = "table",
     professionCooldowns = "table",
+    activityStates = "table",
 }
 
 local TEXTURE_TYPES = { string = true, number = true }
@@ -94,6 +95,32 @@ local PROFESSION_COOLDOWN_FIELDS = {
 
 local function isKey(value)
     return type(value) == "number" or (type(value) == "string" and value ~= "")
+end
+
+local ACTIVITY_STATUSES = {
+    completed = true, incomplete = true, unknown = true,
+    locked = true, ["not-applicable"] = true,
+}
+
+local ACTIVITY_REASONS = {
+    ["farm-observation-required"] = true,
+    ["no-matching-dungeon"] = true,
+    ["unreadable-lfg-reward"] = true,
+}
+
+local function sanitizeActivityStates(source)
+    if type(source) ~= "table" then return nil end
+    local copy = {}
+    for key, record in pairs(source) do
+        if isKey(key) and type(record) == "table" and ACTIVITY_STATUSES[record.status] then
+            local entry = { status = record.status }
+            if type(record.observedAt) == "number" then entry.observedAt = record.observedAt end
+            if type(record.resetsAt) == "number" then entry.resetsAt = record.resetsAt end
+            if ACTIVITY_REASONS[record.reason] then entry.reason = record.reason end
+            copy[key] = entry
+        end
+    end
+    return copy
 end
 
 local function accepts(expected, value)
@@ -232,6 +259,7 @@ local function sanitize(snapshot)
     clean.currencies = copyCurrencyMap(snapshot.currencies)
     clean.items = copyNumberMap(snapshot.items)
     clean.professionCooldowns = copyRecordMap(snapshot.professionCooldowns, PROFESSION_COOLDOWN_FIELDS)
+    clean.activityStates = sanitizeActivityStates(snapshot.activityStates)
     return clean
 end
 
@@ -290,6 +318,7 @@ local SECTION_FIELDS = {
     currencies = { "currencies" },
     items = { "items" },
     professionCooldowns = { "professionCooldowns" },
+    activities = { "activityStates" },
     resources = { "currencies", "items", "professionCooldowns" },
 }
 
@@ -391,7 +420,7 @@ local function recomputeRaidState(state, entries)
     end
 end
 
--- Weekly state is valid only until its official reset. Expired entries are
+-- Timed raid and own-activity states are valid only until their official reset. Expired entries are
 -- deleted outright; they are never demoted into a previous-week record. A retail
 -- state expires per difficulty: only the reset difficulties are pruned, and the
 -- whole state is dropped once none of its difficulties remains.
@@ -434,6 +463,16 @@ function M.expireRaidStates(root, now)
                                     if resetsAt and now >= resetsAt then
                                         states[id] = nil
                                     end
+                                end
+                            end
+                        end
+                        local activities = type(snapshot) == "table" and snapshot.activityStates or nil
+                        if type(activities) == "table" then
+                            for id, state in pairs(activities) do
+                                local resetsAt = type(state) == "table"
+                                    and type(state.resetsAt) == "number" and state.resetsAt or nil
+                                if type(state) ~= "table" or (resetsAt and now >= resetsAt) then
+                                    activities[id] = nil
                                 end
                             end
                         end

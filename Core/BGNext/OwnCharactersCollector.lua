@@ -30,6 +30,9 @@ M.allowedEvents = {
     "CURRENCY_DISPLAY_UPDATE",
     "SKILL_LINES_CHANGED",
     "TRADE_SKILL_UPDATE",
+    "QUEST_TURNED_IN",
+    "QUEST_LOG_UPDATE",
+    "LFG_UPDATE_RANDOM_INFO",
 }
 
 local DEBOUNCE_SECONDS = 1
@@ -45,6 +48,9 @@ local EVENT_SECTIONS = {
     CURRENCY_DISPLAY_UPDATE = { currencies = true },
     SKILL_LINES_CHANGED = { professions = true, professionCooldowns = true },
     TRADE_SKILL_UPDATE = { professions = true, professionCooldowns = true },
+    QUEST_TURNED_IN = { activities = true },
+    QUEST_LOG_UPDATE = { activities = true },
+    LFG_UPDATE_RANDOM_INFO = { activities = true },
 }
 
 local function safeCall(fn, ...)
@@ -100,6 +106,7 @@ function M.collect(env, sections)
     if wants("money") then snapshot.money = read(env, "money", "number") end
     if wants("raid") then snapshot.raidStates = read(env, "raidStates", "table") end
     if wants("professions") then snapshot.professions = read(env, "professions", "table") end
+    if wants("activities") then snapshot.activityStates = read(env, "activities", "table") end
 
     -- Currencies and item counts share one reader so a client family that
     -- exposes neither simply contributes nothing.

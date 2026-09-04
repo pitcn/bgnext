@@ -16,6 +16,7 @@ return function(test)
             money = function() return 50000 end,
             equipment = function() return {} end,
             raidStates = function() return {} end,
+            activities = function() return { celestialFirst = { status = "completed", resetsAt = 2000 } } end,
             resources = function() return {} end,
             professions = function() return {} end,
         }
@@ -35,6 +36,7 @@ return function(test)
     test.eq(snapshot.level, 80, "collects own level")
     test.eq(snapshot.itemLevel, 230.75, "collects own item level")
     test.eq(snapshot.money, 50000, "collects own money")
+    test.eq(snapshot.activityStates.celestialFirst.status, "completed", "collects own activity state")
     test.eq(snapshot.updatedAt, 1000, "stamps the observation time")
 
     -- The collector reads the current character only. There is no parameter

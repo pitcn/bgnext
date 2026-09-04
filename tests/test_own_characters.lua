@@ -192,6 +192,24 @@ return function(test)
     test.eq(partialCaps.currencies.justice.maxQuantity, nil, "non-numeric cap is dropped")
     test.eq(partialCaps.currencies.justice.weeklyBad, nil, "non-whitelisted cap field is dropped")
 
+    local activityRoot = {}
+    local activities = M.upsert(activityRoot, "mop", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        activityStates = {
+            celestialFirst = { status = "completed", observedAt = 1000, resetsAt = 2000, junk = true },
+            farmHarvest = { status = "unknown", observedAt = 1000, reason = "farm-observation-required" },
+            invalid = { status = "guessed", observedAt = 1000 },
+        },
+    })
+    test.eq(activities.activityStates.celestialFirst.status, "completed", "activity status is stored")
+    test.eq(activities.activityStates.celestialFirst.junk, nil, "activity records drop unknown fields")
+    test.eq(activities.activityStates.farmHarvest.reason, "farm-observation-required", "known unknown reason is retained")
+    test.eq(activities.activityStates.invalid, nil, "unrecognized activity status is rejected")
+    M.expireRaidStates(activityRoot, 2500)
+    local expiredActivities = M.get(activityRoot, "mop", 123, "Piti").activityStates
+    test.eq(expiredActivities.celestialFirst, nil, "timed activity state is deleted at reset")
+    test.eq(expiredActivities.farmHarvest.status, "unknown", "untimed evidence gap remains explicit")
+
     -- Profession cooldowns store only a ready flag or a future reset timestamp.
     local cdRoot = {}
     local cds = M.upsert(cdRoot, "vanilla", {

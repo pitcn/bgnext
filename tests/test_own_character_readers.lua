@@ -318,6 +318,57 @@ return function(test)
         Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).resources()
     test.eq(mopMissing.currencies.valor, nil, "missing MoP currency API records no Valor")
 
+    -- MoP routine progress reads only the current character. The daily first
+    -- reward comes from Blizzard's LFG doneToday flag; weekly world bosses use
+    -- the official BGLite quest ids and the client's weekly reset boundary.
+    local mopActivities = Adapters.readers("mop", api({
+        GetNumRandomDungeons = function() return 2 end,
+        GetLFGRandomDungeonInfo = function(index)
+            if index == 1 then return 9001, "随机天神地下城" end
+            return 9002, "随机英雄地下城"
+        end,
+        GetLFGDungeonRewards = function(id) return id == 9001 end,
+        GetQuestResetTime = function() return 3600 end,
+        C_DateAndTime = { GetSecondsUntilWeeklyReset = function() return 7200 end },
+        C_QuestLog = { IsQuestFlaggedCompleted = function(id) return id == 33117 end },
+    }), Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).activities()
+    test.eq(mopActivities.celestialFirst.status, "completed", "daily first reward reads the LFG completion flag")
+    test.eq(mopActivities.celestialFirst.resetsAt, 8600, "daily first reward expires at the daily reset")
+    test.eq(mopActivities.augustCelestials.status, "completed", "Celestials read as completed")
+    test.eq(mopActivities.ordos.status, "incomplete", "Ordos reads as incomplete")
+    test.eq(mopActivities.ordos.resetsAt, 12200, "world-boss flags expire at weekly reset")
+    test.eq(mopActivities.farmHarvest.status, "unknown", "farm harvest is explicit unknown")
+    test.eq(mopActivities.farmHarvest.reason, "farm-observation-required", "farm unknown explains the evidence gap")
+
+    local missingActivities = Adapters.readers("mop", api({
+        GetNumRandomDungeons = false, GetLFGRandomDungeonInfo = false,
+        GetLFGDungeonRewards = false, GetQuestResetTime = false,
+        C_DateAndTime = false, C_QuestLog = false,
+    }), Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).activities()
+    test.eq(missingActivities.farmHarvest.status, "unknown", "farm remains honest when every progress API is absent")
+    test.eq(missingActivities.celestialFirst, nil, "missing LFG APIs never fabricate an incomplete daily")
+    test.eq(missingActivities.augustCelestials, nil, "missing quest APIs never fabricate a world-boss result")
+
+    local noMatchingDungeon = Adapters.readers("mop", api({
+        GetNumRandomDungeons = function() return 1 end,
+        GetLFGRandomDungeonInfo = function() return 9002, "随机英雄地下城" end,
+        GetLFGDungeonRewards = function() return false end,
+        GetQuestResetTime = function() return 3600 end,
+        C_DateAndTime = false, C_QuestLog = false,
+    }), Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).activities()
+    test.eq(noMatchingDungeon.celestialFirst.status, "unknown", "a present LFG API without the target stays unknown")
+    test.eq(noMatchingDungeon.celestialFirst.reason, "no-matching-dungeon", "the unknown daily records its reason")
+
+    local unreadableReward = Adapters.readers("mop", api({
+        GetNumRandomDungeons = function() return 1 end,
+        GetLFGRandomDungeonInfo = function() return 9001, "随机天神地下城" end,
+        GetLFGDungeonRewards = function() return nil end,
+        GetQuestResetTime = function() return 3600 end,
+        C_DateAndTime = false, C_QuestLog = false,
+    }), Catalog.forFamily("mop").raidColumns, Catalog.forFamily("mop").resourceColumns).activities()
+    test.eq(unreadableReward.celestialFirst.status, "unknown", "a nil reward result never becomes not complete")
+    test.eq(unreadableReward.celestialFirst.reason, "unreadable-lfg-reward", "the unreadable reward is explained")
+
     -- Missing, non-function or throwing APIs degrade to nil, never an error.
     local degraded = Adapters.readers("titan", api({
         UnitName = function() error("protected") end,

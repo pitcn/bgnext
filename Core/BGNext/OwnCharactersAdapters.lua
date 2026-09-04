@@ -896,6 +896,122 @@ function M.readResources(api, family, resourceColumns, selection)
     return result
 end
 
+local function activityColumns(resourceColumns)
+    local columns = {}
+    for _, column in ipairs(resourceColumns or {}) do
+        local source = type(column) == "table" and column.source or nil
+        if type(source) == "table" and source.kind == "activity" and type(column.id) == "string" then
+            columns[#columns + 1] = column
+        end
+    end
+    return columns
+end
+
+local function resetAt(api, cadence, nowValue)
+    local seconds
+    if cadence == "daily" then
+        seconds = M.safeCall(api and api.GetQuestResetTime)
+    elseif cadence == "weekly" then
+        local dateApi = api and api.C_DateAndTime
+        local getWeekly = type(dateApi) == "table" and dateApi.GetSecondsUntilWeeklyReset or nil
+        seconds = M.safeCall(getWeekly)
+    end
+    if type(nowValue) ~= "number" or type(seconds) ~= "number" or seconds < 0 then return nil end
+    return nowValue + seconds
+end
+
+local function containsToken(name, tokens)
+    if type(name) ~= "string" or type(tokens) ~= "table" then return false end
+    local folded = string.lower(name)
+    for _, token in ipairs(tokens) do
+        if type(token) == "string" and token ~= ""
+            and string.find(folded, string.lower(token), 1, true) then return true end
+    end
+    return false
+end
+
+-- Reads a deliberately small MoP-only activity catalog. World-boss completion
+-- uses BGLite's official quest ids, and the daily dungeon uses Blizzard's own
+-- random-dungeon `doneToday` result. The farm has no verified public completion
+-- API, so its selectable column reports unknown instead of guessing from login,
+-- inventory changes, map position or elapsed time.
+function M.readActivityStates(api, family, resourceColumns)
+    if family ~= "mop" or type(api) ~= "table" then return nil end
+    local columns = activityColumns(resourceColumns)
+    if #columns == 0 then return nil end
+    local nowValue = M.safeCall(api.time or api.GetServerTime)
+    local states = {}
+
+    for _, column in ipairs(columns) do
+        local source = column.source
+        local key = source.key or column.id
+        if source.detector == "unavailable" then
+            states[key] = {
+                status = "unknown",
+                observedAt = type(nowValue) == "number" and nowValue or nil,
+                reason = "farm-observation-required",
+            }
+        elseif source.detector == "quest-flag" and type(source.questId) == "number" then
+            local questApi = api.C_QuestLog
+            local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted
+                or api.IsQuestFlaggedCompleted
+            local expires = resetAt(api, source.cadence, nowValue)
+            local completed = M.safeCall(isComplete, source.questId)
+            if type(completed) == "boolean" and type(expires) == "number" then
+                states[key] = {
+                    status = completed and "completed" or "incomplete",
+                    observedAt = nowValue,
+                    resetsAt = expires,
+                }
+            end
+        elseif source.detector == "lfg-daily" then
+            local getCount = api.GetNumRandomDungeons
+            local getInfo = api.GetLFGRandomDungeonInfo
+            local getRewards = api.GetLFGDungeonRewards
+            local expires = resetAt(api, source.cadence, nowValue)
+            local count = M.safeCall(getCount)
+            if type(count) == "number" and count >= 0 and type(getInfo) == "function"
+                and type(getRewards) == "function" and type(expires) == "number" then
+                local matched, observed, completed = false, false, false
+                for index = 1, count do
+                    local ok, dungeonId, dungeonName = callAll(getInfo, index)
+                    if ok and type(dungeonId) == "number" and containsToken(dungeonName, source.nameTokens) then
+                        matched = true
+                        local rewardOk, doneToday = callAll(getRewards, dungeonId)
+                        if rewardOk and type(doneToday) == "boolean" then
+                            observed = true
+                            if doneToday then completed = true end
+                        end
+                    end
+                end
+                if matched and observed then
+                    states[key] = {
+                        status = completed and "completed" or "incomplete",
+                        observedAt = nowValue,
+                        resetsAt = expires,
+                    }
+                elseif matched then
+                    states[key] = {
+                        status = "unknown",
+                        observedAt = nowValue,
+                        resetsAt = expires,
+                        reason = "unreadable-lfg-reward",
+                    }
+                else
+                    states[key] = {
+                        status = "unknown",
+                        observedAt = nowValue,
+                        resetsAt = expires,
+                        reason = "no-matching-dungeon",
+                    }
+                end
+            end
+        end
+    end
+    if next(states) == nil then return nil end
+    return states
+end
+
 -- Builds the environment the collector consumes. Every entry is a zero-argument
 -- reader so the collector can treat missing APIs and protected values uniformly.
 function M.readers(family, api, raidColumns, resourceColumns)
@@ -913,6 +1029,7 @@ function M.readers(family, api, raidColumns, resourceColumns)
         raidStates = function() return M.readRaidStates(api, raidColumns, family) end,
         professions = function() return M.readProfessions(api) end,
         resources = function(selection) return M.readResources(api, family, resourceColumns, selection) end,
+        activities = function() return M.readActivityStates(api, family, resourceColumns) end,
     }
 end
 
@@ -969,6 +1086,25 @@ function M.canReadColumn(family, api, column)
             and (type(api.GetSpellCooldown) == "function"
                 or (type(api.C_Spell) == "table" and type(api.C_Spell.GetSpellCooldown) == "function"))
             and resolveSpellName(api, source.spellId) ~= nil
+    end
+    if source.kind == "activity" then
+        if family ~= "mop" then return false end
+        if source.detector == "unavailable" then return true end
+        if source.detector == "quest-flag" then
+            local questApi = api.C_QuestLog
+            local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted
+                or api.IsQuestFlaggedCompleted
+            local dateApi = api.C_DateAndTime
+            return type(source.questId) == "number" and type(isComplete) == "function"
+                and type(dateApi) == "table" and type(dateApi.GetSecondsUntilWeeklyReset) == "function"
+        end
+        if source.detector == "lfg-daily" then
+            return type(api.GetNumRandomDungeons) == "function"
+                and type(api.GetLFGRandomDungeonInfo) == "function"
+                and type(api.GetLFGDungeonRewards) == "function"
+                and type(api.GetQuestResetTime) == "function"
+        end
+        return false
     end
     if source.kind == "tracked-items" then return type(api.GetItemCount) == "function" end
     return false

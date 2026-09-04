@@ -307,6 +307,21 @@ return function(test)
     test.eq(mopHeadings.TOT, "雷电", "mop Throne of Thunder shows 雷电")
     test.eq(mopHeadings.SOO, "奥格", "mop Siege of Orgrimmar shows 奥格")
 
+    -- MoP-only routine trackers are independent optional columns. The farm
+    -- entry deliberately declares an unavailable detector so the UI can show
+    -- an honest unknown state instead of pretending that visiting or logging
+    -- in means the crops were harvested.
+    local mopActivities = {}
+    for _, column in ipairs(Catalog.forFamily("mop").resourceColumns) do
+        if column.source and column.source.kind == "activity" then mopActivities[column.id] = column end
+    end
+    test.eq(mopActivities.celestialFirst.source.detector, "lfg-daily", "daily first win uses the LFG reward state")
+    test.eq(mopActivities.farmHarvest.source.detector, "unavailable", "farm harvest fails closed without a client API")
+    test.eq(mopActivities.augustCelestials.source.questId, 33117, "Celestials use the BGLite world-boss quest flag")
+    test.eq(mopActivities.ordos.source.questId, 33118, "Ordos uses the BGLite world-boss quest flag")
+    test.eq(Catalog.defaultVisible("mop", "resource", "celestialFirst"), false, "new MoP trackers are opt-in")
+    test.eq(Catalog.column("titan", "resource", "celestialFirst"), nil, "MoP activities never leak into Titan")
+
     local retailHeadings = raidHeadings("retail")
     test.eq(retailHeadings.DR, "梦境", "retail 梦境裂隙 shows 梦境")
     test.eq(retailHeadings.MQD, "奎尔", "retail 进军奎尔丹纳斯 shows 奎尔")
