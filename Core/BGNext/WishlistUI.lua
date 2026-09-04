@@ -4,6 +4,26 @@ BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
 local M = { tabNumber = 3 }
+local tabButton
+
+function M.isFeatureEnabled()
+    local settings = BG.BGNext and BG.BGNext.FeatureSettings
+    if not settings or type(settings.isCurrentEnabled) ~= "function" then return true end
+    return settings.isCurrentEnabled("wishlist", BG, BG.BGNext.DB)
+end
+
+function M.refreshFeatureState()
+    local enabled = M.isFeatureEnabled()
+    if tabButton then
+        if type(tabButton.SetShown) == "function" then tabButton:SetShown(enabled)
+        elseif enabled then tabButton:Show() else tabButton:Hide() end
+    end
+    if not enabled then
+        M.closePicker()
+        if BG.HopeMainFrame then BG.HopeMainFrame:Hide() end
+    end
+    return enabled
+end
 
 -- The wishlist equipment picker is the single shared frame BG.FrameZhuangbeiList,
 -- created by BG.SetListzhuangbei (which the normal bill slots also use). Its
@@ -838,6 +858,7 @@ if runtimeReady() then
         end
 
         local function showCurrentRaid()
+            if not M.isFeatureEnabled() then BG.HopeMainFrame:Hide(); return end
             M.closePicker()
             for _, raidId in ipairs(BG.FBtable or {}) do
                 local frame = BG["HopeFrame" .. raidId]
@@ -851,7 +872,8 @@ if runtimeReady() then
         end
         BG.HopeMainFrame:SetScript("OnShow", showCurrentRaid)
         BG.HopeMainFrame:SetScript("OnHide", M.closePicker)
-        BG.Create_TabButton(M.tabNumber, L["心愿清单"] or "心愿清单", BG.HopeMainFrame)
+        tabButton = BG.Create_TabButton(M.tabNumber, L["心愿清单"] or "心愿清单", BG.HopeMainFrame)
+        M.refreshFeatureState()
 
         BG.ButtonImportHope = CreateFrame("Button", nil, BG.HopeMainFrame)
         BG.ButtonImportHope:SetPoint("TOPRIGHT", BG.MainFrame, "TOPRIGHT", -35, 4)
@@ -893,6 +915,7 @@ if runtimeReady() then
         end
 
         BG.SetHope = function(value, raidId)
+            if not M.isFeatureEnabled() then return false end
             local itemId = wishlist.itemIdFromValue(value)
             local root, realmId, player, currentRaidId = context(raidId)
             local result = wishlist.placeItem(root, realmId, player, currentRaidId, limitsFor(currentRaidId), itemId, resolveDrop)
@@ -906,6 +929,7 @@ if runtimeReady() then
         end
 
         BG.DeleteHope = function(value, raidId)
+            if not M.isFeatureEnabled() then return false end
             local itemId = wishlist.itemIdFromValue(value)
             if not itemId then return false end
             local root, realmId, player, currentRaidId = context(raidId)
@@ -920,6 +944,7 @@ if runtimeReady() then
         end
 
         BG.ToggleCurrentWish = function(value)
+            if not M.isFeatureEnabled() then return false end
             return BG.SetHope(value, BG.FB1)
         end
     end)

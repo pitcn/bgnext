@@ -88,6 +88,9 @@ function M.registerUtilityButton(button, previewFont, classicFont)
 end
 
 function M.isPreviewEnabled(root)
+    local featureSettings = BG.BGNext.FeatureSettings
+    if featureSettings and type(featureSettings.isCurrentEnabled) == "function"
+        and not featureSettings.isCurrentEnabled("appearance", BG, root) then return false end
     return type(root) == "table" and type(root.settings) == "table"
         and root.settings.uiTheme == "preview"
 end

@@ -169,6 +169,19 @@ return function(test)
     events.LOOT_OPENED[1]()
     test.eq(button.shown, false, "ordinary world loot does not expose the boss-loot action")
 
+    IsInInstance = function() return true end
+    BG.IsWLK = true
+    BG.BGNext.DB = { settings = {} }
+    BG.BGNext.FeatureSettings = { isEnabled = function() return false end }
+    loot = {
+        { link = "|cff0070dd|Hitem:1005:0:0|h[Disabled sword]|h|r", quantity = 1, quality = 3, bindType = 1, stack = 1 },
+    }
+    events.LOOT_OPENED[1]()
+    test.eq(button.shown, false, "disabled queue feature hides every loot-window entry")
+    local disabledCount, disabledReason = M.enqueueVisibleLoot()
+    test.eq(disabledCount, 0, "disabled loot entry queues nothing")
+    test.eq(disabledReason, "feature-disabled", "disabled loot entry explains its gate")
+
     -- No alternate send path may exist in this entry module.
     local file = assert(io.open("Core/BGNext/LootAuctionEntry.lua", "rb"))
     local source = file:read("*a")

@@ -199,7 +199,9 @@ BG.Init(function()
             GameTooltip:SetOwner(self, "ANCHOR_NONE")
             GameTooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT")
             GameTooltip:ClearLines()
-            for _, text in ipairs(ns.instructionsText) do
+            local guide = BG.BGNext and BG.BGNext.GuideUI
+            local lines = guide and guide.hoverLines and guide.hoverLines() or ns.instructionsText
+            for _, text in ipairs(lines) do
                 AddLine(text)
             end
             GameTooltip:Show()
