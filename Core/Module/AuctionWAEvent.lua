@@ -625,6 +625,10 @@ BG.Init(function()
   return (GetRealmName and GetRealmName() or ""):gsub(" ", ""):gsub("%-", "")
  end
  local function getRaidMemberNames()
+  if Sender and type(Sender.liveRaidMemberNames) == "function" then
+   local live = Sender.liveRaidMemberNames(GetNumGroupMembers, GetRaidRosterInfo)
+   if #live > 0 then return live end
+  end
   local members = {}
   for _, member in ipairs(wa.raidRosterInfo or {}) do
    if member and member.name and member.name ~= "" then

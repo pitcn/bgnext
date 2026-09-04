@@ -22,6 +22,26 @@ return function(test)
     test.eq(Sender.isRaidSender("", "Realm", { "Alice" }), false, "an empty sender is ignored")
     test.eq(Sender.isRaidSender("Alice", "Realm", {}), false, "an empty roster accepts no one")
 
+    -- Auction addon messages can arrive before the delayed roster-cache refresh.
+    -- The event boundary must be able to take a bounded, synchronous snapshot of
+    -- the live raid roster so a real first bid is not discarded on the leader.
+    local liveMembers = Sender.liveRaidMemberNames(
+        function() return 2 end,
+        function(index)
+            if index == 1 then return "Alice" end
+            if index == 2 then return "Bob-OtherRealm" end
+        end)
+    test.eq(#liveMembers, 2, "the live roster snapshot includes current members")
+    test.eq(liveMembers[1], "Alice", "the live roster keeps the bidder name")
+    test.eq(liveMembers[2], "Bob-OtherRealm", "the live roster keeps cross-realm identity")
+    local boundedCalls = 0
+    liveMembers = Sender.liveRaidMemberNames(function() return 1000 end, function(index)
+        boundedCalls = boundedCalls + 1
+        return "Member" .. index
+    end)
+    test.eq(boundedCalls, 40, "the live roster snapshot is bounded to a raid-sized scan")
+    test.eq(#liveMembers, 40, "the bounded snapshot cannot grow from hostile counts")
+
     local roster = {
         { name = "Leader", rank = 2, isML = false },
         { name = "Looter", rank = 0, isML = true },
@@ -123,6 +143,8 @@ return function(test)
         "the target is never passed as the bidder")
     test.eq(source:find("Sender.isRaidSender(sender, realm, members)", 1, true) ~= nil, true,
         "the sender is validated against the current raid roster")
+    test.eq(source:find("Sender.liveRaidMemberNames(GetNumGroupMembers, GetRaidRosterInfo)", 1, true) ~= nil, true,
+        "live bids consult a synchronous roster snapshot before the delayed cache")
     test.eq(source:find("Sender.parseBid(auctionIDStr, itemIDStr)", 1, true) ~= nil, true,
         "protocol numbers are validated before live auction comparisons")
     test.eq(source:find("Sender.isController(sender, realm, wa.raidRosterInfo)", 1, true) ~= nil, true,
