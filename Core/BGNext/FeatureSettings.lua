@@ -54,6 +54,28 @@ function M.isEnabled(root, id, family)
     return enabled(root, id, family, {})
 end
 
+function M.currentFamily(globals)
+    globals = globals or BG
+    local adapters = BG.BGNext and BG.BGNext.OwnCharactersAdapters
+    if adapters and type(adapters.detect) == "function" then
+        local family = adapters.detect(globals)
+        if family then return family end
+    end
+    if globals.IsRetail then return "retail" end
+    if globals.IsMOP then return "mop" end
+    if globals.IsCTM then return "cata" end
+    if globals.IsTitan then return "titan" end
+    if globals.IsWLK then return "wrath" end
+    if globals.IsTBC then return "tbc" end
+    if globals.IsVanilla then return "vanilla" end
+end
+
+function M.isCurrentEnabled(id, globals, root)
+    local family = M.currentFamily(globals)
+    if not family then return false end
+    return M.isEnabled(root or (BG.BGNext and BG.BGNext.DB), id, family)
+end
+
 function M.setEnabled(root, id, value)
     local featureCatalog = catalog()
     local entry = featureCatalog and featureCatalog.get(id) or nil
