@@ -43,10 +43,11 @@ local function refreshUI(kind)
 end
 
 -- A settlement identity may only be established while the evidence is
--- complete: the user is in a raid, a current table is selected, and BGLite has
--- already stamped that table's roster for this raid on the same realm. The
--- stamp is cleared whenever the user clears the table, so a cleared or
--- restarted raid yields a different identity.
+-- complete: the user is in a raid, a current table is detected, and the
+-- current roster is known. Normally that evidence is BGLite's persisted roster
+-- stamp. During the short window after entering another supported raid, the
+-- live roster may provide the same bounded evidence before the first boss has
+-- caused BGLite to persist a stamp.
 function M.raidId(context)
     if type(context) ~= "table" then
         return nil
@@ -331,12 +332,34 @@ local function liveContext()
     local settlement = root and root.currentSettlement
     local inRaid = IsInRaid and IsInRaid(1) and true or false
     local fb = inRaid and BG.FB2 or (settlement and settlement.sourceFb)
+    local now = serverNow()
     local roster
     if type(fb) == "string" and type(BiaoGe) == "table" and type(BiaoGe[fb]) == "table" then
         roster = BiaoGe[fb].raidRoster
     end
+
+    local persistedRoster = type(roster) == "table" and type(roster.time) == "number"
+    if inRaid and not persistedRoster and type(BG.raidRosterInfo) == "table" then
+        local names = {}
+        for _, member in ipairs(BG.raidRosterInfo) do
+            local name = type(member) == "table" and member.name or nil
+            if type(name) == "string" and name:find("%S") then
+                names[#names + 1] = name
+            end
+        end
+        if #names > 0 then
+            roster = {
+                time = now,
+                realm = BG.realmName,
+                roster = names,
+            }
+        end
+    end
     local sameTeam
-    if inRaid and type(fb) == "string" and type(BG.IsNotSameTeam) == "function" then
+    -- IsNotSameTeam intentionally reports "different" when the table has no
+    -- saved roster. Do not apply that sentinel while the live roster is the
+    -- evidence, or every trade before the first boss stamp is discarded.
+    if inRaid and persistedRoster and type(fb) == "string" and type(BG.IsNotSameTeam) == "function" then
         local ok, isDifferent = pcall(BG.IsNotSameTeam, fb)
         if ok then
             sameTeam = not isDifferent
@@ -349,7 +372,7 @@ local function liveContext()
         inRaid = inRaid,
         normalizeName = BG.GSN,
         sameTeam = sameTeam,
-        now = serverNow(),
+        now = now,
     }
 end
 

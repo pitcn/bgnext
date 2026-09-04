@@ -251,10 +251,33 @@ return function(test)
     test.eq(live.roster, BiaoGe.ICC.raidRoster, "live context uses the detected instance roster")
     test.eq(live.now, 12100, "live context uses the server clock")
 
+    -- Moving directly into a second supported raid can happen before that
+    -- table receives its first persisted boss-roster stamp. The detected
+    -- instance plus the live raid roster is enough current evidence to start
+    -- the new settlement; otherwise every early trade in the second raid is
+    -- silently discarded.
+    life.beginSettlement(root, "ZAM@11900", 11900, { fb = "ZAM", realm = "测试服" })
+    BG.FB2 = "SW"
+    BG.raidRosterInfo = { { name = "甲" }, { name = "乙" } }
+    BiaoGe.SW = {}
+    BG.IsNotSameTeam = function()
+        return true -- BGLite's sentinel when this table has no saved roster yet
+    end
+    live = runtime.liveContext()
+    test.eq(runtime.recordTrade(root, live, {
+        completed = true, target = "甲", targetmoney = 100, playermoney = 0,
+        playeritems = { { itemId = 71, count = 1 } }, targetitems = {},
+    }), 1, "a trade in the next detected raid records before its first boss roster stamp")
+    test.eq(root.currentSettlement.sourceFb, "SW", "the early trade opens the detected raid settlement")
+
+    BG.FB2 = "ICC"
+    BG.raidRosterInfo = nil
+    BG.IsNotSameTeam = nil
+    life.beginSettlement(root, "ICC@12000", 12100, { fb = "ICC", realm = "测试服" })
+
     -- One mail attempt owns exactly one success result. A duplicated result is
     -- ignored even when the clock advances; a genuinely new identical attempt
     -- gets a new in-memory token and may be recorded.
-    life.beginSettlement(root, "ICC@12000", 12100, { fb = "ICC", realm = "测试服" })
     test.eq(runtime.notifyMailAttempt("甲", 300, "raid"), true, "raid mail attempt is armed")
     test.eq(runtime.notifyMailSent("甲", 300, "raid"), true, "first result consumes the mail attempt")
     GetServerTime = function() return 12101 end
