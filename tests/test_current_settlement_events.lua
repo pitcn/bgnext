@@ -62,7 +62,7 @@ return function(test)
     fire("TRADE_ACCEPT_UPDATE", true, true)
     fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
     test.eq(#root.currentSettlement.trades, 1, "the completion event records the two-item trade once")
-    test.eq(root.currentSettlement.trades[1].quantity, 2, "the completion event preserves the delivered count")
+    test.eq(root.currentSettlement.trades[1].myItems[1].quantity, 2, "the completion event preserves the delivered count")
 
     -- A repeated completion message books nothing extra: the capture module
     -- commits once, and the store deduplicates the identical snapshot.

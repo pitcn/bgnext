@@ -18,24 +18,36 @@ return function(test)
     test.eq(trade.append(root, {
         raidId = "raid-a",
         player = "甲",
-        itemId = 1,
-        amount = 100,
-        time = 101,
+        completed = true,
         status = "complete",
+        myGold = 0,
+        theirGold = 100,
+        myItems = { { itemId = 1, quantity = 1 } },
+        theirItems = {},
+        time = 101,
         secret = "discard me",
     }), true, "current trade accepted")
     test.eq(root.currentSettlement.trades[1].secret, nil, "unknown trade field discarded")
-    test.eq(trade.append(root, { raidId = "raid-b", player = "乙", amount = 200, time = 102 }), false, "other raid trade rejected")
-    test.eq(trade.append(root, { raidId = "raid-a", player = "", amount = 200, time = 102 }), false, "unnamed trade rejected")
+    test.eq(trade.append(root, {
+        raidId = "raid-b", player = "乙", completed = true, status = "complete",
+        theirGold = 200, time = 102,
+    }), false, "other raid trade rejected")
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "", completed = true, status = "complete",
+        theirGold = 200, time = 102,
+    }), false, "unnamed trade rejected")
 
     -- a repeated success event for the same trade must not create a second record
     test.eq(trade.append(root, {
         raidId = "raid-a",
         player = "甲",
-        itemId = 1,
-        amount = 100,
-        time = 101,
+        completed = true,
         status = "complete",
+        myGold = 0,
+        theirGold = 100,
+        myItems = { { itemId = 1, quantity = 1 } },
+        theirItems = {},
+        time = 101,
     }), false, "duplicate trade event rejected")
     test.eq(#root.currentSettlement.trades, 1, "duplicate trade event not stored")
 
@@ -69,10 +81,10 @@ return function(test)
 
     -- status and direction accept only declared reconciliation states, never free text
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "丙", itemId = 2, amount = 50, time = 104, status = "私人备注",
+        raidId = "raid-a", player = "丙", completed = true, status = "私人备注", theirGold = 50, time = 104,
     }), false, "free-text trade status rejected")
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "丙", itemId = 2, amount = 50, time = 104, status = "cancelled",
+        raidId = "raid-a", player = "丙", completed = true, status = "cancelled", theirGold = 50, time = 104,
     }), true, "cancelled trade stored as cancelled")
     test.eq(root.currentSettlement.trades[2].status, "cancelled", "cancelled trade is never upgraded to success")
     test.eq(mail.append(root, {
@@ -82,18 +94,29 @@ return function(test)
         raidId = "raid-a", player = "丙", amount = 50, time = 105, status = "sent", direction = "私人备注",
     }), false, "free-text mail direction rejected")
 
-    -- quantity is whitelisted and validated: only a positive whole count survives
+    -- gold and item quantity are validated: an explicit 0 is a fact, a negative
+    -- or a missing completed fact is rejected, and only a positive whole item
+    -- count survives inside the item lists.
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "丁", itemId = 3, amount = 50, time = 106,
-        status = "complete", quantity = 2,
-    }), true, "a valid quantity is stored")
-    test.eq(root.currentSettlement.trades[3].quantity, 2, "quantity field is preserved")
+        raidId = "raid-a", player = "丁", completed = true, status = "complete",
+        myGold = 0, theirGold = 0, myItems = { { itemId = 3, quantity = 2 } }, time = 106,
+    }), true, "explicit 0 gold is a valid fact")
+    test.eq(root.currentSettlement.trades[3].myGold, 0, "zero gold is stored as 0, not unknown")
+    test.eq(root.currentSettlement.trades[3].myItems[1].quantity, 2, "item quantity inside the list is preserved")
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "戊", itemId = 4, amount = 50, time = 107,
-        status = "complete", quantity = 0,
-    }), false, "a zero quantity is rejected")
+        raidId = "raid-a", player = "戊", completed = true, status = "complete",
+        theirGold = -1, time = 107,
+    }), false, "a negative gold amount is rejected")
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "戊", itemId = 4, amount = 50, time = 107,
-        status = "complete", quantity = 1.5,
-    }), false, "a fractional quantity is rejected")
+        raidId = "raid-a", player = "戊", completed = false, status = "complete",
+        theirGold = 50, time = 107,
+    }), false, "a trade without the completed fact is rejected")
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "己", completed = true, status = "complete",
+        theirGold = 50, myItems = { { itemId = 4, quantity = 0 } }, time = 108,
+    }), false, "a zero item quantity is rejected")
+    test.eq(trade.append(root, {
+        raidId = "raid-a", player = "己", completed = true, status = "complete",
+        theirGold = 50, myItems = { { itemId = 4, quantity = 1.5 } }, time = 108,
+    }), false, "a fractional item quantity is rejected")
 end

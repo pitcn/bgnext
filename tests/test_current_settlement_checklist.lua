@@ -17,12 +17,18 @@ return function(test)
     end
 
     -- Straight through the real whitelist stores so the checklist sees the
-    -- exact record shapes the runtime writes.
+    -- exact grouped record shape the runtime writes.
     local function addTrade(root, player, itemId, amount, status, time, raidId)
         return trade.append(root, {
             raidId = raidId or root.currentSettlement.raidId,
-            player = player, itemId = itemId, amount = amount,
-            time = time or NOW, status = status,
+            player = player,
+            completed = true,
+            status = status,
+            myGold = 0,
+            theirGold = amount,
+            myItems = { { itemId = itemId, quantity = 1 } },
+            theirItems = {},
+            time = time or NOW,
         })
     end
 
@@ -410,7 +416,12 @@ return function(test)
     -- 10. an anomaly wins over pending, both are counted
     root = newRoot()
     beginSettlement(root, "ICC")
-    addTrade(root, "买家甲", 7001, 100, "complete")
+    -- A legacy flat record without a direction: it proves nothing and adds no
+    -- surplus, matching the historical shape the checklist still reads safely.
+    table.insert(root.currentSettlement.trades, {
+        raidId = root.currentSettlement.raidId, player = "买家甲", itemId = 7001, amount = 100,
+        time = NOW, status = "complete",
+    })
     report = checklist.evaluate({
         settlement = root.currentSettlement,
         bill = bill({ saleRow(1, 1, 7001, "[装备一]", "", "", 500) },

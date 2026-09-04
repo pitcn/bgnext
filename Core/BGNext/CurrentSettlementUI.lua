@@ -136,7 +136,8 @@ function M.directionLabel(direction)
 end
 
 -- The tooltip is driven only by the stored item id; nothing else about the row
--- is used to look an item up.
+-- is used to look an item up. A grouped trade tooltips its first identifiable
+-- item (outgoing before incoming).
 function M.tooltipTarget(row)
     if type(row) ~= "table" then
         return nil
@@ -144,7 +145,30 @@ function M.tooltipTarget(row)
     if type(row.itemId) == "number" then
         return row.itemId
     end
+    if type(row.myItems) == "table" and type(row.myItems[1]) == "table" then
+        return row.myItems[1].itemId
+    end
+    if type(row.theirItems) == "table" and type(row.theirItems[1]) == "table" then
+        return row.theirItems[1].itemId
+    end
     return nil
+end
+
+-- Composes the gold column text for a grouped trade: an explicit 0 renders as
+-- 0, an unknown side is omitted, and two-way gold is never netted. Legacy rows
+-- (which carry a single stored amount) keep using their amountText instead.
+function M.goldText(row)
+    if type(row) ~= "table" then
+        return ""
+    end
+    local parts = {}
+    if type(row.theirGold) == "number" then
+        parts[#parts + 1] = L["收到"] .. " " .. string.format("%d", row.theirGold)
+    end
+    if type(row.myGold) == "number" then
+        parts[#parts + 1] = L["寄出"] .. " " .. string.format("%d", row.myGold)
+    end
+    return table.concat(parts, " / ")
 end
 
 function M.rows(root, kind, options)
@@ -811,14 +835,43 @@ local function acquireRow(win, index)
     return row
 end
 
+-- Builds the item column for one row. Legacy rows show their single stored
+-- item; grouped trades list both delivery directions, each item with its count.
+local function itemCellText(data)
+    if type(data) ~= "table" then
+        return "", nil
+    end
+    if type(data.itemId) == "number" then
+        local text, texture = itemDisplay(data.itemId)
+        return text .. M.quantityText(data.quantity), texture
+    end
+    local parts = {}
+    local texture
+    if type(data.myItems) == "table" then
+        for _, entry in ipairs(data.myItems) do
+            local text, tex = itemDisplay(entry.itemId)
+            if not texture then texture = tex end
+            parts[#parts + 1] = L["寄出"] .. " " .. text .. M.quantityText(entry.quantity)
+        end
+    end
+    if type(data.theirItems) == "table" then
+        for _, entry in ipairs(data.theirItems) do
+            local text, tex = itemDisplay(entry.itemId)
+            if not texture then texture = tex end
+            parts[#parts + 1] = L["收到"] .. " " .. text .. M.quantityText(entry.quantity)
+        end
+    end
+    return table.concat(parts, " / "), texture
+end
+
 local function fillRow(win, row, data)
     row.data = data
     local cells = row.cells
 
     local itemCell = cells.item
     if itemCell then
-        local text, texture = itemDisplay(data.itemId)
-        itemCell.text:SetText(text .. M.quantityText(data.quantity))
+        local text, texture = itemCellText(data)
+        itemCell.text:SetText(text)
         itemCell.icon:SetTexture(texture)
         itemCell.icon:SetShown(texture ~= nil)
     end
@@ -827,7 +880,11 @@ local function fillRow(win, row, data)
         cells.player.text:SetTextColor(1, 0.82, 0)
     end
     if cells.amount then
-        cells.amount.text:SetText(data.amountText or "")
+        local text = data.amountText or ""
+        if type(data.myGold) == "number" or type(data.theirGold) == "number" then
+            text = M.goldText(data)
+        end
+        cells.amount.text:SetText(text)
         cells.amount.text:SetTextColor(1, 0.82, 0)
     end
     if cells.time then

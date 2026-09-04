@@ -188,11 +188,11 @@ return function(test)
         test.eq(#root.currentSettlement.trades, 1, "the completion event records the trade once")
         local row = root.currentSettlement.trades[1]
         test.eq(row.player, "甲", "settlement record keeps the counterparty")
-        test.eq(row.itemId, 11, "settlement record keeps the item")
-        test.eq(row.amount, 100, "settlement record keeps the amount")
+        test.eq(row.myItems[1].itemId, 11, "settlement record keeps the delivered item")
+        test.eq(row.theirGold, 100, "settlement record keeps the received gold")
+        test.eq(row.completed, true, "settlement record keeps the completed fact")
         test.eq(row.status, "complete", "settlement record is complete")
-        test.eq(row.direction, "outgoing", "settlement record keeps the observed direction")
-        test.eq(row.quantity, 1, "settlement record keeps the delivered count")
+        test.eq(row.myItems[1].quantity, 1, "settlement record keeps the delivered count")
 
         -- The bill writer reads BG.trade; after commit it holds the committed
         -- snapshot, so the bill buyer/amount/item come from the frozen state.
@@ -232,7 +232,7 @@ return function(test)
         fire("TRADE_CLOSED")
 
         test.eq(#root.currentSettlement.trades, 1, "a cleared shared table before success still records the frozen trade")
-        test.eq(root.currentSettlement.trades[1].itemId, 22, "the frozen item survives the cleared shared table")
+        test.eq(root.currentSettlement.trades[1].myItems[1].itemId, 22, "the frozen item survives the cleared shared table")
     end
 
     -- =====================================================================
@@ -252,7 +252,7 @@ return function(test)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE) -- success arrives after
 
         test.eq(#root.currentSettlement.trades, 1, "close-before-success still records the frozen trade")
-        test.eq(root.currentSettlement.trades[1].itemId, 33, "close-before-success keeps the item")
+        test.eq(root.currentSettlement.trades[1].myItems[1].itemId, 33, "close-before-success keeps the item")
     end
 
     -- =====================================================================
@@ -272,7 +272,7 @@ return function(test)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
 
         test.eq(#root.currentSettlement.trades, 1, "an item that appears around confirm is captured at accept")
-        test.eq(root.currentSettlement.trades[1].itemId, 44, "the confirm-time item link is recorded")
+        test.eq(root.currentSettlement.trades[1].myItems[1].itemId, 44, "the confirm-time item link is recorded")
     end
 
     -- =====================================================================
@@ -305,18 +305,18 @@ return function(test)
         local byTarget = {}
         for _, t in ipairs(trades) do byTarget[t.player] = byTarget[t.player] or {}; table.insert(byTarget[t.player], t) end
 
-        test.eq(byTarget["甲"][1].quantity, 1, "a single item keeps quantity 1")
+        test.eq(byTarget["甲"][1].myItems[1].quantity, 1, "a single item keeps quantity 1")
         test.eq(byTarget["甲"][1].status, "complete", "a single item with gold is complete")
 
         test.eq(#byTarget["乙"], 1, "two identical items collapse into one record")
-        test.eq(byTarget["乙"][1].quantity, 2, "two identical items keep the summed quantity")
+        test.eq(byTarget["乙"][1].myItems[1].quantity, 2, "two identical items keep the summed quantity")
         test.eq(byTarget["乙"][1].status, "complete", "two identical single units stay complete")
 
-        test.eq(byTarget["丙"][1].quantity, 2, "a stack preserves its count")
+        test.eq(byTarget["丙"][1].myItems[1].quantity, 2, "a stack preserves its count")
         test.eq(byTarget["丙"][1].status, "pending", "a stack cannot prove a single bill sale")
 
-        -- Multiple distinct items in one trade project one row per item, with
-        -- the gold attached to the first row only.
+        -- Multiple distinct items in one trade project one grouped record, with
+        -- the shared gold stored once on the transaction, never per item.
         local distinctRoot = BG.BGNext.DataLifecycle.ensureRoot({})
         BG.BGNext.DB = distinctRoot
         GetServerTime = function() return 24110 end
@@ -327,9 +327,11 @@ return function(test)
         }
         fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
-        test.eq(#distinctRoot.currentSettlement.trades, 2, "two distinct items project two records")
-        test.eq(distinctRoot.currentSettlement.trades[1].amount, 400, "the first distinct item carries the gold")
-        test.eq(distinctRoot.currentSettlement.trades[2].amount, nil, "the second distinct item carries no gold")
+        test.eq(#distinctRoot.currentSettlement.trades, 1, "two distinct items project one grouped record")
+        test.eq(distinctRoot.currentSettlement.trades[1].theirGold, 400, "the shared gold is stored once on the transaction")
+        test.eq(distinctRoot.currentSettlement.trades[1].myItems[1].itemId, 5, "the first delivered item is kept")
+        test.eq(distinctRoot.currentSettlement.trades[1].myItems[2].itemId, 6, "the second delivered item is kept")
+        test.eq(distinctRoot.currentSettlement.trades[1].status, "complete", "a two-item clean delivery reconciles as one transaction")
 
         -- 0 gold: an item-only trade stays pending and never proves a sale.
         local zeroRoot = BG.BGNext.DataLifecycle.ensureRoot({})
@@ -344,7 +346,8 @@ return function(test)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
         test.eq(#zeroRoot.currentSettlement.trades, 1, "a 0-gold trade still records for manual reconciliation")
         test.eq(zeroRoot.currentSettlement.trades[1].status, "pending", "a 0-gold trade is pending, never complete")
-        test.eq(zeroRoot.currentSettlement.trades[1].amount, nil, "a 0-gold trade invents no amount")
+        test.eq(zeroRoot.currentSettlement.trades[1].myGold, 0, "a 0-gold trade keeps its explicit 0 gold")
+        test.eq(zeroRoot.currentSettlement.trades[1].theirGold, 0, "a 0-gold trade keeps its explicit 0 gold")
     end
 
     -- =====================================================================

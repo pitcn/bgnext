@@ -70,30 +70,82 @@ end
 -- and its payment. Direction-less legacy records, incoming purchases, short
 -- payments and packed shared amounts all stay pending, and each evidence row
 -- is consumed at most once. Amounts are never apportioned across items.
+-- Normalizes one stored trade record into the delivery candidates the bill
+-- matcher consumes. A grouped transaction record (the current shape) yields one
+-- candidate per delivered item — outgoing from myItems, incoming from theirItems
+-- — with the recorded gold on the matching side, but only when the trade is
+-- reconciled. A legacy flat record keeps its single item/amount/direction/
+-- quantity. A reconcile-pending grouped trade yields no evidence, so its
+-- completed fact is never silently treated as a settled sale.
+local function recordEvidence(record)
+    local evidence = {}
+    if type(record) ~= "table" then
+        return evidence
+    end
+    if type(record.completed) == "boolean" or type(record.myItems) == "table"
+        or type(record.myGold) == "number" then
+        if record.status ~= "complete" then
+            return evidence
+        end
+        if type(record.myItems) == "table" then
+            for _, entry in ipairs(record.myItems) do
+                evidence[#evidence + 1] = {
+                    itemId = entry.itemId,
+                    quantity = entry.quantity,
+                    direction = "outgoing",
+                    amount = record.theirGold,
+                }
+            end
+        end
+        if type(record.theirItems) == "table" then
+            for _, entry in ipairs(record.theirItems) do
+                evidence[#evidence + 1] = {
+                    itemId = entry.itemId,
+                    quantity = entry.quantity,
+                    direction = "incoming",
+                    amount = record.myGold,
+                }
+            end
+        end
+        return evidence
+    end
+    if record.status == "complete" and type(record.itemId) == "number" then
+        evidence[#evidence + 1] = {
+            itemId = record.itemId,
+            quantity = record.quantity,
+            direction = record.direction,
+            amount = tonumber(record.amount),
+        }
+    end
+    return evidence
+end
+
 local function evaluateSoldRows(input, addPending)
-    -- Group complete trade rows by trade (player + time) so a packed trade
+    -- Group outgoing candidates by trade (player + time) so a packed trade
     -- (several delivered items sharing one gold amount) can be recognised:
-    -- its per-row amount is the trade total and can never prove a single
-    -- bill row's price.
-    local packedTrades, candidates = {}, {}
+    -- the gold is the trade total and can never prove a single bill row's
+    -- price.
+    local candidates, outgoingByTrade = {}, {}
     for _, record in ipairs(input.settlement.trades or {}) do
-        if record.status == "complete" and type(record.itemId) == "number" then
-            local player = normalize(input, record.player)
-            if player then
-                local tradeKey = player .. "|" .. tostring(record.time)
-                packedTrades[tradeKey] = (packedTrades[tradeKey] or 0) + 1
-                local key = tostring(record.itemId) .. "|" .. player
+        local player = normalize(input, record.player)
+        if player then
+            local tradeKey = player .. "|" .. tostring(record.time)
+            for _, entry in ipairs(recordEvidence(record)) do
+                if entry.direction == "outgoing" then
+                    outgoingByTrade[tradeKey] = (outgoingByTrade[tradeKey] or 0) + 1
+                end
+                local key = tostring(entry.itemId) .. "|" .. player
                 local list = candidates[key]
                 if not list then
                     list = {}
                     candidates[key] = list
                 end
-                local quantity = type(record.quantity) == "number"
-                    and record.quantity >= 1 and record.quantity % 1 == 0
-                    and record.quantity or nil
+                local quantity = type(entry.quantity) == "number"
+                    and entry.quantity >= 1 and entry.quantity % 1 == 0
+                    and entry.quantity or nil
                 list[#list + 1] = {
-                    amount = tonumber(record.amount),
-                    direction = record.direction,
+                    amount = entry.amount,
+                    direction = entry.direction,
                     tradeKey = tradeKey,
                     quantity = quantity,
                     remaining = quantity,
@@ -104,7 +156,7 @@ local function evaluateSoldRows(input, addPending)
     end
     for _, list in pairs(candidates) do
         for _, candidate in ipairs(list) do
-            candidate.packed = (packedTrades[candidate.tradeKey] or 0) > 1
+            candidate.packed = (outgoingByTrade[candidate.tradeKey] or 0) > 1
                 or candidate.quantity == nil
                 or (candidate.quantity ~= nil and candidate.quantity > 1)
         end

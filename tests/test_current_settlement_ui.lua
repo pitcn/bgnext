@@ -49,7 +49,8 @@ return function(test)
     -- 3. rows come only from the current settlement
     life.beginSettlement(root, "raid-a", 1000)
     test.eq(trade.append(root, {
-        raidId = "raid-a", player = "甲", itemId = 11, amount = 100, time = 1100, status = "complete",
+        raidId = "raid-a", player = "甲", completed = true, status = "complete",
+        myGold = 0, theirGold = 100, myItems = { { itemId = 11, quantity = 1 } }, time = 1100,
     }), true, "trade stored")
     test.eq(mail.append(root, {
         raidId = "raid-a", player = "乙", amount = 200, time = 1200, status = "sent", direction = "outgoing",
@@ -59,7 +60,8 @@ return function(test)
     test.eq(isEmpty, false, "trade table is populated")
     test.eq(#rows, 1, "only the settlement trade is listed")
     test.eq(rows[1].player, "甲", "trade row shows the counterparty")
-    test.eq(rows[1].amountText, "100", "trade row shows the amount")
+    test.eq(rows[1].theirGold, 100, "trade row carries the received gold")
+    test.eq(ui.goldText(rows[1]), "收到 100 / 寄出 0", "gold shows both directions, an explicit 0 included")
     test.eq(rows[1].timeText, "t1100", "trade row shows the time")
 
     local mailRows = ui.rows(root, "mail", { now = 1300, dateFn = stubDate })
@@ -92,6 +94,8 @@ return function(test)
     test.eq(ui.tooltipTarget({ itemId = 11 }), 11, "tooltip uses the stored item id")
     test.eq(ui.tooltipTarget({ itemId = "11" }), nil, "tooltip refuses a non-numeric item id")
     test.eq(ui.tooltipTarget({}), nil, "a row without an item has no tooltip")
+    test.eq(ui.tooltipTarget({ myItems = { { itemId = 22 } } }), 22, "tooltip uses a grouped outgoing item")
+    test.eq(ui.tooltipTarget({ theirItems = { { itemId = 33 } } }), 33, "tooltip uses a grouped incoming item")
 
     -- 6. filtering and reconciliation are explicit, local and reversible.
     test.eq(#ui.filterRows(rows, "all"), 1, "all filter keeps every row")
@@ -129,7 +133,8 @@ return function(test)
     -- 8. an expired settlement is purged before the table is shown
     life.beginSettlement(root, "raid-b", 2000)
     test.eq(trade.append(root, {
-        raidId = "raid-b", player = "丙", itemId = 22, amount = 300, time = 2100, status = "complete",
+        raidId = "raid-b", player = "丙", completed = true, status = "complete",
+        myGold = 0, theirGold = 300, myItems = { { itemId = 22, quantity = 1 } }, time = 2100,
     }), true, "second settlement trade stored")
     test.eq(ui.prepare(root, 2000 + 7 * 86400), true, "opening the page purges an expired settlement")
     test.eq(root.currentSettlement.raidId, nil, "expired settlement identity removed")
@@ -354,8 +359,8 @@ return function(test)
 
         checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
         checklistTrade.append(BG.BGNext.DB, {
-            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
-            time = nowValue, status = "pending",
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 100, myItems = { { itemId = 7001, quantity = 1 } }, time = nowValue,
         })
 
         local chunk = assert(loadfile("Core/BGNext/CurrentSettlementUI.lua"))
@@ -443,8 +448,8 @@ return function(test)
         BiaoGe.ICC.boss1.qiankuan1 = nil
         checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
         checklistTrade.append(BG.BGNext.DB, {
-            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
-            time = nowValue, status = "pending",
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 100, myItems = { { itemId = 7001, quantity = 1 } }, time = nowValue,
         })
         ui2.Refresh("trade")
         state = ui2.checklistState()
@@ -484,8 +489,8 @@ return function(test)
         -- 10i. clearing the active raid table invalidates the scope at once
         checklistLife.beginSettlement(BG.BGNext.DB, "ICC@123", nowValue, { fb = "ICC", realm = "realm" })
         checklistTrade.append(BG.BGNext.DB, {
-            raidId = "ICC@123", player = "买家甲", itemId = 7001, amount = 100,
-            time = nowValue, status = "pending",
+            raidId = "ICC@123", player = "买家甲", completed = true, status = "pending",
+            myGold = 0, theirGold = 100, myItems = { { itemId = 7001, quantity = 1 } }, time = nowValue,
         })
         ui2.Refresh("checklist")
         test.eq(ui2.checklistState().report.status, "issues", "the re-established scope is checked")
