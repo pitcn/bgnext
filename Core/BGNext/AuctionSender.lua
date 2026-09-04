@@ -10,6 +10,7 @@ local PlayerIdentity = assert(BG.BGNext.PlayerIdentity, "BGNext PlayerIdentity m
 M.MAX_ID = 2147483647
 M.MAX_MONEY = 10000000
 M.MAX_RATE_KEYS = 256
+M.MAX_RAID_MEMBERS = 40
 
 local function boundedInteger(value, minimum, maximum)
     local number = tonumber(value)
@@ -46,6 +47,26 @@ function M.isRaidSender(sender, realm, memberNames)
         if PlayerIdentity.same(sender, name, realm) then return true end
     end
     return false
+end
+
+-- Read a current raid-name snapshot directly at the message boundary. Roster
+-- update events are deliberately delayed by the upstream UI; a bid can arrive
+-- during that delay and must not be rejected merely because the cached table is
+-- still empty. The scan is capped to the maximum raid size and returns names
+-- only, keeping the helper read-only and cheap.
+function M.liveRaidMemberNames(getCount, getMember)
+    if type(getCount) ~= "function" or type(getMember) ~= "function" then return {} end
+    local count = tonumber(getCount())
+    if not count or count ~= count or count <= 0 then return {} end
+    count = math.min(M.MAX_RAID_MEMBERS, math.floor(count))
+    local members = {}
+    for index = 1, count do
+        local name = getMember(index)
+        if type(name) == "string" and name ~= "" then
+            members[#members + 1] = name
+        end
+    end
+    return members
 end
 
 function M.isController(sender, realm, roster)
