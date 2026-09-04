@@ -14,6 +14,20 @@ return function(test)
     for _, text in ipairs({ "基础模式", "游戏内说明书", "待拍队列", "拾取窗口", "拍卖结果", "交易记录", "退货", "农场收菜", "BGLite 2.4.2" }) do
         test.eq(changelogItems:find(text, 1, true) ~= nil, true, "in-game release notes cover " .. text)
     end
+    test.eq(type(info.history), "table", "historical release notes are available")
+    local expectedHistory = { "0.6.0", "0.5.0", "0.4.0", "0.3.1", "0.3.0", "0.2.3", "0.2.2", "0.2.1", "0.2.0", "0.1.0" }
+    for index, version in ipairs(expectedHistory) do
+        test.eq(info.history[index] and info.history[index].version, version,
+            "historical release order includes " .. version)
+        test.eq(type(info.history[index] and info.history[index].changelog), "table",
+            "historical release has player notes for " .. version)
+    end
+    test.eq(info.history[6].changelog[1]:find("正式服心愿", 1, true) ~= nil, true,
+        "0.2.3 history describes its Retail display fixes")
+    test.eq(info.history[7].changelog[1]:find("跨客户端拍卖编号", 1, true) ~= nil, true,
+        "0.2.2 history describes its auction compatibility fixes")
+    test.eq(changelogItems:find("聊天装备", 1, true), nil,
+        "release notes do not promise unverified chat-link Shift-click capture")
     test.eq(type(info.credits.upstream), "table", "upstream credits")
     test.eq(info.credits.contributors[1]:find("@pitcn", 1, true) ~= nil, true,
         "named BGNext maintainer is included in in-game credits")
@@ -37,6 +51,8 @@ return function(test)
     local changelogText = about.buildText("changelog", info)
     test.eq(changelogText:find("BGNext " .. info.version, 1, true) ~= nil, true, "release version rendered")
     test.eq(changelogText:find(info.changelog[1], 1, true) ~= nil, true, "changelog rendered")
+    test.eq(changelogText:find("BGNext 0.6.0", 1, true) ~= nil, true, "previous release rendered")
+    test.eq(changelogText:find("BGNext 0.1.0", 1, true) ~= nil, true, "oldest release rendered")
     test.eq(changelogText:find("Lua 5.1", 1, true), nil, "player changelog avoids implementation jargon")
     test.eq(about.buildText("credits", info):find(info.credits.upstream[1], 1, true) ~= nil, true, "credits rendered")
 

@@ -9,9 +9,21 @@ local L = ns.L
 local c1 = ns.c1
 
 do -- BGNext release text
+    L["新增待拍队列并修复拍卖结果、交易记录、交易通报、预设开拍和正式服团本进度。"] = "Added the auction queue and fixed auction results, trade records, announcements, preset starts, and Retail raid progress."
+    L["新增备选、次 BIS、BIS 三级心愿、结算前检查、旧历史清理，并优化价格预设和性能。"] = "Added Backup, Secondary BIS, and BIS wish priorities, pre-settlement checks, legacy cleanup, and price/performance improvements."
+    L["新增多套团长起拍价、个人心理价、团队拍卖就绪检查和可切换预览外观。"] = "Added multiple leader price schemes, personal target prices, raid auction readiness checks, and a switchable preview theme."
+    L["修复 Alt+右键开拍、姓名匹配和拍卖记录职业颜色，并增加临时关闭装备过滤。"] = "Fixed Alt-right-click auctions, player-name matching, and class colors in auction records, and added a temporary filter bypass."
+    L["装备过滤改为按客户端与专精提供默认方案，并修复角色姓名、交易匹配和角色总览交互。"] = "Made equipment-filter defaults client- and specialization-aware, and fixed names, trade matching, and character-overview interactions."
+    L["修复跨客户端拍卖编号兼容、小地图菜单和货币上限显示，并精简拍卖发起窗口。"] = "Fixed cross-client auction ID compatibility, minimap menus, and currency-cap display, and simplified the auction start window."
+    L["修复正式服心愿与角色总览显示，改进表格缩放，并新增 /biaoge 兼容命令。"] = "Fixed Retail wishlist and character-overview display, improved table scaling, and added the /biaoge compatibility command."
+    L["修复启动时访问停用窗口及简体中文临时对账按钮报错。"] = "Fixed startup access to disabled windows and a Simplified Chinese reconciliation-button error."
+    L["统一 BGNext 身份与安装目录，新增图标、小地图入口、YY 复制和拍卖安全改进。"] = "Unified BGNext identity and installation, adding the icon, minimap entry, YY copying, and auction safety improvements."
+    L["首个社区版本：新增心愿、装备过滤、自有角色总览和当前团核对，并停止加载跨团历史功能。"] = "First community release: added wishes, equipment filtering, own-character overview, and current-raid reconciliation while disabling cross-raid history."
+    L["点击输入框后 Shift+点击背包中的装备；也可粘贴物品链接或输入物品ID。"] = "Focus this box, then Shift-click an item in your bags. You can also paste an item link or enter an item ID."
+    L["待拍队列：先点击输入框，再 Shift+点击背包中的装备；也可粘贴物品链接或输入物品ID。"] = "Auction queue: focus its input, then Shift-click an item in your bags; you can also paste a link or enter an item ID."
     L["新增基础模式、完整模式和自定义模式；可按功能组关闭增强功能，已保存数据不会被删除。"] = "Added Basic, Full, and Custom modes. Enhancement groups can be disabled without deleting saved data."
-    L["新增游戏内说明书，集中介绍主要功能、快捷键、命令、权限限制和隐私边界。"] = "Added an in-game guide covering major features, shortcuts, commands, permission limits, and privacy boundaries."
-    L["重做待拍队列的布局、关闭与清空交互，窗口尺寸变化时会自动重排。"] = "Redesigned the auction queue layout, close and clear actions, with automatic reflow when the window changes size."
+    L["新增游戏内说明书，集中介绍主要功能、快捷键、命令、权限限制和隐私边界；更新日志可查看历代版本。"] = "Added an in-game guide covering major features, shortcuts, commands, permission limits, and privacy boundaries; the changelog now includes past releases."
+    L["重做待拍队列的布局、关闭与清空交互；输入框支持 Shift+点击背包装备，也可粘贴物品链接或输入物品ID。"] = "Redesigned the auction queue layout, close and clear actions; its input accepts Shift-clicked bag items, pasted item links, and item IDs."
     L["有团长或拾取职责时，Boss 拾取窗口新增可见拍卖入口，并复用统一的开拍安全检查。"] = "Added a visible auction entry to boss loot windows for raid leaders and loot-responsible players, using the shared pre-auction safety checks."
     L["修复混合使用 BGNext 与 BGLite 时同物品拍卖计时不同步、卡片误隐藏及拍卖结果缺失。"] = "Fixed desynchronized timers, incorrectly hidden cards, and missing results for identical-item auctions in mixed BGNext and BGLite groups."
     L["修复部分成功交易和邮件记录遗漏；交易记录继续区分已交易与待核对，不把未知金额伪造为零。"] = "Fixed missing successful trade and mail records. Records still distinguish delivery from reconciliation and never invent zero for unknown amounts."
@@ -76,8 +88,8 @@ do --英语说明书
     ns.updateText_now = {
         "BGNext 0.7.0",
         L["新增基础模式、完整模式和自定义模式；可按功能组关闭增强功能，已保存数据不会被删除。"],
-        L["新增游戏内说明书，集中介绍主要功能、快捷键、命令、权限限制和隐私边界。"],
-        L["重做待拍队列的布局、关闭与清空交互，窗口尺寸变化时会自动重排。"],
+        L["新增游戏内说明书，集中介绍主要功能、快捷键、命令、权限限制和隐私边界；更新日志可查看历代版本。"],
+        L["重做待拍队列的布局、关闭与清空交互；输入框支持 Shift+点击背包装备，也可粘贴物品链接或输入物品ID。"],
         L["有团长或拾取职责时，Boss 拾取窗口新增可见拍卖入口，并复用统一的开拍安全检查。"],
         L["修复混合使用 BGNext 与 BGLite 时同物品拍卖计时不同步、卡片误隐藏及拍卖结果缺失。"],
         L["修复部分成功交易和邮件记录遗漏；交易记录继续区分已交易与待核对，不把未知金额伪造为零。"],
