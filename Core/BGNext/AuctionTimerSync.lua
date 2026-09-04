@@ -3,17 +3,26 @@ BG.BGNext = BG.BGNext or {}
 
 local M = {}
 
--- A bid belongs to one auction id, but duplicate copies of the same item share
--- the visible deadline. The supplied refresh function remains responsible for
--- ignoring ended or paused frames.
+local function isFrameObject(value)
+    local kind = type(value)
+    return kind == "table" or kind == "userdata"
+end
+
+-- Gen2 explicitly gives duplicate copies of the same item a shared visible
+-- deadline. Legacy clients identify the bid only by auctionID and refresh just
+-- that card, so BGNext must do the same or mixed clients visibly diverge.
 function M.refreshMatching(frames, bidFrame, refresh)
-    if type(frames) ~= "table" or type(bidFrame) ~= "table" or type(refresh) ~= "function"
+    if type(frames) ~= "table" or not isFrameObject(bidFrame) or type(refresh) ~= "function"
         or type(bidFrame.itemID) ~= "number" then
         return 0
     end
+    if bidFrame.isGen2 ~= true then
+        refresh(bidFrame)
+        return 1
+    end
     local count = 0
     for _, frame in pairs(frames) do
-        if type(frame) == "table" and frame.itemID == bidFrame.itemID then
+        if isFrameObject(frame) and frame.itemID == bidFrame.itemID then
             refresh(frame)
             count = count + 1
         end
