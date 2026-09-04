@@ -87,15 +87,34 @@ return function(test)
         -- Nothing committed before any window/accept/success.
         test.eq(capture.committed(), nil, "no committed snapshot before a trade")
 
+        -- TRADE_ACCEPT_UPDATE supplies numeric 0/1, and 0 is truthy in Lua, so
+        -- the handler must never test the raw args as booleans.
+        capture.beginTrade()
+        BG.trade = trade()
+        test.eq(capture.onAcceptUpdate(0, 0), false, "(0,0) freezes nothing")
+        test.eq(capture.onComplete(), nil, "a (0,0) accept leaves nothing to commit")
+        test.eq(capture.committed(), nil, "a (0,0) accept never commits")
+
+        capture.beginTrade()
+        BG.trade = trade()
+        test.eq(capture.onAcceptUpdate(1, 0), true, "(1,0) freezes a candidate")
+        capture.beginTrade()
+        BG.trade = trade()
+        test.eq(capture.onAcceptUpdate(0, 1), true, "(0,1) freezes a candidate")
+        capture.beginTrade()
+        BG.trade = trade()
+        test.eq(capture.onAcceptUpdate(1, 1), true, "(1,1) freezes a candidate")
+
         -- An absent shared table never becomes a snapshot.
+        capture.beginTrade()
         BG.trade = nil
-        test.eq(capture.onAcceptUpdate(true, false), false, "accept without a trade table freezes nothing")
+        test.eq(capture.onAcceptUpdate(1, 0), false, "accept without a trade table freezes nothing")
 
         -- The last shared table is cleared before the success handler runs, but
         -- the already-frozen snapshot survives and commits exactly once.
         BG.trade = trade()
         capture.beginTrade()
-        test.eq(capture.onAcceptUpdate(false, true), true, "a single-side accept freezes a candidate")
+        test.eq(capture.onAcceptUpdate(0, 1), true, "a single-side accept freezes a candidate")
         BG.trade = nil
         local snap = capture.onComplete()
         test.eq(snap ~= nil, true, "the frozen snapshot survives a cleared shared table")
@@ -116,10 +135,25 @@ return function(test)
         capture.beginTrade()
         test.eq(capture.committed(), nil, "a new window forgets the previous commit")
         BG.trade = trade()
-        test.eq(capture.onAcceptUpdate(true, true), true, "both sides confirm freeze a candidate")
+        test.eq(capture.onAcceptUpdate(1, 1), true, "both sides confirm freeze a candidate")
         capture.onTradeClosed()
         test.eq(capture.committed(), nil, "close alone never commits")
         test.eq(capture.onComplete() ~= nil, true, "a success that arrives after close still commits the frozen snapshot")
+
+        -- Money normalization: unknown stays nil; an explicit 0 stays 0.
+        capture.beginTrade()
+        BG.trade = { target = "甲", targetmoney = nil, playermoney = nil, targetitems = {}, playeritems = {} }
+        test.eq(capture.onAcceptUpdate(1, 1), true, "accept freezes a candidate with unknown money")
+        local unknown = capture.onComplete()
+        test.eq(unknown.targetmoney, nil, "unknown target money stays nil, never fabricated as 0")
+        test.eq(unknown.playermoney, nil, "unknown player money stays nil, never fabricated as 0")
+
+        capture.beginTrade()
+        BG.trade = { target = "甲", targetmoney = 0, playermoney = 0, targetitems = {}, playeritems = {} }
+        test.eq(capture.onAcceptUpdate(1, 1), true, "accept freezes a candidate with explicit zero money")
+        local zero = capture.onComplete()
+        test.eq(zero.targetmoney, 0, "an explicit API 0 target money is stored as 0")
+        test.eq(zero.playermoney, 0, "an explicit API 0 player money is stored as 0")
 
         -- Fail closed: an incomplete snapshot fabricates nothing and surfaces a
         -- local diagnostic instead.
@@ -147,7 +181,7 @@ return function(test)
             target = "甲", targetmoney = 100, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 11, link = "item:11", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
         fire("TRADE_CLOSED")
 
@@ -192,7 +226,7 @@ return function(test)
             target = "甲", targetmoney = 50, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 22, link = "item:22", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         BG.trade = nil -- the shared mutable table is cleared before success
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
         fire("TRADE_CLOSED")
@@ -213,7 +247,7 @@ return function(test)
             target = "甲", targetmoney = 30, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 33, link = "item:33", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("TRADE_CLOSED") -- close arrives first
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE) -- success arrives after
 
@@ -234,7 +268,7 @@ return function(test)
         BG.trade = { target = "甲", targetmoney = 100, playermoney = 0, targetitems = {}, playeritems = {} }
         -- The item becomes available around confirm.
         BG.trade.playeritems = { { itemId = 44, link = "item:44", count = 1 } }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
 
         test.eq(#root.currentSettlement.trades, 1, "an item that appears around confirm is captured at accept")
@@ -256,7 +290,7 @@ return function(test)
                 target = target, targetmoney = money, playermoney = 0,
                 targetitems = {}, playeritems = items,
             }
-            fire("TRADE_ACCEPT_UPDATE", true, true)
+            fire("TRADE_ACCEPT_UPDATE", 1, 1)
             fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
             fire("TRADE_CLOSED")
         end
@@ -291,7 +325,7 @@ return function(test)
             target = "甲", targetmoney = 400, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 5, link = "item:5", count = 1 }, { itemId = 6, link = "item:6", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
         test.eq(#distinctRoot.currentSettlement.trades, 2, "two distinct items project two records")
         test.eq(distinctRoot.currentSettlement.trades[1].amount, 400, "the first distinct item carries the gold")
@@ -306,7 +340,7 @@ return function(test)
             target = "乙", targetmoney = 0, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 7, link = "item:7", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
         test.eq(#zeroRoot.currentSettlement.trades, 1, "a 0-gold trade still records for manual reconciliation")
         test.eq(zeroRoot.currentSettlement.trades[1].status, "pending", "a 0-gold trade is pending, never complete")
@@ -329,7 +363,7 @@ return function(test)
             target = "甲", targetmoney = 100, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 8, link = "item:8", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, false)
+        fire("TRADE_ACCEPT_UPDATE", 1, 0)
         fire("TRADE_CLOSED")
         test.eq(#root.currentSettlement.trades, 0, "a cancelled trade writes nothing")
 
@@ -339,7 +373,7 @@ return function(test)
             target = "甲", targetmoney = 100, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 9, link = "item:9", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", false, false)
+        fire("TRADE_ACCEPT_UPDATE", 0, 0)
         fire("TRADE_CLOSED")
         test.eq(#root.currentSettlement.trades, 0, "a trade with neither side confirmed writes nothing")
 
@@ -350,7 +384,7 @@ return function(test)
             target = "路人", targetmoney = 100, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 88, link = "item:88", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
         test.eq(#root.currentSettlement.trades, 0, "a trade to a non-roster target writes nothing")
         test.eq(BiaoGe.ICC.auctionLog[1].trade, nil, "a non-roster target is never marked 已交易")
@@ -369,7 +403,7 @@ return function(test)
             target = "甲", targetmoney = 60, playermoney = 0, targetitems = {},
             playeritems = { { itemId = 10, link = "item:10", count = 1 } },
         }
-        fire("TRADE_ACCEPT_UPDATE", true, true)
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
         fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
         test.eq(#root.currentSettlement.trades, 1, "an in-combat trade still records through the same event chain")
 
@@ -382,5 +416,85 @@ return function(test)
         }) do
             test.eq(source:find(forbidden, 1, true), nil, "TradeCapture never references " .. forbidden)
         end
+    end
+
+    -- =====================================================================
+    -- 9. Integration: the shared BG.trade is still empty/stale at accept
+    --    (BGLite's deferred BG.After(0, BG.TradeUpdate) has not run), but the
+    --    live trade API already returns the final items and money. The accept
+    --    handler must read the API synchronously, not the stale table.
+    -- =====================================================================
+    do
+        local BG, fire = newHarness()
+        local root = settle(BG, 27000, 27100, { "甲" })
+
+        fire("TRADE_SHOW")
+        BG.trade = { target = "", targetmoney = 0, playermoney = 0, targetitems = {}, playeritems = {} }
+        GetUnitName = function(unit, includeRealm) return "甲" end
+        GetTargetTradeMoney = function() return 55 * 10000 end
+        GetPlayerTradeMoney = function() return 0 end
+        GetTradeTargetItemLink = function() return nil end
+        GetTradeTargetItemInfo = function() return nil end
+        GetTradePlayerItemLink = function(i) if i == 1 then return "item:55" end return nil end
+        GetTradePlayerItemInfo = function(i) if i == 1 then return nil, nil, 1 end return nil end
+
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
+        fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
+        fire("TRADE_CLOSED")
+
+        test.eq(#root.currentSettlement.trades, 1, "a stale shared table at accept still records from the live API")
+        test.eq(root.currentSettlement.trades[1].itemId, 55, "the API item is captured at accept")
+        test.eq(root.currentSettlement.trades[1].amount, 55, "the API money is captured at accept")
+
+        GetUnitName = nil
+        GetTargetTradeMoney = nil
+        GetPlayerTradeMoney = nil
+        GetTradeTargetItemLink = nil
+        GetTradeTargetItemInfo = nil
+        GetTradePlayerItemLink = nil
+        GetTradePlayerItemInfo = nil
+    end
+
+    -- =====================================================================
+    -- 10. Integration: a cancelled trade (one side accepted, never both)
+    --     followed by a stale success message commits nothing.
+    -- =====================================================================
+    do
+        local BG, fire = newHarness()
+        local root = settle(BG, 28000, 28100, { "甲" })
+
+        fire("TRADE_SHOW")
+        BG.trade = {
+            target = "甲", targetmoney = 70, playermoney = 0, targetitems = {},
+            playeritems = { { itemId = 12, link = "item:12", count = 1 } },
+        }
+        fire("TRADE_ACCEPT_UPDATE", 1, 0)
+        fire("TRADE_CLOSED")
+        fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
+
+        test.eq(#root.currentSettlement.trades, 0, "a cancelled trade followed by a success writes nothing")
+        test.eq(BG.BGNext.TradeCapture.committed(), nil, "a cancelled trade leaves no committed snapshot")
+    end
+
+    -- =====================================================================
+    -- 11. Integration: a late legitimate success (close arrives first) commits
+    --     exactly once and is idempotent across duplicate success messages.
+    -- =====================================================================
+    do
+        local BG, fire = newHarness()
+        local root = settle(BG, 29000, 29100, { "甲" })
+
+        fire("TRADE_SHOW")
+        BG.trade = {
+            target = "甲", targetmoney = 40, playermoney = 0, targetitems = {},
+            playeritems = { { itemId = 14, link = "item:14", count = 1 } },
+        }
+        fire("TRADE_ACCEPT_UPDATE", 1, 1)
+        fire("TRADE_CLOSED")
+        fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
+        fire("UI_INFO_MESSAGE", nil, ERR_TRADE_COMPLETE)
+
+        test.eq(#root.currentSettlement.trades, 1, "a late legitimate success commits exactly once")
+        test.eq(root.currentSettlement.trades[1].itemId, 14, "the late success keeps the frozen item")
     end
 end
