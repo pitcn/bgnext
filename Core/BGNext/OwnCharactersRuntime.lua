@@ -68,6 +68,10 @@ end
 -- missing value means enabled (backward-compatible default).
 function M.isEnabled(deps)
     deps = deps or M.deps()
+    local featureSettings = BG.BGNext.FeatureSettings
+    if featureSettings and type(featureSettings.isCurrentEnabled) == "function" then
+        return featureSettings.isCurrentEnabled("role_overview", deps and deps.globals or BG, deps and deps.root)
+    end
     local settings = deps and deps.root and type(deps.root.settings) == "table" and deps.root.settings or nil
     if not settings or type(settings.roleOverviewEnabled) ~= "boolean" then return true end
     return settings.roleOverviewEnabled
@@ -89,7 +93,12 @@ function M.setEnabled(deps, value)
     local root = deps and deps.root
     if type(root) ~= "table" then return end
     root.settings = type(root.settings) == "table" and root.settings or {}
-    root.settings.roleOverviewEnabled = value and true or false
+    local featureSettings = BG.BGNext.FeatureSettings
+    if featureSettings and type(featureSettings.setEnabled) == "function" then
+        featureSettings.setEnabled(root, "role_overview", value and true or false)
+    else
+        root.settings.roleOverviewEnabled = value and true or false
+    end
     local entry = deps.entry or BG.BGNext.RoleOverviewEntry
     if entry and type(entry.setAvailable) == "function" then
         entry.setAvailable(value == true and M.isAvailable(deps))
@@ -103,6 +112,15 @@ function M.setEnabled(deps, value)
         deps._farmHarvestObservedAt = nil
         M.setVisible(deps, false)
     end
+end
+
+function M.refreshFeatureState(deps)
+    deps = deps or M.deps()
+    local enabled = M.isEnabled(deps) and M.isAvailable(deps)
+    local entry = deps and (deps.entry or BG.BGNext.RoleOverviewEntry)
+    if entry and type(entry.setAvailable) == "function" then entry.setAvailable(enabled) end
+    if not enabled then M.setVisible(deps, false) end
+    return enabled
 end
 
 local function cancelVisibleTicker(deps)

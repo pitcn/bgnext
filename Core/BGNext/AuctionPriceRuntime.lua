@@ -9,6 +9,12 @@ BG.BGNext = BG.BGNext or {}
 -- BG entry point below it.
 local M = {}
 
+function M.isFeatureEnabled()
+    local settings = BG.BGNext.FeatureSettings
+    return not settings or type(settings.isCurrentEnabled) ~= "function"
+        or settings.isCurrentEnabled("auction_prices", BG, BG.BGNext.DB)
+end
+
 -- WoW UI objects expose methods and writable addon fields but are represented as
 -- userdata on some client builds. Treat both Lua tables and native UI userdata
 -- as frame-like objects; callers still validate the exact methods they use.
@@ -192,6 +198,7 @@ if runtimeReady() then
     -- OnClick. Any unresolved item keeps the window open with a short local
     -- reason instead of guessing.
     local function prefillLeaderFrame(frame, context, directStart, options)
+        if not M.isFeatureEnabled() then return end
         if not frame then return end
         local items = frame.bt and frame.bt.items
         if type(items) ~= "table" or #items == 0 then return end
@@ -276,6 +283,7 @@ if runtimeReady() then
     -- below the current auction floor, leaves the box untouched. Only
     -- `myMoneyEdit:SetText` is called; the value is never written back.
     local function prefillPersonalFrame(frame, context)
+        if not M.isFeatureEnabled() then return end
         if not frame then return end
         local itemId = frame.itemID
         if type(itemId) ~= "number" then return end

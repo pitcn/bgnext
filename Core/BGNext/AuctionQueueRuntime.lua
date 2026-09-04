@@ -19,9 +19,11 @@ local Store = BG.BGNext.AuctionPriceStore
 local PreSend = assert(BG.BGNext.AuctionPreSend, "AuctionPreSend must load before AuctionQueueRuntime")
 
 local MAX_ROWS = Queue.MAX_ITEMS
-local ROW_HEIGHT = 26
-local HEADER_HEIGHT = 48
-local BOTTOM_PADDING = 26
+local WINDOW_WIDTH = 420
+local ROW_HEIGHT = 48
+local HEADER_HEIGHT = 72
+local BOTTOM_PADDING = 44
+local EMPTY_HEIGHT = 170
 local TIMEOUT_SECONDS = 10
 
 local state = { queue = nil, frame = nil, pending = nil, gen = 0 }
@@ -38,7 +40,7 @@ end
 -- visible count never exceeds what actually fits, so the queue window stays
 -- on-screen at any UIParent height instead of growing to 40*26 + header.
 local function availableViewport()
-    if type(UIParent) ~= "table" or type(UIParent.GetHeight) ~= "function" then
+    if not isFrameObject(UIParent) or type(UIParent.GetHeight) ~= "function" then
         return nil
     end
     local height = UIParent:GetHeight()
@@ -46,10 +48,28 @@ local function availableViewport()
     return height
 end
 
+function M.windowLayout(viewportHeight, itemCount)
+    viewportHeight = tonumber(viewportHeight) or 768
+    itemCount = math.max(0, math.min(MAX_ROWS, math.floor(tonumber(itemCount) or 0)))
+    local maxHeight = math.max(EMPTY_HEIGHT, viewportHeight - 100)
+    local visibleRows = math.max(1, math.min(MAX_ROWS,
+        math.floor((maxHeight - HEADER_HEIGHT - BOTTOM_PADDING) / ROW_HEIGHT)))
+    local height = itemCount == 0 and EMPTY_HEIGHT
+        or math.min(maxHeight, HEADER_HEIGHT + math.min(itemCount, visibleRows) * ROW_HEIGHT + BOTTOM_PADDING)
+    return {
+        width = WINDOW_WIDTH,
+        height = height,
+        emptyHeight = EMPTY_HEIGHT,
+        visibleRows = visibleRows,
+        headerHeight = HEADER_HEIGHT,
+        footerHeight = BOTTOM_PADDING,
+        rowHeight = ROW_HEIGHT,
+    }
+end
+
 local function maxVisibleRows()
     local viewport = availableViewport()
-    if viewport == nil then return MAX_ROWS end
-    return math.min(MAX_ROWS, math.max(1, math.floor((viewport - HEADER_HEIGHT - BOTTOM_PADDING) / ROW_HEIGHT)))
+    return M.windowLayout(viewport or 768, MAX_ROWS).visibleRows
 end
 
 local REASON_TEXT = {
@@ -74,6 +94,16 @@ local SOURCE_TEXT = {
 
 local function storageRoot()
     return BG.BGNext and BG.BGNext.DB
+end
+
+local function featureEnabled()
+    local settings = BG.BGNext and BG.BGNext.FeatureSettings
+    if not settings then return true end
+    if type(settings.isCurrentEnabled) == "function" then
+        return settings.isCurrentEnabled("auction_queue", BG, storageRoot())
+    end
+    if type(settings.isEnabled) ~= "function" then return true end
+    return settings.isEnabled(storageRoot(), "auction_queue", "wrath")
 end
 
 local function currentRaid()
@@ -194,6 +224,30 @@ end
 
 function M.clear()
     if state.queue then Queue.clear(state.queue) end
+end
+
+function M.requestClear()
+    if not state.queue or Queue.size(state.queue) == 0 then return false, "empty" end
+    if type(StaticPopupDialogs) ~= "table" or type(StaticPopup_Show) ~= "function" then
+        return false, "ui-unavailable"
+    end
+    if not StaticPopupDialogs["BGNextAuctionQueueClear"] then
+        StaticPopupDialogs["BGNextAuctionQueueClear"] = {
+            text = L["确定清空待拍队列吗？\n关闭窗口不会清空队列。"],
+            button1 = L["清空队列"],
+            button2 = L["取消"],
+            OnAccept = function()
+                M.clear()
+                M.refreshUI()
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            showAlert = true,
+        }
+    end
+    StaticPopup_Show("BGNextAuctionQueueClear")
+    return true
 end
 
 function M.project()
@@ -485,7 +539,7 @@ end
 local function bindRow(rowFrame, projected, slot)
     rowFrame.id = projected.id
     rowFrame.link = projected.link or ("item:" .. projected.itemId)
-    rowFrame:SetPoint("TOPLEFT", state.frame, "TOPLEFT", 4, -(state.frame.headerHeight + (slot - 1) * ROW_HEIGHT))
+    rowFrame:SetPoint("TOPLEFT", state.frame, "TOPLEFT", 12, -(state.frame.headerHeight + (slot - 1) * ROW_HEIGHT))
     if rowFrame.name then
         rowFrame.name:SetText(projected.link or tostring(projected.itemId))
     end
@@ -498,7 +552,7 @@ local function bindRow(rowFrame, projected, slot)
             rowFrame.price:Hide()
         else
             rowFrame.price:Show()
-            rowFrame.price:SetText(tostring(projected.price or "") .. " " .. M.sourceText(projected.source))
+            rowFrame.price:SetText(tostring(projected.price or "") .. "G · " .. M.sourceText(projected.source))
         end
     end
     if rowFrame.priceEdit then
@@ -521,6 +575,8 @@ function M.refreshUI()
     if offset > maxOffset then offset = maxOffset end
     if offset < 0 then offset = 0 end
     frame.scrollOffset = offset
+    if frame.countText then frame.countText:SetText(tostring(#rows) .. " / " .. tostring(MAX_ROWS)) end
+    if frame.emptyText then frame.emptyText:SetShown(#rows == 0) end
     for slot = 1, maxVisible do
         local rowFrame = frame.rows[slot]
         if not rowFrame then break end
@@ -533,8 +589,7 @@ function M.refreshUI()
         end
     end
     if type(frame.SetHeight) == "function" then
-        local shown = math.min(#rows, maxVisible)
-        frame:SetHeight(frame.headerHeight + shown * ROW_HEIGHT + BOTTOM_PADDING)
+        frame:SetHeight(M.windowLayout(availableViewport() or 768, #rows).height)
     end
 end
 
@@ -565,41 +620,47 @@ end
 
 local function createRow(parent)
     local row = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    row:SetSize(344, ROW_HEIGHT)
+    row:SetSize(WINDOW_WIDTH - 24, ROW_HEIGHT - 4)
     row:SetBackdrop({ bgFile = "Interface/ChatFrame/ChatFrameBackground" })
-    row:SetBackdropColor(0.2, 0.2, 0.2, 0.6)
+    row:SetBackdropColor(0.04, 0.11, 0.17, 0.88)
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row.name:SetPoint("LEFT", 4, 0)
+    row.name:SetPoint("TOPLEFT", 8, -6)
+    row.name:SetWidth(188)
+    row.name:SetJustifyH("LEFT")
+    row.name:SetWordWrap(false)
     row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row.count:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
+    row.count:SetPoint("BOTTOMLEFT", 8, 5)
     row.price = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row.price:SetPoint("LEFT", row.count, "RIGHT", 6, 0)
+    row.price:SetPoint("BOTTOMLEFT", row.count, "BOTTOMRIGHT", 8, 0)
+    row.price:SetWidth(130)
+    row.price:SetJustifyH("LEFT")
+    row.price:SetWordWrap(false)
     row.priceEdit = CreateFrame("EditBox", nil, row)
-    row.priceEdit:SetSize(70, 16)
-    row.priceEdit:SetPoint("LEFT", row.count, "RIGHT", 6, 0)
+    row.priceEdit:SetSize(82, 18)
+    row.priceEdit:SetPoint("BOTTOMLEFT", row.count, "BOTTOMRIGHT", 8, -1)
     row.priceEdit:SetAutoFocus(false)
     row.priceEdit:Hide()
 
-    row.minus = CreateFrame("Button", nil, row)
-    row.minus:SetSize(16, 16)
-    row.minus:SetPoint("RIGHT", row, "RIGHT", -96, 0)
+    row.minus = BG.CreateButton(row)
+    row.minus:SetSize(24, 22)
+    row.minus:SetPoint("RIGHT", row, "RIGHT", -164, 0)
     row.minus:SetText("-")
-    row.plus = CreateFrame("Button", nil, row)
-    row.plus:SetSize(16, 16)
-    row.plus:SetPoint("LEFT", row.minus, "RIGHT", 0, 0)
+    row.plus = BG.CreateButton(row)
+    row.plus:SetSize(24, 22)
+    row.plus:SetPoint("LEFT", row.minus, "RIGHT", 4, 0)
     row.plus:SetText("+")
 
-    row.up = CreateFrame("Button", nil, row)
-    row.up:SetSize(30, 16)
-    row.up:SetPoint("RIGHT", row, "RIGHT", -44, 0)
-    row.up:SetText(L["上移"])
-    row.down = CreateFrame("Button", nil, row)
-    row.down:SetSize(30, 16)
-    row.down:SetPoint("LEFT", row.up, "RIGHT", 0, 0)
-    row.down:SetText(L["下移"])
-    row.remove = CreateFrame("Button", nil, row)
-    row.remove:SetSize(30, 16)
-    row.remove:SetPoint("LEFT", row.down, "RIGHT", 2, 0)
+    row.up = BG.CreateButton(row)
+    row.up:SetSize(24, 22)
+    row.up:SetPoint("LEFT", row.plus, "RIGHT", 8, 0)
+    row.up:SetText("↑")
+    row.down = BG.CreateButton(row)
+    row.down:SetSize(24, 22)
+    row.down:SetPoint("LEFT", row.up, "RIGHT", 4, 0)
+    row.down:SetText("↓")
+    row.remove = BG.CreateButton(row)
+    row.remove:SetSize(54, 22)
+    row.remove:SetPoint("LEFT", row.down, "RIGHT", 8, 0)
     row.remove:SetText(L["移除"])
 
     row:SetScript("OnEnter", function(self)
@@ -654,38 +715,26 @@ local function createRow(parent)
 end
 
 function M.openFrame()
+    if not featureEnabled() then return nil, "feature-disabled" end
     local frame = state.frame
     if not frame then
-        frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-        frame:SetSize(360, 200)
+        if type(BG.CreateMainFrame) ~= "function" then return nil end
+        frame = BG.CreateMainFrame()
+        local layout = M.windowLayout(availableViewport() or 768, 0)
+        frame:SetSize(layout.width, layout.height)
         frame:SetPoint("CENTER")
-        frame:SetBackdrop({
-            bgFile = "Interface/ChatFrame/ChatFrameBackground",
-            edgeFile = "Interface/ChatFrame/ChatFrameBackground",
-            edgeSize = 2,
-        })
-        frame:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
-        frame:SetBackdropBorderColor(0, 0, 0, 1)
         frame:SetFrameStrata("DIALOG")
         frame:SetClampedToScreen(true)
-        frame:SetMovable(true)
-        frame:EnableMouse(true)
-        frame:SetScript("OnMouseDown", function(self) self:StartMoving() end)
-        frame:SetScript("OnMouseUp", function(self) self:StopMovingOrSizing() end)
-
-        frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        frame.title:SetPoint("TOPLEFT", 10, -7)
+        frame.title = frame.titleText or frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         frame.title:SetText(L["待拍队列"])
-
-        frame.closeButton = BG.CreateButton(frame)
-        frame.closeButton:SetSize(24, 20)
-        frame.closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
-        frame.closeButton:SetText("×")
-        frame.closeButton:SetScript("OnClick", function() frame:Hide() end)
+        frame.closeButton = frame.CloseButton
+        frame.countText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        frame.countText:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -6)
+        frame.countText:SetTextColor(0.55, 0.65, 0.73)
 
         frame.input = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-        frame.input:SetSize(150, 20)
-        frame.input:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -28)
+        frame.input:SetSize(300, 24)
+        frame.input:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -34)
         frame.input:SetAutoFocus(false)
         frame.input:SetScript("OnEnterPressed", function(self)
             M.addFromText(self:GetText())
@@ -693,8 +742,8 @@ function M.openFrame()
         end)
 
         frame.addButton = BG.CreateButton(frame)
-        frame.addButton:SetSize(44, 20)
-        frame.addButton:SetPoint("LEFT", frame.input, "RIGHT", 4, 0)
+        frame.addButton:SetSize(76, 24)
+        frame.addButton:SetPoint("LEFT", frame.input, "RIGHT", 8, 0)
         frame.addButton:SetText(L["添加"])
         frame.addButton:SetScript("OnClick", function()
             M.addFromText(frame.input:GetText())
@@ -702,24 +751,26 @@ function M.openFrame()
         end)
 
         frame.clearButton = BG.CreateButton(frame)
-        frame.clearButton:SetSize(44, 20)
-        frame.clearButton:SetPoint("LEFT", frame.addButton, "RIGHT", 4, 0)
-        frame.clearButton:SetText(L["清空"])
-        frame.clearButton:SetScript("OnClick", function()
-            M.clear()
-            M.refreshUI()
-        end)
+        frame.clearButton:SetSize(86, 24)
+        frame.clearButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 10)
+        frame.clearButton:SetText(L["清空队列"])
+        frame.clearButton:SetScript("OnClick", function() M.requestClear() end)
+        local style = BG.BGNext and BG.BGNext.UIStyle
+        if style and type(style.registerButton) == "function" and type(style.setButtonState) == "function" then
+            style.registerButton(frame.clearButton)
+            style.setButtonState(frame.clearButton, "danger", 1)
+        end
 
         frame.scrollUp = BG.CreateButton(frame)
-        frame.scrollUp:SetSize(20, 20)
-        frame.scrollUp:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 3)
-        frame.scrollUp:SetText("^")
+        frame.scrollUp:SetSize(24, 24)
+        frame.scrollUp:SetPoint("RIGHT", frame.clearButton, "LEFT", -12, 0)
+        frame.scrollUp:SetText("↑")
         frame.scrollUp:SetScript("OnClick", function() M.scrollBy(-1) end)
 
         frame.scrollDown = BG.CreateButton(frame)
-        frame.scrollDown:SetSize(20, 20)
+        frame.scrollDown:SetSize(24, 24)
         frame.scrollDown:SetPoint("RIGHT", frame.scrollUp, "LEFT", -2, 0)
-        frame.scrollDown:SetText("v")
+        frame.scrollDown:SetText("↓")
         frame.scrollDown:SetScript("OnClick", function() M.scrollBy(1) end)
 
         frame:EnableMouseWheel(true)
@@ -734,6 +785,14 @@ function M.openFrame()
         frame.headerHeight = HEADER_HEIGHT
         frame.maxVisible = maxVisibleRows()
         frame.scrollOffset = 0
+        frame.emptyText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        frame.emptyText:SetPoint("CENTER", frame, "CENTER", 0, -8)
+        frame.emptyText:SetText(L["暂无待拍装备\n可粘贴装备链接，或从拾取窗口加入。"])
+        frame.emptyText:SetTextColor(0.55, 0.65, 0.73)
+        frame.hintText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        frame.hintText:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 15)
+        frame.hintText:SetText(L["点击装备确认价格并开拍"])
+        frame.hintText:SetTextColor(0.55, 0.65, 0.73)
         state.frame = frame
     end
     frame:Show()
@@ -742,6 +801,11 @@ function M.openFrame()
 end
 
 function M.toggle()
+    if not featureEnabled() then
+        if state.frame then state.frame:Hide() end
+        if type(BG.SendSystemMessage) == "function" then BG.SendSystemMessage(L["待拍队列已在功能管理中关闭。"] ) end
+        return false, "feature-disabled"
+    end
     if state.frame and state.frame:IsShown() then
         state.frame:Hide()
     else
@@ -763,6 +827,8 @@ end
 function M.installEntry(mainFrame)
     if entryButton then
         layoutEntry(entryButton, mainFrame)
+        if type(entryButton.SetShown) == "function" then entryButton:SetShown(featureEnabled())
+        elseif featureEnabled() then entryButton:Show() else entryButton:Hide() end
         return entryButton
     end
     if type(mainFrame) ~= "table" or type(CreateFrame) ~= "function" or type(BG.CreateButton) ~= "function" then
@@ -777,7 +843,18 @@ function M.installEntry(mainFrame)
         M.toggle()
     end)
     entryButton = button
+    if not featureEnabled() then button:Hide() end
     return button
+end
+
+function M.refreshFeatureState()
+    local enabled = featureEnabled()
+    if entryButton then
+        if type(entryButton.SetShown) == "function" then entryButton:SetShown(enabled)
+        elseif enabled then entryButton:Show() else entryButton:Hide() end
+    end
+    if not enabled and state.frame then state.frame:Hide() end
+    return enabled
 end
 
 -- --- Lifecycle -----------------------------------------------------------

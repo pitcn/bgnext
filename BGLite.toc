@@ -24,8 +24,10 @@ Core\BGNext\UIStyle.lua
 Core\BGNext\MainFrameScale.lua
 Core\BGNext\ChatYYCopy.lua
 Core\BGNext\Identity.lua
+Core\BGNext\FeatureCatalog.lua
 Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
+Core\BGNext\FeatureSettings.lua
 Core\BGNext\AutoClearGuard.lua
 Core\BGNext\AuctionPriceStore.lua
 Core\BGNext\AuctionPriceCatalog.lua
@@ -84,6 +86,7 @@ Core\TongBao\QianKuan.lua
 Core\TongBao\Channel.lua
 
 Core\BiaoGe.lua
+Core\BGNext\GuideUI.lua
 Core\BGNext\LegacyLedgerSkin.lua
 Core\BGNext\EquipmentFilterUI.lua
 Core\BGNext\WishlistUI.lua
@@ -111,5 +114,6 @@ Core\Module\hooks.lua
 
 Core\Module\minimap.lua
 Core\Options.lua
+Core\BGNext\FeatureManagementUI.lua
 Core\BGNext\UIThemeSettings.lua
 Core\BGNext\LegacyHistoryCleanup.lua

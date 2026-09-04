@@ -15,6 +15,16 @@ local button
 local queuedSlots = {}
 local lootOpen = false
 
+local function featureEnabled()
+    local settings = BG.BGNext and BG.BGNext.FeatureSettings
+    if not settings then return true end
+    if type(settings.isCurrentEnabled) == "function" then
+        return settings.isCurrentEnabled("auction_queue", BG, BG.BGNext.DB)
+    end
+    if type(settings.isEnabled) ~= "function" then return true end
+    return settings.isEnabled(BG.BGNext.DB, "auction_queue", "wrath")
+end
+
 local function isShown(frame)
     return frame and type(frame.IsShown) == "function" and frame:IsShown()
 end
@@ -119,6 +129,7 @@ end
 
 function M.refresh()
     if not button then return end
+    if not featureEnabled() then button:Hide(); return end
     if not lootOpen then
         button:Hide()
         return
@@ -136,6 +147,7 @@ function M.refresh()
 end
 
 function M.enqueueVisibleLoot()
+    if not featureEnabled() then return 0, "feature-disabled" end
     local reason = state()
     if reason then
         systemMessage(reasonText(reason))
@@ -163,6 +175,11 @@ function M.enqueueVisibleLoot()
     Runtime.refreshUI()
     Runtime.openFrame()
     return added
+end
+
+function M.refreshFeatureState()
+    M.refresh()
+    return featureEnabled()
 end
 
 local function install()
