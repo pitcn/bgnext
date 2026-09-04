@@ -111,6 +111,22 @@ return function(test)
     test.eq(UI.metrics.rowHeight, View.metrics.rowHeight, "renderer and projection share one row height")
     test.eq(UI.metrics.nameColumnWidth, View.metrics.nameColumnWidth, "renderer shares the name column width")
 
+    -- The difficulty abbreviation sits in the remaining column width after the
+    -- completion checkmark, so a three-character "LFR" is never clipped into the
+    -- old single-letter 8px column gap.
+    local lfrLabelWidth = UI.difficultyLabelWidth(UI.metrics.columnWidths.narrow)
+    test.eq(type(lfrLabelWidth), "number", "the difficulty label width is numeric")
+    test.eq(lfrLabelWidth, UI.metrics.columnWidths.narrow - UI.metrics.iconSize - 2,
+        "the label takes the full column width after the checkmark")
+    test.eq(lfrLabelWidth > UI.metrics.columnGap, true, "the label region is wider than the old 8px column gap")
+    local lfrRegion = { width = 0, naturalWidth = 3 * 7 }
+    function lfrRegion:SetWidth(value) self.width = value end
+    function lfrRegion:SetText(value) self.text = value end
+    function lfrRegion:GetStringWidth() return math.min(self.width, self.naturalWidth) end
+    local lfrMeasured = UI.fitTextWidth(lfrRegion, "LFR", lfrLabelWidth)
+    test.eq(lfrMeasured, lfrRegion.naturalWidth, "LFR measures its full width without clipping")
+    test.eq(lfrMeasured <= lfrLabelWidth, true, "LFR fits inside the label region")
+
     -- Class colouring is looked up per row, not stored per character.
     test.eq(type(UI.classColor("HUNTER")), "table", "class colour resolves")
     test.eq(type(UI.classColor("NOPE")), "table", "unknown class falls back safely")
@@ -233,6 +249,96 @@ return function(test)
     test.eq(#currencyTooltipLines, 4, "all four field lines reach the tooltip")
     test.eq(UI.showCurrencyTooltip({ SetText = function() end }, { value = 5 }, function() return nil end),
         false, "a cell without an id cannot populate a tooltip")
+
+    -- A raid cell with a per-difficulty breakdown builds a per-difficulty
+    -- tooltip that names every difficulty. There is no per-boss list: boss
+    -- completion is never reconstructed from a kill count.
+    local raidDifficultyCell = {
+        difficulties = {
+            { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6 },
+            { difficulty = 15, difficultyLabel = "H", completedParts = 3, totalParts = 6 },
+            { difficulty = 17, difficultyLabel = "LFR", completedParts = 4, totalParts = 4 },
+        },
+    }
+    local raidDiffTip = UI.raidTooltip(raidDifficultyCell)
+    test.eq(#raidDiffTip.lines, 3, "a per-difficulty tooltip lists each difficulty")
+    test.eq(raidDiffTip.lines[1], "N 6/6", "the normal difficulty count is listed")
+    test.eq(raidDiffTip.lines[2], "H 3/6", "the heroic partial count is listed")
+    test.eq(raidDiffTip.lines[3], "LFR 4/4", "the raid finder count is named")
+
+    test.eq(UI.raidTooltip({ encounters = { { id = 1, done = true } } }), nil,
+        "a root-level encounters table is not a difficulty breakdown, so it yields nothing")
+    test.eq(UI.raidTooltip({}), nil, "a cell without a breakdown has no raid tooltip")
+
+    -- A malformed difficulty line without a usable count is skipped, never a
+    -- fabricated 0/N.
+    local malformedDifficultyCell = {
+        difficulties = {
+            { difficulty = 14, difficultyLabel = "N", completedParts = 6, totalParts = 6 },
+            { difficulty = 16, difficultyLabel = "M" },
+        },
+    }
+    local malformedDiffTip = UI.raidTooltip(malformedDifficultyCell)
+    test.eq(#malformedDiffTip.lines, 1, "a malformed difficulty line is skipped")
+    test.eq(malformedDiffTip.lines[1], "N 6/6", "the valid difficulty still renders")
+
+    -- A degraded difficulty keeps its reliable total but renders an unknown
+    -- killed count, never a fabricated 0/N or the farthest-reached index.
+    local degradedDiffTip = UI.raidTooltip({
+        difficulties = {
+            { difficulty = 16, difficultyLabel = "M", totalParts = 3 },
+        },
+    })
+    test.eq(#degradedDiffTip.lines, 1, "a degraded difficulty still produces one tooltip line")
+    test.eq(degradedDiffTip.lines[1], "M 未知/3", "the degraded killed count renders as unknown")
+
+    -- A retail difficulty's own per-boss list renders under its difficulty line,
+    -- scoped to that difficulty and using each boss's real killed flag.
+    local bossTooltipCell = {
+        difficulties = {
+            {
+                difficulty = 16, difficultyLabel = "M", completedParts = 1, totalParts = 2,
+                encounters = {
+                    { name = "首王", killed = false },
+                    { name = "次王", killed = true },
+                },
+            },
+            {
+                difficulty = 14, difficultyLabel = "N", completedParts = 2, totalParts = 2,
+                encounters = { { name = "首王", killed = true } },
+            },
+        },
+    }
+    local bossTip = UI.raidTooltip(bossTooltipCell)
+    test.eq(#bossTip.lines, 5, "a per-boss tooltip lists the difficulty and every boss")
+    test.eq(bossTip.lines[1], "M 1/2", "the mythic difficulty header is listed")
+    test.eq(bossTip.lines[2], "    首王 ✗", "mythic boss 1 is not killed")
+    test.eq(bossTip.lines[3], "    次王 ✓", "mythic boss 2 is killed")
+    test.eq(bossTip.lines[4], "N 2/2", "the normal difficulty header is listed")
+    test.eq(bossTip.lines[5], "    首王 ✓", "normal boss 1 is killed, scoped to its own difficulty")
+
+    -- A boss with no name is skipped rather than rendered as an empty line.
+    local namelessBoss = UI.raidTooltip({
+        difficulties = {
+            {
+                difficulty = 16, difficultyLabel = "M", completedParts = 1, totalParts = 2,
+                encounters = { { killed = true }, { name = "次王", killed = true } },
+            },
+        },
+    })
+    test.eq(#namelessBoss.lines, 2, "a nameless boss is skipped, the named one survives")
+    test.eq(namelessBoss.lines[2], "    次王 ✓", "the named boss still renders")
+
+    local raidTooltipTitle, raidTooltipLines = nil, {}
+    local fakeRaidTooltip = {
+        SetText = function(_, value) raidTooltipTitle = value end,
+        AddLine = function(_, value) raidTooltipLines[#raidTooltipLines + 1] = value end,
+    }
+    test.eq(UI.showRaidTooltip(fakeRaidTooltip, raidDifficultyCell), true,
+        "a raid cell can populate the Blizzard tooltip")
+    test.eq(#raidTooltipLines, 3, "every difficulty line reaches the tooltip")
+    test.eq(UI.showRaidTooltip({ SetText = function() end }, {}), false,
+        "a cell without a breakdown cannot populate a tooltip")
 
     -- Profession cooldown headings keep the compact title and resolve the
     -- client's own spell name for the tooltip, falling back when it is absent.

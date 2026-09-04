@@ -3037,6 +3037,7 @@ do -- BGNext 当前团交易与邮件核对
     L["方向"] = true
     L["寄出"] = true
     L["已完成"] = true
+    L["未完成"] = true
     L["已取消"] = true
     L["已寄出"] = true
     L["待核对"] = true
