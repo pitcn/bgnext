@@ -31,7 +31,7 @@ When source research materially influences a change, the design or pull request 
 
 Research notes should describe behavior and conclusions rather than preserve source excerpts. Implementation is written against BGNext's own module boundaries, Blizzard APIs, and repository conventions. Tests assert observable behavior and safety properties, not another addon's private function names or source layout.
 
-The supplied and verified BGLite 2.4.0 baseline remains governed by ADR-0001: baseline overrides are individually recorded and reviewed, and release packages are still built only from the approved runtime graph. Historical or separately installed addon trees are research inputs only and never enter the repository or release package.
+The supplied and verified BGLite baseline remains governed by ADR-0001 and ADR-0004: official Pure Edition source may enter the repository as an immutable upstream baseline, baseline overrides are individually recorded and reviewed, and release packages are still built only from the approved runtime graph. Other historical or separately installed addon trees remain research inputs only and never enter the repository or release package.
 
 ## Consequences
 

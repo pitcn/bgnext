@@ -1,10 +1,10 @@
 # BGNext domain context
 
-BGNext is an independent community enhancement built on the verified BGLite 2.4.0 distribution supplied for the enhancement activity. It is not an official BiaoGe, BGLite, Blizzard, NetEase, or NetEase DD project.
+BGNext is an independent community enhancement built on the verified official BGLite 2.4.1 Pure Edition supplied for the enhancement activity. It is not an official BiaoGe, BGLite, Blizzard, NetEase, or NetEase DD project.
 
 ## Domain terms
 
-- **BGLite baseline** — the immutable 188-file upstream snapshot identified by commit `9e0b119` and `docs/baseline/BGLite-2.4.0.sha256`.
+- **BGLite baseline** — the immutable 188-file official Pure Edition snapshot identified by commit `31b4942` and `docs/baseline/BGLite-2.4.1.sha256`.
 - **BGNext override** — a reviewed modification to a baseline runtime file, recorded in `docs/baseline/BGNext-overrides.sha256`.
 - **BGNext module** — independently authored code under `Core/BGNext/`.
 - **Current auction protocol** — the existing in-game BGLite messages needed for a live raid auction. It is not a general synchronization channel or a historical record.

@@ -17,6 +17,7 @@ do -- BGNext release text
     L["进入新进度时，如旧表仍有未结算内容，自动清空前会先确认；取消不会删除。"] = "When entering a new lockout, automatic clearing asks first if the previous table still has unsettled content. Cancelling preserves it."
     L["正式服角色总览按 Boss 和难度统计团本进度；证据不足时留空，不显示错误完成状态。"] = "Retail character overview now tracks raid progress per boss and difficulty. Missing evidence stays blank instead of showing a false completion."
     L["修复底栏按钮重叠及表格组合键误删装备；待拍窗口新增关闭按钮并统一外观。"] = "Fixed overlapping footer buttons and modified table clicks deleting items. The auction queue now has a close button and consistent styling."
+    L["上游基础升级到官方 BGLite 纯净版 2.4.1；拍卖聊天不再跨重载保存，并补充拍卖记录空数据容错。"] = "Updated the upstream foundation to official BGLite Pure Edition 2.4.1. Auction chat no longer persists across reloads, and auction-log actions now tolerate missing data."
     L["心愿清单：新选装备默认备选，可用滚轮按备选、次 BIS、BIS 切换；已有优先级保持不变。"] = "Wishlist: new selections start as Backup. Use the mouse wheel to cycle Backup, 2nd BiS and BiS; existing priorities are preserved."
     L["心愿优先级改用独立文字徽标，不遮挡装备名称与装等；长列表可以滚动。"] = "Wishlist priorities now use separate text badges without covering item names or levels; long lists can be scrolled."
     L["修复价格预设失焦保存、Alt+右键按预设开拍、Ctrl+右键改价；支持旧价格和心愿字符串导入。"] = "Fixed preset saving on focus loss, Alt+right-click auction starts using presets, and Ctrl+right-click price editing. Legacy price and wishlist imports remain available."
@@ -32,7 +33,7 @@ do -- BGNext release text
     L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"] = "Character overview records only characters you log into yourself. Current-raid trade and mail reconciliation lasts at most seven days, without mail bodies or other-player history profiles."
     L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"] = "Legacy history cleanup in Storage & Privacy cannot be undone: back up WTF first. Updating or reloading does not delete it. Do not enable BGLite, BiaoGe or their dependent extensions alongside BGNext."
     L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"] = "Clients other than Simplified or Traditional Chinese fall back to English. See the release notes for tested client coverage; not all client features have been verified."
-    L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.0 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
+    L["BGNext 基于 BGLite 2.4.1 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.1 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
 end
 
 do --英语说明书
@@ -46,7 +47,7 @@ do --英语说明书
         L["角色总览只记录你亲自登录过的角色。当前团交易和邮件核对最多保留七天；不保存邮件正文，不建立其他玩家历史档案。"],
         L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"],
         L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"],
-        L["BGNext 基于 BGLite 2.4.0 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
+        L["BGNext 基于 BGLite 2.4.1 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"],
     }
     ns.updateText_now = {
         "BGNext 0.6.0",
@@ -54,6 +55,7 @@ do --英语说明书
         L["拍卖结束后，侧边卡片会短暂显示买家和成交金额；流拍或取消也有明确状态。"],
         L["交易记录改进：保留同物品多件数量，确认时采集双方物品与金币，并区分已交易和待核对。"],
         L["修复交易成功或失败通报；同一交易只通报一次，不记录聊天内容或跨团历史。"],
+        L["上游基础升级到官方 BGLite 纯净版 2.4.1；拍卖聊天不再跨重载保存，并补充拍卖记录空数据容错。"],
     }
     ns.updateText_before = {
 
@@ -98,6 +100,7 @@ do -- BGNext wish priorities
 end
 
 do
+    L["总欠款："] = "Total debt:"
     L["战斗的奖励"] = "Rewards of Battle"
     L["删除该站位图"] = "Delete This Positioning Map"
     L["错误！禁止清除欠款"] = "Error! Clearing debts is prohibited"
