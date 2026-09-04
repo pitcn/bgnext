@@ -3219,3 +3219,43 @@ do -- BGNext auto-clear confirmation
     L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"] = true
     L["自动清空保护模块未加载，已跳过自动清空以避免误删；如需清空请手动操作。"] = true
 end
+
+do -- BGNext feature management and guide catalog
+    L["功能管理"] = true
+    L["BGNext 功能管理"] = true
+    L["完整模式"] = true
+    L["基础模式"] = true
+    L["自定义模式"] = true
+    L["当前模式："] = true
+    L["（必需）"] = true
+    L["个人工具"] = true
+    L["拍卖工具"] = true
+    L["结算工具"] = true
+    L["界面与隐私"] = true
+    L["心愿清单"] = true
+    L["记录装备需求，并用备选、次 BIS、BIS 表示优先级。"] = true
+    L["角色总览"] = true
+    L["集中查看自己登录过的角色信息和进度。"] = true
+    L["装备过滤"] = true
+    L["按角色与专精减少不相关装备显示。"] = true
+    L["基础兼容"] = true
+    L["保持与官方 BGLite 的表格和团队流程兼容。"] = true
+    L["开拍安全检查"] = true
+    L["发送拍卖前复核权限、团队、战斗状态和价格。"] = true
+    L["价格预设"] = true
+    L["保存团本起拍价方案和单件价格。"] = true
+    L["待拍队列"] = true
+    L["把多件装备加入队列，逐件确认后开拍。"] = true
+    L["交易事实采集"] = true
+    L["在本地记录当前团的实际交易结果。"] = true
+    L["数据生命周期"] = true
+    L["限制当前结算数据的范围和保留时间。"] = true
+    L["结算记录与检查"] = true
+    L["查看当前团交易、邮件、退货标记和结算前检查。"] = true
+    L["交易通报"] = true
+    L["交易完成后按设置发送团队通报。"] = true
+    L["存储与隐私"] = true
+    L["说明本地保存内容，并提供清理控制。"] = true
+    L["外观增强"] = true
+    L["使用 BGNext 的主题、缩放和界面优化。"] = true
+end

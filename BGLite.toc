@@ -113,5 +113,6 @@ Core\Module\hooks.lua
 
 Core\Module\minimap.lua
 Core\Options.lua
+Core\BGNext\FeatureManagementUI.lua
 Core\BGNext\UIThemeSettings.lua
 Core\BGNext\LegacyHistoryCleanup.lua
