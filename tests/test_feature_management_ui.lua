@@ -6,7 +6,7 @@ return function(test)
 
     local root = { settings = {} }
     local model = ui.viewModel(root, "titan")
-    test.eq(model.mode, "full", "view reports full mode")
+    test.eq(model.mode, "custom", "new opt-in tools keep an untouched install custom")
     test.eq(#model.groups, 4, "view keeps catalog group order")
     test.eq(model.groups[1].id, "personal", "personal group remains first")
 
@@ -18,6 +18,7 @@ return function(test)
     test.eq(rows.auction_safety.saved, nil, "required row has no saved toggle")
     test.eq(rows.wishlist.required, false, "optional row is toggleable")
     test.eq(rows.wishlist.enabled, true, "optional row reports effective state")
+    test.eq(rows.local_history.enabled, false, "history is visibly opt-in")
 
     local ok, reason = ui.toggleFeature(root, "titan", "auction_safety", false)
     test.eq(ok, false, "UI refuses required toggle")

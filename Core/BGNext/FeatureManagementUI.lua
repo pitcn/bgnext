@@ -54,7 +54,7 @@ function M.toggleFeature(root, family, id, value)
 end
 
 local function refreshRuntimes()
-    for _, name in ipairs({ "AuctionPriceUI", "AuctionQueueRuntime", "LootAuctionEntry", "WishlistUI", "OwnCharactersRuntime", "EquipmentFilterRuntime", "EquipmentFilterUI", "CurrentSettlementUI", "UIThemeSettings" }) do
+    for _, name in ipairs({ "AuctionPriceUI", "AuctionQueueRuntime", "LootAuctionEntry", "WishlistUI", "OwnCharactersRuntime", "EquipmentFilterRuntime", "EquipmentFilterUI", "CurrentSettlementUI", "LeaderToolsUI", "UIThemeSettings" }) do
         local runtime = BG.BGNext[name]
         if runtime and type(runtime.refreshFeatureState) == "function" then runtime.refreshFeatureState() end
     end

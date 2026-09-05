@@ -25,13 +25,23 @@ return function(test)
     -- createPending validates the table id
     test.eq(Guard.createPending(nil, 1), nil, "nil table id yields nil")
     test.eq(Guard.createPending("", 1), nil, "empty table id yields nil")
-    local p = Guard.createPending("ZUG", 1)
+    local p = Guard.createPending("ZUG", 1, { instanceID = 309, startB = 3, endB = 8 })
     test.eq(p.fb, "ZUG", "captures the table id")
     test.eq(p.clearType, 1, "captures the clear reason")
+    test.eq(p.instanceID, 309, "captures the instance id")
+    test.eq(p.startB, 3, "captures the first boss row")
+    test.eq(p.endB, 8, "captures the last boss row")
     test.eq(p.state, Guard.STATE_PENDING, "starts pending")
+    test.eq(Guard.createPending("ZUG", 1), nil, "range clear requires a captured scope")
+    test.eq(Guard.createPending("ZUG", 1, { instanceID = 309, startB = 8, endB = 3 }), nil,
+        "reversed boss ranges are rejected")
 
     -- accept with content clears exactly once
-    test.eq(Guard.accept(p, true), "clear", "accept with content clears")
+    test.eq(Guard.accept(p, true, 999), "skip", "accept rejects a changed instance")
+    test.eq(p.state, Guard.STATE_SKIPPED, "changed instance consumes the stale request")
+
+    p = Guard.createPending("ZUG", 1, { instanceID = 309, startB = 3, endB = 8 })
+    test.eq(Guard.accept(p, true, 309), "clear", "accept with matching scope and content clears")
     test.eq(p.state, Guard.STATE_CLEARED, "state advances to cleared")
     test.eq(Guard.accept(p, true), "skip", "a cleared request never clears again")
 
@@ -42,14 +52,14 @@ return function(test)
     test.eq(Guard.accept(p2, true), "skip", "a skipped request never clears later")
 
     -- refuse / cancel abandons without clearing
-    local p3 = Guard.createPending("ZUG", 1)
+    local p3 = Guard.createPending("ZUG", 1, { instanceID = 309, startB = 3, endB = 8 })
     test.eq(Guard.refuse(p3), false, "refuse returns false (do not clear)")
     test.eq(p3.state, Guard.STATE_CANCELLED, "state advances to cancelled")
     test.eq(Guard.accept(p3, true), "skip", "a cancelled request never clears")
 
     -- refuse after a clear does not regress the state
-    local p4 = Guard.createPending("ZUG", 1)
-    Guard.accept(p4, true)
+    local p4 = Guard.createPending("ZUG", 1, { instanceID = 309, startB = 3, endB = 8 })
+    Guard.accept(p4, true, 309)
     test.eq(p4.state, Guard.STATE_CLEARED, "cleared state established")
     test.eq(Guard.refuse(p4), false, "refuse after clear still returns false")
     test.eq(p4.state, Guard.STATE_CLEARED, "refuse does not regress a cleared request")

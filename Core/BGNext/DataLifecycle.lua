@@ -34,6 +34,15 @@ function M.ensureRoot(saved)
     root.ownCharacters = root.ownCharacters or {}
     root.leaderAuctionPricePresets = root.leaderAuctionPricePresets or {}
     root.personalAuctionExpectations = root.personalAuctionExpectations or {}
+    root.leaderTools = type(root.leaderTools) == "table" and root.leaderTools or {}
+    root.leaderTools.expenseTemplates = type(root.leaderTools.expenseTemplates) == "table"
+        and root.leaderTools.expenseTemplates or {}
+    root.leaderTools.localHistory = type(root.leaderTools.localHistory) == "table"
+        and root.leaderTools.localHistory or {}
+    if root.leaderTools.historyRetentionDays ~= 30 and root.leaderTools.historyRetentionDays ~= 90
+        and root.leaderTools.historyRetentionDays ~= 180 then
+        root.leaderTools.historyRetentionDays = 90
+    end
     root.currentRaid = root.currentRaid or {}
     root.currentSettlement = root.currentSettlement or emptySettlement()
     root.currentSettlement.returns = root.currentSettlement.returns or {}

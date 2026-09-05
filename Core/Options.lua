@@ -1460,6 +1460,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                 else
                     BG.options["button" .. name1]:Hide()
                 end
+                if BG.UpdateItemGuoQiFrame then BG.UpdateItemGuoQiFrame() end
             end)
         end
         -- 剩余多少分钟时提醒
@@ -1475,6 +1476,9 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
             }
             local f = O.CreateSlider(name, "|cffFFFFFF" .. L["剩余时间低于多少时提醒(分)"] .. "|r", biaoge, 1, 120, 1, 220, height - h - 25, ontext)
             BG.options["button" .. name] = f
+            f:HookScript("OnValueChanged", function()
+                if BG.UpdateItemGuoQiFrame then BG.UpdateItemGuoQiFrame() end
+            end)
             if BiaoGe.options["guoqiRemind"] ~= 1 then
                 f:Hide()
             end
@@ -2400,8 +2404,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                     L["没有使用自动出价时，如果拍卖剩余时间低于10秒时被顶价，语音提醒你\"小心偷家\"。"],
                 },
                 autoCreateBill           = { L["自动生成表格账单"], L["当一个装备拍卖成功时，会根据拍卖记录，自动填写表格里该装备所对应的买家和金额。"], " ",
-                    L["启用该功能时，交易记账会被自动禁用，以免记账冲突。"], " ",
-                    L["注意：如果你是团长或物品分配者，该功能不会生效。团长或物品分配者仍会使用更为可靠的交易记账。"] },
+                    L["普通团员启用时会停用交易记账以避免冲突；团长或物品分配者仍保留交易记账。"] },
                 autoAuctionFold          = { L["被过滤的装备自动折叠"], L["启用装备过滤时，如果拍卖的装备不合适你，自动折叠。"] },
                 autoAuctionUp            = { L["拍卖竞价窗口自动往上吸附"], L["当靠前的窗口消失时，后面的窗口会自动往上吸附。"] },
                 aotoSendLate             = { L["自动出价的延迟时间随机"], L["启用自动出价时，当别人出价后，默认是自己会延迟0.5秒后才自动出价。"], " ",

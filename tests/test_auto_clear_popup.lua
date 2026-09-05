@@ -29,7 +29,7 @@ local function fakeWidget()
 end
 
 local function makePopup()
-    local h = { dialogs = {}, visible = {}, events = {}, clearCalls = {}, messages = {}, sounds = {} }
+    local h = { dialogs = {}, visible = {}, events = {}, clearCalls = {}, rangeClearCalls = {}, messages = {}, sounds = {} }
     function h.show(which, text_arg1, text_arg2, data, data2)
         local info = h.dialogs[which]
         if h.visible[which] then
@@ -149,6 +149,9 @@ return function(test)
         h.clearCalls[#h.clearCalls + 1] = FB
         return 25
     end
+    BG.ClearBiaoGeRange = function(FB, startB, endB)
+        h.rangeClearCalls[#h.rangeClearCalls + 1] = { FB, startB, endB }
+    end
 
     local function fireCycle()
         h.events["RAID_INSTANCE_WELCOME"]()
@@ -162,43 +165,54 @@ return function(test)
     test.eq(cur ~= nil, true, "auto-clear dialog is shown")
     test.eq(cur.data ~= nil, true, "pending is bound as dialog data")
     test.eq(cur.data.fb, "MC", "pending captures the target table")
+    test.eq(cur.text_arg1:find("Boss 1%-2") ~= nil, true, "range confirmation names the exact boss interval")
+    test.eq(cur.text_arg1:find("当前团结算记录会保留", 1, true) ~= nil, true,
+        "range confirmation truthfully says settlement is preserved")
     h.accept("AUTO_QINGKONG_CONFIRM")
-    test.eq(#h.clearCalls, 1, "accept clears exactly once")
-    test.eq(h.clearCalls[1], "MC", "accept clears the captured table")
+    test.eq(#h.clearCalls, 0, "instance auto-clear never clears the whole shared table")
+    test.eq(#h.rangeClearCalls, 1, "accept clears the captured instance range exactly once")
+    test.eq(h.rangeClearCalls[1][1], "MC", "range clear targets the captured table")
+    test.eq(h.rangeClearCalls[1][2], 1, "range clear starts at the captured boss")
+    test.eq(h.rangeClearCalls[1][3], 2, "range clear ends at the captured boss")
 
     -- 2. Accept revalidates: a table emptied meanwhile is not cleared again.
     h.clearCalls = {}
+    h.rangeClearCalls = {}
     contentPresent = true
     fireCycle()
     contentPresent = false
     h.accept("AUTO_QINGKONG_CONFIRM")
-    test.eq(#h.clearCalls, 0, "an emptied table is not cleared again on accept")
+    test.eq(#h.rangeClearCalls, 0, "an emptied range is not cleared again on accept")
 
     -- 3. Cancel preserves the table and settlement.
     h.clearCalls = {}
+    h.rangeClearCalls = {}
     contentPresent = true
     fireCycle()
     h.cancel("AUTO_QINGKONG_CONFIRM")
-    test.eq(#h.clearCalls, 0, "cancel leaves the table intact")
+    test.eq(#h.rangeClearCalls, 0, "cancel leaves the range intact")
 
     -- 4. Esc preserves the table and settlement.
     h.clearCalls = {}
+    h.rangeClearCalls = {}
     fireCycle()
     h.esc("AUTO_QINGKONG_CONFIRM")
-    test.eq(#h.clearCalls, 0, "Esc leaves the table intact")
+    test.eq(#h.rangeClearCalls, 0, "Esc leaves the range intact")
 
     -- 5. Same-target duplicate: the reused dialog must not cancel the newer
     --    request; accepting still clears exactly once.
     h.clearCalls = {}
+    h.rangeClearCalls = {}
     contentPresent = true
     fireCycle()
     fireCycle()
     test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].data.fb, "MC", "duplicate still targets the table")
     h.accept("AUTO_QINGKONG_CONFIRM")
-    test.eq(#h.clearCalls, 1, "a duplicate event clears exactly once")
+    test.eq(#h.rangeClearCalls, 1, "a duplicate event clears its range exactly once")
 
     -- 6. Cross-target replacement: the newer target wins and clears once.
     h.clearCalls = {}
+    h.rangeClearCalls = {}
     contentPresent = true
     currentInstanceID = 1234
     fireCycle()
@@ -206,11 +220,12 @@ return function(test)
     fireCycle()
     test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].data.fb, "ZUG", "replacement binds the newer target")
     h.accept("AUTO_QINGKONG_CONFIRM")
-    test.eq(#h.clearCalls, 1, "replacement clears once")
-    test.eq(h.clearCalls[1], "ZUG", "replacement clears the newer table")
+    test.eq(#h.rangeClearCalls, 1, "replacement clears once")
+    test.eq(h.rangeClearCalls[1][1], "ZUG", "replacement clears the newer table range")
 
     -- 7. Missing guard must fail closed: no clear, a warning is announced.
     h.clearCalls = {}
+    h.rangeClearCalls = {}
     h.messages = {}
     BG.BGNext.AutoClearGuard = nil
     contentPresent = true

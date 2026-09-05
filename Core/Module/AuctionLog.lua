@@ -582,8 +582,48 @@ BG.Init(function()
                 -- 已移除 CP 货币结算挂载点（第三方付费模块 BGV 提供）
             end
 
+            -- Raid leaders and master looters keep trade bookkeeping enabled, so
+            -- auction completion must not rebuild (and clear) the entire bill.
+            -- Fill only the next empty row for this completed auction instead.
+            function BG.FillBillFromAuctionResult(FB, result)
+                if not FB or type(result) ~= "table" or result.type ~= 1 then return false end
+                if not BiaoGe[FB] or not BG.Frame[FB] then return false end
+                local itemID = GetItemID(result.zhuangbei)
+                if not itemID then return false end
+
+                for b = 1, Maxb[FB] - 1 do
+                    local bossFrame = BG.Frame[FB]["boss" .. b]
+                    local bossData = BiaoGe[FB]["boss" .. b]
+                    if bossFrame and bossData then
+                        for i = 1, BG.GetMaxi(FB, b) do
+                            local zhuangbei = bossFrame["zhuangbei" .. i]
+                            local maijia = bossFrame["maijia" .. i]
+                            local jine = bossFrame["jine" .. i]
+                            if zhuangbei and maijia and jine
+                                and GetItemID(zhuangbei:GetText()) == itemID
+                                and maijia:GetText() == "" and jine:GetText() == ""
+                            then
+                                local r, g, blue = BillBuyer.color(result, GetClassColor)
+                                BillBuyer.set(maijia, result.maijia, r, g, blue)
+                                for key in pairs(BG.playerClass) do
+                                    bossData[key .. i] = result[key]
+                                end
+                                jine:SetText(result.jine or "")
+                                bossData["jine" .. i] = result.jine
+                                return true
+                            end
+                        end
+                    end
+                end
+                return false
+            end
+
             function BG.IsAutoCreateBill()
                 return BiaoGe.options.autoCreateBill == 1 and not BG.IsML
+            end
+
+            function BG.ShouldCreateBillFromAuction()
+                return BiaoGe.options.autoCreateBill == 1
             end
         end
 
@@ -649,9 +689,7 @@ BG.Init(function()
                 GameTooltip:AddLine(self.Text:GetText(), 1, 1, 1, true)
                 GameTooltip:AddLine(L["当一个装备拍卖成功时，会根据拍卖记录，自动填写表格里该装备所对应的买家和金额。"], 1, 0.82, 0, true)
                 GameTooltip:AddLine(" ", 1, 0.82, 0, true)
-                GameTooltip:AddLine(L["启用该功能时，交易记账会被自动禁用，以免记账冲突。"], 1, 0.82, 0, true)
-                GameTooltip:AddLine(" ", 1, 0.82, 0, true)
-                GameTooltip:AddLine(L["注意：如果你是团长或物品分配者，该功能不会生效。团长或物品分配者仍会使用更为可靠的交易记账。"], 1, 0, 0, true)
+                GameTooltip:AddLine(L["普通团员启用时会停用交易记账以避免冲突；团长或物品分配者仍保留交易记账。"], 1, 0.82, 0, true)
                 GameTooltip:Show()
             end)
             bt:SetScript("OnLeave", GameTooltip_Hide)
@@ -2119,9 +2157,17 @@ BG.Init(function()
 
                     BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
 
-                    if BG.IsAutoCreateBill() then
+                    if BG.ShouldCreateBillFromAuction() then
+                        local fillSingleResult = BG.IsML == true
+                        local waitForLeaderPurchaseChoice = fillSingleResult and SamePlayer(maijia, player)
                         BG.After(0.1, function()
-                            BG.CreateBillByAuctionLog(FB)
+                            if waitForLeaderPurchaseChoice then
+                                return
+                            elseif fillSingleResult then
+                                BG.FillBillFromAuctionResult(FB, a)
+                            else
+                                BG.CreateBillByAuctionLog(FB)
+                            end
                         end)
                     end
                 end)
