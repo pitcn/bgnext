@@ -35,6 +35,12 @@ return function(test)
         "mail collection stays on the confirmed send result")
     test.eq(sendMail:find("CurrentSettlementRuntime.notifyMailSent", 1, true) ~= nil, true,
         "batch mail reports only its own executed send result")
+    test.eq(sendMail:find("lastSend = { fullName = fullName, name = name, colorName = colorName, money = money }", 1, true) ~= nil,
+        true, "batch mail freezes the attempted amount with its recipient")
+    test.eq(sendMail:find("local money = tonumber(lastSend.money) or 0", 1, true) ~= nil, true,
+        "the confirmed mail result does not reread a mutable amount field")
+    test.eq(sendMail:find("local goldAmount = money / 10000", 1, true) ~= nil, true,
+        "settlement capture derives gold from the frozen successful attempt")
     test.eq(main:find("CurrentSettlementUI.installEntry", 1, true) ~= nil, true,
         "current-raid record entries are installed on the main window")
 

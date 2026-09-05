@@ -355,10 +355,18 @@ BG.Init(function()
             return ""
         end
 
+        local function RejectAuctionStart(message)
+            if message and type(BG.SendSystemMessage) == "function" then
+                BG.SendSystemMessage(message)
+            end
+        end
+
         function BG.StartAuction(link, bt, isNotAuctioned, notAlt, isRightButton, noSound, callback)
-            if BiaoGe.options["autoAuctionStart"] ~= 1 and not notAlt then return end
-            if not link then return end
-            if not BG.IsML then return end
+            if BiaoGe.options["autoAuctionStart"] ~= 1 and not notAlt then
+                return RejectAuctionStart(L["组合键拍卖已在设置中关闭"])
+            end
+            if not link then return RejectAuctionStart(L["物品无效"]) end
+            if not BG.IsML then return RejectAuctionStart(L["无权限发起拍卖"]) end
             local link = BG.Copy(link)
             local items = {}
             if type(link) == "table" then

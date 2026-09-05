@@ -43,6 +43,18 @@ return function(test)
         "the upstream channel build number is not used as the BGNext release version")
     test.eq(workflow:find('.FullName.Replace("\\", "/")', 1, true) ~= nil, true,
         "the release audit normalizes Windows ZIP entry separators")
+    local baselineGate = assert(workflow:find("tools/verify-baseline.ps1", 1, true),
+        "the release job must verify the baseline before packaging")
+    local buildStep = assert(workflow:find("tools/build-release.ps1", 1, true),
+        "the release job must build the runtime archive")
+    test.eq(baselineGate < buildStep, true,
+        "baseline integrity is verified before a distributable archive is built")
+    test.eq(workflow:find("fetch-depth: 0", 1, true) ~= nil, true,
+        "the release checkout includes the pinned baseline commit")
+    test.eq(workflow:find("lua5.1 tests/run.lua", 1, true) ~= nil, true,
+        "the release workflow runs the Lua suite itself")
+    test.eq(workflow:find("needs: lua-tests", 1, true) ~= nil, true,
+        "the package cannot build or upload before Lua tests pass")
 
     test.eq(init:find('addonName ~= "BGLite"', 1, true), nil,
         "ADDON_LOADED follows the actual packaged addon name")

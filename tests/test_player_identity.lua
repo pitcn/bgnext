@@ -90,4 +90,24 @@ return function(test)
     trade:close()
     test.eq(tradeSource:find('maijia:GetText() == target', 1, true), nil,
         "debt lookup and clear never compare display text to a canonical target")
+
+    local core = assert(io.open("Core/BiaoGe.lua", "rb"))
+    local coreSource = core:read("*a")
+    core:close()
+    test.eq(coreSource:find("return PlayerIdentity.same(left, right, BG.realmName)", 1, true) ~= nil, true,
+        "raid-controller identity delegates to the canonical identity module")
+    test.eq(coreSource:find("IsSamePlayer(name, BG.playerName)", 1, true) ~= nil, true,
+        "raid-controller detection compares the local player canonically")
+    test.eq(coreSource:find("IsSamePlayer(BG.masterLooter, name)", 1, true) ~= nil, true,
+        "master-looter name checks use the same canonical identity rule")
+    test.eq(coreSource:find("IsSamePlayer(BG.raidLeader, name)", 1, true) ~= nil, true,
+        "raid-leader name checks use the same canonical identity rule")
+
+    local toc = assert(io.open("BGLite.toc", "rb"))
+    local tocSource = toc:read("*a")
+    toc:close()
+    local identityLoad = assert(tocSource:find("Core\\BGNext\\PlayerIdentity.lua", 1, true))
+    local rosterLoad = assert(tocSource:find("Core\\BiaoGe.lua", 1, true))
+    test.eq(identityLoad < rosterLoad, true,
+        "player identity loads before the roster code captures its interface")
 end

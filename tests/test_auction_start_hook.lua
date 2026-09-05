@@ -33,6 +33,7 @@ return function(test)
         local nowValue = 1000
         local nextAuctionID = 0
         local sends = {}
+        local messages = {}
 
         -- --- Fake frame factory ------------------------------------------------
 
@@ -201,7 +202,7 @@ return function(test)
             Init2 = function(fn) init2Callbacks[#init2Callbacks + 1] = fn end,
             RegisterEvent = function() end,
             After = function(delay, fn) afters[#afters + 1] = { delay = delay, fn = fn } end,
-            SendSystemMessage = function() end,
+            SendSystemMessage = function(message) messages[#messages + 1] = message end,
             Copy = function(x) return x end,
             CreateButton = function(parent) local b = makeFrame(); b.parent = parent; return b end,
             CreateCloseButton = function(f, x, y)
@@ -345,6 +346,24 @@ return function(test)
             sends[#sends + 1] = { auctionID = nextAuctionID, itemID = itemID, money = money }
             return nextAuctionID
         end
+
+        -- Every authoritative start refusal is visible locally. These checks
+        -- drive the real BG.StartAuction entry rather than a parallel gate.
+        BG.IsML = false
+        BG.StartAuction("item:1001", nil, nil, true)
+        test.eq(messages[#messages], "无权限发起拍卖",
+            "a non-controller sees why the auction did not open")
+        BG.IsML = true
+
+        BiaoGe.options.autoAuctionStart = 0
+        BG.StartAuction("item:1001")
+        test.eq(messages[#messages], "组合键拍卖已在设置中关闭",
+            "a disabled shortcut reports its local setting")
+        BiaoGe.options.autoAuctionStart = 1
+
+        BG.StartAuction(nil, nil, nil, true)
+        test.eq(messages[#messages], "物品无效",
+            "a missing item reports an invalid-item reason")
 
         local function flushZeroTimers()
             local zero, rest = {}, {}
