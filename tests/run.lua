@@ -85,6 +85,7 @@ local suites = {
     "tests/test_auto_clear_guard.lua",
     "tests/test_auto_clear_popup.lua",
     "tests/test_auction_end_result.lua",
+    "tests/test_auto_create_bill_policy.lua",
     "tests/test_auction_cancel_event.lua",
     "tests/test_trade_announcement.lua",
     "tests/test_trade_announcement_events.lua",

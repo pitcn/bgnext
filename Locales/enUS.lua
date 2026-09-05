@@ -55,6 +55,23 @@ do -- BGNext release text
     L["存储与隐私中的旧历史清理不可恢复，请先备份 WTF；升级或重载不会自动清理。不要同时启用 BGLite、BiaoGe 或依赖它们的扩展。"] = "Legacy history cleanup in Storage & Privacy cannot be undone: back up WTF first. Updating or reloading does not delete it. Do not enable BGLite, BiaoGe or their dependent extensions alongside BGNext."
     L["简中和繁中以外的客户端回落英文。不同游戏版本的实测范围见发布说明，不代表全部客户端功能已验证。"] = "Clients other than Simplified or Traditional Chinese fall back to English. See the release notes for tested client coverage; not all client features have been verified."
     L["BGNext 基于 BGLite 2.4.2 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.2 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
+    L["紧急修复团长或物品分配者拍卖成功后，主表不自动填写买家和成交金额的问题。"] = "Hotfixed missing buyer and final amount entries in the main bill after auctions run by raid leaders or master looters."
+    L["新增可选团长工具：支出模板、多拍品中心、实收与分金预览；均可在功能管理中单独开关。"] = "Added optional leader tools: expense templates, Auction Center, and receipts/wage preview, each independently switchable in Feature Management."
+    L["新增默认关闭的本地成交摘要；只在手动确认后保存最小信息，并可设置保留期或一键清空。"] = "Added an opt-in local sale summary that stores minimal information only after confirmation, with retention controls and one-click clearing."
+    L["改进新副本进度清表和交易候选过期处理，只处理当前副本范围，避免影响其他账表数据。"] = "Improved new-lockout clearing and trade-candidate expiry so only the current instance scope is affected."
+    L["新增增强模式与游戏内说明书，重做待拍队列和 Boss 拾取拍卖入口，并改进拍卖、交易、退货与熊猫人角色追踪。"] = "Added enhancement modes and an in-game guide, redesigned the auction queue and boss-loot auction entry, and improved auctions, trades, returns, and Mists character tracking."
+end
+
+do -- BGNext 0.8.0 release text
+    local values = {
+        ["紧急修复团长或物品分配者拍卖成功后，主表不自动填写买家和成交金额的问题。"] = "Hotfixed missing buyer and final amount entries in the main bill after auctions run by raid leaders or master looters.",
+        ["新增可选团长工具：支出模板、多拍品中心、实收与分金预览；均可在功能管理中单独开关。"] = "Added optional leader tools: expense templates, Auction Center, and receipts/wage preview, each independently switchable in Feature Management.",
+        ["新增默认关闭的本地成交摘要；只在手动确认后保存最小信息，并可设置保留期或一键清空。"] = "Added an opt-in local sale summary that stores minimal information only after confirmation, with retention controls and one-click clearing.",
+        ["改进新副本进度清表和交易候选过期处理，只处理当前副本范围，避免影响其他账表数据。"] = "Improved new-lockout clearing and trade-candidate expiry so only the current instance scope is affected.",
+        ["新增增强模式与游戏内说明书，重做待拍队列和 Boss 拾取拍卖入口，并改进拍卖、交易、退货与熊猫人角色追踪。"] = "Added enhancement modes and an in-game guide, redesigned the auction queue and boss-loot auction entry, and improved auctions, trades, returns, and Mists character tracking.",
+    }
+    for key, value in pairs(values) do L[key] = value end
+    ns.updateText_now = { "BGNext 0.8.0", L["紧急修复团长或物品分配者拍卖成功后，主表不自动填写买家和成交金额的问题。"], L["新增可选团长工具：支出模板、多拍品中心、实收与分金预览；均可在功能管理中单独开关。"], L["新增默认关闭的本地成交摘要；只在手动确认后保存最小信息，并可设置保留期或一键清空。"], L["改进新副本进度清表和交易候选过期处理，只处理当前副本范围，避免影响其他账表数据。"] }
 end
 
 do -- BGNext leader tools
@@ -3403,3 +3420,5 @@ do -- BGNext in-game guide
     L["已自动清空表格< %s >的当前副本区间（Boss %s-%s），其他副本记录已保留。"] = "Cleared the current instance range in < %s > (Boss %s-%s); records for other instances were kept."
     L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。是否只清空该区间？其他副本记录与当前团结算记录会保留。"] = "A new lockout was detected, but < %s > still has content in this instance range (Boss %s-%s). Clear only this range? Other instance rows and the current settlement will be kept."
 end
+
+ns.updateText_now = { "BGNext 0.8.0", L["紧急修复团长或物品分配者拍卖成功后，主表不自动填写买家和成交金额的问题。"], L["新增可选团长工具：支出模板、多拍品中心、实收与分金预览；均可在功能管理中单独开关。"], L["新增默认关闭的本地成交摘要；只在手动确认后保存最小信息，并可设置保留期或一键清空。"], L["改进新副本进度清表和交易候选过期处理，只处理当前副本范围，避免影响其他账表数据。"] }

@@ -583,7 +583,7 @@ BG.Init(function()
             end
 
             function BG.IsAutoCreateBill()
-                return BiaoGe.options.autoCreateBill == 1 and not BG.IsML
+                return BiaoGe.options.autoCreateBill == 1
             end
         end
 
@@ -650,8 +650,6 @@ BG.Init(function()
                 GameTooltip:AddLine(L["当一个装备拍卖成功时，会根据拍卖记录，自动填写表格里该装备所对应的买家和金额。"], 1, 0.82, 0, true)
                 GameTooltip:AddLine(" ", 1, 0.82, 0, true)
                 GameTooltip:AddLine(L["启用该功能时，交易记账会被自动禁用，以免记账冲突。"], 1, 0.82, 0, true)
-                GameTooltip:AddLine(" ", 1, 0.82, 0, true)
-                GameTooltip:AddLine(L["注意：如果你是团长或物品分配者，该功能不会生效。团长或物品分配者仍会使用更为可靠的交易记账。"], 1, 0, 0, true)
                 GameTooltip:Show()
             end)
             bt:SetScript("OnLeave", GameTooltip_Hide)
