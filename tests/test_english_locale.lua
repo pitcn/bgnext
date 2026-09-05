@@ -115,6 +115,11 @@ return function(test)
             test.eq(type(value), "string", "loaded UI translation must be text: " .. key)
         end
         test.eq(type(localized.L["存储与隐私"]), "string", "storage tab receives text, never a boolean")
+        test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
+        test.eq(localized.updateText_now[1], "BGNext 0.8.0", "current in-game update notes use the release version")
+        for index, value in ipairs(localized.updateText_now) do
+            test.eq(type(value), "string", "current in-game update note is text at index " .. index)
+        end
         local guide = table.concat(localized.instructionsText, "\n")
         test.eq(guide:find(localized.L["备选"], 1, true) ~= nil, true,
             "guide explains the starting wishlist priority in every locale")
@@ -131,4 +136,9 @@ return function(test)
     test.eq(enUS.L["开始对账"], "Start Reconciliation", "enUS clients use English")
     test.eq(enGB.L["开始对账"], "Start Reconciliation", "enGB clients fall back to English")
     test.eq(deDE.L["开始对账"], "Start Reconciliation", "all non-Chinese clients fall back to English")
+    for _, path in ipairs({ "Locales/zhCN.lua", "Locales/zhTW.lua", "Locales/enUS.lua" }) do
+        local count = 0
+        for _ in read(path):gmatch("ns%.updateText_now%s*=") do count = count + 1 end
+        test.eq(count, 1, path .. " defines the current update notes exactly once")
+    end
 end
