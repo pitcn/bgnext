@@ -2158,8 +2158,9 @@ BG.Init(function()
                     BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
 
                     if BG.ShouldCreateBillFromAuction() then
+                        local fillSingleResult = BG.IsML == true
                         BG.After(0.1, function()
-                            if BG.IsML then
+                            if fillSingleResult then
                                 BG.FillBillFromAuctionResult(FB, a)
                             else
                                 BG.CreateBillByAuctionLog(FB)
