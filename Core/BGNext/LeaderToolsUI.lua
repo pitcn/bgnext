@@ -7,6 +7,7 @@ local L = ns and ns.L or setmetatable({}, { __index = function(_, key) return to
 local M = {}
 local Store = assert(BG.BGNext.LeaderToolsStore, "LeaderToolsStore must load first")
 local Runtime = assert(BG.BGNext.LeaderToolsRuntime, "LeaderToolsRuntime must load first")
+local Layout = assert(BG.BGNext.LeaderToolsLayout, "LeaderToolsLayout must load first")
 
 local state = { frame = nil, entry = nil, tab = nil, selectedTemplate = nil, auctionFilter = "all", elapsed = 0 }
 local TAB_FEATURE = {
@@ -102,25 +103,28 @@ local function refreshTemplates(panel)
 end
 
 local function buildTemplates(parent)
+    local geometry = Layout.TEMPLATES
     local panel = CreateFrame("Frame", nil, parent)
     panel:SetAllPoints()
     panel.templateRows = {}
     local hint = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    hint:SetPoint("TOPLEFT", 205, -10)
+    hint:SetPoint("TOPLEFT", geometry.editorLeft, -10)
     hint:SetText(L["每行填写：项目=金额（金币整数）"])
-    panel.name = edit(panel, 310, 24)
-    panel.name:SetPoint("TOPLEFT", 205, -38)
-    panel.body = edit(panel, 430, 240, true)
-    panel.body:SetPoint("TOPLEFT", 205, -72)
+    panel.name = edit(panel, 475, 24)
+    panel.name:SetPoint("TOPLEFT", geometry.editorLeft, -38)
+    panel.body = edit(panel, 475, 200, true)
+    panel.body:SetPoint("TOPLEFT", geometry.editorLeft, -72)
+    panel.body:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -16, geometry.bodyBottom)
     panel.body:SetJustifyH("LEFT")
     panel.body:SetJustifyV("TOP")
     panel.status = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    panel.status:SetPoint("TOPLEFT", 205, -320)
-    panel.status:SetWidth(430)
+    panel.status:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", geometry.editorLeft, geometry.statusBottom)
+    panel.status:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+    panel.status:SetHeight(18)
     panel.status:SetJustifyH("LEFT")
 
     local new = button(panel, "新建", 68)
-    new:SetPoint("TOPLEFT", 205, -350)
+    new:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", geometry.editorLeft, geometry.primaryBottom)
     new:SetScript("OnClick", function()
         state.selectedTemplate = nil
         panel.name:SetText("") panel.body:SetText("") setStatus(panel, L["请输入新模板。"])
@@ -167,7 +171,7 @@ local function buildTemplates(parent)
         end)
     end)
     local apply = button(panel, "预览并应用", 108)
-    apply:SetPoint("TOPLEFT", new, "BOTTOMLEFT", 0, -10)
+    apply:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", geometry.editorLeft, geometry.secondaryBottom)
     apply:SetScript("OnClick", function()
         local templates = Store.listTemplates(BG.BGNext.DB)
         local template = templates[state.selectedTemplate or 0]
@@ -221,13 +225,15 @@ local function historyExport(root)
 end
 
 local function buildHistory(parent)
+    local geometry = Layout.HISTORY
     local panel = CreateFrame("Frame", nil, parent) panel:SetAllPoints()
     panel.summary = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     panel.summary:SetPoint("TOPLEFT", 18, -20) panel.summary:SetJustifyH("LEFT")
     panel.search = edit(panel, 440, 24) panel.search:SetPoint("TOPLEFT", 18, -52)
     panel.search:SetText("")
     local search = button(panel, "筛选", 80) search:SetPoint("LEFT", panel.search, "RIGHT", 8, 0)
-    panel.body = edit(panel, 610, 240, true) panel.body:SetPoint("TOPLEFT", 18, -88)
+    panel.body = edit(panel, 650, 240, true) panel.body:SetPoint("TOPLEFT", 18, -88)
+    panel.body:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -18, geometry.bodyBottom)
     panel.body:SetJustifyH("LEFT") panel.body:SetJustifyV("TOP")
     local save = button(panel, "保存当前成交摘要", 150) save:SetPoint("BOTTOMLEFT", 18, 18)
     save:SetScript("OnClick", function()
@@ -271,9 +277,12 @@ local function buildHistory(parent)
 end
 
 local function buildAuctions(parent)
+    local geometry = Layout.AUCTIONS
     local panel = CreateFrame("Frame", nil, parent) panel:SetAllPoints() panel.rows = {}
     local hint = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hint:SetPoint("TOPRIGHT", -18, -21)
+    hint:SetPoint("TOPLEFT", 18, -geometry.hintTop)
+    hint:SetPoint("RIGHT", panel, "RIGHT", -18, 0)
+    hint:SetJustifyH("LEFT")
     hint:SetText(L["手动出价同时达到当前价 10 倍且多出至少 1000G 时会再次确认。"])
     local previous
     for _, spec in ipairs({ { "all", "全部" }, { "mine", "我参与的" }, { "urgent", "即将结束" } }) do
@@ -282,16 +291,23 @@ local function buildAuctions(parent)
         filter:SetScript("OnClick", function() state.auctionFilter = spec[1] panel.refresh() end)
         previous = filter
     end
+    panel.scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    panel.scroll:SetPoint("TOPLEFT", 18, -geometry.scrollTop)
+    panel.scroll:SetPoint("BOTTOMRIGHT", -34, geometry.scrollBottom)
+    panel.scrollChild = CreateFrame("Frame", nil, panel.scroll)
+    panel.scrollChild:SetSize(geometry.childWidth, 1)
+    panel.scroll:SetScrollChild(panel.scrollChild)
     panel.empty = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     panel.empty:SetPoint("CENTER") panel.empty:SetText(L["当前没有符合条件的拍品。"])
     panel.refresh = function()
         local auctions = Runtime.currentAuctions(state.auctionFilter)
+        panel.scrollChild:SetHeight(math.max(1, math.min(#auctions, geometry.maxRows) * geometry.rowHeight))
         panel.empty:SetShown(#auctions == 0)
-        for index = 1, 20 do
+        for index = 1, geometry.maxRows do
             local row = panel.rows[index]
             if not row then
-                row = button(panel, "", 610) row:SetHeight(28)
-                row:SetPoint("TOPLEFT", 18, -55 - (index - 1) * 30)
+                row = button(panel.scrollChild, "", geometry.rowWidth) row:SetHeight(28)
+                row:SetPoint("TOPLEFT", 0, -(index - 1) * geometry.rowHeight)
                 panel.rows[index] = row
             end
             local auction = auctions[index]
@@ -312,9 +328,12 @@ local function buildAuctions(parent)
 end
 
 local function buildSettlement(parent)
+    local geometry = Layout.SETTLEMENT
     local panel = CreateFrame("Frame", nil, parent) panel:SetAllPoints()
     panel.text = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    panel.text:SetPoint("TOPLEFT", 28, -35) panel.text:SetWidth(590) panel.text:SetJustifyH("LEFT")
+    panel.text:SetPoint("TOPLEFT", 28, -24)
+    panel.text:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, geometry.textBottom)
+    panel.text:SetJustifyH("LEFT") panel.text:SetJustifyV("TOP")
     panel.confirm = button(panel, "确认当前摘要", 130)
     panel.confirm:SetPoint("BOTTOMLEFT", 28, 25)
     panel.confirm:SetScript("OnClick", function()
@@ -370,11 +389,21 @@ function M.setTab(tab)
     return true
 end
 
+function M.fitToScreen(frame, parent)
+    if not frame or type(frame.SetScale) ~= "function" then return 1 end
+    parent = parent or UIParent
+    local width = parent and type(parent.GetWidth) == "function" and parent:GetWidth() or nil
+    local height = parent and type(parent.GetHeight) == "function" and parent:GetHeight() or nil
+    local scale = Layout.scaleFor(width, height)
+    frame:SetScale(scale)
+    return scale
+end
+
 function M.buildWindow()
     if state.frame then return state.frame end
     if type(CreateFrame) ~= "function" or type(BG.CreateButton) ~= "function" then return nil end
     local frame = CreateFrame("Frame", "BGNextLeaderToolsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(680, 470) frame:SetPoint("CENTER") frame:SetFrameStrata("DIALOG")
+    frame:SetSize(Layout.WIDTH, Layout.HEIGHT) frame:SetPoint("CENTER") frame:SetFrameStrata("DIALOG")
     frame:SetClampedToScreen(true) frame:EnableMouse(true) frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton") frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
@@ -383,7 +412,9 @@ function M.buildWindow()
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -14) title:SetText(L["团长工具"])
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton") close:SetPoint("TOPRIGHT", -3, -3)
-    local content = CreateFrame("Frame", nil, frame) content:SetPoint("TOPLEFT", 10, -68) content:SetPoint("BOTTOMRIGHT", -10, 10)
+    local content = CreateFrame("Frame", nil, frame)
+    content:SetPoint("TOPLEFT", 10, -Layout.HEADER_HEIGHT)
+    content:SetPoint("BOTTOMRIGHT", -10, Layout.BOTTOM_INSET)
     frame.panels = {
         templates = buildTemplates(content), history = buildHistory(content),
         auctions = buildAuctions(content), settlement = buildSettlement(content),
@@ -395,6 +426,8 @@ function M.buildWindow()
         tab:SetScript("OnClick", function() M.setTab(spec[1]) end)
         frame.panels[spec[1]].tabButton = tab previous = tab
     end
+    frame:SetScript("OnShow", function(self) M.fitToScreen(self, UIParent) end)
+    M.fitToScreen(frame, UIParent)
     frame:Hide() state.frame = frame
     return frame
 end

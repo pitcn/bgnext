@@ -110,6 +110,7 @@ Core\BGNext\AuctionQueue.lua
 Core\BGNext\AuctionQueueRuntime.lua
 Core\BGNext\LootAuctionEntry.lua
 Core\BGNext\LeaderToolsRuntime.lua
+Core\BGNext\LeaderToolsLayout.lua
 Core\BGNext\LeaderToolsUI.lua
 Core\Module\Trade.lua
 Core\Module\SendMail.lua
