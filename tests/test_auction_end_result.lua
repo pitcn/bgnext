@@ -110,6 +110,7 @@ return function(test)
 
         BG = { BGNext = {}, Init = function(callback) callback() end,
             AuctionWAEnd = function(...) auctionEndCalls[#auctionEndCalls + 1] = { ... } end }
+        dofile("Core/BGNext/AuctionTimerSync.lua")
         setGlobal("C_Timer", {
             After = function(delay, callback)
                 afters[#afters + 1] = { delay = delay, callback = callback }
@@ -174,6 +175,11 @@ return function(test)
             f.autoTextButton = makeFrame()
             f.logTextButton = makeFrame()
             f.autoSendDelayFrame = makeFrame()
+            f.updateFrame = makeFrame()
+            f.autoFrame = makeFrame()
+            f.autoFrame.updateFrame = makeFrame()
+            f.logs = {}
+            f.resetThreshold = 20
             f.autoTimer = { cancelled = false, Cancel = function(self) self.cancelled = true end }
             if isSmall then
                 f.topMoneyFrame:Hide()
@@ -289,6 +295,52 @@ return function(test)
         wa.Auctioning(fCancel, 20)
         wa.EndAuction(fCancel, "cancel")
         test.eq(fCancel.bar.scripts.OnUpdate, nil, "cancel detaches the countdown OnUpdate")
+
+        -- (12) The real AuctionWA SetMoney path delegates Gen2 duplicate-item
+        -- timer refresh to AuctionTimerSync, while each auctionID keeps its own
+        -- buyer and final ledger result.
+        local originalSetClassCFF = wa.SetClassCFF
+        local originalSetFrameColor = wa.SetFrameColor
+        local originalMoneyChanged = wa.myMoney_OnTextChanged
+        local originalAutoChanged = wa.Auto_OnTextChanged
+        wa.SetClassCFF = function(name) return name end
+        wa.SetFrameColor = function() end
+        wa.myMoney_OnTextChanged = function() end
+        wa.Auto_OnTextChanged = function() end
+
+        local sameA = newBidFrame(22, nil, true)
+        local sameB = newBidFrame(23, nil, true)
+        sameA.itemID, sameB.itemID = 9001, 9001
+        sameA.auctionID, sameB.auctionID = 7001, 7002
+        sameA.isGen2, sameB.isGen2 = true, true
+        sameA.remaining, sameB.remaining = 5, 5
+        sameA.endTime, sameB.endTime = nowValue + 3, nowValue + 9
+
+        wa.SetMoney(sameA, 700, "买家甲")
+        test.eq(sameA.endTime, sameB.endTime,
+            "a Gen2 bid synchronizes duplicate-item deadlines through the real SetMoney path")
+        sameA.remaining, sameB.remaining = 5, 5
+        wa.SetMoney(sameB, 800, "买家乙")
+        test.eq(sameA.endTime, sameB.endTime,
+            "the sibling bid keeps the shared duplicate-item deadline")
+
+        nowValue = sameA.endTime + 1
+        sameA.bar.scripts.OnUpdate(sameA.bar, 0.1)
+        sameB.bar.scripts.OnUpdate(sameB.bar, 0.1)
+        local resultA = auctionEndCalls[#auctionEndCalls - 1]
+        local resultB = auctionEndCalls[#auctionEndCalls]
+        test.eq(resultA[2], "[测试装备]", "the first duplicate item reports its own link")
+        test.eq(resultA[3], "买家甲", "the first auction keeps its own buyer")
+        test.eq(resultA[4], 700, "the first auction keeps its own amount")
+        test.eq(resultA[6], 7001, "the first auction keeps its own auctionID")
+        test.eq(resultB[3], "买家乙", "the second auction keeps its own buyer")
+        test.eq(resultB[4], 800, "the second auction keeps its own amount")
+        test.eq(resultB[6], 7002, "the second auction keeps its own auctionID")
+
+        wa.SetClassCFF = originalSetClassCFF
+        wa.SetFrameColor = originalSetFrameColor
+        wa.myMoney_OnTextChanged = originalMoneyChanged
+        wa.Auto_OnTextChanged = originalAutoChanged
     end)
 
     for _, name in ipairs(watchedGlobals) do

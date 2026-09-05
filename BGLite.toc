@@ -38,6 +38,7 @@ Core\BGNext\AuctionPriceUI.lua
 Core\BGNext\CurrentTrade.lua
 Core\BGNext\ReturnMarker.lua
 Core\BGNext\CurrentMail.lua
+Core\BGNext\MailSendAttempt.lua
 Core\BGNext\CurrentSettlementView.lua
 Core\BGNext\CurrentSettlementChecklist.lua
 Core\BGNext\TradeCapture.lua

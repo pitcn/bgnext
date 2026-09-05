@@ -81,6 +81,7 @@ local suites = {
     "tests/test_event_refresh.lua",
     "tests/test_trade_capture.lua",
     "tests/test_current_settlement_events.lua",
+    "tests/test_mail_send_attempt.lua",
     "tests/test_trade_facts.lua",
     "tests/test_auto_clear_guard.lua",
     "tests/test_auto_clear_popup.lua",
