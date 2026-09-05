@@ -11,6 +11,10 @@ return function(test)
         "auction completion uses the dedicated bill-fill policy")
     test.eq(source:find("local fillSingleResult = BG.IsML == true", 1, true) ~= nil, true,
         "leader and master-looter role is captured before the delayed bill update")
+    test.eq(source:find("local waitForLeaderPurchaseChoice = fillSingleResult and SamePlayer(maijia, player)", 1, true) ~= nil, true,
+        "leader self-purchases keep the existing paid-or-debt choice")
+    test.eq(source:find("if waitForLeaderPurchaseChoice then", 1, true) ~= nil, true,
+        "automatic auction filling does not race the leader self-purchase dialog")
     test.eq(source:find("BG.FillBillFromAuctionResult(FB, a)", 1, true) ~= nil, true,
         "leader and master-looter auction completion fills only the completed result")
     test.eq(source:find("function BG.FillBillFromAuctionResult", 1, true) ~= nil, true,

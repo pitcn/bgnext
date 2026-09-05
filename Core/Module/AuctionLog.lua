@@ -2159,8 +2159,11 @@ BG.Init(function()
 
                     if BG.ShouldCreateBillFromAuction() then
                         local fillSingleResult = BG.IsML == true
+                        local waitForLeaderPurchaseChoice = fillSingleResult and SamePlayer(maijia, player)
                         BG.After(0.1, function()
-                            if fillSingleResult then
+                            if waitForLeaderPurchaseChoice then
+                                return
+                            elseif fillSingleResult then
                                 BG.FillBillFromAuctionResult(FB, a)
                             else
                                 BG.CreateBillByAuctionLog(FB)
