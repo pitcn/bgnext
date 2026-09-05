@@ -3292,6 +3292,7 @@ do -- BGNext auction price presets
     L["上移"] = "Up"
     L["下移"] = "Down"
     L["无权限发起拍卖"] = "You don't have permission to start an auction"
+    L["组合键拍卖已在设置中关闭"] = "Shortcut auctions are disabled in settings"
     L["战斗状态下无法发起拍卖"] = "Cannot start an auction in combat"
     L["物品无效"] = "Invalid item"
     L["请手动输入起拍价"] = "Enter the starting price manually"

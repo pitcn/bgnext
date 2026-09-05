@@ -1849,6 +1849,15 @@ end)
 
 ----------刷新团队成员信息----------
 do
+    local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
+
+    local function IsSamePlayer(left, right)
+        if PlayerIdentity and PlayerIdentity.same then
+            return PlayerIdentity.same(left, right, BG.realmName)
+        end
+        return left == right
+    end
+
     BG.raidRosterInfo = {}
     BG.groupRosterInfo = {}
     BG.raidRosterGUID = {}
@@ -1897,10 +1906,10 @@ do
                     if isML then
                         BG.masterLooter = name
                     end
-                    if name == BG.playerName and (rank == 2 or isML) then
+                    if IsSamePlayer(name, BG.playerName) and (rank == 2 or isML) then
                         BG.IsML = true
                     end
-                    if name == BG.playerName and (rank == 2) then
+                    if IsSamePlayer(name, BG.playerName) and (rank == 2) then
                         BG.IsLeader = true
                     end
                     local guid = UnitGUID("raid" .. i)
@@ -1946,11 +1955,11 @@ do
     function BG.IsMLByName(name)
         local loot = GetLootMethod()
         if loot == "master" or loot == 2 then
-            if BG.masterLooter and BG.masterLooter == name then
+            if BG.masterLooter and IsSamePlayer(BG.masterLooter, name) then
                 return true
             end
         else
-            if BG.raidLeader == name then
+            if IsSamePlayer(BG.raidLeader, name) then
                 return true
             end
         end

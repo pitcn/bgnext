@@ -1397,7 +1397,7 @@ local function RoadSendMail()
             end
 
             function mainFrame.Send(fullName, name, colorName, money)
-                lastSend = { fullName = fullName, name = name, colorName = colorName }
+                lastSend = { fullName = fullName, name = name, colorName = colorName, money = money }
                 ClearSendMail()
                 SetSendMailMoney(money)
                 lastName = BG.GSN(fullName)
@@ -1508,7 +1508,7 @@ local function RoadSendMail()
             f:RegisterEvent("UI_INFO_MESSAGE")
             f:SetScript("OnEvent", function(self, event, _, message)
                 if not (mainFrame.isSending and lastSend.colorName) then return end
-                local money = (tonumber(mainFrame.moneyEdit:GetText()) or 0) * 10000
+                local money = tonumber(lastSend.money) or 0
                 if message == ERR_MAIL_SENT then
                     success = success + 1
                     SendSystemMessage(format(L["已邮寄%s%s金。"], lastSend.colorName, ToGold(money)))
@@ -1523,7 +1523,7 @@ local function RoadSendMail()
                     -- BGNext: 收集本插件刚刚执行成功的这一封工资邮件，
                     -- 不读取收件箱，不保存主题或正文。
                     if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
-                        local goldAmount = tonumber(mainFrame.moneyEdit:GetText()) or 0
+                        local goldAmount = money / 10000
                         BG.BGNext.CurrentSettlementRuntime.notifyMailSent(
                             BG.GSN(lastSend.fullName), goldAmount, BiaoGe.sendMail.member)
                     end

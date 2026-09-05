@@ -1,6 +1,6 @@
 # ADR-0004: Adopt official BGLite 2.4.1 Pure Edition baseline
 
-- Status: Accepted
+- Status: Superseded by ADR-0005
 - Date: 2026-09-03
 
 ## Context
