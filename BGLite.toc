@@ -28,6 +28,8 @@ Core\BGNext\FeatureCatalog.lua
 Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
 Core\BGNext\FeatureSettings.lua
+Core\BGNext\LeaderToolsStore.lua
+Core\BGNext\LeaderToolsView.lua
 Core\BGNext\AutoClearGuard.lua
 Core\BGNext\AuctionPriceStore.lua
 Core\BGNext\AuctionPriceCatalog.lua
@@ -75,6 +77,7 @@ Core\BGNext\HighlightManager.lua
 Core\BGNext\EventRefresh.lua
 Core\function1.lua
 Core\function2.lua
+Core\BGNext\TradeExpiryRuntime.lua
 Core\FBUI\FBUI.xml
 
 Core\Module\DuiZhang.lua
@@ -105,6 +108,8 @@ Core\BGNext\AuctionPriceRuntime.lua
 Core\BGNext\AuctionQueue.lua
 Core\BGNext\AuctionQueueRuntime.lua
 Core\BGNext\LootAuctionEntry.lua
+Core\BGNext\LeaderToolsRuntime.lua
+Core\BGNext\LeaderToolsUI.lua
 Core\Module\Trade.lua
 Core\Module\SendMail.lua
 Core\Module\QuickAccounting.lua

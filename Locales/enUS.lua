@@ -57,6 +57,94 @@ do -- BGNext release text
     L["BGNext 基于 BGLite 2.4.2 独立维护，非暴雪、网易或上游官方产品。个人工具数据仅保存在本地，不自动向游戏外上传。"] = "BGNext is independently maintained on BGLite 2.4.2 and is not an official Blizzard, NetEase or upstream product. Personal tool data stays local and is not automatically uploaded outside the game."
 end
 
+do -- BGNext leader tools
+    local values = {
+        ["多拍品中心"] = "Auction Center",
+        ["集中查看当前拍品，并对明显异常的手动出价再次确认。"] = "Review active auctions together and reconfirm obviously abnormal manual bids.",
+        ["支出模板"] = "Expense Templates", ["保存常用补贴和支出项目，预览后只填入空行。"] = "Save common subsidies and expenses, then preview and fill empty rows only.",
+        ["实收与分金预览"] = "Receipts & Wage Preview", ["分开显示账面收入、已证实实收、欠款和可分工资。"] = "Separate ledger income, proven receipts, debts and distributable wages.",
+        ["本地成交摘要"] = "Local Sale Summary", ["主动保存最小成交摘要，按保留期查看自己的成交与消费。"] = "Explicitly save minimal sale summaries with controlled retention.",
+        ["团长工具：在功能管理中开启所需模块后，可使用支出模板、本地成交摘要、拍卖中心和实收分金预览。"] = "Leader Tools: enable the modules you need in Feature Management to use templates, local summaries, Auction Center and receipt/wage preview.",
+        ["团长工具"] = "Leader Tools", ["每行填写：项目=金额（金币整数）"] = "One per line: label=amount (whole gold)",
+        ["已载入模板："] = "Loaded template: ", ["请输入新模板。"] = "Enter a new template.",
+        ["格式无效，请按“项目=金额”逐行填写。"] = "Invalid format. Enter one label=amount per line.",
+        ["确定保存此支出模板吗？"] = "Save this expense template?", ["模板已保存。"] = "Template saved.", ["模板保存失败："] = "Could not save template: ",
+        ["（副本）"] = " (copy)", ["确定复制此模板吗？"] = "Copy this template?", ["确定重命名此模板吗？"] = "Rename this template?",
+        ["确定删除此模板吗？此操作不可恢复。"] = "Delete this template? This cannot be undone.", ["预览并应用"] = "Preview & Apply",
+        ["请先选择模板并打开当前账表。"] = "Select a template and open the current bill first.", ["无法应用模板："] = "Cannot apply template: ",
+        ["将向 %d 个空白支出行写入内容，确定继续吗？"] = "Write to %d empty expense rows?", ["模板已应用。"] = "Template applied.", ["应用失败："] = "Apply failed: ",
+        ["导出"] = "Export", ["预览导入"] = "Preview Import", ["导入内容无效："] = "Invalid import: ",
+        ["将用导入内容替换现有 %d 套模板，确定继续吗？"] = "Replace current templates with %d imported templates?", ["导入完成。"] = "Import complete.",
+        ["保存当前成交摘要"] = "Save Current Summary", ["只保存物品、金额、副本、时间和“是否本人”，确定吗？"] = "Save only item, amount, raid table, time and a self flag?",
+        ["本次新增 %d 条摘要。"] = "Added %d summary rows.", ["导出摘要"] = "Export Summary", ["清空摘要"] = "Clear Summary",
+        ["确定清空全部本地成交摘要吗？此操作不可恢复。"] = "Clear all local sale summaries? This cannot be undone.",
+        ["共 %d 条；本人消费 %d 金；保留 %d 天"] = "%d rows; self spend %d gold; retain %d days", ["保留 %d 天"] = "Retain %d days",
+        ["我参与的"] = "Mine", ["即将结束"] = "Urgent", ["当前没有符合条件的拍品。"] = "No matching auctions.",
+        ["已结束"] = "Ended", ["已暂停"] = "Paused", ["领先"] = "Leading", ["紧急"] = "Urgent", ["进行中"] = "Active",
+        ["确认当前摘要"] = "Confirm Summary", ["确认只会冻结本地核对标记，不会交易、邮寄、通报或清空。确定吗？"] = "This only freezes a local review marker; it will not trade, mail, announce or clear. Continue?",
+        ["账面收入：%d G"] = "Ledger income: %d G", ["已证实实收：%d G"] = "Proven receipts: %d G", ["支出：%d G"] = "Expenses: %d G",
+        ["欠款：%d G"] = "Debt: %d G", ["待核对事项：%d"] = "Pending checks: %d", ["可分净额："] = "Distributable: ", ["人均工资："] = "Wage per person: ", ["待核对"] = "Pending",
+        ["状态：已确认；账表或交易变化后会自动失效。"] = "Status: confirmed; any bill or trade change invalidates it.",
+        ["状态：待确认或已因数据变化失效。"] = "Status: pending or invalidated by changed data.",
+        ["这里只显示只读预览，不会自动交易、邮寄、通报或清空。"] = "Read-only preview: no automatic trade, mail, announcement or clear.",
+        ["成交摘要"] = "Sale Summary", ["拍卖中心"] = "Auction Center", ["实收与分金"] = "Receipts & Wages",
+    }
+    for key, value in pairs(values) do L[key] = value end
+    L["团长工具：在功能管理中开启所需模块后，可使用支出模板、本地成交摘要、拍卖中心和实收分金预览。"] = "Leader Tools: enable the modules you need in Feature Management to use templates, local summaries, Auction Center and receipt/wage preview."
+    L["团长工具"] = "Leader Tools"
+    L["每行填写：项目=金额（金币整数）"] = "One per line: label=amount (whole gold)"
+    L["已载入模板："] = "Loaded template: "
+    L["请输入新模板。"] = "Enter a new template."
+    L["格式无效，请按“项目=金额”逐行填写。"] = "Invalid format. Enter one label=amount per line."
+    L["确定保存此支出模板吗？"] = "Save this expense template?"
+    L["模板已保存。"] = "Template saved."
+    L["模板保存失败："] = "Could not save template: "
+    L["（副本）"] = " (copy)"
+    L["确定复制此模板吗？"] = "Copy this template?"
+    L["确定重命名此模板吗？"] = "Rename this template?"
+    L["确定删除此模板吗？此操作不可恢复。"] = "Delete this template? This cannot be undone."
+    L["请先选择模板并打开当前账表。"] = "Select a template and open the current bill first."
+    L["无法应用模板："] = "Cannot apply template: "
+    L["将向 %d 个空白支出行写入内容，确定继续吗？"] = "Write to %d empty expense rows?"
+    L["模板已应用。"] = "Template applied."
+    L["应用失败："] = "Apply failed: "
+    L["导入内容无效："] = "Invalid import: "
+    L["将用导入内容替换现有 %d 套模板，确定继续吗？"] = "Replace current templates with %d imported templates?"
+    L["导入完成。"] = "Import complete."
+    L["只保存物品、金额、副本、时间和“是否本人”，确定吗？"] = "Save only item, amount, raid table, time and a self flag?"
+    L["本次新增 %d 条摘要。"] = "Added %d summary rows."
+    L["确定清空全部本地成交摘要吗？此操作不可恢复。"] = "Clear all local sale summaries? This cannot be undone."
+    L["共 %d 条；本人消费 %d 金；保留 %d 天"] = "%d rows; self spend %d gold; retain %d days"
+    L["保留 %d 天"] = "Retain %d days"
+    L["当前没有符合条件的拍品。"] = "No matching auctions."
+    L["已结束"] = "Ended"
+    L["领先"] = "Leading"
+    L["紧急"] = "Urgent"
+    L["进行中"] = "Active"
+    L["确认只会冻结本地核对标记，不会交易、邮寄、通报或清空。确定吗？"] = "This only freezes a local review marker; it will not trade, mail, announce or clear. Continue?"
+    L["账面收入：%d G"] = "Ledger income: %d G"
+    L["已证实实收：%d G"] = "Proven receipts: %d G"
+    L["支出：%d G"] = "Expenses: %d G"
+    L["欠款：%d G"] = "Debt: %d G"
+    L["待核对事项：%d"] = "Pending checks: %d"
+    L["可分净额："] = "Distributable: "
+    L["人均工资："] = "Wage per person: "
+    L["状态：已确认；账表或交易变化后会自动失效。"] = "Status: confirmed; any bill or trade change invalidates it."
+    L["状态：待确认或已因数据变化失效。"] = "Status: pending or invalidated by changed data."
+    L["这里只显示只读预览，不会自动交易、邮寄、通报或清空。"] = "Read-only preview: no automatic trade, mail, announcement or clear."
+    L["本人"] = "Self"
+    L["没有符合条件的摘要。"] = "No matching summaries."
+    L["这次出价为 %s 金，明显高于当前 %s 金。确定继续吗？"] = "This bid is %s gold, far above the current %s gold. Continue?"
+    L["将向 %d 个空白支出行写入内容："] = "The following %d empty expense rows will be filled:"
+    L["第 %d 行：%s = %d G"] = "Row %d: %s = %d G"
+    L["确定继续吗？"] = "Continue?"
+    L["将用导入内容替换现有 %d 套模板："] = "Replace current templates with these %d imported templates:"
+    L["手动出价同时达到当前价 10 倍且多出至少 1000G 时会再次确认。"] = "Manual bids at least 10x the current price and 1000G higher require confirmation."
+    L["清空模板"] = "Clear Templates"
+    L["确定清空全部支出模板吗？此操作不可恢复。"] = "Clear all expense templates? This cannot be undone."
+    L["筛选"] = "Filter"
+end
+
 do -- BGNext return markers
     L["退"] = "R"
     L["退货"] = "Returns"
@@ -3312,4 +3400,6 @@ do -- BGNext in-game guide
     L["命令："] = "Command: "
     L["BGNext 说明书"] = "BGNext Guide"
     L["待拍队列已在功能管理中关闭。"] = "The auction queue is disabled in Feature Management."
+    L["已自动清空表格< %s >的当前副本区间（Boss %s-%s），其他副本记录已保留。"] = "Cleared the current instance range in < %s > (Boss %s-%s); records for other instances were kept."
+    L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。是否只清空该区间？其他副本记录与当前团结算记录会保留。"] = "A new lockout was detected, but < %s > still has content in this instance range (Boss %s-%s). Clear only this range? Other instance rows and the current settlement will be kept."
 end

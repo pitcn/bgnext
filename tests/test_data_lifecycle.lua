@@ -3,6 +3,9 @@ return function(test)
     local life = dofile("Core/BGNext/DataLifecycle.lua")
     local saved = {}
     local root = life.ensureRoot(saved)
+    test.eq(type(root.leaderTools), "table", "leader tools root is initialized")
+    test.eq(type(root.leaderTools.expenseTemplates), "table", "template storage is initialized")
+    test.eq(type(root.leaderTools.localHistory), "table", "history storage is initialized")
 
     test.eq(saved.BGNext, root, "BGNext root attached")
     test.eq(root.schemaVersion, 1, "schema version")

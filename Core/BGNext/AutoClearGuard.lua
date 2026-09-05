@@ -25,19 +25,38 @@ end
 -- A pending auto-clear request captures the target table id and the reason that
 -- made it eligible, but performs no mutation until accept() confirms it.
 -- Returns nil when the table id is missing or empty.
-function M.createPending(fb, clearType)
+function M.createPending(fb, clearType, scope)
     if type(fb) ~= "string" or fb == "" then
         return nil
     end
-    return { fb = fb, clearType = clearType, state = STATE_PENDING }
+    local pending = { fb = fb, clearType = clearType, state = STATE_PENDING }
+    if clearType == 1 then
+        if type(scope) ~= "table"
+            or type(scope.instanceID) ~= "number"
+            or type(scope.startB) ~= "number"
+            or type(scope.endB) ~= "number"
+            or scope.startB < 1
+            or scope.endB < scope.startB
+        then
+            return nil
+        end
+        pending.instanceID = scope.instanceID
+        pending.startB = scope.startB
+        pending.endB = scope.endB
+    end
+    return pending
 end
 
 -- On accept, the captured table is re-checked for old content before clearing,
 -- so a table that was emptied or cleared meanwhile (a duplicate event, a manual
 -- clear) is not cleared a second time. Returns "clear" or "skip" and advances
 -- the pending state; a request that is no longer pending is never cleared.
-function M.accept(pending, hasOldContentNow)
+function M.accept(pending, hasOldContentNow, currentInstanceID)
     if not pending or pending.state ~= STATE_PENDING then
+        return "skip"
+    end
+    if pending.clearType == 1 and currentInstanceID ~= pending.instanceID then
+        pending.state = STATE_SKIPPED
         return "skip"
     end
     if hasOldContentNow == true then

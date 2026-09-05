@@ -5,7 +5,8 @@ return function(test)
 
     local root = { settings = {} }
     test.eq(settings.isEnabled(root, "wishlist", "titan"), true, "missing optional value defaults enabled")
-    test.eq(settings.mode(root, "titan"), "full", "new users start in full mode")
+    test.eq(settings.isEnabled(root, "local_history", "titan"), false, "privacy-sensitive history defaults disabled")
+    test.eq(settings.mode(root, "titan"), "custom", "new tools do not silently change an existing install to full mode")
 
     local changed, reason = settings.setEnabled(root, "auction_safety", false)
     test.eq(changed, false, "required features cannot be disabled")
@@ -20,6 +21,7 @@ return function(test)
     end
     test.eq(settings.mode(root, "titan"), "basic", "basic mode is detected")
     test.eq(settings.applyMode(root, "full", "titan"), true, "full mode applies")
+    test.eq(settings.savedValue(root, "local_history"), true, "full mode explicitly enables local history")
     test.eq(settings.mode(root, "titan"), "full", "full mode is detected")
     settings.setEnabled(root, "wishlist", false)
     test.eq(settings.mode(root, "titan"), "custom", "one individual change yields custom mode")

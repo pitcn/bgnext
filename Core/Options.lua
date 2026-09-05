@@ -1460,6 +1460,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                 else
                     BG.options["button" .. name1]:Hide()
                 end
+                if BG.UpdateItemGuoQiFrame then BG.UpdateItemGuoQiFrame() end
             end)
         end
         -- 剩余多少分钟时提醒
@@ -1475,6 +1476,9 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
             }
             local f = O.CreateSlider(name, "|cffFFFFFF" .. L["剩余时间低于多少时提醒(分)"] .. "|r", biaoge, 1, 120, 1, 220, height - h - 25, ontext)
             BG.options["button" .. name] = f
+            f:HookScript("OnValueChanged", function()
+                if BG.UpdateItemGuoQiFrame then BG.UpdateItemGuoQiFrame() end
+            end)
             if BiaoGe.options["guoqiRemind"] ~= 1 then
                 f:Hide()
             end

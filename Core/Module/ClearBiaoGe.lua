@@ -62,6 +62,21 @@ function BG.ClearBiaoGeUI()
         end
     end
 
+    -- Automatic new-lockout cleanup may target one instance inside a table
+    -- shared by several raids. Keep this path separate from the explicit
+    -- whole-table button so rows belonging to another instance survive.
+    function BG.ClearBiaoGeRange(FB, startB, endB)
+        if not FB or type(startB) ~= "number" or type(endB) ~= "number"
+            or startB < 1 or endB < startB or endB > Maxb[FB]
+        then
+            return false
+        end
+        for b = startB, endB do
+            BG.ClearBiaoGeByIndex(FB, b)
+        end
+        return true
+    end
+
     function BG.ClearBiaoGe(_type, FB)
         if not FB then return end
         if _type == "biaoge" then
@@ -237,12 +252,15 @@ function BG.ClearBiaoGeUI()
         end
 
         local function DoAutoClear(FB, clearType, startB, endB, teamText)
-            local num = BG.ClearBiaoGe("biaoge", FB)
-            BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
             if clearType == 1 then
+                if not BG.ClearBiaoGeRange(FB, startB, endB) then return end
+                BG.SendSystemMessage(format(L["已自动清空表格< %s >的当前副本区间（Boss %s-%s），其他副本记录已保留。"],
+                    BG.GetFBinfo(FB, "shortName"), startB, endB))
                 BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
                     L['当前副本所在的表格BOSS编号（%s-%s）格子中存在旧记录。']:format(startB, endB)))
             elseif clearType == 2 then
+                local num = BG.ClearBiaoGe("biaoge", FB)
+                BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
                 BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
                     teamText))
             end
@@ -259,17 +277,26 @@ function BG.ClearBiaoGeUI()
                 BG.SendSystemMessage(L["自动清空保护模块未加载，已跳过自动清空以避免误删；如需清空请手动操作。"])
                 return
             end
-            local pending = Guard.createPending(FB, clearType)
+            local pending = Guard.createPending(FB, clearType, {
+                instanceID = instanceID,
+                startB = startB,
+                endB = endB,
+            })
             if not pending then return end
-            pending.startB = startB
-            pending.endB = endB
             pending.teamText = teamText
-            pending.instanceID = instanceID
-            StaticPopup_Show("AUTO_QINGKONG_CONFIRM", BG.GetFBinfo(FB, "shortName"), nil, pending)
+            local shortName = BG.GetFBinfo(FB, "shortName")
+            local message
+            if clearType == 1 then
+                message = format(L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。是否只清空该区间？其他副本记录与当前团结算记录会保留。"],
+                    shortName, startB, endB)
+            else
+                message = format(L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"], shortName)
+            end
+            StaticPopup_Show("AUTO_QINGKONG_CONFIRM", message, nil, pending)
         end
 
         StaticPopupDialogs["AUTO_QINGKONG_CONFIRM"] = {
-            text = L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"],
+            text = "%s",
             button1 = L["清空表格"],
             button2 = L["取消"],
             OnAccept = function(self, data)
@@ -277,7 +304,8 @@ function BG.ClearBiaoGeUI()
                 if not pending then return end
                 local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
                 local hasContent = StillHasContent(pending)
-                local decision = Guard and Guard.accept(pending, hasContent) or (hasContent and "clear" or "skip")
+                local currentInstanceID = select(8, GetInstanceInfo())
+                local decision = Guard and Guard.accept(pending, hasContent, currentInstanceID) or "skip"
                 if decision == "clear" then
                     DoAutoClear(pending.fb, pending.clearType, pending.startB, pending.endB, pending.teamText)
                 end

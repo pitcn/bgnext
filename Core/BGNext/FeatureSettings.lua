@@ -37,6 +37,7 @@ local function enabled(root, id, family, visiting)
     if entry.policy == "required" then return true end
     local value = explicitValue(root, id)
     if value == false then return false end
+    if value == nil and entry.defaultEnabled == false then return false end
     visiting = visiting or {}
     if visiting[id] then return false end
     visiting[id] = true

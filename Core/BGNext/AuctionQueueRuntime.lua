@@ -874,6 +874,7 @@ function M.installEntry(mainFrame)
         M.toggle()
     end)
     entryButton = button
+    BG.ButtonAuctionQueue = button
     if not featureEnabled() then button:Hide() end
     return button
 end
