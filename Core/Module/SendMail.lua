@@ -15,6 +15,8 @@ local SendSystemMessage = BG.SendSystemMessage
 local After = C_Timer.After
 local player = UnitName("player")
 local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
+local MailSendAttempt = assert(BG.BGNext and BG.BGNext.MailSendAttempt,
+    "BGNext MailSendAttempt must load before SendMail")
 
 local function ToGold(copper)
     return floor(copper / 10000)
@@ -44,6 +46,7 @@ local function RoadSendMail()
     local sendStartTime = BG.IsTitan and 1.5 or .5
     local sendCD = sendStartTime + .5
     local sendTimeOutCD = sendCD + 1
+    local mailResultTimeOutCD = 10
 
     -- TAB按钮
     do
@@ -1300,9 +1303,12 @@ local function RoadSendMail()
         do
             local updateFrame = CreateFrame("Frame")
             local lastSend = {}
+            local mailAttempt = MailSendAttempt.new()
             local success = 0
             local addFriend = {}
             local SendTbl = {}
+            local sendIndex = 1
+            local sendCount = 0
 
             local bt = BG.CreateButton(mainFrame)
             bt:SetSize(150, 25)
@@ -1362,13 +1368,19 @@ local function RoadSendMail()
 
             function mainFrame.EndSend(type)
                 local maxPlayer = mainFrame.topText.count
+                updateFrame:SetScript("OnUpdate", nil)
+                updateFrame.awaitingElapsed = nil
+                mailAttempt:clear()
+                if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
+                    BG.BGNext.CurrentSettlementRuntime.cancelMailAttempts()
+                end
+                mainFrame.isSending = nil
                 After(1, function()
                     if lastSend.fullName and addFriend[lastSend.fullName] then
                         C_FriendList.RemoveFriend(lastSend.name)
                     end
                     wipe(addFriend)
                     wipe(lastSend)
-                    mainFrame.isSending = nil
                     mainFrame.disFrame:Hide()
                     mainFrame.startButton:SetText(mainFrame.startButton.text1)
                     local msg
@@ -1393,11 +1405,18 @@ local function RoadSendMail()
                     end
                     BG.SendMailMemberFrame.cancelChooseButton.Click()
                 end)
-                updateFrame:SetScript("OnUpdate", nil)
             end
 
             function mainFrame.Send(fullName, name, colorName, money)
-                lastSend = { fullName = fullName, name = name, colorName = colorName, money = money }
+                lastSend = mailAttempt:begin({
+                    fullName = fullName,
+                    name = name,
+                    colorName = colorName,
+                    money = money,
+                })
+                if not lastSend then
+                    return false
+                end
                 ClearSendMail()
                 SetSendMailMoney(money)
                 lastName = BG.GSN(fullName)
@@ -1411,6 +1430,8 @@ local function RoadSendMail()
                     C_FriendList.RemoveFriend(name)
                 end
                 updateFrame.elapsed = 0
+                updateFrame.awaitingElapsed = 0
+                return true
             end
 
             StaticPopupDialogs["BiaoGe_SendMail"] = {
@@ -1439,8 +1460,8 @@ local function RoadSendMail()
                     sort(SendTbl, function(a, b)
                         return a.num < b.num
                     end)
-                    local maxPlayer = #SendTbl
-                    mainFrame.topText.count = maxPlayer
+                    sendCount = #SendTbl
+                    mainFrame.topText.count = sendCount
                     local topText = mainFrame.topText
                     topText.send = 0
                     wipe(addFriend)
@@ -1453,30 +1474,40 @@ local function RoadSendMail()
                         bt.tex:SetTexture(nil)
                     end
 
-                    local i = 1
+                    sendIndex = 1
                     updateFrame.elapsed = sendStartTime
+                    updateFrame.awaitingElapsed = nil
                     updateFrame:SetScript("OnUpdate", function(_, elapsed)
                         if not mainFrame:IsVisible() then
                             mainFrame.EndSend()
                             return
                         end
+                        if mailAttempt:isPending() then
+                            updateFrame.awaitingElapsed = (updateFrame.awaitingElapsed or 0) + elapsed
+                            if updateFrame.awaitingElapsed >= mailResultTimeOutCD then
+                                mainFrame.EndSend()
+                            end
+                            return
+                        end
                         local nowMoney = GetMoney()
-                        if i <= maxPlayer then
+                        if sendIndex <= sendCount then
                             if money + 30 > nowMoney then -- 钱不够了
                                 mainFrame.EndSend("noMoney")
                                 return
                             end
                             updateFrame.elapsed = updateFrame.elapsed + elapsed
                             if updateFrame.elapsed >= sendCD then -- 每x秒邮寄一次
-                                local fullName = SendTbl[i].fullName
-                                local name = SendTbl[i].name
-                                local colorName = SendTbl[i].colorName
+                                local fullName = SendTbl[sendIndex].fullName
+                                local name = SendTbl[sendIndex].name
+                                local colorName = SendTbl[sendIndex].colorName
                                 local isFriend = C_FriendList.GetFriendInfo(name)
                                 if isFriend then -- 如果是好友，直接邮寄
-                                    mainFrame.Send(fullName, name, colorName, money)
+                                    if not mainFrame.Send(fullName, name, colorName, money) then
+                                        mainFrame.EndSend()
+                                        return
+                                    end
                                     topText.send = topText.send + 1
                                     topText:SetText(format(L["正在批量邮寄：%s/%s"], topText.send, topText.count))
-                                    i = i + 1
                                 elseif not addFriend[fullName] then -- 不是朋友，先加好友
                                     addFriend[fullName] = true
                                     C_FriendList.AddFriend(fullName)
@@ -1487,7 +1518,7 @@ local function RoadSendMail()
                                     updateFrame.elapsed = sendStartTime
                                     topText.send = topText.send + 1
                                     topText:SetText(format(L["正在批量邮寄：%s/%s"], topText.send, topText.count))
-                                    i = i + 1
+                                    sendIndex = sendIndex + 1
                                 end
                             end
                         else
@@ -1507,26 +1538,30 @@ local function RoadSendMail()
             local f = CreateFrame("Frame")
             f:RegisterEvent("UI_INFO_MESSAGE")
             f:SetScript("OnEvent", function(self, event, _, message)
-                if not (mainFrame.isSending and lastSend.colorName) then return end
-                local money = tonumber(lastSend.money) or 0
-                if message == ERR_MAIL_SENT then
-                    success = success + 1
-                    SendSystemMessage(format(L["已邮寄%s%s金。"], lastSend.colorName, ToGold(money)))
-                    for _, bt in ipairs(BG.SendMailMemberFrame.buttons) do
-                        if bt.name then
-                            if lastSend.fullName == bt.name then
-                                bt.tex:SetTexture("interface/raidframe/readycheck-ready")
-                                break
-                            end
+                if not mainFrame.isSending then return end
+                local confirmed = mailAttempt:consume(message, ERR_MAIL_SENT)
+                if not (confirmed and confirmed.colorName) then return end
+                updateFrame.awaitingElapsed = nil
+                updateFrame.elapsed = sendStartTime
+                sendIndex = sendIndex + 1
+                lastSend = confirmed
+                local money = tonumber(confirmed.money) or 0
+                success = success + 1
+                SendSystemMessage(format(L["已邮寄%s%s金。"], confirmed.colorName, ToGold(money)))
+                for _, bt in ipairs(BG.SendMailMemberFrame.buttons) do
+                    if bt.name then
+                        if confirmed.fullName == bt.name then
+                            bt.tex:SetTexture("interface/raidframe/readycheck-ready")
+                            break
                         end
                     end
-                    -- BGNext: 收集本插件刚刚执行成功的这一封工资邮件，
-                    -- 不读取收件箱，不保存主题或正文。
-                    if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
-                        local goldAmount = money / 10000
-                        BG.BGNext.CurrentSettlementRuntime.notifyMailSent(
-                            BG.GSN(lastSend.fullName), goldAmount, BiaoGe.sendMail.member)
-                    end
+                end
+                -- BGNext: 收集本插件刚刚执行成功的这一封工资邮件，
+                -- 不读取收件箱，不保存主题或正文。
+                if BG.BGNext and BG.BGNext.CurrentSettlementRuntime then
+                    local goldAmount = money / 10000
+                    BG.BGNext.CurrentSettlementRuntime.notifyMailSent(
+                        BG.GSN(confirmed.fullName), goldAmount, BiaoGe.sendMail.member)
                 end
             end)
 

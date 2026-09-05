@@ -286,6 +286,26 @@ return function(test)
     test.eq(runtime.notifyMailAttempt("甲", 300, "raid"), true, "new identical mail gets a new attempt token")
     test.eq(runtime.notifyMailSent("甲", 300, "raid"), true,
         "new identical mail attempt can be recorded independently")
+
+    -- Keep the settlement boundary bounded and order-safe even if a caller
+    -- accidentally arms more than one attempt before consuming the results.
+    test.eq(runtime.notifyMailAttempt("甲", 400, "raid"), true,
+        "first batch mail attempt is queued")
+    test.eq(runtime.notifyMailAttempt("甲", 500, "raid"), true,
+        "second batch mail attempt is queued")
+    test.eq(runtime.notifyMailSent("甲", 400, "raid"), true,
+        "first batch result keeps its original recipient and amount")
+    test.eq(runtime.notifyMailSent("甲", 500, "raid"), true,
+        "second batch result remains available after the first is consumed")
+    test.eq(runtime.notifyMailAttempt("甲", 600, "raid"), true,
+        "a mail awaiting timeout is armed")
+    runtime.cancelMailAttempts()
+    test.eq(runtime.notifyMailSent("甲", 600, "raid"), false,
+        "stopping or timing out a batch invalidates its late success")
+    test.eq(runtime.notifyMailAttempt("甲", 700, "raid"), true,
+        "a new batch starts without a stale settlement attempt")
+    test.eq(runtime.notifyMailSent("甲", 700, "raid"), true,
+        "the new batch result is not blocked by an earlier timeout")
     test.eq(runtime.notifyMailAttempt("甲", 300, "custom"), false,
         "custom-list mail never receives a settlement token")
 

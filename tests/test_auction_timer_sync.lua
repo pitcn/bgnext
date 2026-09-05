@@ -31,4 +31,12 @@ return function(test)
     test.eq(count, 1, "a legacy bid refreshes only its auctionID frame")
     test.eq(refreshed[legacyBid], 1, "the legacy bid card receives its extension")
     test.eq(refreshed[legacySibling], nil, "a same-item legacy sibling keeps its own deadline")
+
+    local toc = assert(io.open("BGLite.toc", "rb"))
+    local tocSource = toc:read("*a")
+    toc:close()
+    local syncLoad = assert(tocSource:find("Core\\BGNext\\AuctionTimerSync.lua", 1, true))
+    local auctionLoad = assert(tocSource:find("Core\\Module\\AuctionWA.lua", 1, true))
+    test.eq(syncLoad < auctionLoad, true,
+        "the timer synchronizer loads before AuctionWA captures its interface")
 end

@@ -14,7 +14,8 @@ BG.BGNext = BG.BGNext or {}
 local M = {}
 
 local MAX_AGE = 7 * 86400
-local pendingMail
+local MAX_PENDING_MAIL = 20
+local pendingMails = {}
 
 function M.isFeatureEnabled()
     local settings = BG.BGNext.FeatureSettings
@@ -400,12 +401,15 @@ end
 
 -- Called by the batch mail flow at its own confirmed send result.
 function M.notifyMailAttempt(player, amount, scope)
-    if not M.isFeatureEnabled() then pendingMail = nil; return false end
+    if not M.isFeatureEnabled() then pendingMails = {}; return false end
     if scope ~= "raid" or type(player) ~= "string" or not player:find("%S") then
-        pendingMail = nil
+        pendingMails = {}
         return false
     end
-    pendingMail = {
+    if #pendingMails >= MAX_PENDING_MAIL then
+        return false
+    end
+    pendingMails[#pendingMails + 1] = {
         player = player,
         amount = tonumber(amount),
         scope = scope,
@@ -415,8 +419,7 @@ end
 
 function M.notifyMailSent(player, amount, scope)
     local root = BG.BGNext and BG.BGNext.DB
-    local pending = pendingMail
-    pendingMail = nil
+    local pending = table.remove(pendingMails, 1)
     if not root or not pending or pending.player ~= player
         or pending.amount ~= tonumber(amount) or pending.scope ~= scope then
         return false
@@ -427,6 +430,10 @@ function M.notifyMailSent(player, amount, scope)
         player = pending.player,
         amount = pending.amount,
     })
+end
+
+function M.cancelMailAttempts()
+    pendingMails = {}
 end
 
 if BG.Init then

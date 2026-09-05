@@ -1,6 +1,6 @@
 # Explicit BGNext changes to official upstream BGLite 2.4.2 files.
 # Format: SHA-256, two spaces, repository-relative path.
-0050284bd5a303a52902667fcfce81e26f07906b4657391e71a5a718d00fce72  BGLite.toc
+f4b0746abf89984aa730856bd594902d66a0432eb851aeeea0973f4d7698cd27  BGLite.toc
 6686c508bb020bdf0135c48d63b10287c844c635454e63d61dce77f24afcfa14  Bindings.xml
 d03a7eb9a96f3fa4b3e8c97543089ce9867cc8337743a9249aaa3caeacaa7827  Core/BiaoGe.lua
 8fc7555fa145b2e3176bc8379a32dddeb300e52b3743d9cf27f3ee2ea009088e  Core/DB/DB.lua
@@ -24,7 +24,7 @@ de4727bca2970e6ae9fd1f3ba8445e9b8002ce1fd491015e22bc6bb8ace797ea  Core/Module/Lo
 0d75d75a60cf376b831eb9736e8695f254872f6a95fc23bc2b27fb3ba917b493  Core/Module/MailHistory.lua
 24e2d2d0efb5eb3ac18bf732d178e6493c7310a3d13435b53fc866009b57e3b6  Core/Module/minimap.lua
 aa60452445d6c8412e387c4dc07cc5ad088fa153612d610797ce967a6df9bd0c  Core/Module/QuickAccounting.lua
-43a5d87365e8e42b5ef975440d7dfcc8ab92f2c6071722bf81f8dbca3aa8eb29  Core/Module/SendMail.lua
+f65ec29ffa15ac69cdfa076ca17e085c07e2564b8389063d7c4a1133f21e101a  Core/Module/SendMail.lua
 31301510d3e12ce72960c8b378caf905fd662337137e76eeb678cf67f44c0963  Core/Module/Trade.lua
 5925158910c68aef5a637b0e920deee56676a158a448af9fce74fe3c4aa7b8a8  Core/Module/TradeHistory.lua
 17d9fe2cf4f1491a545b750fae224a10a280c2d06c79cb84c828521d9bafa036  Core/Options.lua
