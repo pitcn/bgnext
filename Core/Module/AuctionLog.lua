@@ -19,6 +19,8 @@ local player = BG.playerName
 local realmName = (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName()
 local PlayerIdentity = BG.BGNext and BG.BGNext.PlayerIdentity
 local BillBuyer = BG.BGNext and BG.BGNext.BillBuyer
+local AuctionTradeAccounting = assert(BG.BGNext and BG.BGNext.AuctionTradeAccounting,
+    "BGNext AuctionTradeAccounting must load before AuctionLog")
 
 local function SamePlayer(left, right)
     if PlayerIdentity and PlayerIdentity.same then
@@ -571,6 +573,7 @@ BG.Init(function()
 
                                     jine:SetText(v.jine or "")
                                     BiaoGe[FB]["boss" .. b]["jine" .. i] = v.jine
+                                    AuctionTradeAccounting.linkBillRow(v, b, i)
                                     break
                                 end
                             end
@@ -610,6 +613,10 @@ BG.Init(function()
                                 end
                                 jine:SetText(result.jine or "")
                                 bossData["jine" .. i] = result.jine
+                                -- Keep this association in memory only. Trade
+                                -- completion can add debt to the prefilled row
+                                -- without expanding the saved auction schema.
+                                AuctionTradeAccounting.linkBillRow(result, b, i)
                                 return true
                             end
                         end
@@ -2056,7 +2063,9 @@ BG.Init(function()
             for _, v in ipairs(BiaoGe[FB].auctionLog or {}) do
                 if v.type == 1 and not v.trade and PlayerIdentity
                     and PlayerIdentity.same(v.maijia, tradeName, realmName) then
-                    tinsert(BG.auctionTrade[tradeName], BG.Copy(v))
+                    local copy = BG.Copy(v)
+                    copy.billBoss, copy.billSlot = AuctionTradeAccounting.billRow(v)
+                    tinsert(BG.auctionTrade[tradeName], copy)
                 end
             end
         end

@@ -13,6 +13,8 @@ local AddTexture = ns.AddTexture
 local GetItemID = ns.GetItemID
 local TradeAuctionState = assert(BG.BGNext.TradeAuctionState,
     "BGNext TradeAuctionState must load before Trade")
+local AuctionTradeAccounting = assert(BG.BGNext.AuctionTradeAccounting,
+    "BGNext AuctionTradeAccounting must load before Trade")
 
 local Maxb = ns.Maxb
 local HopeMaxn = ns.HopeMaxn
@@ -2381,31 +2383,16 @@ BG.Init(function()
                                 return
                             end
                             local money = bt.money
-                            local qiankuan = 0
-                            if sumqiankuan ~= 0 then
-                                if sumqiankuan > money then
-                                    qiankuan = money
-                                    sumqiankuan = sumqiankuan - qiankuan
-                                else
-                                    qiankuan = sumqiankuan
-                                    sumqiankuan = 0
-                                end
-                            end
                             tinsert(BG.trade.autoAuction, {
                                 link = link,
                                 player = player,
                                 money = money,
-                                qiankuan = qiankuan,
+                                billBoss = bt.billBoss,
+                                billSlot = bt.billSlot,
                             })
                         end
                     end
-                    -- 如果还有剩余欠款
-                    if sumqiankuan > 0 then
-                        local last = BG.trade.autoAuction[#BG.trade.autoAuction]
-                        if last then
-                            last.qiankuan = last.qiankuan + sumqiankuan
-                        end
-                    end
+                    AuctionTradeAccounting.allocateDebt(BG.trade.autoAuction, sumqiankuan)
                 end
             else
                 player = BG.playerName
@@ -2421,55 +2408,65 @@ BG.Init(function()
                                 return
                             end
                             local money = bt.money
-                            local qiankuan = 0
-                            if sumqiankuan ~= 0 then
-                                if sumqiankuan > money then
-                                    qiankuan = money
-                                    sumqiankuan = sumqiankuan - qiankuan
-                                else
-                                    qiankuan = sumqiankuan
-                                    sumqiankuan = 0
-                                end
-                            end
                             tinsert(BG.trade.autoAuction, {
                                 link = link,
                                 player = player,
                                 money = money,
-                                qiankuan = qiankuan,
+                                billBoss = bt.billBoss,
+                                billSlot = bt.billSlot,
                             })
                         end
                     end
-                    -- 如果还有剩余欠款
-                    if sumqiankuan > 0 then
-                        local last = BG.trade.autoAuction[#BG.trade.autoAuction]
-                        if last then
-                            last.qiankuan = last.qiankuan + sumqiankuan
-                        end
-                    end
+                    AuctionTradeAccounting.allocateDebt(BG.trade.autoAuction, sumqiankuan)
                 end
             end
-            -- 确认表格里是否能全部匹配到合适的格子
+            -- 确认表格里是否能全部匹配到合适的格子。BGNext 会在拍卖
+            -- 结束时立即预填买家和金额，因此交易时优先认领该精确行；
+            -- 未带行坐标的旧记录再按预填内容、最后按原版空行回退。
             local same = {}
             for _, v in ipairs(BG.trade.autoAuction) do
                 local done
-                for b = 1, Maxb[FB] do
-                    for i = 1, BG.GetMaxi(FB, b) do
-                        if not same[b .. "-" .. i] then
-                            local bt = BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]
-                            if bt and BG.IsSameItem(bt:GetText(), v.link) and
-                                BG.Frame[FB]["boss" .. b]["maijia" .. i]:GetText() == "" and
-                                BG.Frame[FB]["boss" .. b]["jine" .. i]:GetText() == "" and
-                                not BiaoGe[FB]["boss" .. b]["qiankuan" .. i]
-                            then
-                                v.b = b
-                                v.i = i
-                                done = true
-                                same[b .. "-" .. i] = true
-                                break
-                            end
+                local function kindAt(b, i)
+                    local bossFrame = BG.Frame[FB]["boss" .. b]
+                    local bossData = BiaoGe[FB]["boss" .. b]
+                    if not (bossFrame and bossData) then return nil end
+                    local item = bossFrame["zhuangbei" .. i]
+                    local buyer = bossFrame["maijia" .. i]
+                    local amount = bossFrame["jine" .. i]
+                    if not (item and buyer and amount) then return nil end
+                    local storedBuyer = bossData["maijia" .. i] or buyer:GetText()
+                    return AuctionTradeAccounting.rowKind(v, {
+                        item = item:GetText(),
+                        buyer = storedBuyer,
+                        amount = amount:GetText(),
+                        debt = bossData["qiankuan" .. i],
+                    }, BG.IsSameItem, function(left, right)
+                        if BG.BGNext.PlayerIdentity then
+                            return BG.BGNext.PlayerIdentity.same(left, right, BG.realmName)
                         end
+                        return left == right
+                    end)
+                end
+                local function claim(b, i, expectedKind)
+                    local key = b .. "-" .. i
+                    if not same[key] and kindAt(b, i) == expectedKind then
+                        v.b, v.i, done, same[key] = b, i, true, true
+                        return true
                     end
+                    return false
+                end
+
+                if v.billBoss and v.billSlot then
+                    claim(v.billBoss, v.billSlot, "prefilled")
+                end
+                for _, expectedKind in ipairs({ "prefilled", "empty" }) do
                     if done then break end
+                    for b = 1, Maxb[FB] do
+                        for i = 1, BG.GetMaxi(FB, b) do
+                            if claim(b, i, expectedKind) then break end
+                        end
+                        if done then break end
+                    end
                 end
                 if not done then
                     wipe(BG.trade.autoAuction)
@@ -2616,8 +2613,12 @@ BG.Init(function()
             for i = 1, 6 do
                 _G["TradePlayerItem" .. i .. "ItemButton"].moneyText:Hide()
                 _G["TradePlayerItem" .. i .. "ItemButton"].moneyText.money = 0
+                _G["TradePlayerItem" .. i .. "ItemButton"].moneyText.billBoss = nil
+                _G["TradePlayerItem" .. i .. "ItemButton"].moneyText.billSlot = nil
                 _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText:Hide()
                 _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText.money = 0
+                _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText.billBoss = nil
+                _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText.billSlot = nil
             end
         end
 
@@ -2748,6 +2749,8 @@ BG.Init(function()
                                     _G["TradePlayerItem" .. i .. "ItemButton"].moneyText:Show()
                                     _G["TradePlayerItem" .. i .. "ItemButton"].moneyText:SetText(L["应收："] .. FormatMoney(money))
                                     _G["TradePlayerItem" .. i .. "ItemButton"].moneyText.money = money
+                                    _G["TradePlayerItem" .. i .. "ItemButton"].moneyText.billBoss = v.billBoss
+                                    _G["TradePlayerItem" .. i .. "ItemButton"].moneyText.billSlot = v.billSlot
                                 end
                                 break
                             end
@@ -2788,6 +2791,8 @@ BG.Init(function()
                                     _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText:Show()
                                     _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText:SetText(L["应付："] .. FormatMoney(money))
                                     _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText.money = money
+                                    _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText.billBoss = v.billBoss
+                                    _G["TradeRecipientItem" .. i .. "ItemButton"].moneyText.billSlot = v.billSlot
                                 end
                                 break
                             end

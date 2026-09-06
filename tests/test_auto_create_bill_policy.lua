@@ -58,6 +58,7 @@ return function(test)
         return function(env)
             local Maxb, GetItemID, BillBuyer, GetClassColor =
                 env.Maxb, env.GetItemID, env.BillBuyer, env.GetClassColor
+            local AuctionTradeAccounting = env.AuctionTradeAccounting
     ]] .. helperSource .. [[
             return BG.FillBillFromAuctionResult
         end
@@ -95,6 +96,11 @@ return function(test)
                 color = function() return 1, 1, 1 end,
                 set = function(box, buyer) box:SetText(buyer) end,
             },
+            AuctionTradeAccounting = {
+                linkBillRow = function(result, boss, slot)
+                    result.testBillBoss, result.testBillSlot = boss, slot
+                end,
+            },
         })
         test.eq(fill("TEST", { type = 1, zhuangbei = "item:123", maijia = "成交玩家", jine = 500, class = "MAGE" }), true,
             "targeted auction fill finds the next empty matching row")
@@ -103,10 +109,13 @@ return function(test)
         test.eq(emptyBuyer:GetText(), "成交玩家", "targeted auction fill writes the completed buyer")
         test.eq(emptyAmount:GetText(), 500, "targeted auction fill writes the completed amount")
         test.eq(BiaoGe.TEST.boss1.class2, "MAGE", "targeted auction fill stores player metadata")
-        test.eq(fill("TEST", { type = 1, zhuangbei = "item:123", maijia = "第二位买家", jine = 600 }), true,
+        local secondResult = { type = 1, zhuangbei = "item:123", maijia = "第二位买家", jine = 600 }
+        test.eq(fill("TEST", secondResult), true,
             "a second sale of the same item finds the next empty row")
         test.eq(nextBuyer:GetText(), "第二位买家", "duplicate items retain independent buyers")
         test.eq(nextAmount:GetText(), 600, "duplicate items retain independent amounts")
+        test.eq(secondResult.testBillBoss, 1, "auction fill retains the exact boss row for later debt accounting")
+        test.eq(secondResult.testBillSlot, 3, "auction fill retains the exact item slot for later debt accounting")
     end)
     BiaoGe, BG = oldBiaoGe, oldBG
     if not ok then error(err, 0) end

@@ -68,6 +68,7 @@ Core\BGNext\RoleOverviewEntry.lua
 Core\BGNext\OwnCharactersRuntime.lua
 Core\BGNext\PlayerIdentity.lua
 Core\BGNext\TradeAuctionState.lua
+Core\BGNext\AuctionTradeAccounting.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua
