@@ -1226,31 +1226,33 @@ BG.Init(function()
  end
  function wa.EndAuction(bidFrame, kind)
   if bidFrame.IsEnd then return end
+  local wasSmallWindow = bidFrame.IsSmallWindow
   -- 结束立即解除倒计时，成交/流拍/取消三路一致；自然到期重复解除安全。
   bidFrame.bar:SetScript("OnUpdate", nil)
   if kind == "cancel" then
    wa.SetEndState(bidFrame, L["拍卖取消"], 1, 0, 0)
-   wa.expandFrame(bidFrame, true)
    bidFrame.currentMoneyText:SetText(L["|cffFF0000拍卖取消"])
    bidFrame.topMoneyText:SetText("")
   elseif kind == "flow" then
    wa.SetEndState(bidFrame, L["流拍"], 1, 0, 0)
-   wa.expandFrame(bidFrame, true)
    bidFrame.currentMoneyText:SetText(L["|cffFF0000流拍：|r"] .. wa.FormatNumber(bidFrame.money))
    bidFrame.topMoneyText:SetText("")
   else
    wa.SetEndState(bidFrame, L["拍卖成功"], 0, 1, 0)
-   wa.expandFrame(bidFrame, true)
-   bidFrame.currentMoneyText:SetText(L["|cff00FF00成交价：|r"] .. wa.FormatNumber(bidFrame.money))
+   local winnerText
    if wa.IsMe(bidFrame) then
-    bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. "|cff" .. wa.GREEN1 .. L[">> 你 <<"])
+    winnerText = "|cff" .. wa.GREEN1 .. L[">> 你 <<"]
+    else
+    winnerText = bidFrame.colorplayer
+   end
+   bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. winnerText)
+   if wasSmallWindow then
+    -- 尊重玩家主动折叠的状态；在单行摘要里仍保留成交人和金额。
+    bidFrame.currentMoneyText:SetText(winnerText .. "|r · " .. wa.FormatNumber(bidFrame.money))
    else
-    bidFrame.topMoneyText:SetText(L["|cff00FF00买家：|r"] .. bidFrame.colorplayer)
+    bidFrame.currentMoneyText:SetText(L["|cff00FF00成交价：|r"] .. wa.FormatNumber(bidFrame.money))
    end
   end
-  -- 折叠卡片强制展开会改变高度；结束态完成布局后做一次有界重排，
-  -- 避免同时拍卖的其他卡片重叠，不引入周期性布局。
-  wa.UpdateAllFrames()
   After(wa.END_DISPLAY_TIME, function()
    wa.UpdateFrame(bidFrame)
   end)

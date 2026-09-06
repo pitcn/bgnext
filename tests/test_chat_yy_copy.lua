@@ -113,7 +113,7 @@ return function(test)
     test.eq(M.install({ addFilter = function() end }), false, "installation is idempotent")
 
     local oldDialogs, oldShow, oldOkay = StaticPopupDialogs, StaticPopup_Show, OKAY
-    local popupValue
+    local popupValue, popupEdit, popupFocusCleared
     StaticPopupDialogs = {}
     OKAY = "OK"
     StaticPopup_Show = function(name, _, _, value)
@@ -121,12 +121,16 @@ return function(test)
             SetText = function(self, text) self.text = text end,
             HighlightText = function() end,
             SetFocus = function() end,
+            ClearFocus = function() popupFocusCleared = true end,
         }
+        popupEdit = edit
         StaticPopupDialogs[name].OnShow({ EditBox = edit }, value)
         popupValue = edit.text
     end
     test.eq(M.showCopyPopup("789"), true, "valid number opens the copy popup")
     test.eq(popupValue, "789", "copy popup contains digits without quotes")
+    StaticPopupDialogs.BGNextCopyYYNumber.OnHide({ EditBox = popupEdit })
+    test.eq(popupFocusCleared, true, "closing the copy popup releases keyboard focus")
     test.eq(M.showCopyPopup("78x"), false, "copy popup rejects non-digits")
     StaticPopupDialogs, StaticPopup_Show, OKAY = oldDialogs, oldShow, oldOkay
 

@@ -231,6 +231,13 @@ return function(test)
     test.eq(cds.professionCooldowns.wrongType, nil, "a non-boolean ready flag is dropped")
     test.eq(cds.professionCooldowns.badEnds, nil, "a non-numeric endsAt is dropped")
 
+    local professionIds = M.upsert(cdRoot, "mop", {
+        realmId = 123, realmName = "时光II", player = "Piti",
+        professions = { { name = "炼金术", skillLineId = 171 } },
+    })
+    test.eq(professionIds.professions[1].skillLineId, 171,
+        "profession snapshots retain the stable Blizzard skill-line id")
+
     -- Cooldown records are deep-copied so callers cannot mutate stored state.
     local mutableCd = { ready = true }
     M.upsert(cdRoot, "vanilla", {

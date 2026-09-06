@@ -162,6 +162,7 @@ function M.showCopyPopup(number)
             end,
             OnHide = function(self)
                 local edit = self.EditBox or self.editBox
+                edit:ClearFocus()
                 edit:SetText("")
             end,
             EditBoxOnEscapePressed = function(self)

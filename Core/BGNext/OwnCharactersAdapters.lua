@@ -733,14 +733,17 @@ function M.readProfessions(api)
     local result = {}
     if type(getProfs) == "function" and type(getInfo) == "function" then
         local _, prof1, prof2 = callAll(getProfs)
-        for position, index in ipairs({ prof1, prof2 }) do
+        local primaryProfessions = { prof1, prof2 }
+        for position = 1, 2 do
+            local index = primaryProfessions[position]
             if type(index) == "number" then
-                local ok, name, texture, rank, maxRank = callAll(getInfo, index)
+                local ok, name, texture, rank, maxRank, _, _, skillLineId = callAll(getInfo, index)
                 if ok and type(name) == "string" and name ~= "" then
                     result[position] = {
                         name = name,
                         skill = type(rank) == "number" and rank or nil,
                         maxSkill = type(maxRank) == "number" and maxRank or nil,
+                        skillLineId = type(skillLineId) == "number" and skillLineId or nil,
                         icon = (type(texture) == "number" or (type(texture) == "string" and texture ~= ""))
                             and texture or nil,
                     }
@@ -750,6 +753,26 @@ function M.readProfessions(api)
     end
     if next(result) ~= nil then return result end
     return readSkillLineProfessions(api)
+end
+
+-- Spell metadata is global and resolves even when the logged-in character has
+-- never learned the corresponding profession. Use Blizzard's stable primary
+-- profession skill-line ID to prevent an unowned recipe from appearing ready.
+local function hasPrimaryProfession(api, skillLineId)
+    if type(skillLineId) ~= "number" then return true end
+    if type(api) ~= "table" or type(api.GetProfessions) ~= "function"
+        or type(api.GetProfessionInfo) ~= "function" then return false end
+    local ok, profession1, profession2 = callAll(api.GetProfessions)
+    if not ok then return false end
+    local primaryProfessions = { profession1, profession2 }
+    for position = 1, 2 do
+        local index = primaryProfessions[position]
+        if type(index) == "number" then
+            local infoOk, _, _, _, _, _, _, currentSkillLineId = callAll(api.GetProfessionInfo, index)
+            if infoOk and currentSkillLineId == skillLineId then return true end
+        end
+    end
+    return false
 end
 
 local function resourceWhitelist(columns)
@@ -762,7 +785,10 @@ local function resourceWhitelist(columns)
             elseif source.kind == "tracked-items" and type(source.prefix) == "string" then
                 prefixes[source.prefix] = true
             elseif source.kind == "profession-cooldown" and type(source.spellId) == "number" then
-                cooldownSpells[source.key or column.id] = source.spellId
+                cooldownSpells[source.key or column.id] = {
+                    spellId = source.spellId,
+                    professionSkillLineId = source.professionSkillLineId,
+                }
             end
         end
     end
@@ -882,8 +908,11 @@ function M.readResources(api, family, resourceColumns, selection)
 
     if wantCooldowns then
         local cooldowns = {}
-        for key, spellId in pairs(allowedCooldowns) do
-            local entry = M.readProfessionCooldown(api, spellId)
+        for key, spec in pairs(allowedCooldowns) do
+            local entry
+            if hasPrimaryProfession(api, spec.professionSkillLineId) then
+                entry = M.readProfessionCooldown(api, spec.spellId)
+            end
             if type(entry) == "table" and next(entry) ~= nil then
                 cooldowns[key] = entry
             end
@@ -1138,6 +1167,7 @@ function M.canReadColumn(family, api, column)
     end
     if source.kind == "profession-cooldown" then
         return type(source.spellId) == "number"
+            and hasPrimaryProfession(api, source.professionSkillLineId)
             and (type(api.GetSpellCooldown) == "function"
                 or (type(api.C_Spell) == "table" and type(api.C_Spell.GetSpellCooldown) == "function"))
             and resolveSpellName(api, source.spellId) ~= nil

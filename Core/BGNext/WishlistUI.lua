@@ -752,6 +752,7 @@ if runtimeReady() then
         edit:SetTextInsets(5, 5, 5, 10)
         scroll:SetScrollChild(edit)
         edit:SetScript("OnEscapePressed", function() panel:Hide() end)
+        panel:SetScript("OnHide", function() edit:ClearFocus() end)
         panel.edit, panel.scroll = edit, scroll
 
         local cancel = BG.CreateButton(panel)
