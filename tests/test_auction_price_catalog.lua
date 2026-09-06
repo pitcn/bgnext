@@ -63,6 +63,18 @@ return function(test)
     test.eq(#withMisc.groups[1].items, 1, "known boss drop stays under boss")
     test.eq(#withMisc.groups[2].items, 2, "unknown table sections remain misc")
 
+    -- Some supported loot catalogs represent a section containing one item as
+    -- the numeric item ID itself instead of a one-element array.
+    local withScalar = catalog.build({
+        raidId = "R3",
+        difficulties = { "N" },
+        bosses = { { id = "boss1", name = "b" }, { id = "misc", name = "m" } },
+        loot = { N = { boss1 = 501, currency = 502 } },
+        describeItem = describe,
+    })
+    test.eq(withScalar.byItem[501].groupId, "boss1", "scalar boss drop is accepted")
+    test.eq(withScalar.byItem[502].groupId, "misc", "scalar unknown section remains misc")
+
     -- Ambiguous cross-raid item resolution returns nil.
     local mk = function(raidId, itemId)
         return catalog.build({

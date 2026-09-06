@@ -30,6 +30,7 @@ local suites = {
     "tests/test_current_settlement_checklist.lua",
     "tests/test_return_marker.lua",
     "tests/test_release_info.lua",
+    "tests/test_update_log_layout.lua",
     "tests/test_wishlist.lua",
     "tests/test_wishlist_ui.lua",
     "tests/test_retail_loot_status.lua",

@@ -23,7 +23,8 @@ return function(test)
         "tab stops after original final difficulty")
 
     test.eq(ui.shortcutAction(false, "LeftButton", true), "wishlist", "member alt-left sets wishlist")
-    test.eq(ui.shortcutAction(true, "LeftButton", true), "wishlist", "master looter alt-left sets wishlist")
+    test.eq(ui.shortcutAction(true, "LeftButton", true), "auction",
+        "master looter alt-left restores the original chat-link auction shortcut")
     test.eq(ui.shortcutAction(true, "RightButton", true), "auction", "master looter alt-right starts auction")
     test.eq(ui.shortcutAction(false, "RightButton", true), "auction",
         "solo alt-right is consumed by the guarded auction path instead of deleting the item")

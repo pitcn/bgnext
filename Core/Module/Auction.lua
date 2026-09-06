@@ -433,7 +433,6 @@ BG.Init(function()
                 end)
                 mainFrame = f
                 BG.StartAucitonFrame = mainFrame
-                f.UpdateFrame = UpdateFrame
 
                 BG.CreateCloseButton(f, 0, 0)
                 f.CloseButton:SetSize(35, 35)
@@ -873,9 +872,6 @@ BG.Init(function()
                     RequestReadiness(false, true)
                 end
                 UpdateReadinessFrame(readiness)
-                if BG.StartAucitonFrame then
-                    BG.StartAucitonFrame:UpdateFrame()
-                end
             end)
         end)
         BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
@@ -895,9 +891,6 @@ BG.Init(function()
                         BG.raidBiaoGeNewVersion[sender] = true
                     end
                     UpdateReadinessFrame(readiness)
-                    if BG.StartAucitonFrame then
-                        BG.StartAucitonFrame:UpdateFrame()
-                    end
                 end
             elseif prefix == "BiaoGeAuction" and distType == "RAID" then -- 拍卖版本
                 local arg1, version = strsplit(",", msg)

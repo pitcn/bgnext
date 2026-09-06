@@ -45,6 +45,7 @@ Core\BGNext\TradeCapture.lua
 Core\BGNext\CurrentSettlementRuntime.lua
 Core\BGNext\TradeAnnouncement.lua
 Core\BGNext\ReleaseInfo.lua
+Core\BGNext\UpdateLogLayout.lua
 Core\BGNext\Wishlist.lua
 Core\BGNext\WishlistReminder.lua
 Core\BGNext\RetailLootStatus.lua
