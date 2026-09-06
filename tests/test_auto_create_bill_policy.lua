@@ -25,6 +25,30 @@ return function(test)
     local compile = loadstring or load
     local isAutoCreateBill = assert(compile("return function()" .. tradeBody .. "\nend"))()
     local shouldCreateBillFromAuction = assert(compile("return function()" .. auctionBody .. "\nend"))()
+    local saveStart = assert(tradeSource:find("            -- 使用自动拍卖的记账", 1, true))
+    local saveEnd = assert(tradeSource:find("            -- 非自动拍卖的记账", saveStart, true))
+    local autoAuctionSave = assert(compile([[
+        return function(env, saved)
+            local BG, BiaoGe, L = env.BG, env.BiaoGe, env.L
+            local GetItemID, GetItemInfoInstant = env.GetItemID, env.GetItemInfoInstant
+            local AddTexture, GetClassRGB = env.AddTexture, env.GetClassRGB
+            local FB = BG.FB1
+    ]] .. tradeSource:sub(saveStart, saveEnd - 1) .. [[
+            return nil
+        end
+    ]]))()
+    local matchStart = assert(tradeSource:find("            -- 确认表格里是否能全部匹配到合适的格子", 1, true))
+    local matchEnd = assert(tradeSource:find("\n        end\n\n        local function UpdateTargetQianKuan", matchStart, true))
+    local autoAuctionMatch = assert(compile([[
+        return function(env)
+            local BG, BiaoGe = env.BG, env.BiaoGe
+            local FB, Maxb = BG.FB1, env.Maxb
+            local AuctionTradeAccounting = env.AuctionTradeAccounting
+            local wipe = env.wipe
+    ]] .. tradeSource:sub(matchStart, matchEnd - 1) .. [[
+            return true
+        end
+    ]]))()
 
     local oldBiaoGe, oldBG = BiaoGe, BG
     local ok, err = pcall(function()
@@ -119,6 +143,63 @@ return function(test)
             item = thirdItem:GetText(), buyer = nextBuyer:GetText(), amount = nextAmount:GetText(),
         }, function(left, right) return left == right end, function(left, right) return left == right end),
             "prefilled", "the real trade matcher accepts the row filled by auction completion")
+
+        -- Full compatibility chain: the actual auction filler prefilled slot 3;
+        -- the trade matcher claims that exact row, debt allocation keeps gold
+        -- units, and the actual auto-auction save branch writes the debt back.
+        local debtShown = false
+        BG.Frame.TEST.boss1.qiankuan3 = { Show = function() debtShown = true end }
+        BG.BGNext = {
+            BillBuyer = {
+                set = function(box, buyer) box:SetText(buyer) end,
+            },
+        }
+        BG.FB1 = "TEST"
+        BG.playerName = "团长"
+        BG.playerClass = {}
+        BG.CancelGuanZhuAndHopeInTrade = function() end
+        BG.tradeSeeFrame = { frame = { SetGreenColor = function() end } }
+        local tradeRecord = {
+            link = secondResult.zhuangbei,
+            player = secondResult.maijia,
+            money = secondResult.jine,
+            billBoss = linkedBoss,
+            billSlot = linkedSlot,
+        }
+        BG.IsSameItem = function(left, right) return left == right end
+        BG.realmName = "Realm"
+        BG.BGNext.PlayerIdentity = {
+            same = function(left, right) return left == right end,
+        }
+        BG.trade = { autoAuction = { tradeRecord } }
+        test.eq(autoAuctionMatch({
+            BG = BG,
+            BiaoGe = BiaoGe,
+            Maxb = { TEST = 1 },
+            AuctionTradeAccounting = accounting,
+            wipe = function(tbl) for key in pairs(tbl) do tbl[key] = nil end end,
+        }), true, "the production trade claim loop completes")
+        test.eq(tradeRecord.b, linkedBoss, "the production matcher claims the auction-filled boss row")
+        test.eq(tradeRecord.i, linkedSlot, "the production matcher claims the auction-filled item slot")
+        accounting.allocateDebt({ tradeRecord }, 400)
+        BG.trade = {
+            autoAuction = { tradeRecord }, many = {}, playerinfo = {}, targetinfo = {},
+        }
+        autoAuctionSave({
+            BG = BG,
+            BiaoGe = BiaoGe,
+            L = setmetatable({}, { __index = function(_, key) return key end }),
+            GetItemID = function(value) return tonumber(tostring(value):match("item:(%d+)")) end,
+            GetItemInfoInstant = function() return nil, nil, nil, nil, 134400 end,
+            AddTexture = function() return "" end,
+            GetClassRGB = function() return 1, 1, 1 end,
+        }, true)
+        test.eq(BiaoGe.TEST.boss1.jine3, 600,
+            "trade save preserves the auction amount in whole gold")
+        test.eq(BiaoGe.TEST.boss1.qiankuan3, 400,
+            "trade save writes the allocated debt to the auction-prefilled row")
+        test.eq(debtShown, true, "trade save exposes the debt marker on the claimed row")
+        test.eq(#BG.trade.many, 1, "the completed auction trade is queued exactly once for final bookkeeping")
     end)
     BiaoGe, BG = oldBiaoGe, oldBG
     if not ok then error(err, 0) end
