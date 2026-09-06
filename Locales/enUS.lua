@@ -66,19 +66,20 @@ do -- BGNext release text
     L["调整团长工具在不同界面缩放下的布局，减少按钮重叠、内容越界和关闭按钮不可见。"] = "Improved Leader Tools layout across UI scales to reduce overlapping buttons, clipped content and hidden close buttons."
     L["加固跨服拍卖权限、交易与批量邮件核对，以及相同物品和延迟事件下的结算处理。"] = "Hardened cross-realm auction permissions, trade and bulk-mail reconciliation, and settlement handling for duplicate items and delayed events."
     L["修复拍卖成功后账表不回填，新增团长工具、多拍品中心、本地成交摘要，并改进自动清表与交易候选清理。"] = "Fixed missing bill updates after successful auctions, added Leader Tools, Auction Center and local sale summaries, and improved automatic clearing and trade-candidate cleanup."
+    L["修复键盘焦点、角色总览误报和拍卖折叠，并改进团长工具布局及核心结算流程。"] = "Fixed keyboard focus, Character Overview false positives and auction collapsing, and improved Leader Tools layout and core settlement flows."
+    L["修复自动拍卖成功记录已经出现，但主表买家和成交金额仍可能保持为空的问题。"] = "Fixed successful auctions appearing in the auction log while leaving the main bill buyer and amount blank."
+    L["成交结果会立即填写到下一条匹配的空白装备行，不覆盖已有手填和交易记账内容。"] = "Results now fill the next matching blank item row immediately without overwriting manual or trade-accounting entries."
+    L["修复团长权限变化时可能漏写的问题；团长本人拍中仍保留已付或欠款选择。"] = "Fixed missed writes after leader-role changes; leader self-purchases still keep the paid-or-debt choice."
 end
 
-do -- BGNext 0.8.1 release text
+do -- BGNext 0.8.2 release text
     local values = {
-        ["修复部分 BGNext 窗口关闭后仍占用键盘输入，导致移动或聊天按键暂时失效的问题。"] = "Fixed BGNext windows retaining keyboard focus after closing, which could temporarily block movement or chat keys.",
-        ["修复角色总览把未学习专业的配方错误显示为已就绪；旧角色数据会在该角色再次登录后刷新。"] = "Fixed Character Overview showing recipes from unlearned professions as ready; older snapshots refresh after logging into that character again.",
-        ["拍卖卡片折叠后保持折叠，结束时仍在摘要中显示买家和成交金额。"] = "Auction cards now remain collapsed while still showing the buyer and final amount in the completed summary.",
-        ["调整团长工具在不同界面缩放下的布局，减少按钮重叠、内容越界和关闭按钮不可见。"] = "Improved Leader Tools layout across UI scales to reduce overlapping buttons, clipped content and hidden close buttons.",
-        ["加固跨服拍卖权限、交易与批量邮件核对，以及相同物品和延迟事件下的结算处理。"] = "Hardened cross-realm auction permissions, trade and bulk-mail reconciliation, and settlement handling for duplicate items and delayed events.",
-        ["修复拍卖成功后账表不回填，新增团长工具、多拍品中心、本地成交摘要，并改进自动清表与交易候选清理。"] = "Fixed missing bill updates after successful auctions, added Leader Tools, Auction Center and local sale summaries, and improved automatic clearing and trade-candidate cleanup.",
+        ["修复自动拍卖成功记录已经出现，但主表买家和成交金额仍可能保持为空的问题。"] = "Fixed successful auctions appearing in the auction log while leaving the main bill buyer and amount blank.",
+        ["成交结果会立即填写到下一条匹配的空白装备行，不覆盖已有手填和交易记账内容。"] = "Results now fill the next matching blank item row immediately without overwriting manual or trade-accounting entries.",
+        ["修复团长权限变化时可能漏写的问题；团长本人拍中仍保留已付或欠款选择。"] = "Fixed missed writes after leader-role changes; leader self-purchases still keep the paid-or-debt choice.",
     }
     for key, value in pairs(values) do L[key] = value end
-    ns.updateText_now = { "BGNext 0.8.1", L["修复部分 BGNext 窗口关闭后仍占用键盘输入，导致移动或聊天按键暂时失效的问题。"], L["修复角色总览把未学习专业的配方错误显示为已就绪；旧角色数据会在该角色再次登录后刷新。"], L["拍卖卡片折叠后保持折叠，结束时仍在摘要中显示买家和成交金额。"], L["调整团长工具在不同界面缩放下的布局，减少按钮重叠、内容越界和关闭按钮不可见。"], L["加固跨服拍卖权限、交易与批量邮件核对，以及相同物品和延迟事件下的结算处理。"] }
+    ns.updateText_now = { "BGNext 0.8.2", L["修复自动拍卖成功记录已经出现，但主表买家和成交金额仍可能保持为空的问题。"], L["成交结果会立即填写到下一条匹配的空白装备行，不覆盖已有手填和交易记账内容。"], L["修复团长权限变化时可能漏写的问题；团长本人拍中仍保留已付或欠款选择。"] }
 end
 
 do -- BGNext leader tools
