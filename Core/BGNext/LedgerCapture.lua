@@ -110,6 +110,21 @@ function M.shouldStopForRoster(state, inRaid, realm, memberNames)
     return true
 end
 
+-- GROUP_LEFT carries the exact party category that the local player left.
+-- This catches a direct team replacement without retaining a roster snapshot,
+-- while unrelated home/instance group changes remain independent.
+function M.shouldStopForGroupLeft(state, category, captureCategory)
+    if type(state) ~= "table" or state.active ~= true then return false end
+    if category == nil then return false end
+    return category == captureCategory
+end
+
+function M.handleGroupLeft(state, category, captureCategory, stopCapture)
+    if not M.shouldStopForGroupLeft(state, category, captureCategory) then return false end
+    stopCapture()
+    return true
+end
+
 function M.appendLine(state, line, now)
     if not M.isActive(state, now) or type(line) ~= "string" then return false end
     if #line > state.maxLineBytes or state.lineCount >= state.maxLines then
