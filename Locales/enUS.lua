@@ -60,18 +60,25 @@ do -- BGNext release text
     L["新增默认关闭的本地成交摘要；只在手动确认后保存最小信息，并可设置保留期或一键清空。"] = "Added an opt-in local sale summary that stores minimal information only after confirmation, with retention controls and one-click clearing."
     L["改进新副本进度清表和交易候选过期处理，只处理当前副本范围，避免影响其他账表数据。"] = "Improved new-lockout clearing and trade-candidate expiry so only the current instance scope is affected."
     L["新增增强模式与游戏内说明书，重做待拍队列和 Boss 拾取拍卖入口，并改进拍卖、交易、退货与熊猫人角色追踪。"] = "Added enhancement modes and an in-game guide, redesigned the auction queue and boss-loot auction entry, and improved auctions, trades, returns, and Mists character tracking."
+    L["修复部分 BGNext 窗口关闭后仍占用键盘输入，导致移动或聊天按键暂时失效的问题。"] = "Fixed BGNext windows retaining keyboard focus after closing, which could temporarily block movement or chat keys."
+    L["修复角色总览把未学习专业的配方错误显示为已就绪；旧角色数据会在该角色再次登录后刷新。"] = "Fixed Character Overview showing recipes from unlearned professions as ready; older snapshots refresh after logging into that character again."
+    L["拍卖卡片折叠后保持折叠，结束时仍在摘要中显示买家和成交金额。"] = "Auction cards now remain collapsed while still showing the buyer and final amount in the completed summary."
+    L["调整团长工具在不同界面缩放下的布局，减少按钮重叠、内容越界和关闭按钮不可见。"] = "Improved Leader Tools layout across UI scales to reduce overlapping buttons, clipped content and hidden close buttons."
+    L["加固跨服拍卖权限、交易与批量邮件核对，以及相同物品和延迟事件下的结算处理。"] = "Hardened cross-realm auction permissions, trade and bulk-mail reconciliation, and settlement handling for duplicate items and delayed events."
+    L["修复拍卖成功后账表不回填，新增团长工具、多拍品中心、本地成交摘要，并改进自动清表与交易候选清理。"] = "Fixed missing bill updates after successful auctions, added Leader Tools, Auction Center and local sale summaries, and improved automatic clearing and trade-candidate cleanup."
 end
 
-do -- BGNext 0.8.0 release text
+do -- BGNext 0.8.1 release text
     local values = {
-        ["紧急修复团长或物品分配者拍卖成功后，主表不自动填写买家和成交金额的问题。"] = "Hotfixed missing buyer and final amount entries in the main bill after auctions run by raid leaders or master looters.",
-        ["新增可选团长工具：支出模板、多拍品中心、实收与分金预览；均可在功能管理中单独开关。"] = "Added optional leader tools: expense templates, Auction Center, and receipts/wage preview, each independently switchable in Feature Management.",
-        ["新增默认关闭的本地成交摘要；只在手动确认后保存最小信息，并可设置保留期或一键清空。"] = "Added an opt-in local sale summary that stores minimal information only after confirmation, with retention controls and one-click clearing.",
-        ["改进新副本进度清表和交易候选过期处理，只处理当前副本范围，避免影响其他账表数据。"] = "Improved new-lockout clearing and trade-candidate expiry so only the current instance scope is affected.",
-        ["新增增强模式与游戏内说明书，重做待拍队列和 Boss 拾取拍卖入口，并改进拍卖、交易、退货与熊猫人角色追踪。"] = "Added enhancement modes and an in-game guide, redesigned the auction queue and boss-loot auction entry, and improved auctions, trades, returns, and Mists character tracking.",
+        ["修复部分 BGNext 窗口关闭后仍占用键盘输入，导致移动或聊天按键暂时失效的问题。"] = "Fixed BGNext windows retaining keyboard focus after closing, which could temporarily block movement or chat keys.",
+        ["修复角色总览把未学习专业的配方错误显示为已就绪；旧角色数据会在该角色再次登录后刷新。"] = "Fixed Character Overview showing recipes from unlearned professions as ready; older snapshots refresh after logging into that character again.",
+        ["拍卖卡片折叠后保持折叠，结束时仍在摘要中显示买家和成交金额。"] = "Auction cards now remain collapsed while still showing the buyer and final amount in the completed summary.",
+        ["调整团长工具在不同界面缩放下的布局，减少按钮重叠、内容越界和关闭按钮不可见。"] = "Improved Leader Tools layout across UI scales to reduce overlapping buttons, clipped content and hidden close buttons.",
+        ["加固跨服拍卖权限、交易与批量邮件核对，以及相同物品和延迟事件下的结算处理。"] = "Hardened cross-realm auction permissions, trade and bulk-mail reconciliation, and settlement handling for duplicate items and delayed events.",
+        ["修复拍卖成功后账表不回填，新增团长工具、多拍品中心、本地成交摘要，并改进自动清表与交易候选清理。"] = "Fixed missing bill updates after successful auctions, added Leader Tools, Auction Center and local sale summaries, and improved automatic clearing and trade-candidate cleanup.",
     }
     for key, value in pairs(values) do L[key] = value end
-    ns.updateText_now = { "BGNext 0.8.0", L["紧急修复团长或物品分配者拍卖成功后，主表不自动填写买家和成交金额的问题。"], L["新增可选团长工具：支出模板、多拍品中心、实收与分金预览；均可在功能管理中单独开关。"], L["新增默认关闭的本地成交摘要；只在手动确认后保存最小信息，并可设置保留期或一键清空。"], L["改进新副本进度清表和交易候选过期处理，只处理当前副本范围，避免影响其他账表数据。"] }
+    ns.updateText_now = { "BGNext 0.8.1", L["修复部分 BGNext 窗口关闭后仍占用键盘输入，导致移动或聊天按键暂时失效的问题。"], L["修复角色总览把未学习专业的配方错误显示为已就绪；旧角色数据会在该角色再次登录后刷新。"], L["拍卖卡片折叠后保持折叠，结束时仍在摘要中显示买家和成交金额。"], L["调整团长工具在不同界面缩放下的布局，减少按钮重叠、内容越界和关闭按钮不可见。"], L["加固跨服拍卖权限、交易与批量邮件核对，以及相同物品和延迟事件下的结算处理。"] }
 end
 
 do -- BGNext leader tools
