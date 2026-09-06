@@ -11,6 +11,16 @@ return function(test)
     test.eq(root.schemaVersion, 1, "schema version")
     test.eq(root.auctionPresets, nil, "duplicate auto-bid presets are not auto-created")
 
+    local repaired = life.ensureRoot({ BGNext = { currentSettlement = 1 } })
+    test.eq(type(repaired.currentSettlement), "table", "invalid settlement storage is repaired on login")
+    test.eq(type(repaired.currentSettlement.trades), "table", "repaired settlement has a trade list")
+    test.eq(type(repaired.currentSettlement.mails), "table", "repaired settlement has a mail list")
+    test.eq(type(repaired.currentSettlement.returns), "table", "repaired settlement has a return list")
+    repaired = life.ensureRoot({ BGNext = { currentRaid = 1 } })
+    test.eq(type(repaired.currentRaid), "table", "invalid current-raid storage is repaired on login")
+    life.beginRaid(repaired, "repaired-raid", 50)
+    test.eq(repaired.currentRaid.raidId, "repaired-raid", "repaired current-raid storage accepts a new raid")
+
     life.beginSettlement(root, "raid-a", 100)
     root.currentSettlement.trades[1] = { amount = 100 }
     life.beginSettlement(root, "raid-a", 200)

@@ -26,7 +26,13 @@ return function(test)
     test.eq(source:find('BG.RegisterEvent("PLAYER_LOGOUT"', 1, true) ~= nil, true,
         "logout clears runtime reconciliation state")
     test.eq(source:find('BG.RegisterEvent("GROUP_ROSTER_UPDATE"', 1, true) ~= nil, true,
-        "roster changes clear runtime reconciliation state")
+        "roster changes revalidate runtime reconciliation state")
+    test.eq(source:find("Capture.shouldStopForRoster", 1, true) ~= nil, true,
+        "an unrelated roster update cannot discard the active reconciliation")
+    test.eq(source:find("IsInRaid()", 1, true) ~= nil, true,
+        "roster revalidation uses the player's current raid, not a party-category subset")
+    test.eq(source:find("IsInRaid(1)", 1, true), nil,
+        "ordinary raids cannot be mistaken for leaving the group")
     test.eq(source:find('L["开始对账"]', 1, true) ~= nil, true,
         "the UI exposes an explicit start action")
 

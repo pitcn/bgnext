@@ -97,6 +97,19 @@ function M.acceptSource(state, sender, realm, memberNames, now)
     return state.sourceKey == PlayerIdentity.key(sender, realm)
 end
 
+-- A roster event is not itself a team boundary: disconnects, promotions and
+-- harmless member changes all emit it. Stop only after leaving the raid or
+-- when the already-bound ledger sender is no longer a current member.
+function M.shouldStopForRoster(state, inRaid, realm, memberNames)
+    if type(state) ~= "table" or state.active ~= true then return false end
+    if not inRaid then return true end
+    if not state.sourceKey then return false end
+    for _, memberName in ipairs(memberNames or {}) do
+        if PlayerIdentity.same(state.sourceKey, memberName, realm) then return false end
+    end
+    return true
+end
+
 function M.appendLine(state, line, now)
     if not M.isActive(state, now) or type(line) ~= "string" then return false end
     if #line > state.maxLineBytes or state.lineCount >= state.maxLines then

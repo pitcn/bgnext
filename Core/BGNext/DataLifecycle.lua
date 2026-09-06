@@ -25,15 +25,17 @@ local function emptySettlement()
 end
 
 function M.ensureRoot(saved)
-    saved.BGNext = saved.BGNext or {}
+    saved.BGNext = type(saved.BGNext) == "table" and saved.BGNext or {}
     local root = saved.BGNext
     root.schemaVersion = 1
-    root.settings = root.settings or {}
-    root.wishlist = root.wishlist or {}
-    root.equipmentFilters = root.equipmentFilters or {}
-    root.ownCharacters = root.ownCharacters or {}
-    root.leaderAuctionPricePresets = root.leaderAuctionPricePresets or {}
-    root.personalAuctionExpectations = root.personalAuctionExpectations or {}
+    root.settings = type(root.settings) == "table" and root.settings or {}
+    root.wishlist = type(root.wishlist) == "table" and root.wishlist or {}
+    root.equipmentFilters = type(root.equipmentFilters) == "table" and root.equipmentFilters or {}
+    root.ownCharacters = type(root.ownCharacters) == "table" and root.ownCharacters or {}
+    root.leaderAuctionPricePresets = type(root.leaderAuctionPricePresets) == "table"
+        and root.leaderAuctionPricePresets or {}
+    root.personalAuctionExpectations = type(root.personalAuctionExpectations) == "table"
+        and root.personalAuctionExpectations or {}
     root.leaderTools = type(root.leaderTools) == "table" and root.leaderTools or {}
     root.leaderTools.expenseTemplates = type(root.leaderTools.expenseTemplates) == "table"
         and root.leaderTools.expenseTemplates or {}
@@ -43,9 +45,15 @@ function M.ensureRoot(saved)
         and root.leaderTools.historyRetentionDays ~= 180 then
         root.leaderTools.historyRetentionDays = 90
     end
-    root.currentRaid = root.currentRaid or {}
-    root.currentSettlement = root.currentSettlement or emptySettlement()
-    root.currentSettlement.returns = root.currentSettlement.returns or {}
+    root.currentRaid = type(root.currentRaid) == "table" and root.currentRaid or {}
+    root.currentRaid.purchases = type(root.currentRaid.purchases) == "table" and root.currentRaid.purchases or {}
+    root.currentSettlement = type(root.currentSettlement) == "table" and root.currentSettlement or emptySettlement()
+    root.currentSettlement.trades = type(root.currentSettlement.trades) == "table"
+        and root.currentSettlement.trades or {}
+    root.currentSettlement.mails = type(root.currentSettlement.mails) == "table"
+        and root.currentSettlement.mails or {}
+    root.currentSettlement.returns = type(root.currentSettlement.returns) == "table"
+        and root.currentSettlement.returns or {}
     return root
 end
 

@@ -69,6 +69,28 @@ function M.liveRaidMemberNames(getCount, getMember)
     return members
 end
 
+-- Take the same bounded message-time snapshot for controller roles. Start,
+-- cancel and timer-control messages can arrive before the upstream cached
+-- roster's delayed refresh, so authorization must not depend on that cache.
+function M.liveRaidRoster(getCount, getMember)
+    if type(getCount) ~= "function" or type(getMember) ~= "function" then return {} end
+    local count = tonumber(getCount())
+    if not count or count ~= count or count <= 0 then return {} end
+    count = math.min(M.MAX_RAID_MEMBERS, math.floor(count))
+    local roster = {}
+    for index = 1, count do
+        local name, rank, _, _, _, _, _, _, _, _, isML = getMember(index)
+        if type(name) == "string" and name ~= "" then
+            roster[#roster + 1] = {
+                name = name,
+                rank = rank,
+                isML = isML == true,
+            }
+        end
+    end
+    return roster
+end
+
 function M.isController(sender, realm, roster)
     if PlayerIdentity.key(sender, realm) == nil then return false end
     for _, member in ipairs(roster or {}) do

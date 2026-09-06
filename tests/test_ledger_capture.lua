@@ -29,6 +29,12 @@ return function(test)
         "another raid member cannot inject into the capture")
     test.eq(Capture.acceptSource(state, "Alice", "Realm", { "Bob" }, 102), false,
         "a source that left the raid is rejected")
+    test.eq(Capture.shouldStopForRoster(state, true, "Realm", { "Alice", "Bob", "Cara" }), false,
+        "an unrelated roster change keeps an active capture")
+    test.eq(Capture.shouldStopForRoster(state, true, "Realm", { "Bob", "Cara" }), true,
+        "the capture stops when its bound source leaves")
+    test.eq(Capture.shouldStopForRoster(state, false, "Realm", {}), true,
+        "leaving the raid stops an active capture")
 
     test.eq(Capture.appendLine(state, "1234567890", 103), true, "a bounded chat line is accepted")
     test.eq(Capture.appendLine(state, "second", 104), true, "a second bounded chat line is accepted")

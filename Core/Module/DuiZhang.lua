@@ -345,7 +345,9 @@ BG.RegisterEvent("PLAYER_LOGOUT", function()
 end)
 
 BG.RegisterEvent("GROUP_ROSTER_UPDATE", function()
-    StopCapture(true)
+    if Capture.shouldStopForRoster(captureState, IsInRaid(), GetRealm(), GetRaidMemberNames()) then
+        StopCapture(true)
+    end
 end)
 
 ------------------创建UI------------------

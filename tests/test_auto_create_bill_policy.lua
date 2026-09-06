@@ -78,6 +78,8 @@ return function(test)
     local firstItem, secondItem, thirdItem = editBox("item:123"), editBox("item:123"), editBox("item:123")
     oldBiaoGe, oldBG = BiaoGe, BG
     ok, err = pcall(function()
+        BG = { BGNext = {} }
+        local accounting = dofile("Core/BGNext/AuctionTradeAccounting.lua")
         BiaoGe = { TEST = { boss1 = {} } }
         BG = {
             playerClass = { class = true },
@@ -96,11 +98,7 @@ return function(test)
                 color = function() return 1, 1, 1 end,
                 set = function(box, buyer) box:SetText(buyer) end,
             },
-            AuctionTradeAccounting = {
-                linkBillRow = function(result, boss, slot)
-                    result.testBillBoss, result.testBillSlot = boss, slot
-                end,
-            },
+            AuctionTradeAccounting = accounting,
         })
         test.eq(fill("TEST", { type = 1, zhuangbei = "item:123", maijia = "成交玩家", jine = 500, class = "MAGE" }), true,
             "targeted auction fill finds the next empty matching row")
@@ -114,8 +112,13 @@ return function(test)
             "a second sale of the same item finds the next empty row")
         test.eq(nextBuyer:GetText(), "第二位买家", "duplicate items retain independent buyers")
         test.eq(nextAmount:GetText(), 600, "duplicate items retain independent amounts")
-        test.eq(secondResult.testBillBoss, 1, "auction fill retains the exact boss row for later debt accounting")
-        test.eq(secondResult.testBillSlot, 3, "auction fill retains the exact item slot for later debt accounting")
+        local linkedBoss, linkedSlot = accounting.billRow(secondResult)
+        test.eq(linkedBoss, 1, "auction fill retains the exact boss row for later debt accounting")
+        test.eq(linkedSlot, 3, "auction fill retains the exact item slot for later debt accounting")
+        test.eq(accounting.rowKind(secondResult, {
+            item = thirdItem:GetText(), buyer = nextBuyer:GetText(), amount = nextAmount:GetText(),
+        }, function(left, right) return left == right end, function(left, right) return left == right end),
+            "prefilled", "the real trade matcher accepts the row filled by auction completion")
     end)
     BiaoGe, BG = oldBiaoGe, oldBG
     if not ok then error(err, 0) end
