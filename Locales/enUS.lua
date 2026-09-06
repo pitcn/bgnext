@@ -70,16 +70,24 @@ do -- BGNext release text
     L["修复自动拍卖成功记录已经出现，但主表买家和成交金额仍可能保持为空的问题。"] = "Fixed successful auctions appearing in the auction log while leaving the main bill buyer and amount blank."
     L["成交结果会立即填写到下一条匹配的空白装备行，不覆盖已有手填和交易记账内容。"] = "Results now fill the next matching blank item row immediately without overwriting manual or trade-accounting entries."
     L["修复团长权限变化时可能漏写的问题；团长本人拍中仍保留已付或欠款选择。"] = "Fixed missed writes after leader-role changes; leader self-purchases still keep the paid-or-debt choice."
+    L["修复拍卖窗口拖动或关闭时的报错，并释放隐藏输入框焦点，避免键盘输入被占用。"] = "Fixed errors while moving or closing auction windows and released hidden input focus so keyboard input is not trapped."
+    L["拍卖成交会先保存买家、金额和账务，再刷新界面；物品缓存或其他界面插件异常不会阻断记账。"] = "Auction results now save the buyer, amount, and accounting before refreshing the UI, so item-cache delays or UI addon errors cannot block the record."
+    L["修复交易对象短暂不可读时买家为空、金额或装备遗漏，以及错误沿用上一位交易对象的问题。"] = "Fixed blank buyers, missing money or items when a trade target is briefly unavailable, and prevented reusing the previous trade target."
+    L["修复角色总览专业冷却时间错误，并且只显示当前角色真正学会的配方。"] = "Fixed profession cooldown timing in Character Overview and now shows only recipes learned by the current character."
+    L["修复团长在聊天框 Alt+左键点击装备时误加入心愿；现在会打开拍卖窗口。"] = "Fixed raid leaders Alt-left-clicking chat items adding a wish; the shortcut now opens the auction window."
+    L["修复自动拍卖成功记录出现后，主表买家和成交金额仍可能为空的问题。"] = "Fixed successful auction records that could still leave the main bill buyer and amount blank."
 end
 
-do -- BGNext 0.8.2 release text
+do -- BGNext 0.8.3 release text
     local values = {
-        ["修复自动拍卖成功记录已经出现，但主表买家和成交金额仍可能保持为空的问题。"] = "Fixed successful auctions appearing in the auction log while leaving the main bill buyer and amount blank.",
-        ["成交结果会立即填写到下一条匹配的空白装备行，不覆盖已有手填和交易记账内容。"] = "Results now fill the next matching blank item row immediately without overwriting manual or trade-accounting entries.",
-        ["修复团长权限变化时可能漏写的问题；团长本人拍中仍保留已付或欠款选择。"] = "Fixed missed writes after leader-role changes; leader self-purchases still keep the paid-or-debt choice.",
+        ["修复拍卖窗口拖动或关闭时的报错，并释放隐藏输入框焦点，避免键盘输入被占用。"] = "Fixed errors while moving or closing auction windows and released hidden input focus so keyboard input is not trapped.",
+        ["拍卖成交会先保存买家、金额和账务，再刷新界面；物品缓存或其他界面插件异常不会阻断记账。"] = "Auction results now save the buyer, amount, and accounting before refreshing the UI, so item-cache delays or UI addon errors cannot block the record.",
+        ["修复交易对象短暂不可读时买家为空、金额或装备遗漏，以及错误沿用上一位交易对象的问题。"] = "Fixed blank buyers, missing money or items when a trade target is briefly unavailable, and prevented reusing the previous trade target.",
+        ["修复角色总览专业冷却时间错误，并且只显示当前角色真正学会的配方。"] = "Fixed profession cooldown timing in Character Overview and now shows only recipes learned by the current character.",
+        ["修复团长在聊天框 Alt+左键点击装备时误加入心愿；现在会打开拍卖窗口。"] = "Fixed raid leaders Alt-left-clicking chat items adding a wish; the shortcut now opens the auction window.",
     }
     for key, value in pairs(values) do L[key] = value end
-    ns.updateText_now = { "BGNext 0.8.2", L["修复自动拍卖成功记录已经出现，但主表买家和成交金额仍可能保持为空的问题。"], L["成交结果会立即填写到下一条匹配的空白装备行，不覆盖已有手填和交易记账内容。"], L["修复团长权限变化时可能漏写的问题；团长本人拍中仍保留已付或欠款选择。"] }
+    ns.updateText_now = { "BGNext 0.8.3", L["修复拍卖窗口拖动或关闭时的报错，并释放隐藏输入框焦点，避免键盘输入被占用。"], L["拍卖成交会先保存买家、金额和账务，再刷新界面；物品缓存或其他界面插件异常不会阻断记账。"], L["修复交易对象短暂不可读时买家为空、金额或装备遗漏，以及错误沿用上一位交易对象的问题。"], L["修复角色总览专业冷却时间错误，并且只显示当前角色真正学会的配方。"], L["修复团长在聊天框 Alt+左键点击装备时误加入心愿；现在会打开拍卖窗口。"] }
 end
 
 do -- BGNext leader tools
