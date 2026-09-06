@@ -94,6 +94,7 @@ local suites = {
     "tests/test_leader_tools_store.lua",
     "tests/test_leader_tools_view.lua",
     "tests/test_leader_tools_runtime.lua",
+    "tests/test_leader_tools_layout.lua",
     "tests/test_leader_tools_ui.lua",
 }
 
