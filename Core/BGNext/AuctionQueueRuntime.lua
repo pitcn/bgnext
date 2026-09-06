@@ -36,6 +36,19 @@ local function isFrameObject(value)
     return kind == "table" or kind == "userdata"
 end
 
+local function releaseEditFocus(...)
+    local release = BG.BGNext and BG.BGNext.releaseEditFocus
+    if type(release) == "function" then
+        return release(...)
+    end
+    for index = 1, select("#", ...) do
+        local edit = select(index, ...)
+        if isFrameObject(edit) and type(edit.ClearFocus) == "function" then
+            edit:ClearFocus()
+        end
+    end
+end
+
 -- Screen-relative viewport height: rows are bound into a fixed pool whose
 -- visible count never exceeds what actually fits, so the queue window stays
 -- on-screen at any UIParent height instead of growing to 40*26 + header.
@@ -812,6 +825,14 @@ function M.openFrame()
             local row = createRow(frame)
             row:Hide()
             frame.rows[i] = row
+        end
+        if type(frame.HookScript) == "function" then
+            frame:HookScript("OnHide", function(self)
+                releaseEditFocus(self.input)
+                for _, row in ipairs(self.rows or {}) do
+                    releaseEditFocus(row.priceEdit)
+                end
+            end)
         end
         frame.headerHeight = HEADER_HEIGHT
         frame.maxVisible = maxVisibleRows()

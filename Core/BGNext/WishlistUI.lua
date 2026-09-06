@@ -150,7 +150,9 @@ end
 
 function M.shortcutAction(isMasterLooter, button, altDown, controlDown, shiftDown)
     if altDown then
-        if button == "LeftButton" then return "wishlist" end
+        -- Preserve the original auction muscle memory for the controller while
+        -- retaining Alt+left wishlist entry for ordinary raid members.
+        if button == "LeftButton" then return isMasterLooter and "auction" or "wishlist" end
         -- Always consume Alt+right-click through the guarded auction path.
         -- BG.StartAuction performs the authoritative permission check; falling
         -- through here would let the legacy plain-right-click branch delete the

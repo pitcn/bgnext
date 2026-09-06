@@ -13,6 +13,18 @@ local sectionTitles = {}
 local openProfileMenu
 local updateRuleButtons
 
+local function releaseEditFocus(...)
+    local release = BG.BGNext and BG.BGNext.releaseEditFocus
+    if type(release) == "function" then return release(...) end
+    for index = 1, select("#", ...) do
+        local edit = select(index, ...)
+        local kind = type(edit)
+        if (kind == "table" or kind == "userdata") and type(edit.ClearFocus) == "function" then
+            edit:ClearFocus()
+        end
+    end
+end
+
 function M.isFeatureEnabled()
     local settings = BG.BGNext.FeatureSettings
     if not settings or type(settings.isCurrentEnabled) ~= "function" then return true end
@@ -410,6 +422,7 @@ local function createUI()
     main:SetScript("OnMouseDown", function(self) self:StartMoving() end)
     main:SetScript("OnMouseUp", function(self) self:StopMovingOrSizing() end)
     main:SetScript("OnShow", function() updateProfileRows(); updateRuleButtons() end)
+    main:SetScript("OnHide", function() releaseEditFocus(main.EditFrame and main.EditFrame.NameEdit) end)
     main:Hide()
     BG.FilterClassItemMainFrame = main
 
@@ -470,6 +483,7 @@ local function createUI()
     edit.NameEdit:SetSize(150, 20)
     edit.NameEdit:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -5)
     edit.NameEdit:SetAutoFocus(false)
+    edit:SetScript("OnHide", function() releaseEditFocus(edit.NameEdit) end)
     edit.Icon = edit:CreateTexture(nil, "ARTWORK")
     edit.Icon:SetSize(40, 40)
     edit.Icon:SetPoint("LEFT", edit.NameEdit, "RIGHT", 25, 0)

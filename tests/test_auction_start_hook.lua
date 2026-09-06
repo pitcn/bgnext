@@ -34,6 +34,7 @@ return function(test)
         local nextAuctionID = 0
         local sends = {}
         local messages = {}
+        local eventHandlers = {}
 
         -- --- Fake frame factory ------------------------------------------------
 
@@ -126,7 +127,7 @@ return function(test)
             function frame:SetAutoFocus() end
             function frame:SetNumeric() end
             function frame:SetMaxLetters() end
-            function frame:ClearFocus() end
+            function frame:ClearFocus() self.focusCleared = true end
             function frame:SetChecked() end
             function frame:GetID() return 0 end
             function frame:GetStringWidth() return 60 end
@@ -200,7 +201,12 @@ return function(test)
             Once = function() end,
             Init = function(fn) initCallbacks[#initCallbacks + 1] = fn end,
             Init2 = function(fn) init2Callbacks[#init2Callbacks + 1] = fn end,
-            RegisterEvent = function() end,
+            RegisterEvent = function(events, handler)
+                if type(events) == "string" then
+                    eventHandlers[events] = eventHandlers[events] or {}
+                    eventHandlers[events][#eventHandlers[events] + 1] = handler
+                end
+            end,
             After = function(delay, fn) afters[#afters + 1] = { delay = delay, fn = fn } end,
             SendSystemMessage = function(message) messages[#messages + 1] = message end,
             Copy = function(x) return x end,
@@ -313,8 +319,10 @@ return function(test)
         end)
         setGlobal("UnitInRaid", function() return false end)
         setGlobal("IsAltKeyDown", function() return false end)
-        setGlobal("UpdateFrame", function() end)
-        setGlobal("ClearAllFocus", function() end)
+        -- This legacy global no longer exists in the supported client/module.
+        -- Auction.lua must not copy or invoke it from readiness callbacks.
+        setGlobal("UpdateFrame", nil)
+        setGlobal("ClearAllFocus", nil)
         setGlobal("YES", "YES")
         setGlobal("NO", "NO")
 
@@ -380,6 +388,33 @@ return function(test)
             f.bt.money = 500
             return f
         end
+
+        local frameWithoutLegacyRefresh = newFrame()
+        test.eq(frameWithoutLegacyRefresh.UpdateFrame, nil,
+            "auction dialog does not expose the removed legacy refresh callback")
+        local dragWithoutLegacyFocusHelper = pcall(function()
+            frameWithoutLegacyRefresh.scripts.OnMouseDown(frameWithoutLegacyRefresh)
+        end)
+        test.eq(dragWithoutLegacyFocusHelper, true,
+            "dragging an auction dialog never calls the nonexistent ClearAllFocus global")
+        for _, key in ipairs({ "Edit1", "Edit2", "Edit3" }) do
+            test.eq(frameWithoutLegacyRefresh[key].focusCleared, true,
+                "dragging releases " .. key .. " focus directly")
+            frameWithoutLegacyRefresh[key].focusCleared = false
+        end
+        frameWithoutLegacyRefresh.scripts.OnHide(frameWithoutLegacyRefresh)
+        for _, key in ipairs({ "Edit1", "Edit2", "Edit3" }) do
+            test.eq(frameWithoutLegacyRefresh[key].focusCleared, true,
+                "hiding releases " .. key .. " focus directly")
+        end
+        BG.BGNext.AuctionSender.isRaidSender = function() return true end
+        local addonEventOK = pcall(function()
+            for _, handler in ipairs(eventHandlers.CHAT_MSG_ADDON or {}) do
+                handler(nil, "CHAT_MSG_ADDON", "BiaoGe", "MyVer-2.0.0", "RAID", "Alice")
+            end
+        end)
+        test.eq(addonEventOK, true,
+            "version readiness event does not invoke the removed auction-dialog refresh callback")
 
         local function fastButtons(f)
             local buttons = {}

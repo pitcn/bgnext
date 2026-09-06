@@ -383,6 +383,14 @@ BG.Init(function()
             local mainFrame
             local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
             do
+                local function clearEditorFocus()
+                    for _, key in ipairs({ "Edit1", "Edit2", "Edit3" }) do
+                        local edit = f[key]
+                        if edit and type(edit.ClearFocus) == "function" then
+                            edit:ClearFocus()
+                        end
+                    end
+                end
                 f:SetBackdrop({
                     bgFile = "Interface/ChatFrame/ChatFrameBackground",
                     edgeFile = "Interface/ChatFrame/ChatFrameBackground",
@@ -414,7 +422,10 @@ BG.Init(function()
                 end)
                 f:SetScript("OnMouseDown", function(self)
                     f:StartMoving()
-                    ClearAllFocus(f)
+                    -- Clear only the three edit boxes created by this dialog.
+                    -- ClearAllFocus is not a Blizzard API on Classic/Titan and
+                    -- calling that absent global aborts the drag handler.
+                    clearEditorFocus()
 
                     f.time = 0
                     f:SetScript("OnUpdate", function(self, time)
@@ -431,9 +442,9 @@ BG.Init(function()
                         end
                     end)
                 end)
+                f:SetScript("OnHide", clearEditorFocus)
                 mainFrame = f
                 BG.StartAucitonFrame = mainFrame
-                f.UpdateFrame = UpdateFrame
 
                 BG.CreateCloseButton(f, 0, 0)
                 f.CloseButton:SetSize(35, 35)
@@ -873,9 +884,6 @@ BG.Init(function()
                     RequestReadiness(false, true)
                 end
                 UpdateReadinessFrame(readiness)
-                if BG.StartAucitonFrame then
-                    BG.StartAucitonFrame:UpdateFrame()
-                end
             end)
         end)
         BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, ...)
@@ -895,9 +903,6 @@ BG.Init(function()
                         BG.raidBiaoGeNewVersion[sender] = true
                     end
                     UpdateReadinessFrame(readiness)
-                    if BG.StartAucitonFrame then
-                        BG.StartAucitonFrame:UpdateFrame()
-                    end
                 end
             elseif prefix == "BiaoGeAuction" and distType == "RAID" then -- 拍卖版本
                 local arg1, version = strsplit(",", msg)

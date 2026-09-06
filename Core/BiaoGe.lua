@@ -253,6 +253,7 @@ BG.Init(function()
             if BiaoGe.options.lastVer then
                 local f = BG.CreateMainFrame()
                 f:SetSize(450, 100)
+                f:SetClampedToScreen(true)
                 f:SetFrameStrata("HIGH")
                 f.titleText:SetText("BGNext")
                 f.texts = {}
@@ -292,7 +293,16 @@ BG.Init(function()
                     t:SetTextColor(1, .82, 0)
                     tinsert(f.texts, t)
                 end
-                f:SetHeight(f:GetTop() - f.texts[#f.texts]:GetBottom() + 0)
+                local heights = {}
+                for i, textRegion in ipairs(f.texts) do
+                    heights[i] = textRegion:GetStringHeight()
+                end
+                local layout = BG.BGNext and BG.BGNext.UpdateLogLayout
+                if layout and type(layout.height) == "function" then
+                    f:SetHeight(layout.height(heights, 15, 35, 20, 100))
+                else
+                    f:SetHeight(f:GetTop() - f.texts[#f.texts]:GetBottom() + 20)
+                end
             end
         end
         BiaoGe.options.lastVer = BG.ver

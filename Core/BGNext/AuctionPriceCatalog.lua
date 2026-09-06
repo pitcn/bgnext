@@ -77,6 +77,17 @@ function M.build(options)
         end
     end
 
+    local function addSection(group, itemIds)
+        if type(itemIds) == "number" then
+            addItem(group, itemIds)
+            return
+        end
+        if type(itemIds) ~= "table" then return end
+        for _, itemId in ipairs(itemIds) do
+            addItem(group, itemId)
+        end
+    end
+
     for _, difficulty in ipairs(difficulties) do
         local diffLoot = loot[difficulty]
         if type(diffLoot) == "table" then
@@ -88,9 +99,7 @@ function M.build(options)
                 local isExchangeResult = type(bossKey) == "string" and bossKey:match("^boss%d+other$") ~= nil
                 if not isExchangeResult then
                     local group = groupById[bossKey] or miscGroup
-                    for _, itemId in ipairs(itemIds) do
-                        addItem(group, itemId)
-                    end
+                    addSection(group, itemIds)
                 end
             end
         end

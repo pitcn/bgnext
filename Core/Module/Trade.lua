@@ -509,6 +509,12 @@ BG.Init(function()
             _G.TradeFrame:HookScript("OnMouseDown", function(self, enter)
                 edit:ClearFocus()
             end)
+            -- A completed, cancelled or manually closed trade all hide the
+            -- native frame. Releasing here prevents a hidden debt EditBox from
+            -- continuing to consume movement/chat keys after the trade ends.
+            _G.TradeFrame:HookScript("OnHide", function()
+                edit:ClearFocus()
+            end)
         end
 
         -- 金币超上限

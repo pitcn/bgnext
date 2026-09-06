@@ -246,6 +246,8 @@ return function(test)
     -- Rested XP, item counts and profession cooldowns are read only when the
     -- family's explicit resource whitelist declares them.
     local vanillaFull = Adapters.readers("vanilla", api({
+        GetTime = function() return 1000 end,
+        IsPlayerSpell = function() return true end,
         GetXPExhaustion = function() return 4200 end,
         GetItemCount = function(id) return id == 22726 and 12 or 0 end,
         GetSpellCooldown = function(id)
@@ -255,18 +257,22 @@ return function(test)
     }), vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources()
     test.eq(vanillaFull.currencies.restXp, 4200, "vanilla reads rested XP via GetXPExhaustion")
     test.eq(vanillaFull.items.atieshFragment, 12, "vanilla reads the Atiesh fragment by item id")
-    test.eq(vanillaFull.professionCooldowns.transmute.endsAt, 8200, "a cooling transmute records its end time")
+    test.eq(vanillaFull.professionCooldowns.transmute.endsAt, 12200,
+        "a cooling transmute converts the relative cooldown end into epoch time")
     test.eq(vanillaFull.professionCooldowns.saltShaker.ready, true, "a zero-duration cooldown is ready")
     test.eq(vanillaFull.professionCooldowns.mooncloth.ready, true, "the third vanilla cooldown is ready when idle")
 
     -- The modern C_Spell table form is preferred over the legacy call.
     local modernCd = Adapters.readers("vanilla", api({
+        GetTime = function() return 1000 end,
+        IsPlayerSpell = function() return true end,
         GetSpellCooldown = false,
         C_Spell = { GetSpellCooldown = function(id)
             return { startTime = 1000, duration = 7200, isEnabled = true }
         end },
     }), vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources()
-    test.eq(modernCd.professionCooldowns.transmute.endsAt, 8200, "the modern C_Spell cooldown API is preferred")
+    test.eq(modernCd.professionCooldowns.transmute.endsAt, 12200,
+        "the modern C_Spell cooldown API is preferred and converted to epoch time")
 
     -- Profession spell names are globally resolvable, so collection must use
     -- the current character's primary skill line rather than treating every
@@ -277,12 +283,22 @@ return function(test)
         GetProfessionInfo = function()
             return "锻造", 136241, 600, 600, 1, 0, 164
         end,
+        IsPlayerSpell = function(spellId) return spellId == 138646 end,
         GetSpellCooldown = function() return 0, 0 end,
     }), mopCatalog.raidColumns, mopCatalog.resourceColumns).resources({ professionCooldowns = true })
     test.eq(mopProfessionCooldowns.professionCooldowns.lightningSteelIngot.ready, true,
         "the learned primary profession exposes its ready cooldown")
     test.eq(mopProfessionCooldowns.professionCooldowns.transmuteLivingSteel, nil,
         "an unlearned profession never produces a false ready checkmark")
+
+    local unlearnedRecipe = Adapters.readers("mop", api({
+        GetProfessions = function() return 7 end,
+        GetProfessionInfo = function() return "炼金", 136240, 600, 600, 1, 0, 171 end,
+        IsPlayerSpell = function() return false end,
+        GetSpellCooldown = function() return 0, 0 end,
+    }), mopCatalog.raidColumns, mopCatalog.resourceColumns).resources({ professionCooldowns = true })
+    test.eq(unlearnedRecipe, nil,
+        "an owned profession without the configured recipe never produces a false ready checkmark")
 
     -- Missing rest-XP, item and cooldown APIs leave those columns empty.
     local noVanillaApi = api({ GetXPExhaustion = false, GetItemCount = false, GetSpellCooldown = false })
