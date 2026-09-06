@@ -148,8 +148,8 @@ return function(test)
     local profApi = api({
         GetProfessions = function() return 164, 165, nil, nil, nil, nil end,
         GetProfessionInfo = function(index)
-            if index == 164 then return "锻造", "interface/icons/prof1", 450, 450, 0, 0 end
-            if index == 165 then return "工程", "interface/icons/prof2", 300, 450, 0, 0 end
+            if index == 164 then return "锻造", "interface/icons/prof1", 450, 450, 0, 0, 164 end
+            if index == 165 then return "工程", "interface/icons/prof2", 300, 450, 0, 0, 165 end
             return nil
         end,
     })
@@ -157,6 +157,7 @@ return function(test)
     test.eq(professions[1].name, "锻造", "first profession name is read")
     test.eq(professions[1].skill, 450, "first profession skill is read")
     test.eq(professions[1].icon, "interface/icons/prof1", "first profession icon is read")
+    test.eq(professions[1].skillLineId, 164, "first profession keeps Blizzard's stable skill-line id")
     test.eq(professions[2].name, "工程", "second profession name is read")
     local numericProfessions = Adapters.readers("titan", api({
         GetProfessions = function() return 164, nil, nil, nil, nil, nil end,
@@ -266,6 +267,22 @@ return function(test)
         end },
     }), vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources()
     test.eq(modernCd.professionCooldowns.transmute.endsAt, 8200, "the modern C_Spell cooldown API is preferred")
+
+    -- Profession spell names are globally resolvable, so collection must use
+    -- the current character's primary skill line rather than treating every
+    -- configured recipe as learned and ready.
+    local mopCatalog = Catalog.forFamily("mop")
+    local mopProfessionCooldowns = Adapters.readers("mop", api({
+        GetProfessions = function() return 7 end,
+        GetProfessionInfo = function()
+            return "锻造", 136241, 600, 600, 1, 0, 164
+        end,
+        GetSpellCooldown = function() return 0, 0 end,
+    }), mopCatalog.raidColumns, mopCatalog.resourceColumns).resources({ professionCooldowns = true })
+    test.eq(mopProfessionCooldowns.professionCooldowns.lightningSteelIngot.ready, true,
+        "the learned primary profession exposes its ready cooldown")
+    test.eq(mopProfessionCooldowns.professionCooldowns.transmuteLivingSteel, nil,
+        "an unlearned profession never produces a false ready checkmark")
 
     -- Missing rest-XP, item and cooldown APIs leave those columns empty.
     local noVanillaApi = api({ GetXPExhaustion = false, GetItemCount = false, GetSpellCooldown = false })

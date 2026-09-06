@@ -1,8 +1,8 @@
 return function(test)
     -- Drives the real AuctionWA.lua countdown end callback with a minimal WoW API
-    -- surface and asserts the final buyer/price becomes visible for a collapsed
-    -- card, bidding stays disabled, and the card is released after a bounded
-    -- display window instead of being kept forever.
+    -- surface and asserts a player's explicit collapsed state is preserved while
+    -- the compact row still shows the final buyer/price. Bidding stays disabled,
+    -- and the card is released after a bounded display window.
     local watchedGlobals = {
         "BG", "C_Timer", "C_ChatInfo", "SOUNDKIT", "CreateFont",
         "BIAOGE_TEXT_FONT", "GetRealmName", "GetTime", "GetTimePreciseSec",
@@ -195,17 +195,17 @@ return function(test)
             f.bar.scripts.OnUpdate(f.bar, 0.1)
         end
 
-        -- (1) Collapsed card with a winner reveals the buyer and the price, keeps
-        -- bidding disabled, and arms a bounded result display.
+        -- (1) A collapsed card stays collapsed, but its one-line result contains
+        -- both buyer and price. Ending an auction must not override the player's
+        -- explicit display choice.
         local f1 = newBidFrame(1, "买家乙", true)
         local f1Timer = f1.autoTimer
         driveEnd(f1, 20)
         test.eq(f1.IsEnd, true, "the end callback marks the auction ended")
-        test.eq(f1.IsSmallWindow, false, "a collapsed card expands to show the result")
-        test.eq(f1.topMoneyFrame.shown, true, "the buyer area becomes visible")
-        test.eq(f1.currentMoneyText.text:find("成交价", 1, true) ~= nil, true, "price label is visible")
+        test.eq(f1.IsSmallWindow, true, "a collapsed card preserves the player's state")
+        test.eq(f1.topMoneyFrame.shown, false, "the expanded buyer area stays hidden")
         test.eq(f1.currentMoneyText.text:find("5000", 1, true) ~= nil, true, "transaction amount is visible")
-        test.eq(f1.topMoneyText.text:find("买家乙", 1, true) ~= nil, true, "the winner name is visible")
+        test.eq(f1.currentMoneyText.text:find("买家乙", 1, true) ~= nil, true, "winner is visible in the compact result")
         test.eq(f1.myMoneyEdit.shown, false, "the bid edit box stays hidden")
         test.eq(f1.cancelButton.shown, false, "the cancel button stays hidden")
         test.eq(f1.hide:IsEnabled(), false, "the collapse/expand button is disabled")
@@ -229,7 +229,7 @@ return function(test)
         -- (3) The player winning is labelled "you", not a fabricated name.
         local f3 = newBidFrame(3, "玩家甲", true)
         driveEnd(f3, 20)
-        test.eq(f3.topMoneyText.text:find("你", 1, true) ~= nil, true, "own win shows 你")
+        test.eq(f3.currentMoneyText.text:find("你", 1, true) ~= nil, true, "own compact win shows 你")
 
         -- (4) A no-bid auction shows 流拍 and never fabricates a buyer.
         local f4 = newBidFrame(4, nil, true)
@@ -237,7 +237,8 @@ return function(test)
         test.eq(f4.IsEnd, true, "no-bid auction ends")
         test.eq(f4.currentMoneyText.text:find("流拍", 1, true) ~= nil, true, "no-bid shows 流拍")
         test.eq(f4.topMoneyText.text, "", "no-bid never fabricates a buyer")
-        test.eq(f4.topMoneyFrame.shown, true, "no-bid card still expands to show the status")
+        test.eq(f4.IsSmallWindow, true, "no-bid card preserves collapsed state")
+        test.eq(f4.topMoneyFrame.shown, false, "no-bid card does not expose expanded rows")
 
         -- (5) Cancelling clears any stale bidder and shows the cancelled status.
         local f5 = newBidFrame(5, "买家丁", false)
@@ -252,16 +253,16 @@ return function(test)
         local longName = "这是一个非常长的买家名字超过二十个字来测试边界情况甲乙丙丁戊"
         local f6 = newBidFrame(6, longName, true)
         driveEnd(f6, 20)
-        test.eq(f6.topMoneyText.text:find(longName, 1, true) ~= nil, true, "long winner name is not truncated away")
+        test.eq(f6.currentMoneyText.text:find(longName, 1, true) ~= nil, true, "long compact winner value is preserved")
 
         -- (7) Two simultaneous auctions end independently.
         local f7 = newBidFrame(7, "买家戊", true)
         local f8 = newBidFrame(8, "买家己", true)
         driveEnd(f7, 30)
         driveEnd(f8, 20)
-        test.eq(f7.topMoneyText.text:find("买家戊", 1, true) ~= nil, true, "first auction keeps its winner")
-        test.eq(f8.topMoneyText.text:find("买家己", 1, true) ~= nil, true, "second auction keeps its winner")
-        test.eq(f7.topMoneyText.text:find("买家己", 1, true), nil, "winners do not cross-contaminate")
+        test.eq(f7.currentMoneyText.text:find("买家戊", 1, true) ~= nil, true, "first auction keeps its winner")
+        test.eq(f8.currentMoneyText.text:find("买家己", 1, true) ~= nil, true, "second auction keeps its winner")
+        test.eq(f7.currentMoneyText.text:find("买家己", 1, true), nil, "winners do not cross-contaminate")
 
         -- (8) The bounded display releases the card instead of keeping it forever.
         local nAfter = #afters
@@ -276,8 +277,8 @@ return function(test)
         test.eq(auctionEndCalls[1][1], 1, "success still reports kind 1")
         test.eq(sentChat[1] == nil, true, "no extra chat is introduced outside the raid-leader path")
 
-        -- (10) A forced end expansion rearranges siblings exactly once (bounded,
-        -- no periodic layout) so simultaneous folded cards do not overlap.
+        -- (10) Ending a collapsed card does not trigger a layout pass because its
+        -- dimensions do not change.
         local arrangeCount = 0
         local origUpdateAllFrames = wa.UpdateAllFrames
         wa.UpdateAllFrames = function()
@@ -286,7 +287,7 @@ return function(test)
         end
         local fCollapsed = newBidFrame(20, "买家壬", true)
         wa.EndAuction(fCollapsed, "success")
-        test.eq(arrangeCount, 1, "forced end expansion rearranges siblings exactly once")
+        test.eq(arrangeCount, 0, "preserved collapsed state needs no sibling rearrangement")
         wa.UpdateAllFrames = origUpdateAllFrames
 
         -- (11) Cancelling also detaches the countdown OnUpdate immediately (the

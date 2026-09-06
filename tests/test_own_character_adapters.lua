@@ -430,15 +430,44 @@ return function(test)
     test.eq(Adapters.canReadColumn("titan", {
         GetSpellCooldown = function() return 0, 0 end,
         GetSpellInfo = function() return "熔炼泰坦精钢" end,
+        GetProfessions = function() return 7 end,
+        GetProfessionInfo = function() return "采矿", 136248, 450, 450, 1, 0, 186 end,
     }, smeltColumn), true,
         "a legacy spell-name resolution authorizes the cooldown")
     test.eq(Adapters.canReadColumn("titan", {
+        GetProfessions = function() return 7 end,
+        GetProfessionInfo = function() return "采矿", 136248, 450, 450, 1, 0, 186 end,
         C_Spell = {
             GetSpellCooldown = function() return { startTime = 0, duration = 0 } end,
             GetSpellInfo = function() return { name = "熔炼泰坦精钢" } end,
         },
     }, smeltColumn), true,
         "a modern spell-name resolution authorizes the cooldown")
+
+    -- Resolving a recipe name is not proof that the current character owns its
+    -- profession: the client resolves names for unlearned spells too. A cooldown
+    -- column must therefore be gated by the character's primary skill-line IDs.
+    local alchemyColumn = {
+        id = "transmuteLivingSteel",
+        source = {
+            kind = "profession-cooldown", key = "transmuteLivingSteel",
+            spellId = 114780, professionSkillLineId = 171,
+        },
+    }
+    local function professionApi(skillLineId)
+        return {
+            GetProfessions = function() return 7 end,
+            GetProfessionInfo = function(index)
+                return "专业", 136240, 600, 600, 1, 0, skillLineId
+            end,
+            GetSpellCooldown = function() return 0, 0 end,
+            GetSpellInfo = function() return "活化钢" end,
+        }
+    end
+    test.eq(Adapters.canReadColumn("mop", professionApi(164), alchemyColumn), false,
+        "an unowned profession cannot expose a resolved cooldown spell")
+    test.eq(Adapters.canReadColumn("mop", professionApi(171), alchemyColumn), true,
+        "the matching primary profession exposes its cooldown")
 
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")

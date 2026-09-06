@@ -808,6 +808,10 @@ if runtimeReady() then
                 if defaultText then editBox:SetText(defaultText) end
                 editBox:SetFocus()
             end
+            dialog.OnHide = function(self)
+                local editBox = M.popupEditBox(self)
+                if editBox then editBox:ClearFocus() end
+            end
             StaticPopup_Show(popupName)
         end
 
@@ -1358,6 +1362,7 @@ if runtimeReady() then
             edit:SetTextInsets(5, 5, 5, 10)
             scroll:SetScrollChild(edit)
             edit:SetScript("OnEscapePressed", function() panel:Hide() end)
+            panel:SetScript("OnHide", function() edit:ClearFocus() end)
             panel.edit, panel.scroll = edit, scroll
 
             local close = BG.CreateButton(panel)
@@ -1436,6 +1441,7 @@ if runtimeReady() then
             scroll:SetScrollChild(edit)
             edit:SetScript("OnEscapePressed", function() panel:Hide() end)
             edit:SetScript("OnTextChanged", function() refreshImportPreview(panel) end)
+            panel:SetScript("OnHide", function() edit:ClearFocus() end)
             panel.edit, panel.scroll = edit, scroll
 
             local summary = panel:CreateFontString(nil, "OVERLAY")
@@ -1754,6 +1760,13 @@ if runtimeReady() then
             -- Drop any pending debounced settle: a hidden page must never
             -- re-filter the catalog, even if a size change was still coalescing.
             cancelSettle()
+            basePriceEdit:ClearFocus()
+            searchBox:ClearFocus()
+            for _, row in ipairs(main.rows or {}) do
+                if row.edit then row.edit:ClearFocus() end
+            end
+            if importPanel and importPanel.edit then importPanel.edit:ClearFocus() end
+            if exportPanel and exportPanel.edit then exportPanel.edit:ClearFocus() end
             if BG.TabButtonsFB then BG.TabButtonsFB:Show() end
         end)
         -- The main frame animates between table heights and responds to UI scale

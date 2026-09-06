@@ -455,6 +455,27 @@ return function(test)
     test.eq(cdCells.mooncloth.text, "3天2小时", "cooldown countdown spans days and hours")
     test.eq(cdCells.saltShaker.text, "5分", "cooldown under an hour shows minutes")
 
+    local function mopAlchemyCell(professions)
+        local projected = View.project({
+            family = "mop", catalog = Catalog.forFamily("mop"),
+            snapshots = { snapshot({
+                professions = professions,
+                professionCooldowns = { transmuteLivingSteel = { ready = true } },
+            }) },
+            currentRealmId = 123, showAllRealms = false, now = 1000,
+            visibility = { resource = { transmuteLivingSteel = true } },
+        })
+        for _, cell in ipairs(projected.resource.rows[1].cells) do
+            if cell.columnId == "transmuteLivingSteel" then return cell end
+        end
+    end
+    test.eq(mopAlchemyCell({ { name = "炼金术", skillLineId = 171 } }).state, "complete",
+        "a matching stored profession may display its cooldown")
+    test.eq(mopAlchemyCell({ { name = "锻造", skillLineId = 164 } }).state, "empty",
+        "a stale cooldown from another profession is hidden")
+    test.eq(mopAlchemyCell({ { name = "炼金术" } }).state, "empty",
+        "legacy snapshots without ownership proof do not show false checkmarks")
+
     local expiredCd = View.project({
         family = "vanilla",
         catalog = Catalog.forFamily("vanilla"),

@@ -424,6 +424,17 @@ local function resourceCell(column, snapshot, now)
     end
 
     if source.kind == "profession-cooldown" then
+        if type(source.professionSkillLineId) == "number" then
+            local ownsProfession = false
+            for _, profession in pairs(type(snapshot.professions) == "table" and snapshot.professions or {}) do
+                if type(profession) == "table"
+                    and profession.skillLineId == source.professionSkillLineId then
+                    ownsProfession = true
+                    break
+                end
+            end
+            if not ownsProfession then return cell end
+        end
         local key = source.key or column.id
         local cooldowns = type(snapshot.professionCooldowns) == "table" and snapshot.professionCooldowns or nil
         local entry = cooldowns and cooldowns[key] or nil

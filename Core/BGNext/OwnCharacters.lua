@@ -74,7 +74,7 @@ end
 
 local PROFESSION_FIELDS = {
     name = "string", skill = "number", maxSkill = "number",
-    icon = TEXTURE_TYPES, cooldownEndsAt = "number",
+    icon = TEXTURE_TYPES, cooldownEndsAt = "number", skillLineId = "number",
 }
 
 -- A currency may carry optional cap fields; only `quantity` is required so a
