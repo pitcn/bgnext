@@ -87,6 +87,70 @@ return function(test)
         -- Nothing committed before any window/accept/success.
         test.eq(capture.committed(), nil, "no committed snapshot before a trade")
 
+        -- The client can expose the counterparty while TRADE_SHOW fires, then
+        -- clear BG.trade.target before the final accept refresh. The completed
+        -- record must keep that observed target rather than write gold against
+        -- a blank buyer.
+        GetUnitName = function() return "甲" end
+        capture.beginTrade()
+        BG.trade = {
+            target = "", targetmoney = 100, playermoney = 0, targetitems = {},
+            playeritems = { { itemId = 11, link = "item:11", count = 1 } },
+        }
+        test.eq(capture.onAcceptUpdate(1, 1), true,
+            "an accept can merge money and items with the TRADE_SHOW counterparty")
+        local earlyTarget = capture.onComplete()
+        test.eq(earlyTarget.target, "甲", "the observed TRADE_SHOW target survives a later blank trade table")
+        test.eq(earlyTarget.targetmoney, 100, "the later observed amount is retained with that target")
+        GetUnitName = nil
+
+        -- A new TRADE_SHOW must never borrow the prior window's mutable target
+        -- when the live client cannot yet provide a new one.
+        BG.trade = {
+            target = "上一位买家", targetmoney = 100, playermoney = 0, targetitems = {},
+            playeritems = { { itemId = 1, link = "item:1", count = 1 } },
+        }
+        capture.beginTrade()
+        BG.trade = {
+            target = "", targetmoney = 200, playermoney = 0, targetitems = {},
+            playeritems = { { itemId = 2, link = "item:2", count = 1 } },
+        }
+        capture.onAcceptUpdate(1, 1)
+        test.eq(capture.onComplete(), nil,
+            "a new trade without a live target never attributes its amount to the prior buyer")
+
+        -- The target can disappear after TRADE_SHOW while live item/money APIs
+        -- still expose the final payload. Those live values must win over a
+        -- stale shared table and merge with the already observed target.
+        GetUnitName = function() return "当前买家" end
+        capture.beginTrade()
+        GetUnitName = function() return nil end
+        GetTargetTradeMoney = function() return 300 * 10000 end
+        GetPlayerTradeMoney = function() return 0 end
+        GetTradeTargetItemLink = function() return nil end
+        GetTradeTargetItemInfo = function() return nil end
+        GetTradePlayerItemLink = function(index) return index == 1 and "item:33" or nil end
+        GetTradePlayerItemInfo = function(index)
+            if index == 1 then return nil, nil, 1 end
+            return nil
+        end
+        BG.trade = {
+            target = "旧对象", targetmoney = 999, playermoney = 0, targetitems = {},
+            playeritems = { { itemId = 99, link = "item:99", count = 1 } },
+        }
+        capture.onAcceptUpdate(1, 1)
+        local livePayload = capture.onComplete()
+        test.eq(livePayload.target, "当前买家", "accept-time payload keeps the TRADE_SHOW target")
+        test.eq(livePayload.targetmoney, 300, "accept-time live money wins over stale shared data")
+        test.eq(livePayload.playeritems[1].itemId, 33, "accept-time live item wins over stale shared data")
+        GetUnitName = nil
+        GetTargetTradeMoney = nil
+        GetPlayerTradeMoney = nil
+        GetTradeTargetItemLink = nil
+        GetTradeTargetItemInfo = nil
+        GetTradePlayerItemLink = nil
+        GetTradePlayerItemInfo = nil
+
         -- TRADE_ACCEPT_UPDATE supplies numeric 0/1, and 0 is truthy in Lua, so
         -- the handler must never test the raw args as booleans.
         capture.beginTrade()

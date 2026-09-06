@@ -312,13 +312,41 @@ function M.readRestExperience(api)
     return xp
 end
 
--- Reads one profession cooldown spell for the logged-in character. The modern
+-- Spell metadata and cooldown values are globally queryable, so neither proves
+-- that this character learned the configured recipe. Prefer the modern spell
+-- book ownership API, then the Classic-compatible spell-known calls. Missing
+-- evidence is deliberately false: an omitted cell is safer than a false ready
+-- checkmark on a character that only owns the profession.
+function M.isProfessionRecipeKnown(api, spellId)
+    if type(api) ~= "table" or type(spellId) ~= "number" then return false end
+    local spellBook = api.C_SpellBook
+    local modern = type(spellBook) == "table" and spellBook.IsSpellKnown or nil
+    if type(modern) == "function" then
+        local enum = api.Enum or Enum
+        local bank = type(enum) == "table" and type(enum.SpellBookSpellBank) == "table"
+            and enum.SpellBookSpellBank.Player or nil
+        local ok, known = callAll(modern, spellId, bank)
+        return ok and known == true
+    end
+    for _, name in ipairs({ "IsPlayerSpell", "IsSpellKnown" }) do
+        local legacy = api[name]
+        if type(legacy) == "function" then
+            local ok, known = callAll(legacy, spellId)
+            return ok and known == true
+        end
+    end
+    return false
+end
+
+-- Reads one known profession cooldown for the logged-in character. The modern
 -- C_Spell table API is preferred; the legacy GetSpellCooldown form is the
--- fallback. A spell with no active cooldown reports duration zero, which is
--- recorded as ready; a spell still cooling records only the time it ends.
--- A missing API or a wrong-typed result yields nil so the column hides.
+-- fallback. Cooldown starts use the client-relative GetTime clock while this
+-- module stores epoch timestamps, so active cooldowns are converted with both
+-- clocks. A missing clock, API, ownership proof or wrong-typed result yields
+-- nil so the column hides instead of displaying an incorrect state.
 function M.readProfessionCooldown(api, spellId)
     if type(api) ~= "table" or type(spellId) ~= "number" then return nil end
+    if not M.isProfessionRecipeKnown(api, spellId) then return nil end
     local start, duration
 
     local spellApi = api.C_Spell
@@ -341,7 +369,11 @@ function M.readProfessionCooldown(api, spellId)
 
     if type(start) ~= "number" or type(duration) ~= "number" then return nil end
     if duration <= 0 then return { ready = true } end
-    return { endsAt = start + duration }
+    local epochNow = M.readNow(api)
+    local relativeNow = M.safeCall(api.GetTime)
+    if type(epochNow) ~= "number" or type(relativeNow) ~= "number" then return nil end
+    local remaining = math.max(0, start + duration - relativeNow)
+    return { endsAt = epochNow + remaining }
 end
 
 -- Resolves a spell ID to a non-empty localized name via the Blizzard spell
@@ -1168,6 +1200,7 @@ function M.canReadColumn(family, api, column)
     if source.kind == "profession-cooldown" then
         return type(source.spellId) == "number"
             and hasPrimaryProfession(api, source.professionSkillLineId)
+            and M.isProfessionRecipeKnown(api, source.spellId)
             and (type(api.GetSpellCooldown) == "function"
                 or (type(api.C_Spell) == "table" and type(api.C_Spell.GetSpellCooldown) == "function"))
             and resolveSpellName(api, source.spellId) ~= nil

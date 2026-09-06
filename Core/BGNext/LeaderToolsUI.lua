@@ -26,6 +26,18 @@ local function anyEnabled()
     return false
 end
 
+local function releaseEditFocus(...)
+    local release = BG.BGNext and BG.BGNext.releaseEditFocus
+    if type(release) == "function" then return release(...) end
+    for index = 1, select("#", ...) do
+        local edit = select(index, ...)
+        local kind = type(edit)
+        if (kind == "table" or kind == "userdata") and type(edit.ClearFocus) == "function" then
+            edit:ClearFocus()
+        end
+    end
+end
+
 local function button(parent, label, width)
     local result = BG.CreateButton(parent)
     result:SetSize(width or 90, 24)
@@ -427,6 +439,15 @@ function M.buildWindow()
         frame.panels[spec[1]].tabButton = tab previous = tab
     end
     frame:SetScript("OnShow", function(self) M.fitToScreen(self, UIParent) end)
+    frame:SetScript("OnHide", function(self)
+        local panels = self.panels or {}
+        releaseEditFocus(
+            panels.templates and panels.templates.name,
+            panels.templates and panels.templates.body,
+            panels.history and panels.history.search,
+            panels.history and panels.history.body
+        )
+    end)
     M.fitToScreen(frame, UIParent)
     frame:Hide() state.frame = frame
     return frame

@@ -37,6 +37,10 @@ return function(test)
         "settings backdrop contains every rule section")
     test.eq(source:find("main:SetBackdropColor(0, 0, 0, 1)", 1, true) ~= nil, true,
         "settings backdrop is opaque over the bill")
+    test.eq(source:find('main:SetScript("OnHide", function()', 1, true) ~= nil, true,
+        "closing the filter settings releases editor focus")
+    test.eq(source:find('edit:SetScript("OnHide", function()', 1, true) ~= nil, true,
+        "closing the profile editor releases its name input focus")
     test.eq(source:find("updateProfileRows()\n    refreshItems()", 1, true) ~= nil, true,
         "the active profile is applied after the initial bill UI exists")
 

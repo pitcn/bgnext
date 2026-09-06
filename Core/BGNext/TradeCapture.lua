@@ -14,7 +14,7 @@ BG.BGNext = BG.BGNext or {}
 -- dropped and never promoted into a buyer, amount or delivered state.
 local M = {}
 
-local frozen, committed, outcome, fullyAccepted, playerAcceptedSeen, targetAcceptedSeen
+local frozen, committed, outcome, fullyAccepted, playerAcceptedSeen, targetAcceptedSeen, observedTarget
 
 -- TRADE_ACCEPT_UPDATE supplies numeric 0/1 (WoW never sends Lua booleans), and
 -- 0 is truthy in Lua, so the handler must never test the raw event args with
@@ -61,15 +61,19 @@ local function copyItems(list)
     return out
 end
 
-local function snapshotOf(raw)
+local function snapshotOf(raw, targetFallback)
     if type(raw) ~= "table" then
         return nil
     end
-    if type(raw.target) ~= "string" or raw.target:find("%S") == nil then
+    local target = raw.target
+    if type(target) ~= "string" or target:find("%S") == nil then
+        target = targetFallback
+    end
+    if type(target) ~= "string" or target:find("%S") == nil then
         return nil
     end
     return {
-        target = raw.target,
+        target = target,
         targetmoney = normalizeMoney(raw.targetmoney),
         playermoney = normalizeMoney(raw.playermoney),
         targetitems = copyItems(raw.targetitems),
@@ -140,9 +144,6 @@ local function refreshFromApi()
     local playermoney = readTradeMoney(GetPlayerTradeMoney)
     local targetitems = readTradeItems(GetTradeTargetItemLink, GetTradeTargetItemInfo)
     local playeritems = readTradeItems(GetTradePlayerItemLink, GetTradePlayerItemInfo)
-    if not target then
-        return nil
-    end
     if targetmoney == nil and playermoney == nil and #targetitems == 0 and #playeritems == 0 then
         return nil
     end
@@ -160,9 +161,9 @@ end
 -- (the last complete state the baseline refreshed), so a collect failure never
 -- produces a partial/empty snapshot in place of a complete candidate.
 local function collectSnapshot()
-    local snap = snapshotOf(refreshFromApi())
+    local snap = snapshotOf(refreshFromApi(), observedTarget)
     if not snap then
-        snap = snapshotOf(BG.trade)
+        snap = snapshotOf(BG.trade, observedTarget)
     end
     return snap
 end
@@ -190,6 +191,10 @@ function M.beginTrade()
     fullyAccepted = nil
     playerAcceptedSeen = nil
     targetAcceptedSeen = nil
+    -- TRADE_SHOW is the earliest stable point at which the live target is
+    -- available. Later baseline refreshes can briefly clear BG.trade.target;
+    -- retain only this one in-memory value for the current bounded lifecycle.
+    observedTarget = readTradeTarget()
 end
 
 function M.onAcceptUpdate(playerAccepted, targetAccepted)

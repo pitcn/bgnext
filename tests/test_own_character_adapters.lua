@@ -430,6 +430,7 @@ return function(test)
     test.eq(Adapters.canReadColumn("titan", {
         GetSpellCooldown = function() return 0, 0 end,
         GetSpellInfo = function() return "熔炼泰坦精钢" end,
+        IsPlayerSpell = function() return true end,
         GetProfessions = function() return 7 end,
         GetProfessionInfo = function() return "采矿", 136248, 450, 450, 1, 0, 186 end,
     }, smeltColumn), true,
@@ -437,6 +438,7 @@ return function(test)
     test.eq(Adapters.canReadColumn("titan", {
         GetProfessions = function() return 7 end,
         GetProfessionInfo = function() return "采矿", 136248, 450, 450, 1, 0, 186 end,
+        C_SpellBook = { IsSpellKnown = function() return true end },
         C_Spell = {
             GetSpellCooldown = function() return { startTime = 0, duration = 0 } end,
             GetSpellInfo = function() return { name = "熔炼泰坦精钢" } end,
@@ -462,12 +464,17 @@ return function(test)
             end,
             GetSpellCooldown = function() return 0, 0 end,
             GetSpellInfo = function() return "活化钢" end,
+            IsPlayerSpell = function() return true end,
         }
     end
     test.eq(Adapters.canReadColumn("mop", professionApi(164), alchemyColumn), false,
         "an unowned profession cannot expose a resolved cooldown spell")
     test.eq(Adapters.canReadColumn("mop", professionApi(171), alchemyColumn), true,
         "the matching primary profession exposes its cooldown")
+    local unlearnedRecipeApi = professionApi(171)
+    unlearnedRecipeApi.IsPlayerSpell = function() return false end
+    test.eq(Adapters.canReadColumn("mop", unlearnedRecipeApi, alchemyColumn), false,
+        "a known profession without the specific learned recipe hides the cooldown")
 
     -- Unknown lookups stay safe.
     test.eq(Catalog.forFamily("nope"), nil, "unknown family has no catalog")

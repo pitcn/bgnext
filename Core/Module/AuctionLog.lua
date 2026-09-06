@@ -1668,7 +1668,8 @@ BG.Init(function()
             local link = v.zhuangbei
             local itemID = GetItemID(link)
             local icon, typeID = select(5, GetItemInfoInstant(link))
-            local r, g, b = GetItemQualityColor(v.quality)
+            local quality = type(v.quality) == "number" and v.quality or 1
+            local r, g, b = GetItemQualityColor(quality)
             local notAuctioned = v.type == 3
             bts.link = link
             bts.itemID = itemID
@@ -2094,76 +2095,94 @@ BG.Init(function()
                 jine = tostring(jine)
                 local itemID = GetItemID(zhuangbei)
                 DeleteAuctioning(itemID)
-                local item = Item:CreateFromItemID(itemID)
-                item:ContinueOnItemLoad(function()
-                    local name, link, quality, level, _, _, _, _, EquipLoc, Texture,
-                    _, typeID, subclassID, bindType = GetItemInfo(zhuangbei)
-                    local FB = GetFB(itemID)
-                    local log
-                    if next(logs) then
-                        log = {}
-                        local num = 1
-                        local yes = true
-                        for i = #logs, 1, -1 do
-                            if not yes and num > 5 then break end
-                            num = num + 1
-                            local a = BG.Copy(logs[i])
-                            a.i = i
-                            tinsert(log, 1, a)
-                        end
-                        if MoneyIsError(jine) and logs[#logs] then
-                            jine = tostring(logs[#logs].money)
-                        end
+                local FB = GetFB(itemID)
+                local log
+                if type(logs) == "table" and next(logs) then
+                    log = {}
+                    local num = 1
+                    local yes = true
+                    for i = #logs, 1, -1 do
+                        if not yes and num > 5 then break end
+                        num = num + 1
+                        local entry = BG.Copy(logs[i])
+                        entry.i = i
+                        tinsert(log, 1, entry)
                     end
+                    if MoneyIsError(jine) and logs[#logs] then
+                        jine = tostring(logs[#logs].money)
+                    end
+                end
 
-                    local playerClass = {}
-                    local rosterMember = PlayerIdentity and PlayerIdentity.find
-                        and PlayerIdentity.find(BG.raidRosterInfo, maijia, realmName)
-                    for k, v in pairs(BG.playerClass) do
-                        local value = rosterMember and rosterMember[k] or select(v.select, v.func(maijia))
-                        if value == 0 then value = nil end
-                        playerClass[k] = value
-                    end
-                    if not playerClass.guild then
-                        playerClass.realm = nil
-                    end
-                    local a = {
-                        type = 1,
-                        time = time(),
-                        zhuangbei = zhuangbei,
-                        maijia = maijia,
-                        jine = jine,
-                        itemlevel = level,
-                        quality = quality,
-                        bindType = bindType,
-                        log = log,
-                        trade = BG.ImML() and SamePlayer(maijia, BG.playerName) or nil,
-                    }
-                    for k, v in pairs(playerClass) do
-                        a[k] = v
-                    end
-                    BiaoGe[FB].auctionLog = BiaoGe[FB].auctionLog or {}
-                    tinsert(BiaoGe[FB].auctionLog, a)
-                    BG.UpdateAuctionLogFrame(nil, true)
+                local playerClass = {}
+                local rosterMember = PlayerIdentity and PlayerIdentity.find
+                    and PlayerIdentity.find(BG.raidRosterInfo, maijia, realmName)
+                for k, v in pairs(BG.playerClass) do
+                    local value = rosterMember and rosterMember[k] or select(v.select, v.func(maijia))
+                    if value == 0 then value = nil end
+                    playerClass[k] = value
+                end
+                if not playerClass.guild then
+                    playerClass.realm = nil
+                end
+                -- GetItemInfo is often immediately available from the winning
+                -- link. Read it best-effort before refreshing the log because
+                -- the renderer consumes quality synchronously; an unavailable
+                -- cache is handled by the renderer fallback below.
+                local _, _, quality, level, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(zhuangbei)
+                local a = {
+                    type = 1,
+                    time = time(),
+                    zhuangbei = zhuangbei,
+                    maijia = maijia,
+                    jine = jine,
+                    itemlevel = level,
+                    quality = quality,
+                    bindType = bindType,
+                    log = log,
+                    trade = BG.ImML() and SamePlayer(maijia, BG.playerName) or nil,
+                }
+                for k, v in pairs(playerClass) do
+                    a[k] = v
+                end
+                BiaoGe[FB].auctionLog = BiaoGe[FB].auctionLog or {}
+                tinsert(BiaoGe[FB].auctionLog, a)
 
-                    local tradeName = BG.GN("NPC")
-                    if BG.tradelastAuctionFrame.frame:IsVisible() and tradeName and SamePlayer(maijia, tradeName) then
-                        BG.GetTargetAuctionTradeItems(maijia)
-                        if BG.ImMLorLeader() then
-                            BG.tradelastAuctionFrame.UpdateChooseType()
-                            BG.tradelastAuctionFrame.UpdateAutoButtons()
-                        end
+                if BG.ShouldCreateBillFromAuction() then
+                    local waitForLeaderPurchaseChoice = BG.ImMLorLeader() and SamePlayer(maijia, player)
+                    if not waitForLeaderPurchaseChoice then
+                        BG.FillBillFromAuctionResult(FB, a)
                     end
+                end
 
-                    if BG.ShouldCreateBillFromAuction() then
-                        local waitForLeaderPurchaseChoice = BG.ImMLorLeader() and SamePlayer(maijia, player)
-                        if not waitForLeaderPurchaseChoice then
-                            BG.FillBillFromAuctionResult(FB, a)
-                        end
+                BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
+
+                -- UI refreshes are deliberately last: a presentation addon
+                -- error must not prevent the completed sale from filling its
+                -- bill row or reaching leader accounting.
+                local tradeName = BG.GN("NPC")
+                if BG.tradelastAuctionFrame.frame:IsVisible() and tradeName and SamePlayer(maijia, tradeName) then
+                    BG.GetTargetAuctionTradeItems(maijia)
+                    if BG.ImMLorLeader() then
+                        BG.tradelastAuctionFrame.UpdateChooseType()
+                        BG.tradelastAuctionFrame.UpdateAutoButtons()
                     end
+                end
+                BG.UpdateAuctionLogFrame(nil, true)
 
-                    BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
-                end)
+                -- Item cache completion is optional enrichment only. The sale,
+                -- bill write and leader accounting above must never wait for an
+                -- asynchronous cache callback, and this closure mutates the
+                -- already-inserted record so it cannot duplicate the sale.
+                local item = Item and Item.CreateFromItemID and Item:CreateFromItemID(itemID)
+                if item and type(item.ContinueOnItemLoad) == "function" then
+                    item:ContinueOnItemLoad(function()
+                        local _, _, quality, level, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(zhuangbei)
+                        if type(level) == "number" then a.itemlevel = level end
+                        if type(quality) == "number" then a.quality = quality end
+                        if type(bindType) == "number" then a.bindType = bindType end
+                        BG.UpdateAuctionLogFrame(nil, true)
+                    end)
+                end
                 return
             elseif endType == 2 and zhuangbei then -- 流拍
                 local itemID = GetItemID(zhuangbei)

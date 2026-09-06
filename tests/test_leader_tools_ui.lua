@@ -29,4 +29,10 @@ return function(test)
         "template editor reserves its footer actions")
     test.eq(source:find('panel.text:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, geometry.textBottom)', 1, true) ~= nil, true,
         "settlement text reserves its confirmation footer")
+    test.eq(source:find('frame:SetScript("OnHide", function(self)', 1, true) ~= nil, true,
+        "closing leader tools has an explicit focus-release lifecycle")
+    test.eq(source:find('panels.templates.name', 1, true) ~= nil, true,
+        "closing leader tools releases the expense-template name editor")
+    test.eq(source:find('panels.history.search', 1, true) ~= nil, true,
+        "closing leader tools releases the history filter editor")
 end

@@ -137,12 +137,26 @@ return function(test)
     local savedAfterFill = false
     local saveCalls = 0
     local delayed = {}
+    local itemLoadCallbacks = {}
+    local flowBiaoGe = { TEST = {} }
+    local rendererCalls = 0
+    local throwOnRefresh = false
     local flowBG = {
         auctionLogFrame = { auctioning = {} },
         Copy = function(value) return value end,
         playerClass = {},
         ImML = function() return true end,
-        UpdateAuctionLogFrame = function() end,
+        UpdateAuctionLogFrame = function()
+            local records = flowBiaoGe.TEST.auctionLog
+            local record = records and records[#records]
+            if record then
+                assert(type(record.quality) == "number", "renderer needs a synchronous quality")
+                assert(type(record.itemlevel) == "number", "renderer needs a synchronous item level")
+                assert(type(record.bindType) == "number", "renderer needs a synchronous bind type")
+                rendererCalls = rendererCalls + 1
+            end
+            if throwOnRefresh then error("simulated presentation failure") end
+        end,
         GN = function() return nil end,
         tradelastAuctionFrame = { frame = { IsVisible = function() return false end } },
         ImMLorLeader = function() return true end,
@@ -159,12 +173,11 @@ return function(test)
         CreateBillByAuctionLog = function() error("full bill rebuild is not required") end,
         After = function(_, callback) delayed[#delayed + 1] = callback end,
     }
-    local flowBiaoGe = { TEST = {} }
     local completeAuction = completionFactory({
         BG = flowBG,
         BiaoGe = flowBiaoGe,
         Item = { CreateFromItemID = function()
-            return { ContinueOnItemLoad = function(_, callback) callback() end }
+            return { ContinueOnItemLoad = function(_, callback) itemLoadCallbacks[#itemLoadCallbacks + 1] = callback end }
         end },
         GetItemID = function() return 123 end,
         GetItemInfo = function() return "item", "item:123", 4, 245, nil, nil, nil, nil, nil, nil, nil, nil, nil, 1 end,
@@ -172,18 +185,36 @@ return function(test)
         player = "团长",
         realmName = "测试服",
     })
-    completeAuction(1, "item:123", "成交玩家", 500, {})
+    completeAuction(1, "item:123", "成交玩家", 500, nil)
     test.eq(billBuyer, "成交玩家", "auction completion writes the buyer before returning")
     test.eq(billAmount, "500", "auction completion writes the amount before returning")
     test.eq(savedAfterFill, true, "primary bill write completes before optional leader accounting")
     test.eq(saveCalls, 1, "auction completion invokes leader accounting after the primary write")
     test.eq(#delayed, 0, "auction completion does not defer the primary bill write")
+    test.eq(#flowBiaoGe.TEST.auctionLog, 1, "a pending item cache callback cannot delay the auction record")
+    test.eq(rendererCalls, 1, "the immediate auction-log refresh receives renderer-safe metadata")
+    itemLoadCallbacks[1]()
+    test.eq(#flowBiaoGe.TEST.auctionLog, 1, "a later item cache callback enriches instead of duplicating the auction record")
+
+    billBuyer, billAmount, savedAfterFill = "", "", false
+    local savesBeforePresentationFailure = saveCalls
+    throwOnRefresh = true
+    local presentationOk = pcall(function()
+        completeAuction(1, "item:123", "刷新失败买家", 550, {})
+    end)
+    throwOnRefresh = false
+    test.eq(presentationOk, false, "the injected presentation failure reaches the caller")
+    test.eq(billBuyer, "刷新失败买家", "presentation failure cannot prevent the core buyer write")
+    test.eq(billAmount, "550", "presentation failure cannot prevent the core amount write")
+    test.eq(saveCalls, savesBeforePresentationFailure + 1,
+        "presentation failure cannot prevent exactly one leader-accounting save")
 
     billBuyer, billAmount, savedAfterFill = "", "", false
     completeAuction(1, "item:123", "团长", 600, {})
     test.eq(billBuyer, "", "leader self-purchase waits for the paid-or-debt choice")
     test.eq(billAmount, "", "leader self-purchase does not prefill an amount before the choice")
-    test.eq(saveCalls, 2, "leader self-purchase invokes the paid-or-debt accounting path")
+    test.eq(saveCalls, savesBeforePresentationFailure + 2,
+        "leader self-purchase invokes the paid-or-debt accounting path")
     test.eq(#delayed, 0, "leader self-purchase does not schedule a competing bill write")
 
     billBuyer, billAmount = "", ""

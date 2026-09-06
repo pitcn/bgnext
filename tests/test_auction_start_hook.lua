@@ -127,7 +127,7 @@ return function(test)
             function frame:SetAutoFocus() end
             function frame:SetNumeric() end
             function frame:SetMaxLetters() end
-            function frame:ClearFocus() end
+            function frame:ClearFocus() self.focusCleared = true end
             function frame:SetChecked() end
             function frame:GetID() return 0 end
             function frame:GetStringWidth() return 60 end
@@ -322,7 +322,7 @@ return function(test)
         -- This legacy global no longer exists in the supported client/module.
         -- Auction.lua must not copy or invoke it from readiness callbacks.
         setGlobal("UpdateFrame", nil)
-        setGlobal("ClearAllFocus", function() end)
+        setGlobal("ClearAllFocus", nil)
         setGlobal("YES", "YES")
         setGlobal("NO", "NO")
 
@@ -392,6 +392,21 @@ return function(test)
         local frameWithoutLegacyRefresh = newFrame()
         test.eq(frameWithoutLegacyRefresh.UpdateFrame, nil,
             "auction dialog does not expose the removed legacy refresh callback")
+        local dragWithoutLegacyFocusHelper = pcall(function()
+            frameWithoutLegacyRefresh.scripts.OnMouseDown(frameWithoutLegacyRefresh)
+        end)
+        test.eq(dragWithoutLegacyFocusHelper, true,
+            "dragging an auction dialog never calls the nonexistent ClearAllFocus global")
+        for _, key in ipairs({ "Edit1", "Edit2", "Edit3" }) do
+            test.eq(frameWithoutLegacyRefresh[key].focusCleared, true,
+                "dragging releases " .. key .. " focus directly")
+            frameWithoutLegacyRefresh[key].focusCleared = false
+        end
+        frameWithoutLegacyRefresh.scripts.OnHide(frameWithoutLegacyRefresh)
+        for _, key in ipairs({ "Edit1", "Edit2", "Edit3" }) do
+            test.eq(frameWithoutLegacyRefresh[key].focusCleared, true,
+                "hiding releases " .. key .. " focus directly")
+        end
         BG.BGNext.AuctionSender.isRaidSender = function() return true end
         local addonEventOK = pcall(function()
             for _, handler in ipairs(eventHandlers.CHAT_MSG_ADDON or {}) do

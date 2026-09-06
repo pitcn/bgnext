@@ -494,8 +494,12 @@ return function(test)
     test.eq(frame.input:GetText():find("item:7002", 1, true), nil,
         "Shift-click does not capture links when the queue input is unfocused")
     test.eq(type(frame.input.scripts.OnEnter), "function", "the queue input explains accepted item sources")
+    frame.input:SetFocus()
+    frame.rows[1].priceEdit:SetFocus()
     frame.closeButton.scripts.OnClick(frame.closeButton)
     test.eq(frame.shown, false, "the close button hides the queue window")
+    test.eq(frame.input:HasFocus(), false, "closing the queue releases its add-item input focus")
+    test.eq(frame.rows[1].priceEdit:HasFocus(), false, "closing the queue releases pooled price-editor focus")
     M.openFrame()
 
     frame.rows[1].plus.scripts.OnClick(frame.rows[1].plus)
