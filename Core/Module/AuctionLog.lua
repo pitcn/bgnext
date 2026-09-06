@@ -582,9 +582,9 @@ BG.Init(function()
                 -- 已移除 CP 货币结算挂载点（第三方付费模块 BGV 提供）
             end
 
-            -- Raid leaders and master looters keep trade bookkeeping enabled, so
-            -- auction completion must not rebuild (and clear) the entire bill.
-            -- Fill only the next empty row for this completed auction instead.
+            -- Auction completion must not rebuild (and clear) the entire bill.
+            -- Fill only the next empty row for this completed auction, preserving
+            -- manual entries and any trade bookkeeping already present.
             function BG.FillBillFromAuctionResult(FB, result)
                 if not FB or type(result) ~= "table" or result.type ~= 1 then return false end
                 if not BiaoGe[FB] or not BG.Frame[FB] then return false end
@@ -2155,21 +2155,14 @@ BG.Init(function()
                         end
                     end
 
-                    BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
-
                     if BG.ShouldCreateBillFromAuction() then
-                        local fillSingleResult = BG.IsML == true
-                        local waitForLeaderPurchaseChoice = fillSingleResult and SamePlayer(maijia, player)
-                        BG.After(0.1, function()
-                            if waitForLeaderPurchaseChoice then
-                                return
-                            elseif fillSingleResult then
-                                BG.FillBillFromAuctionResult(FB, a)
-                            else
-                                BG.CreateBillByAuctionLog(FB)
-                            end
-                        end)
+                        local waitForLeaderPurchaseChoice = BG.ImMLorLeader() and SamePlayer(maijia, player)
+                        if not waitForLeaderPurchaseChoice then
+                            BG.FillBillFromAuctionResult(FB, a)
+                        end
                     end
+
+                    BG.SaveRLAuction(zhuangbei, maijia, jine, FB)
                 end)
                 return
             elseif endType == 2 and zhuangbei then -- 流拍
