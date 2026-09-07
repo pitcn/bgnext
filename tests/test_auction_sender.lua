@@ -42,6 +42,16 @@ return function(test)
     test.eq(boundedCalls, 40, "the live roster snapshot is bounded to a raid-sized scan")
     test.eq(#liveMembers, 40, "the bounded snapshot cannot grow from hostile counts")
 
+    local liveRoster = Sender.liveRaidRoster(
+        function() return 2 end,
+        function(index)
+            if index == 1 then return "Leader", 2, 1, 80, "Warrior", "WARRIOR", nil, true, false, nil, false end
+            return "Looter-OtherRealm", 0, 1, 80, "Rogue", "ROGUE", nil, true, false, nil, true
+        end)
+    test.eq(#liveRoster, 2, "the controller snapshot includes current raid members")
+    test.eq(liveRoster[1].rank, 2, "the live snapshot preserves raid-leader rank")
+    test.eq(liveRoster[2].isML, true, "the live snapshot preserves loot responsibility")
+
     local roster = {
         { name = "Leader", rank = 2, isML = false },
         { name = "Looter", rank = 0, isML = true },
@@ -145,9 +155,11 @@ return function(test)
         "the sender is validated against the current raid roster")
     test.eq(source:find("Sender.liveRaidMemberNames(GetNumGroupMembers, GetRaidRosterInfo)", 1, true) ~= nil, true,
         "live bids consult a synchronous roster snapshot before the delayed cache")
+    test.eq(source:find("Sender.liveRaidRoster(GetNumGroupMembers, GetRaidRosterInfo)", 1, true) ~= nil, true,
+        "auction control messages consult live roles before the delayed cache")
     test.eq(source:find("Sender.parseBid(auctionIDStr, itemIDStr)", 1, true) ~= nil, true,
         "protocol numbers are validated before live auction comparisons")
-    test.eq(source:find("Sender.isController(sender, realm, wa.raidRosterInfo)", 1, true) ~= nil, true,
+    test.eq(source:find("Sender.isController(sender, realm, roster)", 1, true) ~= nil, true,
         "auction control messages require the raid leader or master looter")
     test.eq(source:find("Sender.parseStart(auctionIDStr, itemIDStr, moneyStr, durationStr)", 1, true) ~= nil, true,
         "start-auction fields are validated before item loading")

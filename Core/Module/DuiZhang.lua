@@ -26,6 +26,9 @@ local bigfootyes
 local bigfootItem
 local Capture = assert(BG.BGNext and BG.BGNext.LedgerCapture, "BGNext LedgerCapture must load before DuiZhang")
 local captureState = Capture.new()
+-- Blizzard's party-category enum uses 1 for the instance group. Keep the
+-- numeric fallback for clients that expose the API argument but not the name.
+local CAPTURE_PARTY_CATEGORY = _G.LE_PARTY_CATEGORY_INSTANCE or 1
 BG.sessionDuizhang = {}
 
 local function GetRealm()
@@ -345,7 +348,15 @@ BG.RegisterEvent("PLAYER_LOGOUT", function()
 end)
 
 BG.RegisterEvent("GROUP_ROSTER_UPDATE", function()
-    StopCapture(true)
+    if Capture.shouldStopForRoster(captureState, IsInRaid(1), GetRealm(), GetRaidMemberNames()) then
+        StopCapture(true)
+    end
+end)
+
+BG.RegisterEvent("GROUP_LEFT", function(self, event, category)
+    Capture.handleGroupLeft(captureState, category, CAPTURE_PARTY_CATEGORY, function()
+        StopCapture(true)
+    end)
 end)
 
 ------------------创建UI------------------

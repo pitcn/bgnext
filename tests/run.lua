@@ -62,6 +62,7 @@ local suites = {
     "tests/test_entry_menu_runtime.lua",
     "tests/test_player_identity.lua",
     "tests/test_trade_auction_state.lua",
+    "tests/test_auction_trade_accounting.lua",
     "tests/test_bill_buyer.lua",
     "tests/test_auction_sender.lua",
     "tests/test_auction_timer_sync.lua",

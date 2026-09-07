@@ -67,9 +67,15 @@ $origin = (git remote get-url origin).Trim()
 if ($origin -ne 'https://github.com/pitcn/bgnext.git') {
     throw "Unexpected origin: $origin"
 }
-$common = (git rev-parse --path-format=absolute --git-common-dir).Trim().Replace('\', '/')
-if ($common -notmatch '/BGN/\.git$') {
-    throw "Unexpected common git dir: $common"
+$common = (git rev-parse --path-format=absolute --git-common-dir).Trim()
+if (-not (Test-Path -LiteralPath $common -PathType Container)) {
+    throw "Git common directory does not exist: $common"
+}
+$topLevel = (git rev-parse --show-toplevel).Trim()
+$expectedTopLevel = [System.IO.Path]::GetFullPath($repo).TrimEnd('\', '/')
+$actualTopLevel = [System.IO.Path]::GetFullPath($topLevel).TrimEnd('\', '/')
+if ($actualTopLevel -ne $expectedTopLevel) {
+    throw "Verification script is not running from its repository: $actualTopLevel"
 }
 
 git rev-parse --verify $Base *> $null
@@ -104,11 +110,25 @@ foreach ($step in $plan) {
         }
         'diff-check' {
             $results += Invoke-Checked 'diff-check' {
-                git diff --check "$Base...HEAD"
-                if ($LASTEXITCODE -ne 0) { throw 'committed diff-check failed' }
-                git diff --check
-                if ($LASTEXITCODE -ne 0) { throw 'working-tree diff-check failed' }
-                git diff --cached --check
+                # Windows PowerShell 5.1 promotes native stderr (including
+                # harmless Git line-ending warnings) to terminating errors
+                # under Stop. Judge Git by its exit code so real whitespace
+                # failures still block verification.
+                $previousPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try {
+                    git diff --check "$Base...HEAD" 2>&1 | Out-Null
+                    $committedExit = $LASTEXITCODE
+                    git diff --check 2>&1 | Out-Null
+                    $workingExit = $LASTEXITCODE
+                    git diff --cached --check 2>&1 | Out-Null
+                    $cachedExit = $LASTEXITCODE
+                } finally {
+                    $ErrorActionPreference = $previousPreference
+                }
+                if ($committedExit -ne 0) { throw 'committed diff-check failed' }
+                if ($workingExit -ne 0) { throw 'working-tree diff-check failed' }
+                if ($cachedExit -ne 0) { throw 'cached diff-check failed' }
             }
         }
         'luac' {

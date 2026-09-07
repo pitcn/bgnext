@@ -60,4 +60,83 @@ return function(test)
     activeProfile = catalog.getDefault("retail", "WARRIOR", "spec:73")
     test.eq(BG.FilterAll(1005, 4, "INVTYPE_CHEST", 4, "100 护甲"), nil,
         "Retail tank profile does not apply the legacy tank-stat filter")
+
+    -- Auction payloads already carry cached item data on the normal BGLite/WA
+    -- path. Apply that data immediately: MoP clients must not depend on a later
+    -- ItemMixin callback merely to mark and fold an incompatible auction.
+    activeProfile = catalog.getDefault("mop", "MAGE", "spec:62")
+    tooltipText = "+10 智力"
+    BGA = { aura_env = { SetFrameColor = function(frame, color) frame.color = color end } }
+    BG.playerName = "Local"
+    BG.itemCaches = {}
+    BG.After = function(_, callback) callback() end
+    GetRealmName = function() return "Realm" end
+    GetItemInfo = function()
+        return "板甲", "item:2001", 4, 500, 90, "护甲", "板甲", 1,
+            "INVTYPE_CHEST", 0, 0, 4, 4, 1
+    end
+    local deferredCallbacks = 0
+    Item = {
+        CreateFromItemID = function()
+            return {
+                ContinueOnItemLoad = function()
+                    deferredCallbacks = deferredCallbacks + 1
+                    -- Reproduce the affected client path: callback is not
+                    -- delivered even though GetItemInfo is already complete.
+                end,
+            }
+        end,
+    }
+    local updated, updatedBindType
+    local frame = { itemID = 2001, link = "item:2001", player = "Other" }
+    BG.UpdateAuctionFilter(frame, function(filtered, bindType)
+        updated, updatedBindType = filtered, bindType
+    end)
+    test.eq(frame.filter, true, "cached MoP auction is filtered synchronously")
+    test.eq(frame.color, 2, "cached MoP auction receives the filtered frame color")
+    test.eq(updated, true, "cached MoP auction immediately reaches the fold callback")
+    test.eq(updatedBindType, 1, "cached auction passes binding type to the fold policy")
+    test.eq(deferredCallbacks, 0, "cached auction data does not wait on ItemMixin")
+
+    -- Preserve the reason the deferred path was added: a genuinely uncached
+    -- auction must be retried after item data arrives.
+    local loaded = false
+    GetItemInfo = function()
+        if not loaded then return nil end
+        return "板甲", "item:2002", 4, 500, 90, "护甲", "板甲", 1,
+            "INVTYPE_CHEST", 0, 0, 4, 4, 1
+    end
+    Item.CreateFromItemID = function()
+        return {
+            ContinueOnItemLoad = function(_, callback)
+                loaded = true
+                callback()
+            end,
+        }
+    end
+    local deferredFrame = { itemID = 2002, link = "item:2002", player = "Other" }
+    local deferredUpdated
+    BG.UpdateAuctionFilter(deferredFrame, function(filtered) deferredUpdated = filtered end)
+    test.eq(deferredFrame.filter, true, "uncached auction is filtered after item data loads")
+    test.eq(deferredUpdated, true, "uncached auction still reaches the fold callback")
+
+    -- A delayed result belongs to the captured item only. If a host addon ever
+    -- reuses the frame first, the old result must not recolor or fold the new row.
+    loaded = false
+    local pendingLoad
+    Item.CreateFromItemID = function()
+        return {
+            ContinueOnItemLoad = function(_, callback) pendingLoad = callback end,
+        }
+    end
+    local staleUpdated
+    local reusedFrame = { itemID = 2003, link = "item:2003", player = "Other" }
+    BG.UpdateAuctionFilter(reusedFrame, function(filtered) staleUpdated = filtered end)
+    reusedFrame.itemID = 2004
+    reusedFrame.link = "item:2004"
+    loaded = true
+    pendingLoad()
+    test.eq(reusedFrame.filter, nil, "stale item load does not filter a reused auction frame")
+    test.eq(reusedFrame.color, nil, "stale item load does not recolor a reused auction frame")
+    test.eq(staleUpdated, nil, "stale item load does not invoke the new row's fold callback")
 end

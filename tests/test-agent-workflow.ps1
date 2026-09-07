@@ -76,7 +76,7 @@ Assert-True ($highHandoff.Contains('high_risk_review:')) 'high handoff includes 
 Assert-True ($highHandoff.Contains('security/privacy: unverified')) 'high handoff preserves manual uncertainty'
 
 $sandboxParent = Join-Path ([System.IO.Path]::GetTempPath()) ("bgn-agent-workflow-" + [guid]::NewGuid().ToString('N'))
-$sandboxRepo = Join-Path $sandboxParent 'BGN'
+$sandboxRepo = Join-Path $sandboxParent 'addon-maintenance'
 try {
     New-Item -ItemType Directory -Force -Path (Join-Path $sandboxRepo 'tools') | Out-Null
     Copy-Item -LiteralPath (Join-Path $repo 'tools\agent-verify.ps1') -Destination (Join-Path $sandboxRepo 'tools\agent-verify.ps1')
@@ -88,7 +88,7 @@ try {
     git config user.name 'Agent Workflow Test'
     git remote add origin 'https://github.com/pitcn/bgnext.git'
     Set-Content -LiteralPath 'README.md' -Value 'seed' -Encoding utf8
-    git add README.md
+    git add README.md tools
     git commit -q -m 'seed'
     New-Item -ItemType Directory -Force -Path 'Core\Module' | Out-Null
     Set-Content -LiteralPath 'Core\Module\Trade.lua' -Value '-- high-risk fixture' -Encoding utf8
@@ -117,6 +117,20 @@ try {
     }
     Assert-Equal 0 $highExit 'CLI permits an explicit upgrade'
     Assert-True (($highOutput -join "`n").Contains('PLAN lua-tests,baseline,diff-check,luac,high-review')) 'CLI prints a compact high-risk plan'
+
+    Remove-Item -LiteralPath 'Core\Module\Trade.lua'
+    Set-Content -LiteralPath 'README.md' -Value "seed`nworking tree change" -Encoding utf8
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $lowRunOutput = & $powerShellExe -NoProfile -File $verifyScript -Risk low -Base HEAD 2>&1
+        $lowRunExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($lowRunExit -ne 0) { Write-Host (($lowRunOutput | ForEach-Object { $_.ToString() }) -join "`n") }
+    Assert-Equal 0 $lowRunExit 'CLI executes diff-check outside a repository named BGN'
+    Assert-True (($lowRunOutput -join "`n").Contains('PASS diff-check')) 'CLI reports a successful diff-check'
 } finally {
     Pop-Location
     if (Test-Path -LiteralPath $sandboxParent) {

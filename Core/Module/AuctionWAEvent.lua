@@ -640,7 +640,10 @@ BG.Init(function()
  local function isAuthorizedController(sender)
   if not Sender then return false end
   local realm = getRealm()
-  return Sender.isController(sender, realm, wa.raidRosterInfo)
+  local live = type(Sender.liveRaidRoster) == "function"
+   and Sender.liveRaidRoster(GetNumGroupMembers, GetRaidRosterInfo) or {}
+  local roster = #live > 0 and live or wa.raidRosterInfo
+  return Sender.isController(sender, realm, roster)
  end
  local function eventHandler(self, event, ...)
   if event == "CHAT_MSG_ADDON" then

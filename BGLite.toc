@@ -6,7 +6,7 @@
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.2
-## X-BGNext-Version: 0.8.3
+## X-BGNext-Version: 0.8.4
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.2
@@ -68,6 +68,7 @@ Core\BGNext\RoleOverviewEntry.lua
 Core\BGNext\OwnCharactersRuntime.lua
 Core\BGNext\PlayerIdentity.lua
 Core\BGNext\TradeAuctionState.lua
+Core\BGNext\AuctionTradeAccounting.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua

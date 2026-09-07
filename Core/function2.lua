@@ -413,22 +413,33 @@ do
             return
         end
 
+        local itemID = f.itemID
         local function applyFilter()
-            local _, itemLink, _, _, _, _, _, _, equipLoc, _, _, typeID, subclassID, bindType = GetItemInfo(f.itemID)
+            if f.itemID ~= itemID then return true end
+            local _, itemLink, _, _, _, _, _, _, equipLoc, _, _, typeID, subclassID, bindType = GetItemInfo(itemID)
+            if not typeID then return false end
             local itemRef = ItemPrimaryStats.selectItemRef(f.link, itemLink, f.itemID)
             local filtered = typeID and BG.FilterAll(itemRef, typeID, equipLoc, subclassID) or false
             f.filter = filtered or nil
             BGA.aura_env.SetFrameColor(f, filtered and 2 or 0)
             if onUpdated then onUpdated(filtered, bindType) end
+            return true
         end
 
-        local item = Item:CreateFromItemID(f.itemID)
+        -- The original BGLite auction path evaluates GetItemInfo immediately.
+        -- Keep that reliable path when the WA payload has already populated the
+        -- cache, and retain the deferred fallback added for genuinely uncached
+        -- links instead of making every auction depend on ItemMixin callbacks.
+        if applyFilter() then return end
+
+        local item = Item:CreateFromItemID(itemID)
         item:ContinueOnItemLoad(function()
-            if not BG.itemCaches[f.itemID] then
-                BG.Tooltip_SetItemByID(f.itemID)
+            if f.itemID ~= itemID then return end
+            if not BG.itemCaches[itemID] then
+                BG.Tooltip_SetItemByID(itemID)
                 BG.After(0.01, function()
                     applyFilter()
-                    BG.itemCaches[f.itemID] = true
+                    BG.itemCaches[itemID] = true
                 end)
             else
                 applyFilter()

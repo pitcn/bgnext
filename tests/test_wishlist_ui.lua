@@ -35,6 +35,14 @@ return function(test)
         "solo ctrl-right edits the local leader-price scheme instead of deleting the item")
     test.eq(ui.shortcutAction(true, "RightButton", true, true, false), "auction",
         "alt-right keeps priority over ctrl-right")
+    test.eq(ui.shortcutAction(true, "LeftButton", true, false, true), nil,
+        "alt-shift reaches the original shift link-insertion path")
+    test.eq(ui.shortcutAction(true, "RightButton", true, false, true), nil,
+        "alt-shift right-click is not consumed as an auction")
+    test.eq(ui.shortcutAction(true, "LeftButton", true, true, true), nil,
+        "alt-ctrl-shift reaches the original cell-swap path")
+    test.eq(ui.shortcutAction(true, "RightButton", true, true, true), nil,
+        "the original cell-swap chord is preserved for either mouse button")
     test.eq(ui.shortcutAction(true, "RightButton", false, true, true), nil,
         "shift combinations are left to existing table actions")
     test.eq(ui.isLooted(7001, { 7002, 7001 }), true, "recorded current-raid item shows looted marker")

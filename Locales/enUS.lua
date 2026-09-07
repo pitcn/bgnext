@@ -78,8 +78,20 @@ do -- BGNext release text
     L["修复自动拍卖成功记录出现后，主表买家和成交金额仍可能为空的问题。"] = "Fixed successful auction records that could still leave the main bill buyer and amount blank."
 end
 
-do -- BGNext 0.8.3 release text
+do -- BGNext 0.8.4 release text
+    L["修复成交已写入买家和金额后，交易完成仍可能漏记欠款或算错总消费的问题。"] = "Fixed missing debt and incorrect total spending after an auction had already filled the buyer and amount."
+    L["恢复表格装备组合快捷键的原版优先级，新增操作不再拦截 Shift 插入链接或交换单元格。"] = "Restored the original modifier priority for bill items, so new actions no longer block Shift link insertion or cell swapping."
+    L["拍卖装备过滤恢复同步判断，避免筛选启用后仍显示全部装备。"] = "Restored synchronous auction-item filtering so an enabled profile no longer briefly lists every item."
+    L["团队刚建立或拾取职责变化时使用实时职责校验，避免第一条合法拍卖控制消息被忽略。"] = "Auction control now checks live raid roles so the first valid command after forming a raid or changing loot responsibility is not ignored."
+    L["对账期间普通成员变化不再清空；离团、来源离队或直接换团时仍会安全停止。"] = "Ledger reconciliation now survives unrelated roster changes and still stops safely when leaving, losing the source, or switching raids."
+    L["修复拍卖与交易记账、键盘焦点、专业冷却和聊天框团长开拍入口。"] = "Fixed auction and trade accounting, keyboard focus, profession cooldowns, and the leader auction shortcut from chat."
     local values = {
+        ["修复成交已写入买家和金额后，交易完成仍可能漏记欠款或算错总消费的问题。"] = "Fixed missing debt and incorrect total spending after an auction had already filled the buyer and amount.",
+        ["恢复表格装备组合快捷键的原版优先级，新增操作不再拦截 Shift 插入链接或交换单元格。"] = "Restored the original modifier priority for bill items, so new actions no longer block Shift link insertion or cell swapping.",
+        ["拍卖装备过滤恢复同步判断，避免筛选启用后仍显示全部装备。"] = "Restored synchronous auction-item filtering so an enabled profile no longer briefly lists every item.",
+        ["团队刚建立或拾取职责变化时使用实时职责校验，避免第一条合法拍卖控制消息被忽略。"] = "Auction control now checks live raid roles so the first valid command after forming a raid or changing loot responsibility is not ignored.",
+        ["对账期间普通成员变化不再清空；离团、来源离队或直接换团时仍会安全停止。"] = "Ledger reconciliation now survives unrelated roster changes and still stops safely when leaving, losing the source, or switching raids.",
+        ["修复拍卖与交易记账、键盘焦点、专业冷却和聊天框团长开拍入口。"] = "Fixed auction and trade accounting, keyboard focus, profession cooldowns, and the leader auction shortcut from chat.",
         ["修复拍卖窗口拖动或关闭时的报错，并释放隐藏输入框焦点，避免键盘输入被占用。"] = "Fixed errors while moving or closing auction windows and released hidden input focus so keyboard input is not trapped.",
         ["拍卖成交会先保存买家、金额和账务，再刷新界面；物品缓存或其他界面插件异常不会阻断记账。"] = "Auction results now save the buyer, amount, and accounting before refreshing the UI, so item-cache delays or UI addon errors cannot block the record.",
         ["修复交易对象短暂不可读时买家为空、金额或装备遗漏，以及错误沿用上一位交易对象的问题。"] = "Fixed blank buyers, missing money or items when a trade target is briefly unavailable, and prevented reusing the previous trade target.",
@@ -87,7 +99,7 @@ do -- BGNext 0.8.3 release text
         ["修复团长在聊天框 Alt+左键点击装备时误加入心愿；现在会打开拍卖窗口。"] = "Fixed raid leaders Alt-left-clicking chat items adding a wish; the shortcut now opens the auction window.",
     }
     for key, value in pairs(values) do L[key] = value end
-    ns.updateText_now = { "BGNext 0.8.3", L["修复拍卖窗口拖动或关闭时的报错，并释放隐藏输入框焦点，避免键盘输入被占用。"], L["拍卖成交会先保存买家、金额和账务，再刷新界面；物品缓存或其他界面插件异常不会阻断记账。"], L["修复交易对象短暂不可读时买家为空、金额或装备遗漏，以及错误沿用上一位交易对象的问题。"], L["修复角色总览专业冷却时间错误，并且只显示当前角色真正学会的配方。"], L["修复团长在聊天框 Alt+左键点击装备时误加入心愿；现在会打开拍卖窗口。"] }
+    ns.updateText_now = { "BGNext 0.8.4", L["修复成交已写入买家和金额后，交易完成仍可能漏记欠款或算错总消费的问题。"], L["恢复表格装备组合快捷键的原版优先级，新增操作不再拦截 Shift 插入链接或交换单元格。"], L["拍卖装备过滤恢复同步判断，避免筛选启用后仍显示全部装备。"], L["团队刚建立或拾取职责变化时使用实时职责校验，避免第一条合法拍卖控制消息被忽略。"], L["对账期间普通成员变化不再清空；离团、来源离队或直接换团时仍会安全停止。"] }
 end
 
 do -- BGNext leader tools

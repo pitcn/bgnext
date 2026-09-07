@@ -150,6 +150,10 @@ end
 
 function M.shortcutAction(isMasterLooter, button, altDown, controlDown, shiftDown)
     if altDown then
+        -- BiaoGe/BGLite resolve Shift and Alt+Ctrl+Shift before their Alt
+        -- auction branch. Leave every Alt+Shift chord untouched so the caller
+        -- can preserve link insertion and the original cell-swap operation.
+        if shiftDown then return nil end
         -- Preserve the original auction muscle memory for the controller while
         -- retaining Alt+left wishlist entry for ordinary raid members.
         if button == "LeftButton" then return isMasterLooter and "auction" or "wishlist" end

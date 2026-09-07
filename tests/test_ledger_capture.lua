@@ -29,6 +29,38 @@ return function(test)
         "another raid member cannot inject into the capture")
     test.eq(Capture.acceptSource(state, "Alice", "Realm", { "Bob" }, 102), false,
         "a source that left the raid is rejected")
+    test.eq(Capture.shouldStopForRoster(state, true, "Realm", { "Alice", "Bob", "Cara" }), false,
+        "an unrelated roster change keeps an active capture")
+    test.eq(Capture.shouldStopForRoster(state, true, "Realm", { "Bob", "Cara" }), true,
+        "the capture stops when its bound source leaves")
+    test.eq(Capture.shouldStopForRoster(state, false, "Realm", {}), true,
+        "leaving the raid stops an active capture")
+    test.eq(Capture.shouldStopForGroupLeft(state, 1, 1), true,
+        "leaving the captured party category stops even if a later roster has the same source")
+    test.eq(Capture.shouldStopForGroupLeft(state, 0, 1), false,
+        "leaving an unrelated party category does not stop the captured raid")
+    test.eq(Capture.shouldStopForGroupLeft(state, nil, 1), false,
+        "a category-less event cannot prove that the captured raid was left")
+    local cleared = false
+    test.eq(Capture.handleGroupLeft(state, 1, 1, function()
+        cleared = true
+        Capture.stop(state)
+    end), true, "the live group-left boundary invokes the stop path")
+    test.eq(cleared, true, "the stop path clears the active session")
+    test.eq(state.active, false, "the direct-switch boundary leaves capture inactive")
+    Capture.start(state, 105)
+    test.eq(Capture.bindSource(state, "Alice-Realm", "Realm", { "Alice-Realm" }, 106), true,
+        "a later capture can bind the same source in a new raid independently")
+    Capture.start(state, 100)
+    local moduleFile = assert(io.open("Core/Module/DuiZhang.lua", "rb"))
+    local moduleSource = moduleFile:read("*a")
+    moduleFile:close()
+    test.eq(moduleSource:find('BG.RegisterEvent("GROUP_LEFT"', 1, true) ~= nil, true,
+        "the live capture observes the local player leaving its raid category")
+    test.eq(moduleSource:find("Capture.handleGroupLeft", 1, true) ~= nil, true,
+        "the live group-left event uses the category-aware capture boundary")
+    test.eq(moduleSource:find("LE_PARTY_CATEGORY_INSTANCE or 1", 1, true) ~= nil, true,
+        "the captured category follows Blizzard's named instance-group enum")
 
     test.eq(Capture.appendLine(state, "1234567890", 103), true, "a bounded chat line is accepted")
     test.eq(Capture.appendLine(state, "second", 104), true, "a second bounded chat line is accepted")
