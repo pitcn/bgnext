@@ -2,9 +2,20 @@ return function(test)
     -- Pure decision logic for the in-game trade-result announcement. Loading the
     -- module with no BG.Init defined keeps the live wiring dormant, so only the
     -- resolveChannel/decide/render functions are exercised here.
-    BG = { BGNext = {} }
+    BG = { BGNext = {}, IsTitan = true }
+    BG.BGNext.FeatureCatalog = dofile("Core/BGNext/FeatureCatalog.lua")
+    BG.BGNext.FeatureSettings = dofile("Core/BGNext/FeatureSettings.lua")
     local M = dofile("Core/BGNext/TradeAnnouncement.lua")
     test.eq(BG.BGNext.TradeAnnouncement, M, "the module registers itself")
+
+    -- Announcement support is required infrastructure. A stale false value
+    -- written by an older Basic-mode build cannot suppress the dedicated
+    -- BiaoGe/BGLite master switch; decide() remains the send authorization.
+    BG.BGNext.DB = { settings = { features = { trade_announcement = false } } }
+    BiaoGe = { options = { tradeMSG = 0 } }
+    test.eq(M.isFeatureEnabled(), true, "an older generic false value cannot disable announcement support")
+    BiaoGe.options.tradeMSG = 1
+    test.eq(M.isFeatureEnabled(), true, "dedicated master uses the always-available announcement support")
 
     -- resolveChannel: the settings UI only accepts WHISPER or RAID.
     test.eq(M.resolveChannel("WHISPER", false, false), "WHISPER", "whisper preference always whispers")

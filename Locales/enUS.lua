@@ -3410,6 +3410,8 @@ do -- BGNext feature management and guide catalog
     L["查看当前团交易、邮件、退货标记和结算前检查。"] = "Review current-raid trades, mail, return markers and pre-settlement checks."
     L["交易通报"] = "Trade Announcements"
     L["交易完成后按设置发送团队通报。"] = "Send configured raid announcements after a trade completes."
+    L["交易通报设置"] = "Trade Announcement Settings"
+    L["通报能力始终可用；只有在交易设置中主动开启后才发送。"] = "Announcement support is always available; messages are sent only after you enable them in Trade settings."
     L["存储与隐私"] = "Storage & Privacy"
     L["说明本地保存内容，并提供清理控制。"] = "Explain locally stored data and provide cleanup controls."
     L["外观增强"] = "Appearance Enhancements"

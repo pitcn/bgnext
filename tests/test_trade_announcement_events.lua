@@ -15,7 +15,10 @@ return function(test)
     -- read from the authoritative current-window unit BG.GN("NPC"), never from
     -- the shared BG.trade.target snapshot, which can be blank or a previous
     -- partner when this module's TRADE_SHOW handler runs before Trade.lua.
-    BG = { BGNext = {} }
+    BG = { BGNext = {}, IsTitan = true }
+    BG.BGNext.FeatureCatalog = dofile("Core/BGNext/FeatureCatalog.lua")
+    BG.BGNext.FeatureSettings = dofile("Core/BGNext/FeatureSettings.lua")
+    BG.BGNext.DB = { settings = { features = { trade_announcement = false } } }
     local events = {}
     local sent = {}
 
@@ -62,6 +65,10 @@ return function(test)
 
     test.eq(events.UI_INFO_MESSAGE ~= nil, true, "registered the message handler")
     test.eq(events.TRADE_SHOW ~= nil, true, "registered the trade-window handler")
+
+    -- The original BiaoGe/BGLite trade setting is the explicit communication
+    -- consent. A generic BGNext mode selected earlier must not leave that
+    -- visible master switch checked while silently suppressing its whisper.
 
     -- (1) The current partner comes from BG.GN("NPC"), not the stale shared target.
     npcName = "新对象"
@@ -123,4 +130,12 @@ return function(test)
     events.UI_INFO_MESSAGE(nil, nil, nil, ERR_TRADE_COMPLETE)
     test.eq(#sent, 5, "the partner captured at show time is still announced")
     test.eq(sent[5].target, "丙", "show-time partner, not the stale target")
+
+    -- The generic feature flag alone never authorizes communication. The
+    -- dedicated master remains the final user-facing send switch.
+    BiaoGe.options.tradeMSG = 0
+    npcName = "丁"
+    events.TRADE_SHOW()
+    events.UI_INFO_MESSAGE(nil, nil, nil, ERR_TRADE_COMPLETE)
+    test.eq(#sent, 5, "unchecked dedicated master blocks a send even when the generic feature is enabled")
 end
