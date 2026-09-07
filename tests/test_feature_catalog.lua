@@ -20,6 +20,8 @@ return function(test)
     end
     test.eq(catalog.get("auction_safety").policy, "required", "auction safety is required")
     test.eq(catalog.get("storage_privacy").policy, "required", "privacy controls are required")
+    test.eq(catalog.get("trade_announcement").policy, "required",
+        "trade announcement availability is required; its dedicated master controls sending")
     test.eq(catalog.get("auction_queue").policy, "optional", "auction queue is optional")
     test.eq(catalog.get("expense_templates").defaultEnabled, false, "new leader tools require explicit opt-in")
     test.eq(catalog.get("local_history").defaultEnabled, false, "history is private and disabled by default")

@@ -16,6 +16,10 @@ return function(test)
     end
     test.eq(rows.auction_safety.required, true, "required row has no editable state")
     test.eq(rows.auction_safety.saved, nil, "required row has no saved toggle")
+    test.eq(rows.trade_announcement.required, true,
+        "trade announcements expose no second master toggle")
+    test.eq(rows.trade_announcement.saved, nil,
+        "trade announcement sending remains controlled by its dedicated settings")
     test.eq(rows.wishlist.required, false, "optional row is toggleable")
     test.eq(rows.wishlist.enabled, true, "optional row reports effective state")
     test.eq(rows.local_history.enabled, false, "history is visibly opt-in")

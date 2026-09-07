@@ -3340,6 +3340,8 @@ do -- BGNext feature management and guide catalog
     L["查看当前团交易、邮件、退货标记和结算前检查。"] = true
     L["交易通报"] = true
     L["交易完成后按设置发送团队通报。"] = true
+    L["交易通报设置"] = true
+    L["通报能力始终可用；只有在交易设置中主动开启后才发送。"] = true
     L["存储与隐私"] = true
     L["说明本地保存内容，并提供清理控制。"] = true
     L["外观增强"] = true
