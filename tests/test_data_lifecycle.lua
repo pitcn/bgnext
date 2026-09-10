@@ -10,6 +10,12 @@ return function(test)
     test.eq(saved.BGNext, root, "BGNext root attached")
     test.eq(root.schemaVersion, 1, "schema version")
     test.eq(root.auctionPresets, nil, "duplicate auto-bid presets are not auto-created")
+    test.eq(type(root.roleOverviewCharacterOrder), "table", "character order storage is initialized")
+    local preserved = { titan = { { realmId = 123, player = "Piti" } } }
+    test.eq(life.ensureRoot({ BGNext = { roleOverviewCharacterOrder = preserved } }).roleOverviewCharacterOrder,
+        preserved, "valid character order storage is preserved")
+    test.eq(type(life.ensureRoot({ BGNext = { roleOverviewCharacterOrder = 1 } }).roleOverviewCharacterOrder),
+        "table", "invalid character order storage is repaired")
 
     local repaired = life.ensureRoot({ BGNext = { currentSettlement = 1 } })
     test.eq(type(repaired.currentSettlement), "table", "invalid settlement storage is repaired on login")

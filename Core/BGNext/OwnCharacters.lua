@@ -374,6 +374,85 @@ function M.list(root, clientFamily)
     return rows
 end
 
+local function validIdentity(realmId, player)
+    return type(realmId) == "number" and type(player) == "string" and player ~= ""
+end
+
+local function identityKey(realmId, player)
+    return tostring(realmId) .. "\031" .. player
+end
+
+-- Rebuilds order from current snapshots on every read. Corrupt, duplicate, and
+-- stale saved entries are ignored; unranked current snapshots follow the legacy
+-- deterministic list order.
+function M.characterOrder(root, clientFamily)
+    local snapshots = M.list(root, clientFamily)
+    local available, ordered, seen = {}, {}, {}
+    for _, snapshot in ipairs(snapshots) do
+        if validIdentity(snapshot.realmId, snapshot.player) then
+            available[identityKey(snapshot.realmId, snapshot.player)] = snapshot
+        end
+    end
+    local storage = type(root) == "table" and root.roleOverviewCharacterOrder or nil
+    local saved = type(storage) == "table" and storage[clientFamily] or nil
+    if type(saved) == "table" then
+        for _, entry in ipairs(saved) do
+            local realmId = type(entry) == "table" and entry.realmId or nil
+            local player = type(entry) == "table" and entry.player or nil
+            local key = validIdentity(realmId, player) and identityKey(realmId, player) or nil
+            if key and available[key] and not seen[key] then
+                ordered[#ordered + 1] = { realmId = realmId, player = player }
+                seen[key] = true
+            end
+        end
+    end
+    for _, snapshot in ipairs(snapshots) do
+        local key = identityKey(snapshot.realmId, snapshot.player)
+        if not seen[key] then
+            ordered[#ordered + 1] = { realmId = snapshot.realmId, player = snapshot.player }
+            seen[key] = true
+        end
+    end
+    return ordered
+end
+
+function M.listOrdered(root, clientFamily)
+    local snapshots, byIdentity, ordered = M.list(root, clientFamily), {}, {}
+    for _, snapshot in ipairs(snapshots) do
+        byIdentity[identityKey(snapshot.realmId, snapshot.player)] = snapshot
+    end
+    for _, identity in ipairs(M.characterOrder(root, clientFamily)) do
+        local snapshot = byIdentity[identityKey(identity.realmId, identity.player)]
+        if snapshot then ordered[#ordered + 1] = snapshot end
+    end
+    return ordered
+end
+
+function M.moveCharacter(root, clientFamily, realmId, player, delta)
+    if delta ~= -1 and delta ~= 1 then return false end
+    if not validIdentity(realmId, player) then return false end
+    local order = M.characterOrder(root, clientFamily)
+    local target = identityKey(realmId, player)
+    local index
+    for i, entry in ipairs(order) do
+        if identityKey(entry.realmId, entry.player) == target then index = i break end
+    end
+    if not index or not order[index + delta] then return false end
+    order[index], order[index + delta] = order[index + delta], order[index]
+    root.roleOverviewCharacterOrder = type(root.roleOverviewCharacterOrder) == "table"
+        and root.roleOverviewCharacterOrder or {}
+    root.roleOverviewCharacterOrder[clientFamily] = order
+    return true
+end
+
+function M.resetCharacterOrder(root, clientFamily)
+    if type(root) ~= "table" or not isKey(clientFamily) then return false end
+    local storage = type(root.roleOverviewCharacterOrder) == "table" and root.roleOverviewCharacterOrder or nil
+    if not storage or storage[clientFamily] == nil then return false end
+    storage[clientFamily] = nil
+    return true
+end
+
 local function difficultyRank(label)
     if label == "M" then return 4 end
     if label == "H" then return 3 end
@@ -490,6 +569,17 @@ function M.delete(root, clientFamily, realmId, player)
     if not realm or type(player) ~= "string" then return false end
     if realm[player] == nil then return false end
     realm[player] = nil
+    local storage = type(root.roleOverviewCharacterOrder) == "table" and root.roleOverviewCharacterOrder or nil
+    local order = storage and storage[clientFamily] or nil
+    if type(order) == "table" then
+        local kept = {}
+        for _, entry in ipairs(order) do
+            if type(entry) == "table" and not (entry.realmId == realmId and entry.player == player) then
+                kept[#kept + 1] = entry
+            end
+        end
+        storage[clientFamily] = kept
+    end
     if next(realm) == nil then
         local family = familyTable(root, clientFamily, false)
         if family then family[realmId] = nil end
@@ -499,13 +589,17 @@ end
 
 function M.clearFamily(root, clientFamily)
     local store = type(root) == "table" and root.ownCharacters or nil
-    if type(store) ~= "table" or not isKey(clientFamily) then return end
-    store[clientFamily] = nil
+    if not isKey(clientFamily) then return end
+    if type(store) == "table" then store[clientFamily] = nil end
+    if type(root) == "table" and type(root.roleOverviewCharacterOrder) == "table" then
+        root.roleOverviewCharacterOrder[clientFamily] = nil
+    end
 end
 
 function M.clearAll(root)
     if type(root) ~= "table" then return end
     root.ownCharacters = {}
+    root.roleOverviewCharacterOrder = {}
 end
 
 BG.BGNext.OwnCharacters = M
