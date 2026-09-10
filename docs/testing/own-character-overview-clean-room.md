@@ -47,5 +47,6 @@ Capture on the Anniversary/Titan client with matching resolution, UI scale, real
 13. Titan saved-instance tuples use the 14th `instanceID` and third `reset` result; grouped columns aggregate the BGLite baseline instance sets (`548+550`, `533+615+616`, `309+649`, `568+580`).
 14. `RequestRaidInfo()` runs only at module installation and explicit user refresh, never on ordinary equipment, money, bag, currency or profession event collection.
 15. Countdown maintenance runs once per minute only while the overview is visible and stops when hidden or disabled.
+16. Character order — open role-overview settings, move a character up and down, verify the overview refreshes immediately, reload to verify persistence, switch current/all-realm views to verify relative order, then restore default and verify no character snapshot was deleted.
 
 Do not mark the feature complete, and do not publish a Release, until these screenshots are approved by the maintainer and the independent provenance audit passes.

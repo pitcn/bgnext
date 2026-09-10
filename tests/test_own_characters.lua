@@ -128,6 +128,55 @@ return function(test)
     M.clearAll(root)
     test.eq(#M.list(root, "mop"), 0, "clearAll empties every family")
 
+    -- Character order is a separate, full-identity array scoped by client family.
+    local orderRoot = {}
+    M.upsert(orderRoot, "titan", { realmId = 123, realmName = "时光II", player = "Alpha" })
+    M.upsert(orderRoot, "titan", { realmId = 456, realmName = "时光III", player = "Piti" })
+    M.upsert(orderRoot, "titan", { realmId = 123, realmName = "时光II", player = "Piti" })
+    M.upsert(orderRoot, "mop", { realmId = 123, realmName = "时光II", player = "Mop" })
+    test.eq(M.listOrdered(orderRoot, "titan")[1].player, "Alpha", "missing order uses deterministic default")
+    test.eq(M.moveCharacter(orderRoot, "titan", 456, "Piti", -1), true, "middle character moves up")
+    local titanOrder = M.characterOrder(orderRoot, "titan")
+    test.eq(titanOrder[2].realmId, 456, "stored order uses realm identity")
+    test.eq(titanOrder[2].player, "Piti", "stored order uses player identity")
+    test.eq(titanOrder[2].realmName, nil, "stored order contains no snapshot fields")
+    test.eq(M.moveCharacter(orderRoot, "titan", 123, "Alpha", -1), false, "first character cannot move up")
+    test.eq(M.moveCharacter(orderRoot, "titan", 123, "Piti", 1), false, "last character cannot move down")
+    orderRoot.roleOverviewCharacterOrder.titan = {
+        { realmId = 456, player = "Piti" }, { realmId = 456, player = "Piti" },
+        { realmId = "bad", player = "Bad" }, { realmId = 999, player = "Gone" }, { player = "Missing" },
+    }
+    test.eq(#M.characterOrder(orderRoot, "titan"), 3, "bad order entries are ignored and missing rows append")
+    M.upsert(orderRoot, "titan", { realmId = 789, realmName = "时光IV", player = "New" })
+    test.eq(M.listOrdered(orderRoot, "titan")[4].player, "New", "new character appends after custom order")
+    orderRoot.ownCharacters.titan[123].Malformed = { realmId = 999 }
+    test.eq(#M.characterOrder(orderRoot, "titan"), 4, "malformed snapshots cannot enter character order")
+    local Settings = dofile("Core/BGNext/RoleOverviewSettings.lua")
+    local settingsRows = Settings.characterOrderRows(orderRoot, "titan", M)
+    test.eq(#settingsRows, 4, "settings ignores malformed snapshots when listing ordered characters")
+    test.eq(settingsRows[4].player, "New", "settings keeps the valid custom order after malformed snapshots")
+    M.moveCharacter(orderRoot, "mop", 123, "Mop", -1)
+    test.eq(orderRoot.roleOverviewCharacterOrder.mop, nil, "single-family boundary move does not create order")
+    test.eq(M.delete(orderRoot, "titan", 456, "Piti"), true, "deletes ordered character")
+    test.eq(#M.characterOrder(orderRoot, "titan"), 3, "delete removes only matching order entry")
+    M.resetCharacterOrder(orderRoot, "titan")
+    test.eq(orderRoot.roleOverviewCharacterOrder.titan, nil, "reset removes selected order")
+    test.eq(M.get(orderRoot, "titan", 123, "Alpha").player, "Alpha", "reset preserves snapshots")
+    M.clearFamily(orderRoot, "titan")
+    test.eq(orderRoot.roleOverviewCharacterOrder.titan, nil, "clear family clears matching order")
+    M.clearAll(orderRoot)
+    test.eq(next(orderRoot.roleOverviewCharacterOrder), nil, "clear all clears every order")
+    local unsupported = {}
+    M.upsert(unsupported, "wrath", { realmId = 1, player = "NoOrder" })
+    test.eq(#M.characterOrder(unsupported, "wrath"), 0, "unsupported family cannot read character order")
+    test.eq(M.moveCharacter(unsupported, "wrath", 1, "NoOrder", -1), false, "unsupported family cannot persist moves")
+    test.eq(M.resetCharacterOrder(unsupported, "wrath"), false, "unsupported family cannot reset order")
+    local scalarOrder = {}
+    M.upsert(scalarOrder, "titan", { realmId = 1, player = "Fallback" })
+    scalarOrder.roleOverviewCharacterOrder = { titan = "corrupt" }
+    test.eq(#M.customCharacterOrder(scalarOrder, "titan"), 0,
+        "scalar family order safely falls back to no explicit order")
+
     -- list() is deterministic and defensive.
     local fresh = {}
     M.ensureRoot(fresh)

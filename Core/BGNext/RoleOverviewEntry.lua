@@ -324,6 +324,7 @@ local function provider()
         family = family,
         catalog = catalog,
         snapshots = snapshots,
+        characterOrder = Model and Model.customCharacterOrder(root, family) or nil,
         currentRealmId = BG.realmID or (type(GetRealmID) == "function" and GetRealmID()),
         showAllRealms = state.shift,
         now = type(time) == "function" and time() or nil,

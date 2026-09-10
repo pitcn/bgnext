@@ -3,6 +3,7 @@ return function(test)
     dofile("Core/BGNext/OwnCharactersAdapters.lua")
     local Catalog = dofile("Core/BGNext/OwnCharactersCatalog.lua")
     local View = dofile("Core/BGNext/OwnCharactersView.lua")
+    local Settings = dofile("Core/BGNext/RoleOverviewSettings.lua")
 
     local function snapshot(overrides)
         local base = {
@@ -28,6 +29,29 @@ return function(test)
         for key, value in pairs(overrides or {}) do base[key] = value end
         return base
     end
+
+    local orderRows = Settings.characterOrderRows({}, "titan", {
+        listOrdered = function()
+            return {
+                { realmId = 123, realmName = "时光II", player = "Piti" },
+                { realmId = 456, realmName = "时光III", player = "Piti" },
+                { realmId = 789, realmName = "时光IV", player = "Alt" },
+            }
+        end,
+    })
+    test.eq(orderRows[1].label, "时光II-Piti", "same-name order row includes realm label")
+    test.eq(orderRows[3].label, "Alt", "unique order row remains compact")
+    test.eq(orderRows[1].canMoveUp, false, "first order row cannot move up")
+    test.eq(orderRows[1].canMoveDown, true, "first order row can move down")
+    test.eq(orderRows[3].canMoveDown, false, "last order row cannot move down")
+    local settingsSource = assert(io.open("Core/BGNext/RoleOverviewSettings.lua", "r")):read("*a")
+    test.eq(string.find(settingsSource, "角色顺序", 1, true) ~= nil, true, "settings has order heading")
+    test.eq(string.find(settingsSource, "Model.moveCharacter", 1, true) ~= nil, true, "settings moves through model")
+    test.eq(string.find(settingsSource, "Model.resetCharacterOrder", 1, true) ~= nil, true, "settings resets through model")
+    test.eq(string.find(settingsSource, "RegisterForDrag", 1, true), nil, "settings registers no drag behavior")
+    local layout = Settings.characterOrderLayout(3, -100)
+    test.eq(layout.lowerY < layout.restoreY, true, "dynamic order layout leaves space below restore")
+    test.eq(layout.height > 0, true, "dynamic order layout grows panel height")
 
     -- Two sections with the approved titles and hints.
     local view = View.project(input())
@@ -281,6 +305,21 @@ return function(test)
     local allRealms = View.project(input({ snapshots = multiRealm, showAllRealms = true }))
     test.eq(#allRealms.raid.rows, 3, "shift shows every local realm")
     test.eq(allRealms.raid.rows[1].realmId, 123, "current realm sorts first")
+
+    local customOrder = {
+        { realmId = 456, player = "Piti" },
+        { realmId = 123, player = "Piti" },
+    }
+    local orderedAll = View.project(input({ snapshots = multiRealm, showAllRealms = true, characterOrder = customOrder }))
+    test.eq(orderedAll.raid.rows[1].realmId, 456, "custom rank overrides current realm sorting")
+    test.eq(orderedAll.raid.rows[2].realmId, 123, "custom order retains full identity")
+    test.eq(orderedAll.raid.rows[3].player, "Alt", "unranked characters follow ranked rows")
+    local orderedCurrent = View.project(input({ snapshots = multiRealm, characterOrder = customOrder }))
+    test.eq(orderedCurrent.raid.rows[1].realmId, 123, "current-realm filtering retains relative custom order")
+    local malformedOrder = View.project(input({ snapshots = multiRealm, showAllRealms = true, characterOrder = {
+        { realmId = 456, player = "Piti" }, { realmId = 456, player = "Piti" }, { realmId = "bad", player = "Piti" },
+    } }))
+    test.eq(#malformedOrder.raid.rows, 3, "bad order entries cannot hide or duplicate rows")
 
     -- Same-name cross-realm characters stay two rows and gain a short prefix.
     local piti = {}

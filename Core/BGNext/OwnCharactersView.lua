@@ -571,8 +571,16 @@ end
 
 -- Rows are ordered current realm first, then realm, then character name, so
 -- the table does not reshuffle between logins.
-local function buildRows(snapshots, currentRealmId, showAllRealms)
+local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder)
     local rows = {}
+    local ranks = {}
+    for index, identity in ipairs(type(characterOrder) == "table" and characterOrder or {}) do
+        if type(identity) == "table" and type(identity.realmId) == "number"
+            and isNonEmptyString(identity.player) then
+            local key = tostring(identity.realmId) .. "\031" .. identity.player
+            if ranks[key] == nil then ranks[key] = index end
+        end
+    end
     for _, snapshot in ipairs(snapshots or {}) do
         if isValidSnapshot(snapshot) then
             local isCurrentRealm = snapshot.realmId == currentRealmId
@@ -580,11 +588,15 @@ local function buildRows(snapshots, currentRealmId, showAllRealms)
                 rows[#rows + 1] = {
                     snapshot = snapshot,
                     isCurrentRealm = isCurrentRealm,
+                    rank = ranks[tostring(snapshot.realmId) .. "\031" .. snapshot.player],
                 }
             end
         end
     end
     table.sort(rows, function(a, b)
+        if a.rank and b.rank and a.rank ~= b.rank then return a.rank < b.rank end
+        if a.rank ~= nil and b.rank == nil then return true end
+        if a.rank == nil and b.rank ~= nil then return false end
         if a.isCurrentRealm ~= b.isCurrentRealm then return a.isCurrentRealm end
         local ra, rb = tostring(a.snapshot.realmId), tostring(b.snapshot.realmId)
         if ra ~= rb then return ra < rb end
@@ -681,7 +693,7 @@ function M.project(input)
     local raidColumns = visibleColumns(catalog.raidColumns, "raid", input.visibility, available)
     local resourceColumns = visibleColumns(catalog.resourceColumns, "resource", input.visibility, available)
 
-    local entries = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true)
+    local entries = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true, input.characterOrder)
     markAmbiguousNames(entries)
 
     local raidRows, resourceRows = {}, {}

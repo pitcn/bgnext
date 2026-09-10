@@ -32,6 +32,8 @@ function M.ensureRoot(saved)
     root.wishlist = type(root.wishlist) == "table" and root.wishlist or {}
     root.equipmentFilters = type(root.equipmentFilters) == "table" and root.equipmentFilters or {}
     root.ownCharacters = type(root.ownCharacters) == "table" and root.ownCharacters or {}
+    root.roleOverviewCharacterOrder = type(root.roleOverviewCharacterOrder) == "table"
+        and root.roleOverviewCharacterOrder or {}
     root.leaderAuctionPricePresets = type(root.leaderAuctionPricePresets) == "table"
         and root.leaderAuctionPricePresets or {}
     root.personalAuctionExpectations = type(root.personalAuctionExpectations) == "table"

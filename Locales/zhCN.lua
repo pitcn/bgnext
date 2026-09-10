@@ -3284,6 +3284,11 @@ end
 end
 
 do -- BGNext character overview
+    L["角色顺序"] = true
+    L["上移"] = true
+    L["下移"] = true
+    L["恢复默认排序"] = true
+    L["暂无角色数据"] = true
     L["本周获得"] = true
     L["不足1分钟"] = true
     L["当前数量"] = true
