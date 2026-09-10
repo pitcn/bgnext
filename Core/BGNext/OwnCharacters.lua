@@ -450,7 +450,9 @@ end
 function M.listOrdered(root, clientFamily)
     local snapshots, byIdentity, ordered = M.list(root, clientFamily), {}, {}
     for _, snapshot in ipairs(snapshots) do
-        byIdentity[identityKey(snapshot.realmId, snapshot.player)] = snapshot
+        if validIdentity(snapshot.realmId, snapshot.player) then
+            byIdentity[identityKey(snapshot.realmId, snapshot.player)] = snapshot
+        end
     end
     for _, identity in ipairs(M.characterOrder(root, clientFamily)) do
         local snapshot = byIdentity[identityKey(identity.realmId, identity.player)]

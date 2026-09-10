@@ -149,8 +149,12 @@ return function(test)
     test.eq(#M.characterOrder(orderRoot, "titan"), 3, "bad order entries are ignored and missing rows append")
     M.upsert(orderRoot, "titan", { realmId = 789, realmName = "时光IV", player = "New" })
     test.eq(M.listOrdered(orderRoot, "titan")[4].player, "New", "new character appends after custom order")
-    orderRoot.ownCharacters.titan[123].Malformed = { player = "Malformed" }
+    orderRoot.ownCharacters.titan[123].Malformed = { realmId = 999 }
     test.eq(#M.characterOrder(orderRoot, "titan"), 4, "malformed snapshots cannot enter character order")
+    local Settings = dofile("Core/BGNext/RoleOverviewSettings.lua")
+    local settingsRows = Settings.characterOrderRows(orderRoot, "titan", M)
+    test.eq(#settingsRows, 4, "settings ignores malformed snapshots when listing ordered characters")
+    test.eq(settingsRows[4].player, "New", "settings keeps the valid custom order after malformed snapshots")
     M.moveCharacter(orderRoot, "mop", 123, "Mop", -1)
     test.eq(orderRoot.roleOverviewCharacterOrder.mop, nil, "single-family boundary move does not create order")
     test.eq(M.delete(orderRoot, "titan", 456, "Piti"), true, "deletes ordered character")
