@@ -78,7 +78,8 @@ do -- BGNext release text
     L["修复自动拍卖成功记录出现后，主表买家和成交金额仍可能为空的问题。"] = "Fixed successful auction records that could still leave the main bill buyer and amount blank."
 end
 
-do -- BGNext 0.8.5 release text
+do -- BGNext 0.8.6 release text
+    L["角色总览设置新增上移、下移排序；各客户端版本分别保存，恢复默认排序不会删除角色数据；无效、过期或重复的排序数据会安全忽略。"] = "Character Overview settings now offer Up/Down ordering. Each client family keeps its own order; Restore Default does not delete character data; malformed, stale, or duplicate order data is safely ignored."
     L["修复基础或完整模式与交易通报设置冲突；只有在交易设置中主动开启后才会发送。"] = "Fixed a Basic/Full mode conflict with Trade Announcement settings; messages are sent only when explicitly enabled in Trade settings."
     L["修复成交欠款、组合快捷键、装备过滤、拍卖权限与当前团对账问题。"] = "Fixed auction debt, modifier shortcuts, equipment filtering, auction permissions, and current-raid reconciliation."
     L["修复成交已写入买家和金额后，交易完成仍可能漏记欠款或算错总消费的问题。"] = "Fixed missing debt and incorrect total spending after an auction had already filled the buyer and amount."
@@ -101,7 +102,7 @@ do -- BGNext 0.8.5 release text
         ["修复团长在聊天框 Alt+左键点击装备时误加入心愿；现在会打开拍卖窗口。"] = "Fixed raid leaders Alt-left-clicking chat items adding a wish; the shortcut now opens the auction window.",
     }
     for key, value in pairs(values) do L[key] = value end
-    ns.updateText_now = { "BGNext 0.8.5", L["修复基础或完整模式与交易通报设置冲突；只有在交易设置中主动开启后才会发送。"] }
+    ns.updateText_now = { "BGNext 0.8.6", L["角色总览设置新增上移、下移排序；各客户端版本分别保存，恢复默认排序不会删除角色数据；无效、过期或重复的排序数据会安全忽略。"] }
 end
 
 do -- BGNext leader tools

@@ -17,9 +17,10 @@ local info = {
     activityUrl = "https://m.ds.163.com/article/6a8e490b5b32bc1f3ab97aaa/?isNew=1",
     repositoryUrl = "https://github.com/pitcn/bgnext",
     changelog = {
-        L["修复基础或完整模式与交易通报设置冲突；只有在交易设置中主动开启后才会发送。"],
+        L["角色总览设置新增上移、下移排序；各客户端版本分别保存，恢复默认排序不会删除角色数据；无效、过期或重复的排序数据会安全忽略。"],
     },
     history = {
+        { version = "0.8.5", changelog = { L["修复基础或完整模式与交易通报设置冲突；只有在交易设置中主动开启后才会发送。"] } },
         { version = "0.8.4", changelog = { L["修复成交欠款、组合快捷键、装备过滤、拍卖权限与当前团对账问题。"] } },
         { version = "0.8.3", changelog = { L["修复拍卖与交易记账、键盘焦点、专业冷却和聊天框团长开拍入口。"] } },
         { version = "0.8.2", changelog = { L["修复自动拍卖成功记录出现后，主表买家和成交金额仍可能为空的问题。"] } },
