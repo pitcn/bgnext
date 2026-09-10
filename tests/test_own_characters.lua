@@ -167,6 +167,11 @@ return function(test)
     test.eq(#M.characterOrder(unsupported, "wrath"), 0, "unsupported family cannot read character order")
     test.eq(M.moveCharacter(unsupported, "wrath", 1, "NoOrder", -1), false, "unsupported family cannot persist moves")
     test.eq(M.resetCharacterOrder(unsupported, "wrath"), false, "unsupported family cannot reset order")
+    local scalarOrder = {}
+    M.upsert(scalarOrder, "titan", { realmId = 1, player = "Fallback" })
+    scalarOrder.roleOverviewCharacterOrder = { titan = "corrupt" }
+    test.eq(#M.customCharacterOrder(scalarOrder, "titan"), 0,
+        "scalar family order safely falls back to no explicit order")
 
     -- list() is deterministic and defensive.
     local fresh = {}

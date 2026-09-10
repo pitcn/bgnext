@@ -435,7 +435,8 @@ function M.customCharacterOrder(root, clientFamily)
         if validIdentity(snapshot.realmId, snapshot.player) then available[identityKey(snapshot.realmId, snapshot.player)] = true end
     end
     local storage = type(root) == "table" and root.roleOverviewCharacterOrder or nil
-    for _, entry in ipairs(type(storage) == "table" and storage[clientFamily] or {}) do
+    local saved = type(storage) == "table" and storage[clientFamily] or nil
+    for _, entry in ipairs(type(saved) == "table" and saved or {}) do
         local realmId = type(entry) == "table" and entry.realmId or nil
         local player = type(entry) == "table" and entry.player or nil
         local key = validIdentity(realmId, player) and identityKey(realmId, player) or nil
