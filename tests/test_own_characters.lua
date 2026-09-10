@@ -149,6 +149,8 @@ return function(test)
     test.eq(#M.characterOrder(orderRoot, "titan"), 3, "bad order entries are ignored and missing rows append")
     M.upsert(orderRoot, "titan", { realmId = 789, realmName = "时光IV", player = "New" })
     test.eq(M.listOrdered(orderRoot, "titan")[4].player, "New", "new character appends after custom order")
+    orderRoot.ownCharacters.titan[123].Malformed = { player = "Malformed" }
+    test.eq(#M.characterOrder(orderRoot, "titan"), 4, "malformed snapshots cannot enter character order")
     M.moveCharacter(orderRoot, "mop", 123, "Mop", -1)
     test.eq(orderRoot.roleOverviewCharacterOrder.mop, nil, "single-family boundary move does not create order")
     test.eq(M.delete(orderRoot, "titan", 456, "Piti"), true, "deletes ordered character")

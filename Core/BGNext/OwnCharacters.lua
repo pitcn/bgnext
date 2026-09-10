@@ -407,10 +407,12 @@ function M.characterOrder(root, clientFamily)
         end
     end
     for _, snapshot in ipairs(snapshots) do
-        local key = identityKey(snapshot.realmId, snapshot.player)
-        if not seen[key] then
-            ordered[#ordered + 1] = { realmId = snapshot.realmId, player = snapshot.player }
-            seen[key] = true
+        if validIdentity(snapshot.realmId, snapshot.player) then
+            local key = identityKey(snapshot.realmId, snapshot.player)
+            if not seen[key] then
+                ordered[#ordered + 1] = { realmId = snapshot.realmId, player = snapshot.player }
+                seen[key] = true
+            end
         end
     end
     return ordered
