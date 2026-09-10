@@ -3,6 +3,7 @@ return function(test)
     dofile("Core/BGNext/OwnCharactersAdapters.lua")
     local Catalog = dofile("Core/BGNext/OwnCharactersCatalog.lua")
     local View = dofile("Core/BGNext/OwnCharactersView.lua")
+    local Settings = dofile("Core/BGNext/RoleOverviewSettings.lua")
 
     local function snapshot(overrides)
         local base = {
@@ -28,6 +29,26 @@ return function(test)
         for key, value in pairs(overrides or {}) do base[key] = value end
         return base
     end
+
+    local orderRows = Settings.characterOrderRows({}, "titan", {
+        listOrdered = function()
+            return {
+                { realmId = 123, realmName = "时光II", player = "Piti" },
+                { realmId = 456, realmName = "时光III", player = "Piti" },
+                { realmId = 789, realmName = "时光IV", player = "Alt" },
+            }
+        end,
+    })
+    test.eq(orderRows[1].label, "时光II-Piti", "same-name order row includes realm label")
+    test.eq(orderRows[3].label, "Alt", "unique order row remains compact")
+    test.eq(orderRows[1].canMoveUp, false, "first order row cannot move up")
+    test.eq(orderRows[1].canMoveDown, true, "first order row can move down")
+    test.eq(orderRows[3].canMoveDown, false, "last order row cannot move down")
+    local settingsSource = assert(io.open("Core/BGNext/RoleOverviewSettings.lua", "r")):read("*a")
+    test.eq(string.find(settingsSource, "角色顺序", 1, true) ~= nil, true, "settings has order heading")
+    test.eq(string.find(settingsSource, "Model.moveCharacter", 1, true) ~= nil, true, "settings moves through model")
+    test.eq(string.find(settingsSource, "Model.resetCharacterOrder", 1, true) ~= nil, true, "settings resets through model")
+    test.eq(string.find(settingsSource, "RegisterForDrag", 1, true), nil, "settings registers no drag behavior")
 
     -- Two sections with the approved titles and hints.
     local view = View.project(input())

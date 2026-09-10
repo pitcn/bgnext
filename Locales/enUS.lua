@@ -3358,6 +3358,11 @@ do -- BGNext auction price presets
 end
 
 do -- BGNext character overview
+    L["角色顺序"] = "Character Order"
+    L["上移"] = "Up"
+    L["下移"] = "Down"
+    L["恢复默认排序"] = "Restore Default Order"
+    L["暂无角色数据"] = "No Character Data"
     L["本周获得"] = "Earned this week"
     L["不足1分钟"] = "Less than 1 min"
     L["当前数量"] = "Current"
