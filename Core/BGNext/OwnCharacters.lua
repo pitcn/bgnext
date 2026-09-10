@@ -378,6 +378,13 @@ local function validIdentity(realmId, player)
     return type(realmId) == "number" and type(player) == "string" and player ~= ""
 end
 
+-- Matches the catalog families whose role overview is enabled or pending
+-- verification; unverified Wrath/Cataclysm never receive order storage.
+local ORDER_FAMILIES = { vanilla = true, tbc = true, titan = true, mop = true, retail = true }
+local function supportsCharacterOrder(clientFamily)
+    return ORDER_FAMILIES[clientFamily] == true
+end
+
 local function identityKey(realmId, player)
     return tostring(realmId) .. "\031" .. player
 end
@@ -386,6 +393,7 @@ end
 -- stale saved entries are ignored; unranked current snapshots follow the legacy
 -- deterministic list order.
 function M.characterOrder(root, clientFamily)
+    if not supportsCharacterOrder(clientFamily) then return {} end
     local snapshots = M.list(root, clientFamily)
     local available, ordered, seen = {}, {}, {}
     for _, snapshot in ipairs(snapshots) do
@@ -418,6 +426,26 @@ function M.characterOrder(root, clientFamily)
     return ordered
 end
 
+-- Explicit saved ranks only. The provider deliberately uses this rather than
+-- the effective order so an absent/reset/corrupt setting retains view defaults.
+function M.customCharacterOrder(root, clientFamily)
+    if not supportsCharacterOrder(clientFamily) then return {} end
+    local available, ordered, seen = {}, {}, {}
+    for _, snapshot in ipairs(M.list(root, clientFamily)) do
+        if validIdentity(snapshot.realmId, snapshot.player) then available[identityKey(snapshot.realmId, snapshot.player)] = true end
+    end
+    local storage = type(root) == "table" and root.roleOverviewCharacterOrder or nil
+    for _, entry in ipairs(type(storage) == "table" and storage[clientFamily] or {}) do
+        local realmId = type(entry) == "table" and entry.realmId or nil
+        local player = type(entry) == "table" and entry.player or nil
+        local key = validIdentity(realmId, player) and identityKey(realmId, player) or nil
+        if key and available[key] and not seen[key] then
+            ordered[#ordered + 1] = { realmId = realmId, player = player }; seen[key] = true
+        end
+    end
+    return ordered
+end
+
 function M.listOrdered(root, clientFamily)
     local snapshots, byIdentity, ordered = M.list(root, clientFamily), {}, {}
     for _, snapshot in ipairs(snapshots) do
@@ -431,6 +459,7 @@ function M.listOrdered(root, clientFamily)
 end
 
 function M.moveCharacter(root, clientFamily, realmId, player, delta)
+    if not supportsCharacterOrder(clientFamily) then return false end
     if delta ~= -1 and delta ~= 1 then return false end
     if not validIdentity(realmId, player) then return false end
     local order = M.characterOrder(root, clientFamily)
@@ -448,7 +477,7 @@ function M.moveCharacter(root, clientFamily, realmId, player, delta)
 end
 
 function M.resetCharacterOrder(root, clientFamily)
-    if type(root) ~= "table" or not isKey(clientFamily) then return false end
+    if type(root) ~= "table" or not isKey(clientFamily) or not supportsCharacterOrder(clientFamily) then return false end
     local storage = type(root.roleOverviewCharacterOrder) == "table" and root.roleOverviewCharacterOrder or nil
     if not storage or storage[clientFamily] == nil then return false end
     storage[clientFamily] = nil

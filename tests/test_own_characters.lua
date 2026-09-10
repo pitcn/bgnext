@@ -162,6 +162,11 @@ return function(test)
     test.eq(orderRoot.roleOverviewCharacterOrder.titan, nil, "clear family clears matching order")
     M.clearAll(orderRoot)
     test.eq(next(orderRoot.roleOverviewCharacterOrder), nil, "clear all clears every order")
+    local unsupported = {}
+    M.upsert(unsupported, "wrath", { realmId = 1, player = "NoOrder" })
+    test.eq(#M.characterOrder(unsupported, "wrath"), 0, "unsupported family cannot read character order")
+    test.eq(M.moveCharacter(unsupported, "wrath", 1, "NoOrder", -1), false, "unsupported family cannot persist moves")
+    test.eq(M.resetCharacterOrder(unsupported, "wrath"), false, "unsupported family cannot reset order")
 
     -- list() is deterministic and defensive.
     local fresh = {}

@@ -185,6 +185,14 @@ function M.characterOrderRows(root, family, model)
     return rows
 end
 
+function M.characterOrderLayout(rowCount, orderTop)
+    local count = math.max(tonumber(rowCount) or 0, 1)
+    local top = tonumber(orderTop) or 0
+    local restoreY = top - count * 26 - 4
+    local lowerY = restoreY - 41
+    return { restoreY = restoreY, lowerY = lowerY, height = math.abs(lowerY) + 160 }
+end
+
 -- Shows the confirmation dialog and, on accept, runs the matching clear on the
 -- runtime. The runtime's clear functions are already tested; this is only the
 -- in-game confirmation wrapper.
@@ -304,6 +312,7 @@ function M.BuildPanel(parent)
         orderHeading:SetText(BG.STC_g1(L["角色顺序"]))
         y = y - 25
         local orderTop, orderControls = y, {}
+        local layoutLowerControls
         local emptyOrder = parent:CreateFontString(nil, "ARTWORK")
         emptyOrder:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
         emptyOrder:SetPoint("TOPLEFT", parent, 20, orderTop)
@@ -323,8 +332,9 @@ function M.BuildPanel(parent)
                     orderControls[index] = control
                 end
                 local rowY = orderTop - (index - 1) * 26
-                control.label:SetPoint("TOPLEFT", parent, 20, rowY); control.label:SetText(row.label)
-                control.up:SetPoint("TOPLEFT", parent, 180, rowY + 3); control.down:SetPoint("LEFT", control.up, "RIGHT", 5, 0)
+                control.label:ClearAllPoints(); control.label:SetPoint("TOPLEFT", parent, 20, rowY); control.label:SetText(row.label)
+                control.up:ClearAllPoints(); control.up:SetPoint("TOPLEFT", parent, 180, rowY + 3)
+                control.down:ClearAllPoints(); control.down:SetPoint("LEFT", control.up, "RIGHT", 5, 0)
                 control.up:SetText(L["上移"]); control.down:SetText(L["下移"])
                 control.up:SetEnabled(row.canMoveUp); control.down:SetEnabled(row.canMoveDown)
                 control.up:SetScript("OnClick", function()
@@ -335,8 +345,10 @@ function M.BuildPanel(parent)
                 end)
                 control.label:Show(); control.up:Show(); control.down:Show()
             end
-            restoreOrder:ClearAllPoints(); restoreOrder:SetPoint("TOPLEFT", parent, 20, orderTop - math.max(#rows, 1) * 26 - 4)
+            local layout = M.characterOrderLayout(#rows, orderTop)
+            restoreOrder:ClearAllPoints(); restoreOrder:SetPoint("TOPLEFT", parent, 20, layout.restoreY)
             restoreOrder:SetShown(#rows > 0)
+            if layoutLowerControls then layoutLowerControls(layout) end
         end
         restoreOrder:SetText(L["恢复默认排序"])
         restoreOrder:SetScript("OnClick", function()
@@ -344,7 +356,7 @@ function M.BuildPanel(parent)
         end)
         rebuildOrderRows()
         if type(parent.HookScript) == "function" then parent:HookScript("OnShow", rebuildOrderRows) end
-        y = orderTop - math.max(#M.characterOrderRows(root, family, Model), 1) * 26 - 45
+        y = M.characterOrderLayout(#M.characterOrderRows(root, family, Model), orderTop).lowerY
 
         -- Disabling the module stops collection and refresh; no data is
         -- deleted, and re-checking restores collection.
@@ -388,7 +400,14 @@ function M.BuildPanel(parent)
         clearAll:SetScript("OnClick", function() M.confirmClear("all", nil) end)
         y = y - 30
 
-        parent:SetSize(400, math.abs(y) + 60)
+        layoutLowerControls = function(layout)
+            enabledCheck:ClearAllPoints(); enabledCheck:SetPoint("TOPLEFT", parent, 20, layout.lowerY)
+            clearFamily:ClearAllPoints(); clearFamily:SetPoint("TOPLEFT", parent, 20, layout.lowerY - 40)
+            clearAll:ClearAllPoints(); clearAll:SetPoint("TOPLEFT", parent, 20, layout.lowerY - 70)
+            parent:SetSize(400, layout.height)
+        end
+        layoutLowerControls(M.characterOrderLayout(#M.characterOrderRows(root, family, Model), orderTop))
+
     end)
 end
 

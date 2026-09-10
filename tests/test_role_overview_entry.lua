@@ -4,8 +4,8 @@ return function(test)
     dofile("Core/BGNext/OwnCharactersAdapters.lua")
     local Entry = dofile("Core/BGNext/RoleOverviewEntry.lua")
     local providerSource = assert(io.open("Core/BGNext/RoleOverviewEntry.lua", "r")):read("*a")
-    test.eq(string.find(providerSource, "Model.characterOrder(root, family)", 1, true) ~= nil, true,
-        "provider obtains sanitized character order from the model")
+    test.eq(string.find(providerSource, "Model.customCharacterOrder(root, family)", 1, true) ~= nil, true,
+        "provider obtains only explicit custom order from the model")
     test.eq(string.find(providerSource, "characterOrder = Model", 1, true) ~= nil, true,
         "provider passes model order to the projection")
 

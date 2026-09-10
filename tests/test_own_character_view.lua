@@ -49,6 +49,9 @@ return function(test)
     test.eq(string.find(settingsSource, "Model.moveCharacter", 1, true) ~= nil, true, "settings moves through model")
     test.eq(string.find(settingsSource, "Model.resetCharacterOrder", 1, true) ~= nil, true, "settings resets through model")
     test.eq(string.find(settingsSource, "RegisterForDrag", 1, true), nil, "settings registers no drag behavior")
+    local layout = Settings.characterOrderLayout(3, -100)
+    test.eq(layout.lowerY < layout.restoreY, true, "dynamic order layout leaves space below restore")
+    test.eq(layout.height > 0, true, "dynamic order layout grows panel height")
 
     -- Two sections with the approved titles and hints.
     local view = View.project(input())
