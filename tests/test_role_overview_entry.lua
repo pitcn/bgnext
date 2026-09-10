@@ -3,6 +3,11 @@ return function(test)
     local Model = dofile("Core/BGNext/OwnCharacters.lua")
     dofile("Core/BGNext/OwnCharactersAdapters.lua")
     local Entry = dofile("Core/BGNext/RoleOverviewEntry.lua")
+    local providerSource = assert(io.open("Core/BGNext/RoleOverviewEntry.lua", "r")):read("*a")
+    test.eq(string.find(providerSource, "Model.characterOrder(root, family)", 1, true) ~= nil, true,
+        "provider obtains sanitized character order from the model")
+    test.eq(string.find(providerSource, "characterOrder = Model", 1, true) ~= nil, true,
+        "provider passes model order to the projection")
 
     -- Hover previews, leaving hides again, unless the window was pinned.
     test.eq(Entry.intent("hover", {}), "preview", "hover previews the overview")
