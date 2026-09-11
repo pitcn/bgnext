@@ -99,6 +99,7 @@ return function(test)
         "local function showExportPanel",
         "local function confirmClearRaid",
         "wishlist.parseImport",
+        "wishlist.previewImport",
         "wishlist.applyImport",
         "wishlist.exportRaid",
         "wishlist.migrateFlatRaid",
@@ -107,6 +108,12 @@ return function(test)
     }) do
         test.eq(source:find(required, 1, true) ~= nil, true, "original control contract present: " .. required)
     end
+    test.eq(source:find('"merge"', 1, true) ~= nil, true,
+        "wishlist import offers the safe default merge mode")
+    test.eq(source:find('"replace"', 1, true) ~= nil, true,
+        "wishlist import keeps replacement behind an explicit mode")
+    test.eq(source:find("StaticPopup_Show", 1, true) ~= nil, true,
+        "wishlist import previews changes in a cancellable confirmation")
     for _, forbiddenApi in ipairs({ "C_Clipboard", "CopyToClipboard", "ChatEdit_InsertLink" }) do
         test.eq(source:find(forbiddenApi, 1, true), nil, "no automatic clipboard or chat export: " .. forbiddenApi)
     end

@@ -104,6 +104,23 @@ return function(test)
     test.eq(ambiguous[1].myGold, 50, "my gold is kept on its own side")
     test.eq(ambiguous[1].theirGold, 100, "their gold is kept on its own side")
     test.eq(ambiguous[1].status, "pending", "both-gold trade stays pending")
+
+    -- An API gap is not evidence of zero gold. Both gold sides must be known
+    -- before an otherwise clean sale can become reconciliation-complete.
+    local unknownMyGold = runtime.tradeRows({
+        completed = true, target = "甲", targetmoney = 500,
+        playeritems = { { itemId = 7002, count = 1 } },
+    })
+    test.eq(unknownMyGold[1].completed, true, "unknown gold keeps the completed trade fact")
+    test.eq(unknownMyGold[1].myGold, nil, "unknown player gold remains nil")
+    test.eq(unknownMyGold[1].status, "pending", "unknown player gold cannot prove a clean sale")
+
+    local unknownTheirGold = runtime.tradeRows({
+        completed = true, target = "乙", playermoney = 500,
+        targetitems = { { itemId = 7003, count = 1 } },
+    })
+    test.eq(unknownTheirGold[1].theirGold, nil, "unknown target gold remains nil")
+    test.eq(unknownTheirGold[1].status, "pending", "unknown target gold cannot prove a clean purchase")
     local ambiguousRoot = life.ensureRoot({})
     test.eq(runtime.recordTrade(ambiguousRoot, context(5450, 5000), {
         completed = true, target = "甲", targetmoney = 100, playermoney = 50,

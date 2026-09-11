@@ -2352,7 +2352,7 @@ BG.Init(function()
             hideOnEscape = true,
             showAlert = true,
         }
-        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, _, sender)
+        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, sender)
             if prefix ~= "BiaoGe" or distType ~= "RAID" then return end
             local cmd, itemID, link, money = strsplit("^", msg)
             if cmd ~= "ReAuction" then return end
@@ -2413,7 +2413,7 @@ BG.Init(function()
             hideOnEscape = true,
             showAlert = true,
         }
-        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, _, sender)
+        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, sender)
             if prefix ~= "BiaoGe2" or distType ~= "RAID" then return end
             local cmd, itemID, link = strsplit("^", msg)
             if cmd ~= "RemindAuction" then return end
@@ -2489,7 +2489,7 @@ BG.Init(function()
             hideOnEscape = true,
             showAlert = true,
         }
-        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, channel, _, sender)
+        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, channel, sender)
             if prefix ~= "BiaoGe2" or channel ~= "RAID" then return end
             if sender == player or not BG.IsMLByName(sender) then return end
             local cmd, itemID, link, buyer, money = strsplit("^", msg)

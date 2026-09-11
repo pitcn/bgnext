@@ -232,19 +232,27 @@ function M.currentSettlementSummary()
     if not context then return View.settlementSummary(nil, nil) end
     local bill = M.collectBill(context)
     local settlement = context.root and context.root.currentSettlement
-    return View.settlementSummary(bill, settlement)
+    return View.settlementSummary(bill, settlement, M.settlementNameKey)
+end
+
+function M.settlementNameKey(value)
+    local identity = BG.BGNext.PlayerIdentity
+    if identity and type(identity.key) == "function" then
+        return identity.key(value, BG.realmName)
+    end
+    return type(value) == "string" and value ~= "" and value or nil
 end
 
 function M.currentSettlementState()
     local context = M.currentContext()
     if not context then
         local bill, settlement = {}, {}
-        return { summary = View.settlementSummary(bill, settlement),
+        return { summary = View.settlementSummary(bill, settlement, M.settlementNameKey),
             fingerprint = View.settlementFingerprint(bill, settlement) }
     end
     local bill = M.collectBill(context)
     local settlement = context.root and context.root.currentSettlement or {}
-    return { summary = View.settlementSummary(bill, settlement),
+    return { summary = View.settlementSummary(bill, settlement, M.settlementNameKey),
         fingerprint = View.settlementFingerprint(bill, settlement) }
 end
 

@@ -537,36 +537,161 @@ function M.parseImport(text, limitsByRaid)
     return { ok = true, raids = raids, priorities = priorities, itemCount = itemCount }
 end
 
-function M.applyImport(root, realmId, player, parsed)
-    if type(parsed) ~= "table" or parsed.ok ~= true or type(parsed.raids) ~= "table" then
-        return false
+local function cloneTable(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, entry in pairs(value) do
+        result[key] = cloneTable(entry)
     end
-    if type(root) ~= "table" or type(root.wishlist) ~= "table"
-        or not validContextKey(realmId) or not validText(player)
-    then
-        return false
-    end
-    for raidId, importedRaid in pairs(parsed.raids) do
-        local raid = getRaid(root, realmId, player, raidId, true)
-        for key in pairs(raid) do
-            raid[key] = nil
-        end
-        local raidPriorities = parsed.priorities and parsed.priorities[raidId] or nil
-        for difficultyIndex, importedBosses in pairs(importedRaid) do
-            local bosses = {}
-            raid[difficultyIndex] = bosses
-            local difficultyPriorities = raidPriorities and raidPriorities[difficultyIndex] or nil
-            for bossIndex, importedSlots in pairs(importedBosses) do
-                local slots = {}
-                bosses[bossIndex] = slots
-                local bossPriorities = difficultyPriorities and difficultyPriorities[bossIndex] or nil
-                for slotIndex, itemId in ipairs(importedSlots) do
-                    local priority = bossPriorities and bossPriorities[slotIndex] or nil
-                    slots[slotIndex] = encodeSlot(itemId, priority)
+    return result
+end
+
+local function sameSlot(left, right)
+    return slotItemId(left) == slotItemId(right) and slotPriority(left) == slotPriority(right)
+end
+
+local function guardToken(value)
+    local text = tostring(value)
+    return tostring(#text) .. ":" .. text
+end
+
+local function eachSlot(raid, callback)
+    if type(raid) ~= "table" then return end
+    for difficultyIndex, bosses in pairs(raid) do
+        if type(bosses) == "table" then
+            for bossIndex, slots in pairs(bosses) do
+                if type(slots) == "table" then
+                    for slotIndex, value in pairs(slots) do
+                        if slotItemId(value) then
+                            callback(difficultyIndex, bossIndex, slotIndex, value)
+                        end
+                    end
                 end
             end
         end
     end
+end
+
+local function importedRaid(parsed, raidId, source)
+    if type(source) ~= "table" then return nil end
+    local result = {}
+    local raidPriorities = parsed.priorities and parsed.priorities[raidId] or nil
+    for difficultyIndex, importedBosses in pairs(source) do
+        if not validPositiveIndex(difficultyIndex) or type(importedBosses) ~= "table" then return nil end
+        local bosses = {}
+        result[difficultyIndex] = bosses
+        local difficultyPriorities = raidPriorities and raidPriorities[difficultyIndex] or nil
+        for bossIndex, importedSlots in pairs(importedBosses) do
+            if not validPositiveIndex(bossIndex) or type(importedSlots) ~= "table" then return nil end
+            local slots = {}
+            bosses[bossIndex] = slots
+            local bossPriorities = difficultyPriorities and difficultyPriorities[bossIndex] or nil
+            for slotIndex, itemId in ipairs(importedSlots) do
+                if not validItemId(itemId) then return nil end
+                local priority = bossPriorities and bossPriorities[slotIndex] or nil
+                slots[slotIndex] = encodeSlot(itemId, priority)
+            end
+        end
+    end
+    return result
+end
+
+local function planImport(root, realmId, player, parsed, mode)
+    if type(parsed) ~= "table" or parsed.ok ~= true or type(parsed.raids) ~= "table" then
+        return nil
+    end
+    if type(root) ~= "table" or type(root.wishlist) ~= "table"
+        or not validContextKey(realmId) or not validText(player)
+    then
+        return nil
+    end
+    mode = mode == nil and "merge" or mode
+    if mode ~= "merge" and mode ~= "replace" then return nil end
+
+    local realm = root.wishlist[realmId]
+    if realm ~= nil and type(realm) ~= "table" then return nil end
+    local current = realm and realm[player] or nil
+    if current ~= nil and type(current) ~= "table" then return nil end
+    current = current or {}
+    local staged = cloneTable(current)
+    local summary = {
+        ok = true, mode = mode, raidCount = 0, itemCount = 0,
+        addCount = 0, replaceCount = 0, deleteCount = 0, unchangedCount = 0,
+    }
+    local guardParts = {}
+
+    for raidId, sourceRaid in pairs(parsed.raids) do
+        if not validContextKey(raidId) then return nil end
+        local incoming = importedRaid(parsed, raidId, sourceRaid)
+        if not incoming then return nil end
+        local existing = current[raidId]
+        if existing ~= nil and type(existing) ~= "table" then return nil end
+        existing = existing or {}
+        summary.raidCount = summary.raidCount + 1
+        guardParts[#guardParts + 1] = "R" .. guardToken(raidId)
+        eachSlot(existing, function(difficultyIndex, bossIndex, slotIndex, value)
+            guardParts[#guardParts + 1] = table.concat({
+                "S", guardToken(raidId), guardToken(difficultyIndex), guardToken(bossIndex),
+                guardToken(slotIndex), guardToken(slotItemId(value)), guardToken(slotPriority(value)),
+            }, "|")
+        end)
+
+        eachSlot(incoming, function(difficultyIndex, bossIndex, slotIndex, value)
+            summary.itemCount = summary.itemCount + 1
+            local old = existing[difficultyIndex] and existing[difficultyIndex][bossIndex]
+                and existing[difficultyIndex][bossIndex][slotIndex]
+            if not slotItemId(old) then
+                summary.addCount = summary.addCount + 1
+            elseif sameSlot(old, value) then
+                summary.unchangedCount = summary.unchangedCount + 1
+            else
+                summary.replaceCount = summary.replaceCount + 1
+            end
+        end)
+
+        if mode == "replace" then
+            eachSlot(existing, function(difficultyIndex, bossIndex, slotIndex)
+                local replacement = incoming[difficultyIndex] and incoming[difficultyIndex][bossIndex]
+                    and incoming[difficultyIndex][bossIndex][slotIndex]
+                if not slotItemId(replacement) then
+                    summary.deleteCount = summary.deleteCount + 1
+                end
+            end)
+            staged[raidId] = incoming
+        else
+            local target = cloneTable(existing)
+            eachSlot(incoming, function(difficultyIndex, bossIndex, slotIndex, value)
+                target[difficultyIndex] = target[difficultyIndex] or {}
+                target[difficultyIndex][bossIndex] = target[difficultyIndex][bossIndex] or {}
+                target[difficultyIndex][bossIndex][slotIndex] = cloneTable(value)
+            end)
+            staged[raidId] = target
+        end
+    end
+    table.sort(guardParts)
+    summary.guard = table.concat(guardParts, ";")
+    return staged, summary
+end
+
+function M.previewImport(root, realmId, player, parsed, mode)
+    local _, summary = planImport(root, realmId, player, parsed, mode)
+    return summary or { ok = false, mode = mode == "replace" and "replace" or "merge" }
+end
+
+function M.applyImport(root, realmId, player, parsed, mode, expectedPreview)
+    local staged, currentPreview = planImport(root, realmId, player, parsed, mode)
+    if not staged then return false, "invalid" end
+    if expectedPreview ~= nil and (type(expectedPreview) ~= "table"
+        or expectedPreview.mode ~= currentPreview.mode or expectedPreview.guard ~= currentPreview.guard)
+    then
+        return false, "changed"
+    end
+    local realm = root.wishlist[realmId]
+    if not realm then
+        realm = {}
+        root.wishlist[realmId] = realm
+    end
+    realm[player] = staged
     return true
 end
 
