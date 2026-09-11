@@ -105,6 +105,28 @@ return function(test)
     test.eq(englishSource:find("BGNext v0%.2%.3", 1, false), nil, "English guide is not pinned to an obsolete version")
     test.eq(english["添加装备"], "Add Equipment", "active Add Equipment label remains English")
 
+    local wishlistSource = read("Core/BGNext/WishlistUI.lua")
+    local wishlistCopy = {
+        ["合并导入"] = "Merge",
+        ["替换导入"] = "Replace",
+        ["心愿已发生变化，请重新预览后再导入。"] =
+            "Your wishlist changed. Preview the import again before applying it.",
+        ["心愿导入失败：当前角色信息不可用。"] =
+            "Wishlist import failed: the current character is unavailable.",
+        ["心愿清单导入成功：新增%d，覆盖%d，删除%d。"] =
+            "Wishlist imported: %d added, %d overwritten, %d deleted.",
+        ["心愿导入失败：%s"] = "Wishlist import failed: %s",
+        ["确认合并心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"] =
+            "Merge wishlist data for %d raid(s)? %d added, %d overwritten, %d deleted.",
+        ["确认替换心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"] =
+            "Replace wishlist data for %d raid(s)? %d added, %d overwritten, %d deleted.",
+    }
+    for key, value in pairs(wishlistCopy) do
+        test.eq(wishlistSource:find('L["' .. key .. '"]', 1, true) ~= nil, true,
+            "wishlist import copy uses the locale table: " .. key)
+        test.eq(english[key], value, "wishlist import English copy is reviewed: " .. key)
+    end
+
     local zhCN = loadLocale("zhCN")
     local zhTW = loadLocale("zhTW")
     local enUS = loadLocale("enUS")

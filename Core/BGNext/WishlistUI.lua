@@ -779,12 +779,12 @@ if runtimeReady() then
                 local applied, reason = wishlist.applyImport(
                     data.root, data.realmId, data.player, data.parsed, data.mode, data.preview)
                 if not applied then
-                    localMessage(reason == "changed" and "心愿已发生变化，请重新预览后再导入。"
-                        or "心愿导入失败：当前角色信息不可用。")
+                    localMessage(reason == "changed" and L["心愿已发生变化，请重新预览后再导入。"]
+                        or L["心愿导入失败：当前角色信息不可用。"])
                     return
                 end
                 refreshImportedRaids(data.parsed)
-                localMessage(string.format("心愿清单导入成功：新增%d，覆盖%d，删除%d。",
+                localMessage(string.format(L["心愿清单导入成功：新增%d，覆盖%d，删除%d。"],
                     data.preview.addCount, data.preview.replaceCount, data.preview.deleteCount))
                 panel:Hide()
             end
@@ -804,18 +804,23 @@ if runtimeReady() then
             local function acceptImport(mode)
                 local parsed = wishlist.parseImport(edit:GetText(), limitsByRaid())
                 if not parsed.ok then
-                    localMessage("心愿导入失败：" .. tostring(parsed.reason))
+                    localMessage(string.format(L["心愿导入失败：%s"], tostring(parsed.reason)))
                     return
                 end
                 local root, realmId, player = context()
                 local preview = wishlist.previewImport(root, realmId, player, parsed, mode)
                 if not preview.ok then
-                    localMessage("心愿导入失败：当前角色信息不可用。")
+                    localMessage(L["心愿导入失败：当前角色信息不可用。"])
                     return
                 end
-                local action = mode == "replace" and "替换" or "合并"
-                local message = string.format("确认%s心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。",
-                    action, preview.raidCount, preview.addCount, preview.replaceCount, preview.deleteCount)
+                local message
+                if mode == "replace" then
+                    message = string.format(L["确认替换心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"],
+                        preview.raidCount, preview.addCount, preview.replaceCount, preview.deleteCount)
+                else
+                    message = string.format(L["确认合并心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"],
+                        preview.raidCount, preview.addCount, preview.replaceCount, preview.deleteCount)
+                end
                 StaticPopup_Show(popupKey, message, nil, {
                     root = root, realmId = realmId, player = player,
                     parsed = parsed, mode = mode, preview = preview,
@@ -824,14 +829,14 @@ if runtimeReady() then
             local okay = BG.CreateButton(panel)
             okay:SetSize(78, 25)
             okay:SetPoint("BOTTOMLEFT", 8, 10)
-            okay:SetText("合并导入")
+            okay:SetText(L["合并导入"])
             okay:SetScript("OnClick", function() acceptImport("merge") end)
             edit:SetScript("OnEnterPressed", function() acceptImport("merge") end)
 
             local replace = BG.CreateButton(panel)
             replace:SetSize(78, 25)
             replace:SetPoint("RIGHT", cancel, "LEFT", -4, 0)
-            replace:SetText("替换导入")
+            replace:SetText(L["替换导入"])
             replace:SetScript("OnClick", function() acceptImport("replace") end)
         end
         return panel
