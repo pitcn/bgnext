@@ -160,12 +160,41 @@ return function(test)
         "oversized import rejected")
 
     wish.setSlot(codecRoot, "realm", "A", "TOC", limits, 1, 1, 1, 7200)
+    wish.setSlot(codecRoot, "realm", "A", "ICC", limits, 1, 1, 1, 7300)
     local beforeInvalid = wish.getSlot(codecRoot, "realm", "A", "ICC", 1, 2, 1)
     test.eq(wish.applyImport(codecRoot, "realm", "A", wish.parseImport("bad", { ICC = limits })), false,
         "invalid import is not applied")
     test.eq(wish.getSlot(codecRoot, "realm", "A", "ICC", 1, 2, 1), beforeInvalid,
         "invalid import preserves existing raid")
     test.eq(wish.applyImport(codecRoot, "realm", "A", imported), true, "valid import applied")
-    test.eq(wish.getSlot(codecRoot, "realm", "A", "ICC", 2, 1, 1), 7100, "valid import replaces raid")
+    test.eq(wish.getSlot(codecRoot, "realm", "A", "ICC", 2, 1, 1), 7100, "valid import writes imported slots")
+    test.eq(wish.getSlot(codecRoot, "realm", "A", "ICC", 1, 1, 1), 7300,
+        "default import merges without deleting an untouched existing slot")
     test.eq(wish.getSlot(codecRoot, "realm", "A", "TOC", 1, 1, 1), 7200, "valid import preserves other raid")
+
+    test.eq(type(wish.previewImport), "function", "wishlist import exposes a read-only change preview")
+    if type(wish.previewImport) == "function" then
+        local preview = wish.previewImport(codecRoot, "realm", "A", imported, "replace")
+        test.eq(preview.ok, true, "replace preview accepts a parsed import")
+        test.eq(preview.mode, "replace", "preview reports the explicit mode")
+        test.eq(preview.raidCount, 1, "preview reports affected raids")
+        test.eq(preview.deleteCount > 0, true, "replace preview reports existing slots it will delete")
+
+        local guardedRoot = { wishlist = {} }
+        local guardedPreview = wish.previewImport(guardedRoot, "realm", "A", imported, "merge")
+        wish.setSlot(guardedRoot, "realm", "A", "ICC", limits, 1, 2, 1, 7999)
+        local guardedApplied, guardedReason = wish.applyImport(
+            guardedRoot, "realm", "A", imported, "merge", guardedPreview)
+        test.eq(guardedApplied, false, "a stale preview cannot overwrite a newer wishlist edit")
+        test.eq(guardedReason, "changed", "stale preview reports the data-change reason")
+        test.eq(wish.getSlot(guardedRoot, "realm", "A", "ICC", 1, 2, 1), 7999,
+            "the newer wishlist edit survives stale confirmation")
+    end
+
+    test.eq(wish.applyImport(codecRoot, "realm", "A", imported, "replace"), true,
+        "explicit replace import is still supported")
+    test.eq(wish.getSlot(codecRoot, "realm", "A", "ICC", 1, 1, 1), nil,
+        "explicit replace removes untouched slots in an affected raid")
+    test.eq(wish.getSlot(codecRoot, "realm", "A", "TOC", 1, 1, 1), 7200,
+        "explicit replace remains scoped to imported raids")
 end

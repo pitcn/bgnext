@@ -55,7 +55,15 @@ function M.isRiskyBid(current, offered)
     return current ~= nil and offered ~= nil and offered >= current * 10 and offered - current >= 1000
 end
 
-local function cleanSale(record)
+local function normalizedName(normalizeName, value)
+    if type(value) ~= "string" or value == "" then return nil end
+    if type(normalizeName) ~= "function" then return value end
+    local ok, result = pcall(normalizeName, value)
+    if ok and type(result) == "string" and result ~= "" then return result end
+    return nil
+end
+
+local function cleanSale(record, normalizeName)
     if type(record) ~= "table" or record.completed ~= true or record.status ~= "complete"
         or finiteWhole(record.myGold, true) ~= 0 or type(record.myItems) ~= "table"
         or #record.myItems ~= 1 or type(record.theirItems) ~= "table" or #record.theirItems ~= 0 then return nil end
@@ -64,10 +72,10 @@ local function cleanSale(record)
     local item = record.myItems[1]
     local itemId = type(item) == "table" and finiteWhole(item.itemId, false) or nil
     if not itemId or item.quantity ~= 1 then return nil end
-    return received, itemId
+    return received, itemId, normalizedName(normalizeName, record.player)
 end
 
-function M.settlementSummary(bill, settlement)
+function M.settlementSummary(bill, settlement, normalizeName)
     bill, settlement = type(bill) == "table" and bill or {}, type(settlement) == "table" and settlement or {}
     local result = { ledgerIncome = 0, provenReceived = 0, expenses = 0, debt = 0, pendingCount = 0 }
     local saleRows, billKeys = 0, {}
@@ -76,8 +84,9 @@ function M.settlementSummary(bill, settlement)
         if type(row.item) == "string" and row.item ~= "" and type(row.buyer) == "string"
             and row.buyer ~= "" and value and value > 0 then
             result.ledgerIncome, saleRows = result.ledgerIncome + value, saleRows + 1
-            if finiteWhole(row.itemId, false) then
-                local key = tostring(row.itemId) .. "|" .. tostring(value)
+            local buyerKey = normalizedName(normalizeName, row.buyer)
+            if finiteWhole(row.itemId, false) and buyerKey then
+                local key = tostring(row.itemId) .. "|" .. tostring(value) .. "|" .. buyerKey
                 billKeys[key] = (billKeys[key] or 0) + 1
             else
                 result.pendingCount = result.pendingCount + 1
@@ -100,11 +109,15 @@ function M.settlementSummary(bill, settlement)
     end
     local provenTrades, tradeKeys = 0, {}
     for _, record in ipairs(type(settlement.trades) == "table" and settlement.trades or {}) do
-        local received, itemId = cleanSale(record)
+        local received, itemId, buyerKey = cleanSale(record, normalizeName)
         if received then
             result.provenReceived, provenTrades = result.provenReceived + received, provenTrades + 1
-            local key = tostring(itemId) .. "|" .. tostring(received)
-            tradeKeys[key] = (tradeKeys[key] or 0) + 1
+            if buyerKey then
+                local key = tostring(itemId) .. "|" .. tostring(received) .. "|" .. buyerKey
+                tradeKeys[key] = (tradeKeys[key] or 0) + 1
+            else
+                result.pendingCount = result.pendingCount + 1
+            end
         elseif type(record) == "table" and record.completed == true
             and type(record.myItems) == "table" and #record.myItems > 0 then
             result.pendingCount = result.pendingCount + 1

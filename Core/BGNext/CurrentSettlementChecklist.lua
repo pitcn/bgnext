@@ -95,7 +95,8 @@ local function recordEvidence(record)
     end
     if type(record.completed) == "boolean" or type(record.myItems) == "table"
         or type(record.myGold) == "number" then
-        if record.status ~= "complete" then
+        if record.status ~= "complete" or type(record.myGold) ~= "number"
+            or type(record.theirGold) ~= "number" then
             return evidence
         end
         if type(record.myItems) == "table" then

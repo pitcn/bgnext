@@ -762,36 +762,82 @@ if runtimeReady() then
         panel.edit, panel.scroll = edit, scroll
 
         local cancel = BG.CreateButton(panel)
-        cancel:SetSize(110, 25)
+        cancel:SetSize(importMode and 70 or 110, 25)
         cancel:SetPoint("BOTTOMRIGHT", -8, 10)
         cancel:SetText(CANCEL or "取消")
         cancel:SetScript("OnClick", function() panel:Hide() end)
 
         if importMode then
-            local function acceptImport()
-                local parsed = wishlist.parseImport(edit:GetText(), limitsByRaid())
-                if not parsed.ok then
-                    localMessage("心愿导入失败：" .. tostring(parsed.reason))
-                    return
-                end
-                local root, realmId, player = context()
-                if not wishlist.applyImport(root, realmId, player, parsed) then
-                    localMessage("心愿导入失败：当前角色信息不可用。")
-                    return
-                end
+            local function refreshImportedRaids(parsed)
                 for raidId in pairs(parsed.raids) do
                     local raidFrame = BG["HopeFrame" .. raidId]
                     if raidFrame and raidFrame:IsShown() then raidFrame:Refresh() end
                 end
-                localMessage(string.format("心愿清单导入成功，一共导入%d件装备。", parsed.itemCount))
+            end
+
+            local function applyConfirmed(data)
+                local applied, reason = wishlist.applyImport(
+                    data.root, data.realmId, data.player, data.parsed, data.mode, data.preview)
+                if not applied then
+                    localMessage(reason == "changed" and L["心愿已发生变化，请重新预览后再导入。"]
+                        or L["心愿导入失败：当前角色信息不可用。"])
+                    return
+                end
+                refreshImportedRaids(data.parsed)
+                localMessage(string.format(L["心愿清单导入成功：新增%d，覆盖%d，删除%d。"],
+                    data.preview.addCount, data.preview.replaceCount, data.preview.deleteCount))
                 panel:Hide()
             end
+
+            local popupKey = "BGNEXT_WISHLIST_IMPORT_CONFIRM"
+            StaticPopupDialogs[popupKey] = StaticPopupDialogs[popupKey] or {
+                text = "%s",
+                button1 = YES,
+                button2 = NO,
+                timeout = 0,
+                whileDead = true,
+                hideOnEscape = true,
+                showAlert = true,
+                OnAccept = function(_, data) applyConfirmed(data) end,
+            }
+
+            local function acceptImport(mode)
+                local parsed = wishlist.parseImport(edit:GetText(), limitsByRaid())
+                if not parsed.ok then
+                    localMessage(string.format(L["心愿导入失败：%s"], tostring(parsed.reason)))
+                    return
+                end
+                local root, realmId, player = context()
+                local preview = wishlist.previewImport(root, realmId, player, parsed, mode)
+                if not preview.ok then
+                    localMessage(L["心愿导入失败：当前角色信息不可用。"])
+                    return
+                end
+                local message
+                if mode == "replace" then
+                    message = string.format(L["确认替换心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"],
+                        preview.raidCount, preview.addCount, preview.replaceCount, preview.deleteCount)
+                else
+                    message = string.format(L["确认合并心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"],
+                        preview.raidCount, preview.addCount, preview.replaceCount, preview.deleteCount)
+                end
+                StaticPopup_Show(popupKey, message, nil, {
+                    root = root, realmId = realmId, player = player,
+                    parsed = parsed, mode = mode, preview = preview,
+                })
+            end
             local okay = BG.CreateButton(panel)
-            okay:SetSize(110, 25)
+            okay:SetSize(78, 25)
             okay:SetPoint("BOTTOMLEFT", 8, 10)
-            okay:SetText(OKAY or "确定")
-            okay:SetScript("OnClick", acceptImport)
-            edit:SetScript("OnEnterPressed", acceptImport)
+            okay:SetText(L["合并导入"])
+            okay:SetScript("OnClick", function() acceptImport("merge") end)
+            edit:SetScript("OnEnterPressed", function() acceptImport("merge") end)
+
+            local replace = BG.CreateButton(panel)
+            replace:SetSize(78, 25)
+            replace:SetPoint("RIGHT", cancel, "LEFT", -4, 0)
+            replace:SetText(L["替换导入"])
+            replace:SetScript("OnClick", function() acceptImport("replace") end)
         end
         return panel
     end
