@@ -257,9 +257,11 @@ function M.tradeRows(trade, itemIdOf)
     -- completed trade is never auto-settled, and a pending reconcile state
     -- never negates the completed fact.
     local status = "pending"
-    if theirs > 0 and mine == 0 and #theirItems == 0 and #myItems > 0 and mySingleUnits then
+    if myGold ~= nil and theirGold ~= nil
+        and theirs > 0 and mine == 0 and #theirItems == 0 and #myItems > 0 and mySingleUnits then
         status = "complete"
-    elseif mine > 0 and theirs == 0 and #myItems == 0 and #theirItems > 0 and theirSingleUnits then
+    elseif myGold ~= nil and theirGold ~= nil
+        and mine > 0 and theirs == 0 and #myItems == 0 and #theirItems > 0 and theirSingleUnits then
         status = "complete"
     end
 

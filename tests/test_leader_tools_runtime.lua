@@ -3,6 +3,12 @@ return function(test)
     BG.BGNext.LeaderToolsStore = dofile("Core/BGNext/LeaderToolsStore.lua")
     BG.BGNext.LeaderToolsView = dofile("Core/BGNext/LeaderToolsView.lua")
     local runtime = dofile("Core/BGNext/LeaderToolsRuntime.lua")
+    BG.realmName = "My Realm"
+    BG.BGNext.PlayerIdentity = dofile("Core/BGNext/PlayerIdentity.lua")
+    test.eq(runtime.settlementNameKey("One"), runtime.settlementNameKey("One-MyRealm"),
+        "leader settlement passes local short and full names through canonical identity")
+    test.eq(runtime.settlementNameKey("One-OtherRealm") == runtime.settlementNameKey("One-MyRealm"), false,
+        "leader settlement keeps same-name cross-realm buyers distinct")
 
     local saved = {
         boss1 = { zhuangbei1 = "Item A", maijia1 = "Me", jine1 = "500" },

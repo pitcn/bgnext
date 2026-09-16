@@ -28,6 +28,7 @@ local function CreateListTable(onClick, tbl1)
                 and BG.Frame[FB]["boss" .. b]["maijia" .. i]:GetText() == ""
                 and BG.Frame[FB]["boss" .. b]["jine" .. i]:GetText() == "" then
                 local name, link, quality, level, _, _, _, _, _, _, sellPrice, typeID = GetItemInfo(zb:GetText())
+                level = BG.ResolveItemLevel and BG.ResolveItemLevel(link or zb:GetText(), level) or level
                 local leveltext = ""
                 if typeID == 2 or typeID == 4 then
                     if onClick then

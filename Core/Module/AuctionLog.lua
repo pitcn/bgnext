@@ -1032,6 +1032,7 @@ BG.Init(function()
 
                     local name, link, quality, level, _, _, _, _, EquipLoc, Texture,
                     _, typeID, subclassID, bindType = GetItemInfo(zhuangbei)
+                    level = BG.ResolveItemLevel and BG.ResolveItemLevel(link or zhuangbei, level) or level
                     local a = {
                         time = GetServerTime(),
                         zhuangbei = zhuangbei,
@@ -1202,7 +1203,7 @@ BG.Init(function()
                                 type = 2,
                                 time = GetServerTime(),
                                 zhuangbei = v.zhuangbei,
-                                itemlevel = v.level,
+                                itemlevel = BG.ResolveItemLevel and BG.ResolveItemLevel(v.zhuangbei, v.level) or v.level,
                                 quality = v.quality,
                                 bindType = v.bindType,
                             })
@@ -1786,7 +1787,8 @@ BG.Init(function()
                 f.level = f:CreateFontString()
                 f.level:SetFont(BIAOGE_TEXT_FONT, 11, "OUTLINE")
                 f.level:SetPoint("BOTTOM", bts.icon, 0, 1)
-                f.level:SetText((typeID == 2 or typeID == 4) and v.itemlevel or nil)
+                f.level:SetText(BG.DisplayItemLevel and BG.DisplayItemLevel(v.zhuangbei, v.itemlevel, typeID)
+                    or ((typeID == 2 or typeID == 4) and v.itemlevel or nil))
                 f.level:SetTextColor(r, g, b)
                 if v.bindType == 2 then
                     local text = bts.iconFrame:CreateFontString()
@@ -1964,6 +1966,7 @@ BG.Init(function()
                     item:ContinueOnItemLoad(function()
                         local name, link, quality, level, _, _, _, _, EquipLoc, Texture,
                         _, typeID, subclassID, bindType = GetItemInfo(zhuangbei)
+                        level = BG.ResolveItemLevel and BG.ResolveItemLevel(link or zhuangbei, level) or level
                         newTbl[i] = {
                             type = 3,
                             zhuangbei = zhuangbei,
@@ -2138,6 +2141,7 @@ BG.Init(function()
                 -- the renderer consumes quality synchronously; an unavailable
                 -- cache is handled by the renderer fallback below.
                 local _, _, quality, level, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(zhuangbei)
+                level = BG.ResolveItemLevel and BG.ResolveItemLevel(zhuangbei, level) or level
                 local a = {
                     type = 1,
                     time = time(),
@@ -2186,6 +2190,7 @@ BG.Init(function()
                 if item and type(item.ContinueOnItemLoad) == "function" then
                     item:ContinueOnItemLoad(function()
                         local _, _, quality, level, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(zhuangbei)
+                        level = BG.ResolveItemLevel and BG.ResolveItemLevel(zhuangbei, level) or level
                         if type(level) == "number" then a.itemlevel = level end
                         if type(quality) == "number" then a.quality = quality end
                         if type(bindType) == "number" then a.bindType = bindType end
@@ -2200,6 +2205,7 @@ BG.Init(function()
                 item:ContinueOnItemLoad(function()
                     local name, link, quality, level, _, _, _, _, EquipLoc, Texture,
                     _, typeID, subclassID, bindType = GetItemInfo(zhuangbei)
+                    level = BG.ResolveItemLevel and BG.ResolveItemLevel(link or zhuangbei, level) or level
                     local FB = GetFB(itemID)
                     local a = {
                         type = 2,
@@ -2352,7 +2358,7 @@ BG.Init(function()
             hideOnEscape = true,
             showAlert = true,
         }
-        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, _, sender)
+        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, sender)
             if prefix ~= "BiaoGe" or distType ~= "RAID" then return end
             local cmd, itemID, link, money = strsplit("^", msg)
             if cmd ~= "ReAuction" then return end
@@ -2413,7 +2419,7 @@ BG.Init(function()
             hideOnEscape = true,
             showAlert = true,
         }
-        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, _, sender)
+        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, distType, sender)
             if prefix ~= "BiaoGe2" or distType ~= "RAID" then return end
             local cmd, itemID, link = strsplit("^", msg)
             if cmd ~= "RemindAuction" then return end
@@ -2489,7 +2495,7 @@ BG.Init(function()
             hideOnEscape = true,
             showAlert = true,
         }
-        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, channel, _, sender)
+        BG.RegisterEvent("CHAT_MSG_ADDON", function(self, event, prefix, msg, channel, sender)
             if prefix ~= "BiaoGe2" or channel ~= "RAID" then return end
             if sender == player or not BG.IsMLByName(sender) then return end
             local cmd, itemID, link, buyer, money = strsplit("^", msg)

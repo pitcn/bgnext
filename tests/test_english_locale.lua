@@ -105,6 +105,28 @@ return function(test)
     test.eq(englishSource:find("BGNext v0%.2%.3", 1, false), nil, "English guide is not pinned to an obsolete version")
     test.eq(english["添加装备"], "Add Equipment", "active Add Equipment label remains English")
 
+    local wishlistSource = read("Core/BGNext/WishlistUI.lua")
+    local wishlistCopy = {
+        ["合并导入"] = "Merge",
+        ["替换导入"] = "Replace",
+        ["心愿已发生变化，请重新预览后再导入。"] =
+            "Your wishlist changed. Preview the import again before applying it.",
+        ["心愿导入失败：当前角色信息不可用。"] =
+            "Wishlist import failed: the current character is unavailable.",
+        ["心愿清单导入成功：新增%d，覆盖%d，删除%d。"] =
+            "Wishlist imported: %d added, %d overwritten, %d deleted.",
+        ["心愿导入失败：%s"] = "Wishlist import failed: %s",
+        ["确认合并心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"] =
+            "Merge wishlist data for %d raid(s)? %d added, %d overwritten, %d deleted.",
+        ["确认替换心愿？涉及%d个副本：新增%d，覆盖%d，删除%d。"] =
+            "Replace wishlist data for %d raid(s)? %d added, %d overwritten, %d deleted.",
+    }
+    for key, value in pairs(wishlistCopy) do
+        test.eq(wishlistSource:find('L["' .. key .. '"]', 1, true) ~= nil, true,
+            "wishlist import copy uses the locale table: " .. key)
+        test.eq(english[key], value, "wishlist import English copy is reviewed: " .. key)
+    end
+
     local zhCN = loadLocale("zhCN")
     local zhTW = loadLocale("zhTW")
     local enUS = loadLocale("enUS")
@@ -116,7 +138,7 @@ return function(test)
         end
         test.eq(type(localized.L["存储与隐私"]), "string", "storage tab receives text, never a boolean")
         test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
-        test.eq(localized.updateText_now[1], "BGNext 0.8.6", "current in-game update notes use the release version")
+        test.eq(localized.updateText_now[1], "BGNext 0.8.7", "current in-game update notes use the release version")
         for index, value in ipairs(localized.updateText_now) do
             test.eq(type(value), "string", "current in-game update note is text at index " .. index)
         end
@@ -127,7 +149,7 @@ return function(test)
         BG = { BGNext = {} }
         dofile("Core/BGNext/Identity.lua")
         local releaseInfo = assert(loadfile("Core/BGNext/ReleaseInfo.lua"))("BGNext", localized)
-        test.eq(releaseInfo.changelog[1], localized.L["角色总览设置新增上移、下移排序；各客户端版本分别保存，恢复默认排序不会删除角色数据；无效、过期或重复的排序数据会安全忽略。"],
+        test.eq(releaseInfo.changelog[1], localized.L["修复泰坦重铸部分装备不显示或显示错误物品等级的问题；表格、拾取、拍卖、交易与流拍通报现在使用一致的有效装等。"],
             "in-game release notes use the selected locale")
         BG = previousBG
     end

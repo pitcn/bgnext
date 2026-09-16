@@ -1,6 +1,10 @@
 return function(test)
     BG = { BGNext = {} }
     local view = dofile("Core/BGNext/LeaderToolsView.lua")
+    local function identity(name)
+        if type(name) ~= "string" then return nil end
+        return name:lower():gsub("%-myrealm$", "")
+    end
 
     local frames = {
         { auctionID = "a", itemID = 1, link = "item-a", money = 500, player = "Me", remaining = 4, IsEnd = false },
@@ -31,13 +35,13 @@ return function(test)
     }
     local settlement = {
         trades = {
-            { completed = true, status = "complete", myGold = 0, theirGold = 500,
+            { player = "One-MyRealm", completed = true, status = "complete", myGold = 0, theirGold = 500,
                 myItems = { { itemId = 1, quantity = 1 } }, theirItems = {} },
-            { completed = true, status = "complete", myGold = 0, theirGold = 700,
+            { player = "Two-MyRealm", completed = true, status = "complete", myGold = 0, theirGold = 700,
                 myItems = { { itemId = 2, quantity = 1 } }, theirItems = {} },
         },
     }
-    local ready = view.settlementSummary(bill, settlement)
+    local ready = view.settlementSummary(bill, settlement, identity)
     test.eq(ready.ledgerIncome, 1200, "ledger income is explicit")
     test.eq(ready.provenReceived, 1200, "clean outgoing trades prove receipts")
     test.eq(ready.expenses, 200, "expenses are separate")
@@ -50,28 +54,47 @@ return function(test)
     bill.rows[1].amount = "500"
 
     settlement.trades[2].status = "pending"
-    local pending = view.settlementSummary(bill, settlement)
+    local pending = view.settlementSummary(bill, settlement, identity)
     test.eq(pending.provenReceived, 500, "pending trade is not counted as received")
     test.eq(pending.distributable, nil, "unknown receipt blocks distributable claim")
     test.eq(pending.pendingCount > 0, true, "pending facts are visible")
     bill.rows[1].debt = 100
-    test.eq(view.settlementSummary(bill, settlement).debt, 100, "debt remains separate")
+    test.eq(view.settlementSummary(bill, settlement, identity).debt, 100, "debt remains separate")
     bill.splitCount = "2.5"
-    test.eq(view.settlementSummary(bill, settlement).wage, nil, "fractional split count is invalid")
+    test.eq(view.settlementSummary(bill, settlement, identity).wage, nil, "fractional split count is invalid")
 
     bill.rows[1].debt, bill.splitCount = nil, "2"
     settlement.trades[2].status = "complete"
     settlement.trades[1].theirGold, settlement.trades[2].theirGold = 600, 600
-    local wrongPairing = view.settlementSummary(bill, settlement)
+    local wrongPairing = view.settlementSummary(bill, settlement, identity)
     test.eq(wrongPairing.provenReceived, 1200, "actual clean receipts stay visible")
     test.eq(wrongPairing.distributable, nil, "equal totals cannot hide per-item receipt mismatches")
 
-    local empty = view.settlementSummary({ rows = {}, expenses = {}, splitCount = 2 }, {})
+    local empty = view.settlementSummary({ rows = {}, expenses = {}, splitCount = 2 }, {}, identity)
     test.eq(empty.distributable, nil, "an empty bill never fabricates a confirmed zero distribution")
 
     settlement.trades[1].theirGold, settlement.trades[2].theirGold = 500, 700
     local malformedExpense = view.settlementSummary({
         rows = bill.rows, expenses = { { name = "", amount = 50 } }, splitCount = 2,
-    }, settlement)
+    }, settlement, identity)
     test.eq(malformedExpense.distributable, nil, "an amount without an expense label remains pending")
+
+    local wrongBuyer = view.settlementSummary({
+        rows = { { itemId = 1, item = "A", buyer = "One", amount = 500 } },
+        expenses = {}, splitCount = 1,
+    }, {
+        trades = { { player = "Other", completed = true, status = "complete", myGold = 0, theirGold = 500,
+            myItems = { { itemId = 1, quantity = 1 } }, theirItems = {} } },
+    }, identity)
+    test.eq(wrongBuyer.provenReceived, 500, "a clean receipt remains visible even when its buyer differs")
+    test.eq(wrongBuyer.distributable, nil, "same item and amount from another buyer cannot prove the bill row")
+
+    local sameBuyer = view.settlementSummary({
+        rows = { { itemId = 1, item = "A", buyer = "One", amount = 500 } },
+        expenses = {}, splitCount = 1,
+    }, {
+        trades = { { player = "One-MyRealm", completed = true, status = "complete", myGold = 0, theirGold = 500,
+            myItems = { { itemId = 1, quantity = 1 } }, theirItems = {} } },
+    }, identity)
+    test.eq(sameBuyer.distributable, 500, "canonical same-buyer identity still proves the bill row")
 end

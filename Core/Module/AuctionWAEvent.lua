@@ -91,6 +91,7 @@ BG.Init(function()
   end
   local itemName, link, rarity, itemLevel, minLevel, itemType, itemSubType, minLevel, equipLoc, icon,
   minLevel, sellPrice, classID, subclassID = GetItemInfo(link or itemID)
+  itemLevel = BG.ResolveItemLevel and BG.ResolveItemLevel(link or itemID, itemLevel) or itemLevel
   local auctionFrame
   mod = isGen2 and mod or "normal"
   do
