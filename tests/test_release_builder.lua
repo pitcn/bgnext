@@ -21,6 +21,10 @@ return function(test)
         "the release archive installs into a BGNext directory")
     test.eq(builder:find('$releaseTocName = "BGNext.toc"', 1, true) ~= nil, true,
         "the release archive exposes a TOC matching the BGNext directory")
+    test.eq(builder:find("Compress-Archive", 1, true), nil,
+        "the Windows release builder does not emit non-standard backslash ZIP entries")
+    test.eq(builder:find('.Replace("\\", "/")', 1, true) ~= nil, true,
+        "the release builder writes portable forward-slash ZIP entry names")
     test.eq(builder:find("Script|Include", 1, true) ~= nil, true,
         "nested XML runtime dependencies are discovered")
     for _, path in ipairs({
@@ -41,8 +45,8 @@ return function(test)
         "the default archive name uses the BGNext release version")
     test.eq(builder:find("Join-Path $repositoryRoot \"addon_version.txt\"") == nil, true,
         "the upstream channel build number is not used as the BGNext release version")
-    test.eq(workflow:find('.FullName.Replace("\\", "/")', 1, true) ~= nil, true,
-        "the release audit normalizes Windows ZIP entry separators")
+    test.eq(workflow:find('FullName.Contains("\\")', 1, true) ~= nil, true,
+        "the release audit rejects non-standard backslash ZIP entry separators")
     local baselineGate = assert(workflow:find("tools/verify-baseline.ps1", 1, true),
         "the release job must verify the baseline before packaging")
     local buildStep = assert(workflow:find("tools/build-release.ps1", 1, true),
