@@ -315,6 +315,7 @@ local function OnTextChanged(self)
         BG.OnItemLoad(itemText):ContinueOnItemLoad(function()
             local name, link, quality, level, _, _, _, _, _, Texture,
             _, typeID, _, bindType = GetItemInfo(itemText)
+            level = BG.ResolveItemLevel and BG.ResolveItemLevel(link or itemText, level) or level
             BG.AddHText(FB, itemText, itemID, self)
             self.icon:SetTexture(Texture)
             BiaoGe[FB]["boss" .. bossnum]["itemLevel" .. i] = level

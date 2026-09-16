@@ -905,6 +905,11 @@ end
 
 ------------------创建：装等------------------
 function BG.LevelText(bt, level, typeID)
+    if BG.DisplayItemLevel then
+        level = BG.DisplayItemLevel(bt:GetText(), level, typeID)
+    elseif not (bt:GetText():find("item:") and (typeID == 2 or typeID == 4)) then
+        level = nil
+    end
     if not bt.levelText then
         local f = CreateFrame("Frame", nil, bt)
         f:SetPoint("RIGHT", 0, 0)
@@ -914,7 +919,7 @@ function BG.LevelText(bt, level, typeID)
         f:SetSize(f.text:GetWidth(), 20)
         bt.levelText = f
     end
-    if bt:GetText():find("item:") and (typeID == 2 or typeID == 4) and level then
+    if level then
         bt.levelText.text:ClearAllPoints()
         local x = -1
         if bt.bindingTex and bt.bindingTex:IsVisible() then

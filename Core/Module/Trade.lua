@@ -1603,6 +1603,7 @@ BG.Init(function()
                                 end
                                 if notBound then
                                     local _, _, _, level, _, _, _, _, _, _, _, typeID = GetItemInfo(vv.itemID)
+                                    level = BG.ResolveItemLevel and BG.ResolveItemLevel(info.hyperlink or vv.itemID, level) or level
                                     tinsert(lastItemsInfo, {
                                         link = info.hyperlink,
                                         itemID = vv.itemID,

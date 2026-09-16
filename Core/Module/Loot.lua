@@ -353,6 +353,7 @@ BG.Init(function()
     -- 记录物品进表格
     local biaogefull
     local function _AddLootItem(itemID, FB, numb, link, Texture, level, Hope, count, typeID, lootplayer, fromLast)
+        level = BG.ResolveItemLevel and BG.ResolveItemLevel(link, level) or level
         local icon
         if BG.GetItemCount(itemID) ~= 0 then
             icon = AddTexture("interface/raidframe/readycheck-ready")
@@ -562,6 +563,7 @@ BG.Init(function()
         if not count then count = 1 end
 
         local name, _, quality, level, _, _, _, stackCount, _, Texture, _, typeID, subclassID, bindType = GetItemInfo(link)
+        level = BG.ResolveItemLevel and BG.ResolveItemLevel(link, level) or level
         if bindType == 4 then return end             -- 属于任务物品的不记录
         local itemID = GetItemID(link)
         if BG.Loot.blacklist[itemID] then return end -- 过滤黑名单物品
@@ -1523,7 +1525,8 @@ BG.Init2(function()
                     f.level = f:CreateFontString()
                     f.level:SetFont(BIAOGE_TEXT_FONT, 11, "OUTLINE")
                     f.level:SetPoint("BOTTOM", bts.icon, 0, 1)
-                    f.level:SetText((typeID == 2 or typeID == 4) and v.itemlevel or nil)
+                    f.level:SetText(BG.DisplayItemLevel and BG.DisplayItemLevel(v.zhuangbei, v.itemlevel, typeID)
+                        or ((typeID == 2 or typeID == 4) and v.itemlevel or nil))
                     f.level:SetTextColor(r, g, b)
                     if v.bindType == 2 then
                         local text = bts.iconFrame:CreateFontString()
