@@ -117,7 +117,33 @@ try {
         New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
         Copy-Item -LiteralPath $source -Destination $destination
     }
-    Compress-Archive -LiteralPath $addonRoot -DestinationPath $outputFullPath -CompressionLevel Optimal
+    Add-Type -AssemblyName System.IO.Compression
+    $outputStream = [IO.File]::Open($outputFullPath, [IO.FileMode]::CreateNew)
+    try {
+        $archive = [IO.Compression.ZipArchive]::new(
+            $outputStream,
+            [IO.Compression.ZipArchiveMode]::Create,
+            $false
+        )
+        try {
+            foreach ($file in Get-ChildItem -LiteralPath $addonRoot -File -Recurse | Sort-Object FullName) {
+                $entryName = $file.FullName.Substring($stagingRoot.Length + 1).Replace("\", "/")
+                $entry = $archive.CreateEntry($entryName, [IO.Compression.CompressionLevel]::Optimal)
+                $entryStream = $entry.Open()
+                $sourceStream = [IO.File]::OpenRead($file.FullName)
+                try {
+                    $sourceStream.CopyTo($entryStream)
+                } finally {
+                    $sourceStream.Dispose()
+                    $entryStream.Dispose()
+                }
+            }
+        } finally {
+            $archive.Dispose()
+        }
+    } finally {
+        $outputStream.Dispose()
+    }
 } finally {
     if (Test-Path -LiteralPath $stagingRoot) {
         Remove-Item -LiteralPath $stagingRoot -Recurse -Force

@@ -42,7 +42,11 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path ./artifacts/BGNext.zip))
           try {
-            $paths = @($archive.Entries | ForEach-Object { $_.FullName.Replace("\", "/") })
+            $invalidSeparators = @($archive.Entries | Where-Object { $_.FullName.Contains("\") })
+            if ($invalidSeparators.Count -gt 0) {
+              throw "Release contains non-standard backslash ZIP entry separators"
+            }
+            $paths = @($archive.Entries | ForEach-Object { $_.FullName })
             $denied = @(
               "History.lua",
               "TradeHistory.lua",
