@@ -41,7 +41,12 @@ local function makePopup()
                 info.OnCancel({ data = old.data, data2 = old.data2 }, old.data, old.data2)
             end
         end
-        h.visible[which] = { data = data, data2 = data2, text_arg1 = text_arg1 }
+        h.visible[which] = {
+            data = data,
+            data2 = data2,
+            text_arg1 = text_arg1,
+            button3 = info and info.button3,
+        }
         return which
     end
     function h.accept(which)
@@ -57,6 +62,14 @@ local function makePopup()
         local cur = h.visible[which]
         if info and info.OnCancel and cur then
             info.OnCancel({ data = cur.data, data2 = cur.data2 }, cur.data, cur.data2)
+            h.visible[which] = nil
+        end
+    end
+    function h.alt(which)
+        local info = h.dialogs[which]
+        local cur = h.visible[which]
+        if info and info.OnAlt and cur then
+            info.OnAlt({ data = cur.data, data2 = cur.data2 }, cur.data, "clicked")
             h.visible[which] = nil
         end
     end
@@ -92,12 +105,20 @@ return function(test)
     BG.IsTBCFB = function() return false end
     BG.RegisterEvent = function(event, handler) h.events[event] = handler end
     BG.After = function(delay, cb) cb() end
-    BG.FBIDtable = { [1234] = "MC", [5678] = "ZUG" }
-    BG.bossPositionStartEnd = { [1234] = { 1, 2 }, [5678] = { 1, 2 } }
+    BG.FBIDtable = { [1234] = "MC", [4321] = "MC", [5678] = "ZUG" }
+    BG.bossPositionStartEnd = {
+        [1234] = { 1, 2 },
+        [4321] = { 3, 4 },
+        [5678] = { 1, 2 },
+    }
     BG.ClickFBbutton = function() end
     BG.SendSystemMessage = function(msg) h.messages[#h.messages + 1] = msg end
     BG.PlaySound = function(snd) h.sounds[#h.sounds + 1] = snd end
-    BG.GetFBinfo = function(fb, key) return fb end
+    BG.GetFBinfo = function(fb, key)
+        if key == "phase" then return "P5" end
+        if key == "shortName" then return "P5双本" end
+        return fb
+    end
     BG.STC_b1 = function(s) return s end
 
     local Maxb = { ["MC"] = 5, ["ZUG"] = 5 }
@@ -113,6 +134,8 @@ return function(test)
 
     local currentInstanceID = 1234
     GetRealmID = function() return 1 end
+    GetMoney = function() return 12340000 end
+    GetServerTime = function() return 987654 end
     IsAddOnLoaded = function() end
     GetLootMethod = function() end
     BIAOGE_TEXT_FONT = "Font"
@@ -151,6 +174,7 @@ return function(test)
     end
     BG.ClearBiaoGeRange = function(FB, startB, endB)
         h.rangeClearCalls[#h.rangeClearCalls + 1] = { FB, startB, endB }
+        return true
     end
 
     local function fireCycle()
@@ -174,6 +198,22 @@ return function(test)
     test.eq(h.rangeClearCalls[1][1], "MC", "range clear targets the captured table")
     test.eq(h.rangeClearCalls[1][2], 1, "range clear starts at the captured boss")
     test.eq(h.rangeClearCalls[1][3], 2, "range clear ends at the captured boss")
+    test.eq(BiaoGe.clearBiaoGeMoney.MC.money, 1234,
+        "partial clear records the current character gold baseline")
+
+    -- The same prompt offers an explicit whole-phase action. This is the safe
+    -- way to clear both instance ranges plus their shared misc/penalty/expense
+    -- rows, instead of silently widening the partial-clear action.
+    h.clearCalls = {}
+    h.rangeClearCalls = {}
+    contentPresent = true
+    fireCycle()
+    cur = h.visible["AUTO_QINGKONG_CONFIRM"]
+    test.eq(cur.button3, "清理所有P5副本", "whole-phase action names the current phase")
+    h.alt("AUTO_QINGKONG_CONFIRM")
+    test.eq(#h.rangeClearCalls, 0, "whole-phase action does not run the partial range clear")
+    test.eq(#h.clearCalls, 1, "whole-phase action clears the complete shared table once")
+    test.eq(h.clearCalls[1], "MC", "whole-phase action targets the captured shared table")
 
     -- 2. Accept revalidates: a table emptied meanwhile is not cleared again.
     h.clearCalls = {}
@@ -219,6 +259,10 @@ return function(test)
     currentInstanceID = 5678
     fireCycle()
     test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].data.fb, "ZUG", "replacement binds the newer target")
+    test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].button3, nil,
+        "a single-raid table does not offer a misleading whole-phase action")
+    test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].text_arg1:find("清理所有", 1, true), nil,
+        "a single-raid table does not describe an unavailable whole-phase action")
     h.accept("AUTO_QINGKONG_CONFIRM")
     test.eq(#h.rangeClearCalls, 1, "replacement clears once")
     test.eq(h.rangeClearCalls[1][1], "ZUG", "replacement clears the newer table range")
