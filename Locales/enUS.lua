@@ -78,7 +78,8 @@ do -- BGNext release text
     L["修复自动拍卖成功记录出现后，主表买家和成交金额仍可能为空的问题。"] = "Fixed successful auction records that could still leave the main bill buyer and amount blank."
 end
 
-do -- BGNext 0.8.8 release text
+do -- BGNext 0.8.9 release text
+    L["修复泰坦重铸 P5 双本分段清理后共享杂项和旧金额残留的问题；新增“清理所有 P5 副本”，并修复清表金币基准未更新。"] = "Fixed shared miscellaneous rows and old amounts remaining after a partial Titan P5 clear. Added Clear All P5 Raids and fixed the clear-time gold baseline."
     L["修复部分发布包在网易 DD 等工具中可能被识别为目录层级异常的问题；插件功能与 0.8.7 相同。"] = "Fixed release archives that some tools, including NetEase DD, could interpret as having an invalid folder layout. Addon behavior is unchanged from 0.8.7."
     L["修复泰坦重铸部分装备不显示或显示错误物品等级的问题；表格、拾取、拍卖、交易与流拍通报现在使用一致的有效装等。"] = "Fixed missing or incorrect item levels for some Titan Reforged gear. Bills, loot, auctions, trades, and unsold announcements now use the same effective item level."
     L["修复当前团结算在金币证据不完整时可能过早判定，以及相同装备和金额可能核对错买家的问题。"] = "Fixed current-raid reconciliation completing too early without complete gold evidence and matching the wrong buyer for identical items and prices."
@@ -108,8 +109,8 @@ do -- BGNext 0.8.8 release text
     }
     for key, value in pairs(values) do L[key] = value end
     ns.updateText_now = {
-        "BGNext 0.8.8",
-        L["修复部分发布包在网易 DD 等工具中可能被识别为目录层级异常的问题；插件功能与 0.8.7 相同。"],
+        "BGNext 0.8.9",
+        L["修复泰坦重铸 P5 双本分段清理后共享杂项和旧金额残留的问题；新增“清理所有 P5 副本”，并修复清表金币基准未更新。"],
     }
 end
 
@@ -3463,4 +3464,8 @@ do -- BGNext in-game guide
     L["待拍队列已在功能管理中关闭。"] = "The auction queue is disabled in Feature Management."
     L["已自动清空表格< %s >的当前副本区间（Boss %s-%s），其他副本记录已保留。"] = "Cleared the current instance range in < %s > (Boss %s-%s); records for other instances were kept."
     L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。是否只清空该区间？其他副本记录与当前团结算记录会保留。"] = "A new lockout was detected, but < %s > still has content in this instance range (Boss %s-%s). Clear only this range? Other instance rows and the current settlement will be kept."
+    L["只清当前副本"] = "Clear current raid only"
+    L["清理所有%s副本"] = "Clear all %s raids"
+    L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本时，其他副本、杂项、罚款、支出和当前团结算记录会保留；如需开始整个新阶段，请选择“清理所有%s副本”。"] = "A new lockout was detected, but table < %s > still has content in this raid range (Boss %s-%s). If only this raid is cleared, the other raid, shared miscellaneous rows, penalties, expenses, and the current settlement are kept. To start the whole phase fresh, choose Clear all %s raids."
+    L["已清理所有%s副本，并清除共享的杂项、罚款和当前团结算记录；支出按现有清表设置处理。"] = "Cleared all %s raids, including shared miscellaneous rows, penalties, and the current settlement. Expenses follow the existing clear-table settings."
 end

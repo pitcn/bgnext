@@ -77,6 +77,19 @@ function BG.ClearBiaoGeUI()
         return true
     end
 
+    local function RecordClearBiaoGeMoney(FB)
+        local money = floor(GetMoney() / 1e4)
+        BiaoGe.clearBiaoGeMoney = BiaoGe.clearBiaoGeMoney or {}
+        BiaoGe.clearBiaoGeMoney[FB] = {
+            FB = FB,
+            realmID = realmID,
+            name = player,
+            money = money,
+            time = GetServerTime()
+        }
+        BG.UpdateButtonClearBiaoGeMoney()
+    end
+
     function BG.ClearBiaoGe(_type, FB)
         if not FB then return end
         if _type == "biaoge" then
@@ -127,16 +140,7 @@ function BG.ClearBiaoGeUI()
                 BiaoGe[FB]["boss" .. Maxb[FB] + 2]["jine4"] = num
             end
 
-            local money = floor(GetMoney() / 1e4)
-            BiaoGe.clearBiaoGeMoney = BiaoGe.clearBiaoGeMoney or {}
-            BiaoGe.clearBiaoGeMoney[FB] = {
-                FB = FB,
-                realmID = realmID,
-                name = player,
-                money = money,
-                time = GetServerTime()
-            }
-            BG.UpdateButtonClearBiaoGeMoney()
+            RecordClearBiaoGeMoney(FB)
             return num
         end
     end
@@ -251,9 +255,37 @@ function BG.ClearBiaoGeUI()
             return BG.BiaoGeHavedItem(pending.fb, "autoQingKong", pending.instanceID)
         end
 
+        local function StillHasAnyContent(pending)
+            return pending and BG.BiaoGeHavedItem(pending.fb) or false
+        end
+
+        -- Only tables that actually combine distinct instance ranges may offer
+        -- the whole-phase action. A phase can contain several independent
+        -- tables, and clearing one of them must never be labelled as clearing
+        -- every raid in that phase.
+        local function HasMultipleInstanceRanges(FB)
+            local ranges = {}
+            local count = 0
+            for instanceID, mappedFB in pairs(BG.FBIDtable or {}) do
+                if mappedFB == FB then
+                    local range = BG.bossPositionStartEnd and BG.bossPositionStartEnd[instanceID]
+                    if range and type(range[1]) == "number" and type(range[2]) == "number" then
+                        local key = range[1] .. ":" .. range[2]
+                        if not ranges[key] then
+                            ranges[key] = true
+                            count = count + 1
+                            if count > 1 then return true end
+                        end
+                    end
+                end
+            end
+            return false
+        end
+
         local function DoAutoClear(FB, clearType, startB, endB, teamText)
             if clearType == 1 then
                 if not BG.ClearBiaoGeRange(FB, startB, endB) then return end
+                RecordClearBiaoGeMoney(FB)
                 BG.SendSystemMessage(format(L["已自动清空表格< %s >的当前副本区间（Boss %s-%s），其他副本记录已保留。"],
                     BG.GetFBinfo(FB, "shortName"), startB, endB))
                 BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
@@ -263,6 +295,12 @@ function BG.ClearBiaoGeUI()
                 BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
                 BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
                     teamText))
+            elseif clearType == 3 then
+                local num = BG.ClearBiaoGe("biaoge", FB)
+                BG.SendSystemMessage(format(L["已清理所有%s副本，并清除共享的杂项、罚款和当前团结算记录；支出按现有清表设置处理。"],
+                    BG.GetFBinfo(FB, "phase") or BG.GetFBinfo(FB, "shortName")))
+                BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"],
+                    BG.GetFBinfo(FB, "shortName"), num))
             end
             BG.PlaySound("qingkong")
         end
@@ -284,13 +322,25 @@ function BG.ClearBiaoGeUI()
             })
             if not pending then return end
             pending.teamText = teamText
+            pending.canClearWholeTable = clearType == 1 and HasMultipleInstanceRanges(FB)
             local shortName = BG.GetFBinfo(FB, "shortName")
+            local phase = BG.GetFBinfo(FB, "phase") or shortName
             local message
             if clearType == 1 then
-                message = format(L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。是否只清空该区间？其他副本记录与当前团结算记录会保留。"],
-                    shortName, startB, endB)
+                if pending.canClearWholeTable then
+                    message = format(L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本时，其他副本、杂项、罚款、支出和当前团结算记录会保留；如需开始整个新阶段，请选择“清理所有%s副本”。"],
+                        shortName, startB, endB, phase)
+                else
+                    message = format(L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。是否只清空该区间？其他副本记录与当前团结算记录会保留。"],
+                        shortName, startB, endB)
+                end
             else
                 message = format(L["检测到新副本进度，表格< %s >仍有未结算内容，清空将同时清除表格内容与当前团的结算记录。是否清空？"], shortName)
+            end
+            local dialogInfo = StaticPopupDialogs["AUTO_QINGKONG_CONFIRM"]
+            if dialogInfo then
+                dialogInfo.button1 = clearType == 1 and L["只清当前副本"] or L["清空表格"]
+                dialogInfo.button3 = pending.canClearWholeTable and format(L["清理所有%s副本"], phase) or nil
             end
             StaticPopup_Show("AUTO_QINGKONG_CONFIRM", message, nil, pending)
         end
@@ -315,6 +365,17 @@ function BG.ClearBiaoGeUI()
                 local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
                 if Guard and pending then
                     Guard.refuse(pending)
+                end
+            end,
+            OnAlt = function(self, data)
+                local pending = data
+                if not pending or pending.clearType ~= 1 or not pending.canClearWholeTable then return end
+                local Guard = BG.BGNext and BG.BGNext.AutoClearGuard
+                local hasContent = StillHasAnyContent(pending)
+                local currentInstanceID = select(8, GetInstanceInfo())
+                local decision = Guard and Guard.accept(pending, hasContent, currentInstanceID) or "skip"
+                if decision == "clear" then
+                    DoAutoClear(pending.fb, 3, pending.startB, pending.endB, pending.teamText)
                 end
             end,
             timeout = 0,
