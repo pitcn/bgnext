@@ -325,7 +325,7 @@ local function provider()
         catalog = catalog,
         snapshots = snapshots,
         characterOrder = Model and Model.customCharacterOrder(root, family) or nil,
-        maxLevel = BG.fullLevel_RoleOverview,
+        maxLevel = BG.fullLevel,
         showNonMaxLevel = settings and settings.showNonMaxLevel(root) or false,
         currentRealmId = BG.realmID or (type(GetRealmID) == "function" and GetRealmID()),
         showAllRealms = state.shift,

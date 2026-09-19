@@ -656,6 +656,12 @@ return function(test)
     test.eq(allLevels.resource.totals.money, 100000, "opt-in totals include restored characters")
     local missingThreshold = View.project(input({ snapshots = levelSnapshots }))
     test.eq(missingThreshold.characterCount, 2, "a missing client max level fails open")
+    local zeroThreshold = View.project(input({ snapshots = levelSnapshots, maxLevel = 0 }))
+    test.eq(zeroThreshold.characterCount, 2, "a non-positive client max level fails open")
+    local unknownLevel = snapshot({ player = "Unknown" })
+    unknownLevel.level = nil
+    local unknownLevelView = View.project(input({ snapshots = { unknownLevel }, maxLevel = 80 }))
+    test.eq(unknownLevelView.characterCount, 0, "a snapshot without a numeric level cannot impersonate max level")
     local allRealmMaxOnly = View.project(input({
         snapshots = {
             snapshot({ player = "LocalMax", level = 80 }),

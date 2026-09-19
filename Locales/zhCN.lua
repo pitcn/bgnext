@@ -3309,6 +3309,7 @@ do -- BGNext character overview
     L["当前数量"] = true
     L["总上限"] = true
     L["每周上限"] = true
+    L["显示非满级角色"] = true
     L["启用角色总览"] = true
     L["清空"] = true
     L["清空当前版本角色数据"] = true

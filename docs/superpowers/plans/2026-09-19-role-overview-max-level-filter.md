@@ -4,7 +4,7 @@
 
 **Goal:** Add a default-on max-level-only view to the own-character overview, with an opt-in setting to show non-max-level characters, without deleting or changing stored character data.
 
-**Architecture:** Keep the rule in the pure role-overview projection so current-realm and all-realm views, counts, totals, stripes, and window size share one filter. Keep SavedVariables access and the checkbox in `RoleOverviewSettings.lua`; pass only the resolved boolean and existing client-specific `BG.fullLevel_RoleOverview` into the projection provider.
+**Architecture:** Keep the rule in the pure role-overview projection so current-realm and all-realm views, counts, totals, stripes, and window size share one filter. Keep SavedVariables access and the checkbox in `RoleOverviewSettings.lua`; pass only the resolved boolean and existing actual client level cap `BG.fullLevel` into the projection provider. Do not use `BG.fullLevel_RoleOverview`, which is the legacy overview's lower display threshold rather than the level cap.
 
 **Tech Stack:** Lua 5.1, WoW Frame API, existing plain-Lua test harness, PowerShell verification scripts.
 
@@ -66,6 +66,7 @@ git commit -m "test: cover role overview level filter"
 - Modify: `Core/BGNext/RoleOverviewSettings.lua`
 - Modify: `Core/BGNext/RoleOverviewEntry.lua`
 - Modify: `Locales/enUS.lua`
+- Modify: `Locales/zhCN.lua`
 - Modify: `Locales/zhTW.lua`
 
 - [ ] **Step 1: Add boolean-only preference helpers**
@@ -104,7 +105,7 @@ Require `levelVisible(...)` together with the existing realm condition before in
 Add to the `view.project` input in `RoleOverviewEntry.lua`:
 
 ```lua
-maxLevel = BG.fullLevel_RoleOverview,
+maxLevel = BG.fullLevel,
 showNonMaxLevel = settings and settings.showNonMaxLevel(root) or false,
 ```
 
@@ -128,7 +129,7 @@ end)
 
 Include this control in `layoutLowerControls` and increase panel height so it cannot overlap the enable/clear controls.
 
-Add `Show Non-Max-Level Characters` to `Locales/enUS.lua` and `顯示非滿級角色` to `Locales/zhTW.lua`; the English-locale suite requires every BGNext-owned static key in both locale files.
+Register the key in `Locales/zhCN.lua`, add `Show Non-Max-Level Characters` to `Locales/enUS.lua`, and add `顯示非滿級角色` to `Locales/zhTW.lua`; the locale suite requires every BGNext-owned static key in all locale files.
 
 - [ ] **Step 5: Run focused and full tests and verify GREEN**
 
@@ -139,7 +140,7 @@ Expected: every Lua suite passes, including the new default-hidden and opt-in ca
 - [ ] **Step 6: Commit the implementation**
 
 ```powershell
-git add -- Core/BGNext/OwnCharactersView.lua Core/BGNext/RoleOverviewSettings.lua Core/BGNext/RoleOverviewEntry.lua Locales/enUS.lua Locales/zhTW.lua tests/test_own_character_view.lua tests/test_role_overview_entry.lua
+git add -- Core/BGNext/OwnCharactersView.lua Core/BGNext/RoleOverviewSettings.lua Core/BGNext/RoleOverviewEntry.lua Locales/enUS.lua Locales/zhCN.lua Locales/zhTW.lua tests/test_own_character_view.lua tests/test_role_overview_entry.lua
 git commit -m "feat: hide non-max characters by default"
 ```
 
@@ -157,15 +158,15 @@ Add a data-inventory row:
 | `settings.roleOverviewShowNonMaxLevel` | Explicit user display choice, boolean only | Show locally stored non-max-level own characters in the role overview; absence/invalid values keep them hidden | Local until changed or all BGNext data is cleared; never deletes snapshots | None | Role overview settings checkbox | Low |
 ```
 
-- [ ] **Step 2: Refresh only the two changed locale override hashes**
+- [ ] **Step 2: Refresh only the three changed locale override hashes**
 
 Run:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'Locales/enUS.lua','Locales/zhTW.lua'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'Locales/enUS.lua','Locales/zhCN.lua','Locales/zhTW.lua'
 ```
 
-Replace only the `Locales/enUS.lua` and `Locales/zhTW.lua` hashes in `docs/baseline/BGNext-overrides.sha256`. The three `Core/BGNext` runtime files are BGNext-only and must not be added to the upstream override manifest. `docs/baseline/BGLite-2.4.2.sha256` remains immutable.
+Replace only the `Locales/enUS.lua`, `Locales/zhCN.lua`, and `Locales/zhTW.lua` hashes in `docs/baseline/BGNext-overrides.sha256`. The three `Core/BGNext` runtime files are BGNext-only and must not be added to the upstream override manifest. `docs/baseline/BGLite-2.4.2.sha256` remains immutable.
 
 - [ ] **Step 3: Run high-risk repository verification**
 

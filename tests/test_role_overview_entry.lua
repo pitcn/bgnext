@@ -8,8 +8,8 @@ return function(test)
         "provider obtains only explicit custom order from the model")
     test.eq(string.find(providerSource, "characterOrder = Model", 1, true) ~= nil, true,
         "provider passes model order to the projection")
-    test.eq(string.find(providerSource, "maxLevel = BG.fullLevel_RoleOverview", 1, true) ~= nil, true,
-        "provider passes the current client max level to the projection")
+    test.eq(string.find(providerSource, "maxLevel = BG.fullLevel,", 1, true) ~= nil, true,
+        "provider passes the actual current client level cap to the projection")
     test.eq(string.find(providerSource, "settings.showNonMaxLevel(root)", 1, true) ~= nil, true,
         "provider passes the explicit non-max display preference")
 
