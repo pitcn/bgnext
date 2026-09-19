@@ -8,6 +8,10 @@ return function(test)
         "provider obtains only explicit custom order from the model")
     test.eq(string.find(providerSource, "characterOrder = Model", 1, true) ~= nil, true,
         "provider passes model order to the projection")
+    test.eq(string.find(providerSource, "maxLevel = BG.fullLevel_RoleOverview", 1, true) ~= nil, true,
+        "provider passes the current client max level to the projection")
+    test.eq(string.find(providerSource, "settings.showNonMaxLevel(root)", 1, true) ~= nil, true,
+        "provider passes the explicit non-max display preference")
 
     -- Hover previews, leaving hides again, unless the window was pinned.
     test.eq(Entry.intent("hover", {}), "preview", "hover previews the overview")

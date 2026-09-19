@@ -3386,6 +3386,7 @@ do -- BGNext character overview
     L["当前数量"] = "Current"
     L["总上限"] = "Total cap"
     L["每周上限"] = "Weekly cap"
+    L["显示非满级角色"] = "Show Non-Max-Level Characters"
     L["启用角色总览"] = "Enable Character Overview"
     L["清空"] = "Clear"
     L["清空当前版本角色数据"] = "Clear This Client's Character Data"
