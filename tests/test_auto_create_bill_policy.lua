@@ -54,14 +54,14 @@ return function(test)
     local ok, err = pcall(function()
         BiaoGe = { options = { autoCreateBill = 1 } }
         BG = { IsML = true }
-        test.eq(shouldCreateBillFromAuction(), true,
-            "checked auction result filling remains active for the raid leader/master looter")
+        test.eq(shouldCreateBillFromAuction(), false,
+            "raid leaders and master looters keep the upstream trade-confirmed bill boundary")
         test.eq(isAutoCreateBill(), false,
             "leader trade accounting remains active")
 
         BG.IsML = nil
         test.eq(shouldCreateBillFromAuction(), true,
-            "checked auction result filling remains active for ordinary raid members")
+            "ordinary raid members retain local auction-result filling")
         test.eq(isAutoCreateBill(), true,
             "ordinary member trade accounting remains suppressed to prevent duplicate entries")
 
@@ -205,9 +205,9 @@ return function(test)
     if not ok then error(err, 0) end
 
     -- Exercise the public auction-completion entry point with the item-cache
-    -- boundary completing synchronously. A successful auction must be visible
-    -- in the bill before the handler returns; it must not depend on a later
-    -- timer that can observe a changed raid/table state.
+    -- boundary completing synchronously. Leaders keep the upstream
+    -- trade-confirmed bill boundary, while ordinary members retain the local
+    -- auction-result view without depending on a delayed timer.
     local completionStart = assert(source:find("        function BG.AuctionWAEnd", 1, true))
     local completionEnd = assert(source:find("\n        end\n    end\n\n    -- 拍卖成功的聊天信息", completionStart, true))
     local completionSource = source:sub(completionStart, completionEnd + #"\n        end" - 1)
@@ -257,7 +257,6 @@ return function(test)
             saveCalls = saveCalls + 1
             savedAfterFill = billBuyer == "成交玩家" and billAmount == "500"
         end,
-        ShouldCreateBillFromAuction = function() return true end,
         IsML = true,
         FillBillFromAuctionResult = function(_, result)
             billBuyer, billAmount = result.maijia, result.jine
@@ -266,6 +265,9 @@ return function(test)
         CreateBillByAuctionLog = function() error("full bill rebuild is not required") end,
         After = function(_, callback) delayed[#delayed + 1] = callback end,
     }
+    flowBG.ShouldCreateBillFromAuction = function()
+        return shouldCreateBillFromAuction()
+    end
     local completeAuction = completionFactory({
         BG = flowBG,
         BiaoGe = flowBiaoGe,
@@ -278,17 +280,20 @@ return function(test)
         player = "团长",
         realmName = "测试服",
     })
+    local completionOldBiaoGe, completionOldBG = BiaoGe, BG
+    BiaoGe, BG = { options = { autoCreateBill = 1 } }, flowBG
     completeAuction(1, "item:123", "成交玩家", 500, nil)
-    test.eq(billBuyer, "成交玩家", "auction completion writes the buyer before returning")
-    test.eq(billAmount, "500", "auction completion writes the amount before returning")
-    test.eq(savedAfterFill, true, "primary bill write completes before optional leader accounting")
-    test.eq(saveCalls, 1, "auction completion invokes leader accounting after the primary write")
-    test.eq(#delayed, 0, "auction completion does not defer the primary bill write")
+    test.eq(billBuyer, "", "leader auction completion does not book an unconfirmed buyer")
+    test.eq(billAmount, "", "leader auction completion does not book unreceived gold")
+    test.eq(savedAfterFill, false, "leader accounting does not depend on an auction-result prefill")
+    test.eq(saveCalls, 1, "auction completion still invokes leader accounting")
+    test.eq(#delayed, 0, "leader auction completion schedules no competing bill write")
     test.eq(#flowBiaoGe.TEST.auctionLog, 1, "a pending item cache callback cannot delay the auction record")
     test.eq(rendererCalls, 1, "the immediate auction-log refresh receives renderer-safe metadata")
     itemLoadCallbacks[1]()
     test.eq(#flowBiaoGe.TEST.auctionLog, 1, "a later item cache callback enriches instead of duplicating the auction record")
 
+    flowBG.IsML = nil
     billBuyer, billAmount, savedAfterFill = "", "", false
     local savesBeforePresentationFailure = saveCalls
     throwOnRefresh = true
@@ -297,12 +302,13 @@ return function(test)
     end)
     throwOnRefresh = false
     test.eq(presentationOk, false, "the injected presentation failure reaches the caller")
-    test.eq(billBuyer, "刷新失败买家", "presentation failure cannot prevent the core buyer write")
-    test.eq(billAmount, "550", "presentation failure cannot prevent the core amount write")
+    test.eq(billBuyer, "刷新失败买家", "ordinary-member auction filling survives a presentation failure")
+    test.eq(billAmount, "550", "ordinary-member auction amount survives a presentation failure")
     test.eq(saveCalls, savesBeforePresentationFailure + 1,
         "presentation failure cannot prevent exactly one leader-accounting save")
 
     billBuyer, billAmount, savedAfterFill = "", "", false
+    flowBG.IsML = true
     completeAuction(1, "item:123", "团长", 600, {})
     test.eq(billBuyer, "", "leader self-purchase waits for the paid-or-debt choice")
     test.eq(billAmount, "", "leader self-purchase does not prefill an amount before the choice")
@@ -312,6 +318,7 @@ return function(test)
 
     billBuyer, billAmount = "", ""
     flowBG.ImMLorLeader = function() return false end
+    flowBG.IsML = nil
     completeAuction(1, "item:123", "团长", 700, {})
     test.eq(billBuyer, "团长", "stale cached leader state cannot suppress a self-buyer result")
     test.eq(billAmount, "700", "stale cached leader state cannot leave the amount empty")
@@ -322,4 +329,5 @@ return function(test)
     test.eq(billBuyer, "普通团员", "ordinary members use the targeted result writer")
     test.eq(billAmount, "800", "ordinary members do not depend on a full bill rebuild")
     test.eq(#delayed, 0, "ordinary-member bill writes are not deferred")
+    BiaoGe, BG = completionOldBiaoGe, completionOldBG
 end

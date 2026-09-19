@@ -630,7 +630,7 @@ BG.Init(function()
             end
 
             function BG.ShouldCreateBillFromAuction()
-                return BiaoGe.options.autoCreateBill == 1
+                return BiaoGe.options.autoCreateBill == 1 and not BG.IsML
             end
         end
 
