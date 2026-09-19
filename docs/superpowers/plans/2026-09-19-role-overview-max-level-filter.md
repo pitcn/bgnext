@@ -65,6 +65,8 @@ git commit -m "test: cover role overview level filter"
 - Modify: `Core/BGNext/OwnCharactersView.lua`
 - Modify: `Core/BGNext/RoleOverviewSettings.lua`
 - Modify: `Core/BGNext/RoleOverviewEntry.lua`
+- Modify: `Locales/enUS.lua`
+- Modify: `Locales/zhTW.lua`
 
 - [ ] **Step 1: Add boolean-only preference helpers**
 
@@ -126,6 +128,8 @@ end)
 
 Include this control in `layoutLowerControls` and increase panel height so it cannot overlap the enable/clear controls.
 
+Add `Show Non-Max-Level Characters` to `Locales/enUS.lua` and `顯示非滿級角色` to `Locales/zhTW.lua`; the English-locale suite requires every BGNext-owned static key in both locale files.
+
 - [ ] **Step 5: Run focused and full tests and verify GREEN**
 
 Run: `powershell -ExecutionPolicy Bypass -File tools/run-lua-tests.ps1`
@@ -135,7 +139,7 @@ Expected: every Lua suite passes, including the new default-hidden and opt-in ca
 - [ ] **Step 6: Commit the implementation**
 
 ```powershell
-git add -- Core/BGNext/OwnCharactersView.lua Core/BGNext/RoleOverviewSettings.lua Core/BGNext/RoleOverviewEntry.lua tests/test_own_character_view.lua
+git add -- Core/BGNext/OwnCharactersView.lua Core/BGNext/RoleOverviewSettings.lua Core/BGNext/RoleOverviewEntry.lua Locales/enUS.lua Locales/zhTW.lua tests/test_own_character_view.lua tests/test_role_overview_entry.lua
 git commit -m "feat: hide non-max characters by default"
 ```
 
@@ -143,6 +147,7 @@ git commit -m "feat: hide non-max characters by default"
 
 **Files:**
 - Modify: `docs/security/data-inventory.md`
+- Modify: `docs/baseline/BGNext-overrides.sha256`
 
 - [ ] **Step 1: Document the display-only field**
 
@@ -152,15 +157,15 @@ Add a data-inventory row:
 | `settings.roleOverviewShowNonMaxLevel` | Explicit user display choice, boolean only | Show locally stored non-max-level own characters in the role overview; absence/invalid values keep them hidden | Local until changed or all BGNext data is cleared; never deletes snapshots | None | Role overview settings checkbox | Low |
 ```
 
-- [ ] **Step 2: Confirm the upstream override manifest remains unchanged**
+- [ ] **Step 2: Refresh only the two changed locale override hashes**
 
 Run:
 
 ```powershell
-git diff --exit-code origin/main...HEAD -- docs/baseline/BGNext-overrides.sha256 docs/baseline/BGLite-2.4.2.sha256
+Get-FileHash -Algorithm SHA256 -LiteralPath 'Locales/enUS.lua','Locales/zhTW.lua'
 ```
 
-Expected: no diff. All three runtime files are BGNext-only modules, not changed BGLite upstream files, so adding them to the upstream override manifest would be incorrect.
+Replace only the `Locales/enUS.lua` and `Locales/zhTW.lua` hashes in `docs/baseline/BGNext-overrides.sha256`. The three `Core/BGNext` runtime files are BGNext-only and must not be added to the upstream override manifest. `docs/baseline/BGLite-2.4.2.sha256` remains immutable.
 
 - [ ] **Step 3: Run high-risk repository verification**
 
@@ -186,6 +191,6 @@ Expected: no collector, auction, trade, debt, bill, or character-deletion code c
 - [ ] **Step 5: Commit documentation and verification metadata**
 
 ```powershell
-git add -- docs/security/data-inventory.md
+git add -- docs/security/data-inventory.md docs/baseline/BGNext-overrides.sha256
 git commit -m "docs: record role overview display preference"
 ```
