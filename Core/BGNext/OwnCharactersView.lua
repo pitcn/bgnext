@@ -569,9 +569,15 @@ local function resourceCell(column, snapshot, now)
     return cell
 end
 
+local function levelVisible(snapshot, maxLevel, showNonMaxLevel)
+    if showNonMaxLevel == true then return true end
+    if type(maxLevel) ~= "number" or maxLevel <= 0 then return true end
+    return type(snapshot.level) == "number" and snapshot.level >= maxLevel
+end
+
 -- Rows are ordered current realm first, then realm, then character name, so
 -- the table does not reshuffle between logins.
-local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder)
+local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder, maxLevel, showNonMaxLevel)
     local rows = {}
     local ranks = {}
     for index, identity in ipairs(type(characterOrder) == "table" and characterOrder or {}) do
@@ -584,7 +590,7 @@ local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrde
     for _, snapshot in ipairs(snapshots or {}) do
         if isValidSnapshot(snapshot) then
             local isCurrentRealm = snapshot.realmId == currentRealmId
-            if showAllRealms or isCurrentRealm then
+            if (showAllRealms or isCurrentRealm) and levelVisible(snapshot, maxLevel, showNonMaxLevel) then
                 rows[#rows + 1] = {
                     snapshot = snapshot,
                     isCurrentRealm = isCurrentRealm,
@@ -693,7 +699,8 @@ function M.project(input)
     local raidColumns = visibleColumns(catalog.raidColumns, "raid", input.visibility, available)
     local resourceColumns = visibleColumns(catalog.resourceColumns, "resource", input.visibility, available)
 
-    local entries = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true, input.characterOrder)
+    local entries = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true,
+        input.characterOrder, input.maxLevel, input.showNonMaxLevel)
     markAmbiguousNames(entries)
 
     local raidRows, resourceRows = {}, {}

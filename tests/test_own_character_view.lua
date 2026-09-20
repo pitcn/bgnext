@@ -49,6 +49,10 @@ return function(test)
     test.eq(string.find(settingsSource, "Model.moveCharacter", 1, true) ~= nil, true, "settings moves through model")
     test.eq(string.find(settingsSource, "Model.resetCharacterOrder", 1, true) ~= nil, true, "settings resets through model")
     test.eq(string.find(settingsSource, "RegisterForDrag", 1, true), nil, "settings registers no drag behavior")
+    test.eq(string.find(settingsSource, "显示非满级角色", 1, true) ~= nil, true,
+        "settings exposes the non-max character display switch")
+    test.eq(string.find(settingsSource, "M.setShowNonMaxLevel(root", 1, true) ~= nil, true,
+        "the display switch writes only through the validated setting helper")
     local layout = Settings.characterOrderLayout(3, -100)
     test.eq(layout.lowerY < layout.restoreY, true, "dynamic order layout leaves space below restore")
     test.eq(layout.height > 0, true, "dynamic order layout grows panel height")
@@ -634,6 +638,40 @@ return function(test)
     -- Height grows with rows and shrinks when characters are filtered out.
     test.eq(totals.height > view.height, true, "more characters make the window taller")
 
+    -- Role overview defaults to max-level characters for the active client.
+    -- This is a display projection only: the source snapshots remain intact.
+    local levelSnapshots = {
+        snapshot({ player = "Max", level = 80, money = 10000 }),
+        snapshot({ player = "Alt", level = 1, money = 90000 }),
+    }
+    local maxOnly = View.project(input({ snapshots = levelSnapshots, maxLevel = 80 }))
+    test.eq(maxOnly.characterCount, 1, "non-max characters are hidden by default")
+    test.eq(maxOnly.resource.rows[1].player, "Max", "the max-level character remains visible")
+    test.eq(maxOnly.resource.totals.money, 10000, "totals exclude hidden non-max characters")
+    test.eq(levelSnapshots[2].level, 1, "filtering never mutates hidden snapshots")
+    local allLevels = View.project(input({
+        snapshots = levelSnapshots, maxLevel = 80, showNonMaxLevel = true,
+    }))
+    test.eq(allLevels.characterCount, 2, "the opt-in setting restores non-max characters")
+    test.eq(allLevels.resource.totals.money, 100000, "opt-in totals include restored characters")
+    local missingThreshold = View.project(input({ snapshots = levelSnapshots }))
+    test.eq(missingThreshold.characterCount, 2, "a missing client max level fails open")
+    local zeroThreshold = View.project(input({ snapshots = levelSnapshots, maxLevel = 0 }))
+    test.eq(zeroThreshold.characterCount, 2, "a non-positive client max level fails open")
+    local unknownLevel = snapshot({ player = "Unknown" })
+    unknownLevel.level = nil
+    local unknownLevelView = View.project(input({ snapshots = { unknownLevel }, maxLevel = 80 }))
+    test.eq(unknownLevelView.characterCount, 0, "a snapshot without a numeric level cannot impersonate max level")
+    local allRealmMaxOnly = View.project(input({
+        snapshots = {
+            snapshot({ player = "LocalMax", level = 80 }),
+            snapshot({ player = "RemoteAlt", realmId = 456, realmName = "时光III", level = 1 }),
+        },
+        maxLevel = 80,
+        showAllRealms = true,
+    }))
+    test.eq(allRealmMaxOnly.characterCount, 1, "all-realm view uses the same max-level filter")
+
     -- Empty and malformed input stay safe.
     local empty = View.project(input({ snapshots = {} }))
     test.eq(#empty.raid.rows, 0, "no characters yields no rows")
@@ -721,6 +759,13 @@ return function(test)
     test.eq(Settings.visibilityFor(nil, "titan") ~= nil, true, "missing root is safe")
     Settings.setVisible(root, nil, "raid", "MCtitan", false)
     test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "a missing family writes nothing")
+
+    local preferenceRoot = {}
+    test.eq(Settings.showNonMaxLevel(preferenceRoot), false, "non-max characters default to hidden")
+    Settings.setShowNonMaxLevel(preferenceRoot, true)
+    test.eq(Settings.showNonMaxLevel(preferenceRoot), true, "the user can opt in to non-max characters")
+    Settings.setShowNonMaxLevel(preferenceRoot, "yes")
+    test.eq(Settings.showNonMaxLevel(preferenceRoot), true, "invalid values cannot overwrite the preference")
 
     -- Only booleans are stored, so a corrupted save cannot smuggle in data.
     Settings.setVisible(root, "titan", "raid", "MCtitan", "yes")

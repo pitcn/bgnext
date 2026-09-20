@@ -78,7 +78,9 @@ do -- BGNext release text
     L["修复自动拍卖成功记录出现后，主表买家和成交金额仍可能为空的问题。"] = "Fixed successful auction records that could still leave the main bill buyer and amount blank."
 end
 
-do -- BGNext 0.8.9 release text
+do -- BGNext 0.8.10 release text
+    L["修复团长或物品分配者拍卖结束但未实际交易时，主表仍提前写入买家和金额的问题；现在只在真实交易完成后入账。"] = "Fixed raid leader and master-looter auctions writing buyer and amount into the bill before an actual trade. The bill now records the sale only after the trade completes."
+    L["角色总览默认隐藏非满级角色；可在设置中选择显示，隐藏只影响界面，不删除角色数据。"] = "Character Overview now hides non-max-level characters by default. They can be shown in settings; hiding affects only the view and never deletes character data."
     L["修复泰坦重铸 P5 双本分段清理后共享杂项和旧金额残留的问题；新增“清理所有 P5 副本”，并修复清表金币基准未更新。"] = "Fixed shared miscellaneous rows and old amounts remaining after a partial Titan P5 clear. Added Clear All P5 Raids and fixed the clear-time gold baseline."
     L["修复部分发布包在网易 DD 等工具中可能被识别为目录层级异常的问题；插件功能与 0.8.7 相同。"] = "Fixed release archives that some tools, including NetEase DD, could interpret as having an invalid folder layout. Addon behavior is unchanged from 0.8.7."
     L["修复泰坦重铸部分装备不显示或显示错误物品等级的问题；表格、拾取、拍卖、交易与流拍通报现在使用一致的有效装等。"] = "Fixed missing or incorrect item levels for some Titan Reforged gear. Bills, loot, auctions, trades, and unsold announcements now use the same effective item level."
@@ -109,8 +111,9 @@ do -- BGNext 0.8.9 release text
     }
     for key, value in pairs(values) do L[key] = value end
     ns.updateText_now = {
-        "BGNext 0.8.9",
-        L["修复泰坦重铸 P5 双本分段清理后共享杂项和旧金额残留的问题；新增“清理所有 P5 副本”，并修复清表金币基准未更新。"],
+        "BGNext 0.8.10",
+        L["修复团长或物品分配者拍卖结束但未实际交易时，主表仍提前写入买家和金额的问题；现在只在真实交易完成后入账。"],
+        L["角色总览默认隐藏非满级角色；可在设置中选择显示，隐藏只影响界面，不删除角色数据。"],
     }
 end
 
@@ -3386,6 +3389,7 @@ do -- BGNext character overview
     L["当前数量"] = "Current"
     L["总上限"] = "Total cap"
     L["每周上限"] = "Weekly cap"
+    L["显示非满级角色"] = "Show Non-Max-Level Characters"
     L["启用角色总览"] = "Enable Character Overview"
     L["清空"] = "Clear"
     L["清空当前版本角色数据"] = "Clear This Client's Character Data"

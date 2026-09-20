@@ -109,6 +109,19 @@ function M.visibilityFor(root, family)
     return visibility
 end
 
+-- Display preference only. Missing or malformed saved values keep the compact
+-- default without changing or deleting any stored character snapshot.
+function M.showNonMaxLevel(root)
+    local settings = type(root) == "table" and root.settings or nil
+    return type(settings) == "table" and settings.roleOverviewShowNonMaxLevel == true
+end
+
+function M.setShowNonMaxLevel(root, value)
+    if type(root) ~= "table" or type(value) ~= "boolean" then return end
+    root.settings = type(root.settings) == "table" and root.settings or {}
+    root.settings.roleOverviewShowNonMaxLevel = value
+end
+
 -- Returns a predicate saying whether this client can actually read a column.
 -- Both the settings page and the projection use it, so a field with no
 -- verified reader is neither offered as a checkbox nor rendered with a guess.
@@ -358,6 +371,28 @@ function M.BuildPanel(parent)
         if type(parent.HookScript) == "function" then parent:HookScript("OnShow", rebuildOrderRows) end
         y = M.characterOrderLayout(#M.characterOrderRows(root, family, Model), orderTop).lowerY
 
+        -- This changes only the visible projection. Collection and saved
+        -- snapshots continue unchanged, so hidden alts reappear immediately
+        -- when enabled or after reaching the current client's max level.
+        local showNonMaxCheck = CreateFrame("CheckButton", nil, parent, "ChatConfigCheckButtonTemplate")
+        showNonMaxCheck:SetSize(30, 30)
+        showNonMaxCheck:SetPoint("TOPLEFT", parent, 20, y)
+        showNonMaxCheck.Text:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+        showNonMaxCheck.Text:SetText(L["显示非满级角色"])
+        showNonMaxCheck.Text:SetWordWrap(false)
+        showNonMaxCheck.Text:SetWidth(180)
+        showNonMaxCheck:SetHitRectInsets(0, -showNonMaxCheck.Text:GetWidth(), 0, 0)
+        local function updateShowNonMaxLevel()
+            showNonMaxCheck:SetChecked(M.showNonMaxLevel(root))
+        end
+        updateShowNonMaxLevel()
+        showNonMaxCheck:SetScript("OnClick", function(self)
+            M.setShowNonMaxLevel(root, self:GetChecked() and true or false)
+            refresh()
+        end)
+        showNonMaxCheck:SetScript("OnShow", updateShowNonMaxLevel)
+        y = y - 40
+
         -- Disabling the module stops collection and refresh; no data is
         -- deleted, and re-checking restores collection.
         local runtime = BG.BGNext and BG.BGNext.OwnCharactersRuntime
@@ -401,10 +436,11 @@ function M.BuildPanel(parent)
         y = y - 30
 
         layoutLowerControls = function(layout)
-            enabledCheck:ClearAllPoints(); enabledCheck:SetPoint("TOPLEFT", parent, 20, layout.lowerY)
-            clearFamily:ClearAllPoints(); clearFamily:SetPoint("TOPLEFT", parent, 20, layout.lowerY - 40)
-            clearAll:ClearAllPoints(); clearAll:SetPoint("TOPLEFT", parent, 20, layout.lowerY - 70)
-            parent:SetSize(400, layout.height)
+            showNonMaxCheck:ClearAllPoints(); showNonMaxCheck:SetPoint("TOPLEFT", parent, 20, layout.lowerY)
+            enabledCheck:ClearAllPoints(); enabledCheck:SetPoint("TOPLEFT", parent, 20, layout.lowerY - 40)
+            clearFamily:ClearAllPoints(); clearFamily:SetPoint("TOPLEFT", parent, 20, layout.lowerY - 80)
+            clearAll:ClearAllPoints(); clearAll:SetPoint("TOPLEFT", parent, 20, layout.lowerY - 110)
+            parent:SetSize(400, layout.height + 40)
         end
         layoutLowerControls(M.characterOrderLayout(#M.characterOrderRows(root, family, Model), orderTop))
 
