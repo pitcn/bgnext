@@ -138,7 +138,7 @@ return function(test)
         end
         test.eq(type(localized.L["存储与隐私"]), "string", "storage tab receives text, never a boolean")
         test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
-        test.eq(localized.updateText_now[1], "BGNext 0.8.9", "current in-game update notes use the release version")
+        test.eq(localized.updateText_now[1], "BGNext 0.8.10", "current in-game update notes use the release version")
         for index, value in ipairs(localized.updateText_now) do
             test.eq(type(value), "string", "current in-game update note is text at index " .. index)
         end
@@ -149,7 +149,7 @@ return function(test)
         BG = { BGNext = {} }
         dofile("Core/BGNext/Identity.lua")
         local releaseInfo = assert(loadfile("Core/BGNext/ReleaseInfo.lua"))("BGNext", localized)
-        test.eq(releaseInfo.changelog[1], localized.L["修复泰坦重铸 P5 双本分段清理后共享杂项和旧金额残留的问题；新增“清理所有 P5 副本”，并修复清表金币基准未更新。"],
+        test.eq(releaseInfo.changelog[1], localized.L["修复团长或物品分配者拍卖结束但未实际交易时，主表仍提前写入买家和金额的问题；现在只在真实交易完成后入账。"],
             "in-game release notes use the selected locale")
         BG = previousBG
     end
