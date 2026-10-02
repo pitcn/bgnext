@@ -20,7 +20,14 @@ def positive_integer(value, maximum):
 
 
 def read_drops(source, require_complete=True):
-    reader = csv.DictReader(source)
+    reader = csv.DictReader(source, strict=True)
+    try:
+        return _read_pools(reader, require_complete)
+    except csv.Error as exc:
+        raise ValueError(f"line {reader.line_num}: malformed CSV: {exc}") from exc
+
+
+def _read_pools(reader, require_complete):
     if reader.fieldnames is None or set(reader.fieldnames) != FIELDS or len(reader.fieldnames) != len(FIELDS):
         raise ValueError("required CSV columns: boss,item_id,observed_mode,verified,evidence")
     pools = {}
@@ -51,8 +58,9 @@ def render_lua(pools):
         "-- Locally prepared Titan P6 candidate; review the source CSV before loading.",
         "-- One 25-player pool per boss; mechanic hard mode is not a separate raid difficulty.",
         "-- Boss coverage does not prove that every drop is present.",
-        'if not BG.IsTitan then return end',
-        'local raid = BG.Loot.ULDtitan',
+        'if type(BG) ~= "table" or not BG.IsTitan then return end',
+        'local raid = type(BG.Loot) == "table" and BG.Loot.ULDtitan',
+        'if type(raid) ~= "table" or type(raid.N) ~= "table" then return end',
     ]
     for boss, items in sorted(pools.items()):
         lines.append(f"raid.N.boss{boss} = {{ " + ", ".join(map(str, items)) + " }")

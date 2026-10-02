@@ -13,6 +13,20 @@ SPEC.loader.exec_module(loot)
 
 
 class PrepareP6LootTests(unittest.TestCase):
+    def run_lua(self, script):
+        lua = shutil.which("lua5.1") or shutil.which("lua")
+        if not lua:
+            candidate = Path(r"C:\Program Files (x86)\Lua\5.1\lua.exe")
+            if candidate.exists():
+                lua = str(candidate)
+        if not lua:
+            self.skipTest("Lua runtime unavailable; run the repository Lua checks")
+        with tempfile.TemporaryDirectory() as directory:
+            script_path = Path(directory) / "integration.lua"
+            script_path.write_text(script, encoding="utf-8")
+            result = subprocess.run([lua, str(script_path)], cwd=ROOT, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_same_boss_verified_drops_share_one_pool(self):
         source = io.StringIO(
             "boss,item_id,observed_mode,verified,evidence\n"
@@ -73,13 +87,6 @@ class PrepareP6LootTests(unittest.TestCase):
             self.assertFalse(rejected.exists())
 
     def test_generated_pool_works_with_real_wishlist_and_price_modules(self):
-        lua = shutil.which("lua5.1") or shutil.which("lua")
-        if not lua:
-            candidate = Path(r"C:\Program Files (x86)\Lua\5.1\lua.exe")
-            if candidate.exists():
-                lua = str(candidate)
-        if not lua:
-            self.skipTest("Lua runtime unavailable; run the repository Lua checks")
         pools = loot.read_drops(io.StringIO(
             "boss,item_id,observed_mode,verified,evidence\n"
             "1,90001,normal,yes,fixture\n1,90002,hard,yes,fixture\n"
@@ -100,11 +107,29 @@ assert(prices.byItem[90001] and prices.byItem[90002])
 assert(#prices.groups[1].items == 2)
 assert(BG.Loot.ULDtitan.H == nil and BG.Loot.ULDtitan.N10 == nil)
 ''' % loot.render_lua(pools)
-        with tempfile.TemporaryDirectory() as directory:
-            script_path = Path(directory) / "integration.lua"
-            script_path.write_text(script, encoding="utf-8")
-            result = subprocess.run([lua, str(script_path)], cwd=ROOT, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.run_lua(script)
+
+    def test_candidate_is_safe_when_catalog_is_missing_or_not_titan(self):
+        candidate = loot.render_lua({1: [90001]})
+        self.run_lua('''local loadCandidate = assert(loadstring([=[%s]=]))
+BG = nil
+assert(pcall(loadCandidate))
+for _, state in ipairs({{}, {IsTitan = false}, {IsTitan = true},
+    {IsTitan = true, Loot = {}}, {IsTitan = true, Loot = {ULDtitan = {N = 1}}}}) do
+    BG = state
+    assert(pcall(loadCandidate))
+end
+BG = {IsTitan = false, Loot = {ULDtitan = {N = {boss1 = {123}}}}}
+assert(pcall(loadCandidate))
+assert(BG.Loot.ULDtitan.N.boss1[1] == 123)
+''' % candidate)
+
+    def test_malformed_quotes_are_rejected_instead_of_becoming_evidence(self):
+        for row in ('1,90001,normal,yes,"fixture"garbage\n',
+                    '1,90001,normal,yes,"unterminated\n'):
+            with self.subTest(row=row), self.assertRaises(ValueError):
+                loot.read_drops(io.StringIO("boss,item_id,observed_mode,verified,evidence\n" + row),
+                                require_complete=False)
 
 
 if __name__ == "__main__":

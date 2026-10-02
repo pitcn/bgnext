@@ -60,6 +60,8 @@ python tools/prepare-titan-p6-loot.py .local/p6-confirmed.csv --output .local/DB
 
 ## 验证
 
+第二轮复核补充：新 P6 列只接受有限、整数且在总数范围内的进度，异常值留空，旧副本逻辑不变；模拟覆盖旧快照按分区刷新、金币/货币保留以及 P6 重置不清除未到期 P5。维护工具严格拒绝损坏的 CSV 引号，生成文件在非 Titan 或目录未初始化时安全退出。旧版 dd24fc4 与准备版进行了五客户端、固定种子 60325 的 600 组差分检查，旧副本状态及 API 调用次数均一致。这仍不是实机验收。
+
 ```powershell
 pwsh -NoProfile -File tools/run-lua-tests.ps1
 python -m unittest discover -s tests/maintenance -v
