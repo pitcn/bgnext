@@ -557,7 +557,9 @@ function M.readRaidStates(api, raidColumns, family)
         if type(column) == "table" and type(column.id) == "string" and type(instanceIds) == "table" then
             for _, instanceId in ipairs(instanceIds) do
                 if type(instanceId) == "number" then
-                    byInstance[instanceId] = { columnId = column.id, totalParts = #instanceIds }
+                    byInstance[instanceId] = {
+                        columnId = column.id, totalParts = #instanceIds, maxPlayers = source.maxPlayers,
+                    }
                 end
             end
         end
@@ -573,7 +575,8 @@ function M.readRaidStates(api, raidColumns, family)
         local ok, name, lockoutId, reset, difficulty, locked, extended, mostSig, isRaid,
             maxPlayers, difficultyName, numEncounters, encounterProgress, _, instanceId = callAll(getInfo, index)
         local mapping = byInstance[instanceId]
-        if ok and locked == true and isRaid == true and mapping then
+        if ok and locked == true and isRaid == true and mapping
+            and (mapping.maxPlayers == nil or maxPlayers == mapping.maxPlayers) then
             local label = type(difficulty) == "number" and DIFFICULTY_LABELS[difficulty] or nil
             if family == "retail" and label then
                 -- Publish a difficulty only when its boss total and kill count are
