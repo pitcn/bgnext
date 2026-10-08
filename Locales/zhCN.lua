@@ -8,6 +8,7 @@ local L = setmetatable({}, {
     end
 })
 ns.L = L
+L["未能获取物品信息，未自动记账，请手动补记：%s"] = "未能获取物品信息，未自动记账，请手动补记：%s"
 
 local c1 = "|cff" .. "ffff66"
 ns.c1 = c1

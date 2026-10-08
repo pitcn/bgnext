@@ -7,6 +7,7 @@ ns.enUS = true
 
 local L = ns.L
 local c1 = ns.c1
+L["未能获取物品信息，未自动记账，请手动补记：%s"] = "Item information could not be loaded. Not recorded automatically; please add it manually: %s"
 
 do -- BGNext release text
     L["新增待拍队列并修复拍卖结果、交易记录、交易通报、预设开拍和正式服团本进度。"] = "Added the auction queue and fixed auction results, trade records, announcements, preset starts, and Retail raid progress."

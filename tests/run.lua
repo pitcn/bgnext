@@ -53,6 +53,7 @@ local suites = {
     "tests/test_own_character_adapters.lua",
     "tests/test_titan_p6.lua",
     "tests/test_titan_p6_loot.lua",
+    "tests/test_loot_item_cache.lua",
     "tests/test_own_character_collector.lua",
     "tests/test_own_character_readers.lua",
     "tests/test_retail_boss_lockouts.lua",
