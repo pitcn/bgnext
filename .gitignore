@@ -3,3 +3,4 @@
 dist/
 *.zip
 *.sha256
+__pycache__/

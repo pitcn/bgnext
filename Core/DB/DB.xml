@@ -13,4 +13,5 @@
     <Script file="Core\DB\DB_Loot_Vanilla_Sod.lua"/>
     <Script file="Core\DB\DB_Loot_Vanilla_60.lua"/>
     <Script file="Core\DB\DB_Loot_BlackWhiteList.lua"/>
+    <Script file="Core\DB\DB_Loot_Titan_P6.lua"/>
 </Ui>

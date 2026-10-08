@@ -18,7 +18,7 @@ BG.BGNext = BG.BGNext or {}
 
 local M = {}
 
-local function raid(id, zoneId, title, fullTitle, variant, instanceIds, defaultVisible, color)
+local function raid(id, zoneId, title, fullTitle, variant, instanceIds, defaultVisible, color, maxPlayers)
     local ids = instanceIds
     if type(ids) ~= "table" then
         ids = type(zoneId) == "number" and { zoneId } or {}
@@ -40,6 +40,7 @@ local function raid(id, zoneId, title, fullTitle, variant, instanceIds, defaultV
             key = id,
             instanceIds = ids,
             readable = #ids > 0,
+            maxPlayers = maxPlayers,
         },
     }
 end
@@ -155,6 +156,7 @@ local CATALOG = {
     titan = {
         status = "tested-in-game",
         raidColumns = {
+            raid("ULDtitan", 603, "ULD", "奥杜尔", nil, { 603 }, true, "00BFFF", 25),
             raid("SWtitan", 580, "太阳井", "太阳之井高地", nil, { 580 }, true, "00BFFF"),
             raid("ZAtitan", 568, "祖阿曼", "祖阿曼", nil, { 568 }, true, "00BFFF"),
             raid("TOCtitan", 649, "TOC", "十字军的试炼", nil, { 649 }, true, "00BFFF"),

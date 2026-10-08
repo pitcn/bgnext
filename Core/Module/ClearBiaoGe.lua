@@ -17,6 +17,9 @@ local GetLootMethod = GetLootMethod or C_PartyInfo.GetLootMethod
 
 function BG.ClearBiaoGeUI()
     function BG.ClearBiaoGeByIndex(FB, b)
+        if b <= Maxb[FB] and BG.InvalidatePendingLoot then
+            BG.InvalidatePendingLoot(FB)
+        end
         if b == Maxb[FB] + 1 then
             for i = 1, BG.Maxi + 10 do -- 清空支出
                 if BG.Frame[FB]["boss" .. Maxb[FB] + 1]["zhuangbei" .. i] then
@@ -33,7 +36,7 @@ function BG.ClearBiaoGeUI()
                 end
             end
         elseif b <= Maxb[FB] then
-            for i = 1, BG.Maxi + 10 do
+            for i = 1, math.max(BG.Maxi + 10, BG.GetMaxi(FB, b)) do
                 -- 表格
                 if BG.Frame[FB]["boss" .. b]["zhuangbei" .. i] then
                     BG.Frame[FB]["boss" .. b]["zhuangbei" .. i]:SetText("")

@@ -75,10 +75,10 @@ return function(test)
     test.eq(#view.raid.rows, 1, "one character is one raid row")
     test.eq(#view.resource.rows, 1, "one character is one resource row")
     test.eq(view.raid.rows[1].player, "Piti", "row is keyed by character")
-    test.eq(#view.raid.columns, 7, "only the original default Titan raid columns project")
-    test.eq(view.raid.columns[1].id, "SWtitan", "raid columns keep the original Titan order")
+    test.eq(#view.raid.columns, 8, "Titan defaults include the independent P6 raid")
+    test.eq(view.raid.columns[1].id, "ULDtitan", "P6 appears before older default raids")
     test.eq(#view.raid.rows[1].cells, #view.raid.columns, "each row has one cell per column")
-    test.eq(view.raid.rows[1].cells[1].columnId, "SWtitan", "cells follow column order")
+    test.eq(view.raid.rows[1].cells[1].columnId, "ULDtitan", "cells follow column order")
 
     -- The first column header carries the visible character count.
     test.eq(type(view.raid.nameHeader), "string", "raid name header exists")
