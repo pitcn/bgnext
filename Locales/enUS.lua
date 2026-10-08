@@ -111,10 +111,14 @@ do -- BGNext 0.8.10 release text
         ["修复团长在聊天框 Alt+左键点击装备时误加入心愿；现在会打开拍卖窗口。"] = "Fixed raid leaders Alt-left-clicking chat items adding a wish; the shortcut now opens the auction window.",
     }
     for key, value in pairs(values) do L[key] = value end
+    L["更新泰坦重铸奥杜尔25人掉落、兑换物和心愿配置。"] = "Update Titan Reforged Ulduar 25-player drops, tokens and wishlist configuration."
+    L["奥杜尔账单改为四列，杂项扩至56格，保留旧账位置；瓦兰奈尔碎片继续累加。"] = "Expand the Ulduar ledger to four columns and 56 miscellaneous slots while preserving existing entries; Valanyr fragments continue to accumulate."
+    L["修复装备信息尚未缓存时自动拾取记账可能报错或漏记，以及新增杂项格子清不干净的问题。"] = "Fix automatic loot recording errors or missing entries while item information is uncached, and ensure all expanded miscellaneous slots clear correctly."
     ns.updateText_now = {
-        "BGNext 0.8.10",
-        L["修复团长或物品分配者拍卖结束但未实际交易时，主表仍提前写入买家和金额的问题；现在只在真实交易完成后入账。"],
-        L["角色总览默认隐藏非满级角色；可在设置中选择显示，隐藏只影响界面，不删除角色数据。"],
+        "BGNext 0.8.11",
+        L["更新泰坦重铸奥杜尔25人掉落、兑换物和心愿配置。"],
+        L["奥杜尔账单改为四列，杂项扩至56格，保留旧账位置；瓦兰奈尔碎片继续累加。"],
+        L["修复装备信息尚未缓存时自动拾取记账可能报错或漏记，以及新增杂项格子清不干净的问题。"],
     }
 end
 
