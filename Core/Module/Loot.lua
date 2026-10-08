@@ -525,7 +525,12 @@ BG.Init(function()
         lootEpoch = lootEpoch + 1
         pendingLoot, pendingCount = {}, 0
     end
-    BG.RegisterEvent({ "GROUP_LEFT", "PLAYER_LEAVING_WORLD", "ZONE_CHANGED_NEW_AREA" }, CancelPendingLoot)
+    BG.RegisterEvent({ "GROUP_LEFT", "PLAYER_LEAVING_WORLD" }, CancelPendingLoot)
+    BG.RegisterEvent("ZONE_CHANGED_NEW_AREA", function()
+        for id, entry in pairs(pendingLoot) do
+            if not entry.current(true) then ForgetPending(id) end
+        end
+    end)
     BG.RegisterEvent("GROUP_ROSTER_UPDATE", function()
         if not IsInGroup() then CancelPendingLoot() end
     end)

@@ -132,11 +132,26 @@ return function(test)
     f.advance(0.2)
     test.eq(f.item(1), nil, "world leave cancels pending writes")
 
+    -- A zone notification alone is not proof of a changed loot scope.
+    for _, beforeLoad in ipairs({ true, false }) do
+        f = fixture()
+        f.emit("ENCOUNTER_START", 1)
+        f.emit("CHAT_MSG_LOOT", "LOOT_ITEM_SELF:item:45132")
+        if not beforeLoad then f.load() end
+        f.emit("ZONE_CHANGED_NEW_AREA")
+        if beforeLoad then f.load() end
+        f.advance(0.2)
+        test.eq(f.item(1), "item:45132", "unchanged scope preserves pending and scheduled loot")
+    end
+
     -- Metadata completion and the existing 0.1s bill timer are both guarded.
     for _, change in ipairs({
         function(f) f.bg.InvalidatePendingLoot("ULDtitan") end,
         function(f) f.emit("GROUP_LEFT") end,
-        function(f) f.emit("ZONE_CHANGED_NEW_AREA") end,
+        function(f)
+            f.env.GetInstanceInfo = function() return "Other", "raid", 4, nil, nil, nil, nil, 533 end
+            f.emit("ZONE_CHANGED_NEW_AREA")
+        end,
         function(f) f.bg.FB2 = "NAXX" end,
         function(f) f.env.GetInstanceInfo = function() return "Other", "raid", 4, nil, nil, nil, nil, 533 end end,
         function(f) f.env.GetInstanceInfo = function() return "Ulduar", "raid", 3, nil, nil, nil, nil, 603 end end,
