@@ -1,6 +1,6 @@
 # Explicit BGNext changes to official upstream BGLite 2.4.2 files.
 # Format: SHA-256, two spaces, repository-relative path.
-95653edb775aca92acae4beb17f2923cc8dea05d261dc2eb9aa831e04e25271b  BGLite.toc
+ff021cec0c981f5be3bc567330bd4505c8f37e0bc4dbde6470dd0113643ca18a  BGLite.toc
 6686c508bb020bdf0135c48d63b10287c844c635454e63d61dce77f24afcfa14  Bindings.xml
 f8a90b730efec9419558043f705902afddd87f4aea77d19fb8caafb3d0033dc0  Core/BiaoGe.lua
 84df2da8b74d718223c1a6c37fd99bae153b0f61af703271f17b0edbea7924a6  Core/DB/DB.lua
@@ -35,7 +35,7 @@ abc2c06dbe7887ff0daf98ab06b8ab711cc42822bd22a5e1c621288970297161  Core/TongBao/L
 fe1c25533575333ef9934022382659bc0b470cef1fbb69ef0d45a9a52d2e9455  Libs/LibCustomGlow-1.0/LICENSE
 1824b7091f7535e822d3fc0138013e0370eb894efcf7cc2ef1babb81f7997fcf  Libs/LibDataBroker-1.1/README.textile
 c780c7948b6d5b32cbafc6e44a1bd39c67a1896e67a315b795f019b44b0c7d62  Libs/UTF8/utf8data.lua
-49276cfdc8a06d0f54fe5d0fd974af7092bb8134cd6b395d6a4845242963943e  Locales/enUS.lua
-80b21045f646bfa98d01791b85f400d5ca9209d9b6ea2467948ef32171b54b5f  Locales/zhCN.lua
-bca8e67290f2e26cbb16a777c448286cd16dba823ea44ce9caa3ca4dcbaa0497  Locales/zhTW.lua
+57a698e895fb9853bddd725539530e0dbe48007cac3488d4be21540b46a806f0  Locales/enUS.lua
+81d16df4d79caea08b9a18ea9ab41a081ee313e35ccb6e530c18c70585a0a391  Locales/zhCN.lua
+992b266257097fc0d337b0772df3842cfbe4300ea49fa522e3cd76076cd228f2  Locales/zhTW.lua
 cc805549f61f1667a5859c112d26f9920d84e2bc2cdd80661f0188187c87cdc7  Media/icon/icon.tga

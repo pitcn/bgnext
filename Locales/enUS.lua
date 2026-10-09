@@ -114,11 +114,10 @@ do -- BGNext 0.8.10 release text
     L["更新泰坦重铸奥杜尔25人掉落、兑换物和心愿配置。"] = "Update Titan Reforged Ulduar 25-player drops, tokens and wishlist configuration."
     L["奥杜尔账单改为四列，杂项扩至56格，保留旧账位置；瓦兰奈尔碎片继续累加。"] = "Expand the Ulduar ledger to four columns and 56 miscellaneous slots while preserving existing entries; Valanyr fragments continue to accumulate."
     L["修复装备信息尚未缓存时自动拾取记账可能报错或漏记，以及新增杂项格子清不干净的问题。"] = "Fix automatic loot recording errors or missing entries while item information is uncached, and ensure all expanded miscellaneous slots clear correctly."
+    L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"] = "Fix the Ulduar salary list overlapping announcement buttons; move the fines, expenses, overview and salary sections upward while keeping all 56 miscellaneous slots."
     ns.updateText_now = {
-        "BGNext 0.8.11",
-        L["更新泰坦重铸奥杜尔25人掉落、兑换物和心愿配置。"],
-        L["奥杜尔账单改为四列，杂项扩至56格，保留旧账位置；瓦兰奈尔碎片继续累加。"],
-        L["修复装备信息尚未缓存时自动拾取记账可能报错或漏记，以及新增杂项格子清不干净的问题。"],
+        "BGNext 0.8.12",
+        L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"],
     }
 end
 
