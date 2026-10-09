@@ -17,14 +17,10 @@ return function(test)
     test.eq(c.columns, 4, "P6 has four display columns")
     test.eq(c.width, 1685, "expanded table uses existing wide frame")
     test.eq(c.rows[15], 56, "misc has capacity for a full raid")
-    test.eq(c.fold, 33, "misc folds into 32 and 24 rows to leave room for summary")
+    test.eq(c.fold, 35, "misc folds into 34 and 22 rows to leave room for announcement")
     test.eq(c.maxb, 16, "boss/misc/fine identities remain stable")
     test.eq(c.starts[4], 15, "fine/expense/summary move to fourth column")
-    -- Existing big-raid widgets use 20px normal rows, 20.1px scroll rows,
-    -- 15px first-scroll gap and 13px subsequent gaps. Reserve footer space.
-    local rightBottom = 78 + (c.rows[15] - c.fold + 1) * 20
-        + 15 + c.rows[16] * 20.1 + 13 + c.pay * 20.1 + 13 + 5 * 20.1
-    test.eq(rightBottom <= c.height - 30, true, "final column fits including wages and footer")
+    -- Actual footer anchors are exercised by test_ulduar_footer_layout.lua.
     local previous = { 4,4,4,4,5,4,5,5,5,5,5,5,6,6 }
     local required = { 5,4,5,5,6,4,5,5,6,5,6,6,6,6 }
     for b = 1, 14 do
@@ -90,7 +86,7 @@ return function(test)
         layout.FBZhuangBeiUI("ULDtitan", 3, 2, 2, i, c.rows[15])
         test.eq(layout.Frame.ULDtitan.boss15["zhuangbei" .. i]:GetText(), "existing", "saved misc rows restore")
     end
-    local foldPoint = layout.Frame.ULDtitan.boss15.zhuangbei33.point
+    local foldPoint = layout.Frame.ULDtitan.boss15["zhuangbei" .. c.fold].point
     test.eq(foldPoint[2], anchor, "second misc half anchors to the next column")
     test.eq(foldPoint[4], 170, "fold uses existing column offset")
     test.eq(saved.boss14.zhuangbei6, "old boss item", "layout construction preserves old data")
