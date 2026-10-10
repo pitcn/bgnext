@@ -648,6 +648,8 @@ function M.Draw(layout)
     resetPool()
 
     frame:SetSize(layout.width, layout.height)
+    local entry = BG.BGNext.RoleOverviewEntry
+    if entry and type(entry.RefreshScale) == "function" then entry.RefreshScale() end
 
     local textIndex, textureIndex, buttonIndex, itemButtonIndex, headerButtonIndex, addButtonIndex, valueButtonIndex = 0, 0, 0, 0, 0, 0, 0
     local function nextText()

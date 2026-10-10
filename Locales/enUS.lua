@@ -6,6 +6,9 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["角色总览缩放：%d%%"] = "Role overview scale: %d%%"
+L["恢复默认缩放"] = "Reset scale"
+L["仅调整角色总览和悬停预览；超出屏幕时自动限制大小。"] = "Adjust only the role overview and hover preview; automatically limit the size to fit the screen."
 local c1 = ns.c1
 L["未能获取物品信息，未自动记账，请手动补记：%s"] = "Item information could not be loaded. Not recorded automatically; please add it manually: %s"
 

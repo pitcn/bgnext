@@ -122,6 +122,25 @@ function M.setShowNonMaxLevel(root, value)
     root.settings.roleOverviewShowNonMaxLevel = value
 end
 
+local function normalizeScale(value)
+    if type(value) ~= "number" or value ~= value or value <= 0 or value == math.huge then return nil end
+    return math.floor(math.max(0.5, math.min(1.5, value)) * 100 + 0.5) / 100
+end
+
+-- A local display preference only; absent/invalid values never migrate storage.
+function M.scale(root)
+    local settings = type(root) == "table" and root.settings or nil
+    return normalizeScale(type(settings) == "table" and settings.roleOverviewScale) or 1
+end
+
+function M.setScale(root, value)
+    local scale = normalizeScale(value)
+    if type(root) ~= "table" or not scale then return false end
+    root.settings = type(root.settings) == "table" and root.settings or {}
+    root.settings.roleOverviewScale = scale
+    return true
+end
+
 -- Returns a predicate saying whether this client can actually read a column.
 -- Both the settings page and the projection use it, so a field with no
 -- verified reader is neither offered as a checkbox nor rendered with a guess.
@@ -268,6 +287,51 @@ function M.BuildPanel(parent)
                 BG.BGNext.OwnCharactersUI.Refresh()
             end
         end
+
+        local scaleLabel = parent:CreateFontString(nil, "ARTWORK")
+        scaleLabel:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+        scaleLabel:SetPoint("TOPLEFT", parent, 15, y)
+        local template = BG.IsWLK_80 and "TextToSpeechSliderTemplate" or "OptionsSliderTemplate"
+        local scaleSlider = CreateFrame("Slider", nil, parent, template)
+        scaleSlider:SetPoint("TOPLEFT", parent, 25, y - 30)
+        scaleSlider:SetWidth(200)
+        scaleSlider:SetMinMaxValues(50, 150)
+        scaleSlider:SetValueStep(1)
+        scaleSlider:SetObeyStepOnDrag(true)
+        scaleSlider.Low:SetText("50%")
+        scaleSlider.High:SetText("150%")
+        scaleSlider.Text:SetText("")
+        local syncingScale = false
+        local function syncScale()
+            syncingScale = true
+            local percent = math.floor(M.scale(root) * 100 + 0.5)
+            scaleSlider:SetValue(percent)
+            scaleLabel:SetText(string.format(L["角色总览缩放：%d%%"], percent))
+            syncingScale = false
+        end
+        scaleSlider:SetScript("OnValueChanged", function(_, percent)
+            if syncingScale then return end
+            if M.setScale(root, percent / 100) then
+                syncScale()
+                local entry = BG.BGNext.RoleOverviewEntry
+                if entry and entry.RefreshScale then entry.RefreshScale() end
+            end
+        end)
+        scaleSlider:SetScript("OnShow", syncScale)
+        syncScale()
+        local resetScale = BG.CreateButton(parent)
+        resetScale:SetSize(130, 25)
+        resetScale:SetPoint("TOPLEFT", parent, 250, y - 27)
+        resetScale:SetText(L["恢复默认缩放"])
+        resetScale:SetScript("OnClick", function() scaleSlider:SetValue(100) end)
+        local scaleHint = parent:CreateFontString(nil, "ARTWORK")
+        scaleHint:SetFont(BIAOGE_TEXT_FONT, 13, "OUTLINE")
+        scaleHint:SetPoint("TOPLEFT", parent, 20, y - 65)
+        scaleHint:SetSize(360, 40)
+        scaleHint:SetJustifyH("LEFT")
+        scaleHint:SetWordWrap(true)
+        scaleHint:SetText(L["仅调整角色总览和悬停预览；超出屏幕时自动限制大小。"])
+        y = y - 115
 
         for _, group in ipairs(PANEL_SECTIONS) do
             local heading = parent:CreateFontString(nil, "ARTWORK")
