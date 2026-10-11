@@ -298,10 +298,12 @@ function BG.ClearBiaoGeUI()
                 BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"], BG.GetFBinfo(FB, "shortName"), num))
                 BG.SendSystemMessage(L['自动清空表格的原因：1.当前副本你是新CD；2.%s']:format(
                     teamText))
-            elseif clearType == 3 then
+            elseif clearType == 3 or clearType == 4 then
                 local num = BG.ClearBiaoGe("biaoge", FB)
-                BG.SendSystemMessage(format(L["已清理所有%s副本，并清除共享的杂项、罚款和当前团结算记录；支出按现有清表设置处理。"],
-                    BG.GetFBinfo(FB, "phase") or BG.GetFBinfo(FB, "shortName")))
+                if clearType == 3 then
+                    BG.SendSystemMessage(format(L["已清理所有%s副本，并清除共享的杂项、罚款和当前团结算记录；支出按现有清表设置处理。"],
+                        BG.GetFBinfo(FB, "phase") or BG.GetFBinfo(FB, "shortName")))
+                end
                 BG.SendSystemMessage(format(L["已自动清空表格< %s >，分钱人数已改为%s人。"],
                     BG.GetFBinfo(FB, "shortName"), num))
             end
@@ -325,16 +327,17 @@ function BG.ClearBiaoGeUI()
             })
             if not pending then return end
             pending.teamText = teamText
-            pending.canClearWholeTable = clearType == 1 and HasMultipleInstanceRanges(FB)
+            pending.canClearWholeTable = clearType == 1
+            pending.hasMultipleInstanceRanges = HasMultipleInstanceRanges(FB)
             local shortName = BG.GetFBinfo(FB, "shortName")
             local phase = BG.GetFBinfo(FB, "phase") or shortName
             local message
             if clearType == 1 then
-                if pending.canClearWholeTable then
+                if pending.hasMultipleInstanceRanges then
                     message = format(L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本时，其他副本、杂项、罚款、支出和当前团结算记录会保留；如需开始整个新阶段，请选择“清理所有%s副本”。"],
                         shortName, startB, endB, phase)
                 else
-                    message = format(L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。是否只清空该区间？其他副本记录与当前团结算记录会保留。"],
+                    message = format(L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本会保留杂项、罚款、支出和当前团结算记录；选择“清空表格”可同时清除这些记录，支出按现有清表设置处理。"],
                         shortName, startB, endB)
                 end
             else
@@ -343,7 +346,8 @@ function BG.ClearBiaoGeUI()
             local dialogInfo = StaticPopupDialogs["AUTO_QINGKONG_CONFIRM"]
             if dialogInfo then
                 dialogInfo.button1 = clearType == 1 and L["只清当前副本"] or L["清空表格"]
-                dialogInfo.button3 = pending.canClearWholeTable and format(L["清理所有%s副本"], phase) or nil
+                dialogInfo.button3 = pending.canClearWholeTable and
+                    (pending.hasMultipleInstanceRanges and format(L["清理所有%s副本"], phase) or L["清空表格"]) or nil
             end
             StaticPopup_Show("AUTO_QINGKONG_CONFIRM", message, nil, pending)
         end
@@ -378,7 +382,8 @@ function BG.ClearBiaoGeUI()
                 local currentInstanceID = select(8, GetInstanceInfo())
                 local decision = Guard and Guard.accept(pending, hasContent, currentInstanceID) or "skip"
                 if decision == "clear" then
-                    DoAutoClear(pending.fb, 3, pending.startB, pending.endB, pending.teamText)
+                    DoAutoClear(pending.fb, pending.hasMultipleInstanceRanges and 3 or 4,
+                        pending.startB, pending.endB, pending.teamText)
                 end
             end,
             timeout = 0,

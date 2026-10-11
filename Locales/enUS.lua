@@ -6,6 +6,9 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["角色总览缩放：%d%%"] = "Role overview scale: %d%%"
+L["恢复默认缩放"] = "Reset scale"
+L["仅调整角色总览和悬停预览；超出屏幕时自动限制大小。"] = "Adjust only the role overview and hover preview; automatically limit the size to fit the screen."
 local c1 = ns.c1
 L["未能获取物品信息，未自动记账，请手动补记：%s"] = "Item information could not be loaded. Not recorded automatically; please add it manually: %s"
 
@@ -115,9 +118,12 @@ do -- BGNext 0.8.10 release text
     L["奥杜尔账单改为四列，杂项扩至56格，保留旧账位置；瓦兰奈尔碎片继续累加。"] = "Expand the Ulduar ledger to four columns and 56 miscellaneous slots while preserving existing entries; Valanyr fragments continue to accumulate."
     L["修复装备信息尚未缓存时自动拾取记账可能报错或漏记，以及新增杂项格子清不干净的问题。"] = "Fix automatic loot recording errors or missing entries while item information is uncached, and ensure all expanded miscellaneous slots clear correctly."
     L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"] = "Fix the Ulduar salary list overlapping announcement buttons; move the fines, expenses, overview and salary sections upward while keeping all 56 miscellaneous slots."
+    L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"] = "Added independent role overview scaling from 50% to 150%, saved preferences and reset; both the pinned window and hover preview use it."
+    L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"] = "Added Clear table to new-lockout prompts for single-raid tables such as Ulduar, including miscellaneous rows, penalties and the current settlement; expenses follow existing retention settings."
     ns.updateText_now = {
-        "BGNext 0.8.12",
-        L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"],
+        "BGNext 0.8.13",
+        L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"],
+        L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"],
     }
 end
 
@@ -3476,4 +3482,5 @@ do -- BGNext in-game guide
     L["清理所有%s副本"] = "Clear all %s raids"
     L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本时，其他副本、杂项、罚款、支出和当前团结算记录会保留；如需开始整个新阶段，请选择“清理所有%s副本”。"] = "A new lockout was detected, but table < %s > still has content in this raid range (Boss %s-%s). If only this raid is cleared, the other raid, shared miscellaneous rows, penalties, expenses, and the current settlement are kept. To start the whole phase fresh, choose Clear all %s raids."
     L["已清理所有%s副本，并清除共享的杂项、罚款和当前团结算记录；支出按现有清表设置处理。"] = "Cleared all %s raids, including shared miscellaneous rows, penalties, and the current settlement. Expenses follow the existing clear-table settings."
+    L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本会保留杂项、罚款、支出和当前团结算记录；选择“清空表格”可同时清除这些记录，支出按现有清表设置处理。"] = "A new lockout was detected, but < %s > still has content in this raid range (Boss %s-%s). Clear current raid only keeps miscellaneous rows, penalties, expenses and the current settlement. Clear table also removes these records; expenses follow your existing clear-table settings."
 end

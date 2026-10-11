@@ -251,6 +251,7 @@ end
 --------------------------------------------------------------------------
 
 local pinned = false
+local dragging = false
 local state = { pinned = pinned }
 local window
 local entryButton
@@ -270,6 +271,12 @@ local function placeWindow(mode)
     local ui = BG.BGNext.OwnCharactersUI
     if ui and type(ui.SetMode) == "function" then ui.SetMode(mode) end
     local presentation = M.windowPresentation(mode, hoverKind)
+    local settings = BG.BGNext.RoleOverviewSettings
+    local preferred = settings and settings.scale(BG.BGNext.DB) or 1
+    local fit = BG.BGNext.MainFrameScale
+    local scale = fit and fit.compute(preferred, window:GetWidth(), window:GetHeight(),
+        UIParent:GetWidth(), UIParent:GetHeight()) or preferred
+    window:SetScale(scale)
     window:SetFrameStrata(presentation.strata)
     if window.SetFrameLevel then window:SetFrameLevel(100) end
     if window.SetToplevel then window:SetToplevel(true) end
@@ -286,15 +293,21 @@ local function placeWindow(mode)
     local anchor = M.restorePoint(saved, {
         width = UIParent:GetWidth(),
         height = UIParent:GetHeight(),
-        windowWidth = window:GetWidth(),
-        windowHeight = window:GetHeight(),
+        windowWidth = window:GetWidth() * scale,
+        windowHeight = window:GetHeight() * scale,
     })
     if anchor then
-        local ok = pcall(window.SetPoint, window, anchor.point, UIParent, anchor.relativePoint, anchor.x, anchor.y)
+        local ok = pcall(window.SetPoint, window, anchor.point, UIParent, anchor.relativePoint,
+            anchor.x / scale, anchor.y / scale)
         if ok then return end
     end
     window:SetPoint(presentation.point, UIParent, presentation.relativePoint,
         presentation.x, presentation.y)
+end
+
+-- Called after a redraw or preference change; never opens a hidden window.
+function M.RefreshScale()
+    if window and not dragging then placeWindow(state.previewVisible and "preview" or "pinned") end
 end
 
 function M.canOpen(runtime)
@@ -355,6 +368,7 @@ local function ensureWindow()
     window:EnableMouse(true)
     window:RegisterForDrag("LeftButton")
     window:SetScript("OnHide", function()
+        if dragging then window:StopMovingOrSizing(); dragging = false end
         local wasManaged = pinned or state.previewVisible == true
         pinned = false
         state.pinned = false
@@ -364,9 +378,13 @@ local function ensureWindow()
             M.syncVisibility(runtime, BG.BGNext.OwnCharactersUI, false)
         end
     end)
-    window:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    window:SetScript("OnDragStart", function(self) dragging = true; self:StartMoving() end)
+    window:RegisterEvent("DISPLAY_SIZE_CHANGED")
+    window:RegisterEvent("UI_SCALE_CHANGED")
+    window:SetScript("OnEvent", function() M.RefreshScale() end)
     window:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        dragging = false
         local root = BG.BGNext.DB
         if root then
             root.settings = type(root.settings) == "table" and root.settings or {}
@@ -374,11 +392,13 @@ local function ensureWindow()
             local parentX, parentY = UIParent:GetCenter()
             if type(centerX) == "number" and type(centerY) == "number"
                 and type(parentX) == "number" and type(parentY) == "number" then
-                local x = centerX - parentX
-                local y = centerY - parentY
+                local scale = self:GetEffectiveScale() / UIParent:GetEffectiveScale()
+                local x = centerX * scale - parentX
+                local y = centerY * scale - parentY
                 root.settings.roleOverviewPoint = M.sanitizePoint("CENTER", UIParent, "CENTER", x, y)
             end
         end
+        M.RefreshScale()
     end)
 
     -- Restore the saved anchor when it is still valid; otherwise reset to a

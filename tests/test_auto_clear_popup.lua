@@ -10,6 +10,7 @@ local function fakeWidget()
     function w:SetSize() return self end
     function w:SetPoint() return self end
     function w:SetText() return self end
+    function w:GetText() return self.text or "" end
     function w:SetFormattedText() return self end
     function w:RegisterForClicks() return self end
     function w:SetScript() return self end
@@ -115,6 +116,7 @@ return function(test)
     BG.SendSystemMessage = function(msg) h.messages[#h.messages + 1] = msg end
     BG.PlaySound = function(snd) h.sounds[#h.sounds + 1] = snd end
     BG.GetFBinfo = function(fb, key)
+        if key == "maxplayers" then return 25 end
         if key == "phase" then return "P5" end
         if key == "shortName" then return "P5双本" end
         return fb
@@ -168,6 +170,7 @@ return function(test)
 
     -- Spy on the actual clear path so the popup wiring can be asserted without
     -- mutating any real table or settlement.
+    local realClear, realRange = BG.ClearBiaoGe, BG.ClearBiaoGeRange
     BG.ClearBiaoGe = function(_type, FB)
         h.clearCalls[#h.clearCalls + 1] = FB
         return 25
@@ -259,19 +262,122 @@ return function(test)
     currentInstanceID = 5678
     fireCycle()
     test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].data.fb, "ZUG", "replacement binds the newer target")
-    test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].button3, nil,
-        "a single-raid table does not offer a misleading whole-phase action")
+    test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].button3, "清空表格",
+        "a single-raid table offers an explicitly labelled complete clear")
     test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].text_arg1:find("清理所有", 1, true), nil,
         "a single-raid table does not describe an unavailable whole-phase action")
     h.accept("AUTO_QINGKONG_CONFIRM")
     test.eq(#h.rangeClearCalls, 1, "replacement clears once")
     test.eq(h.rangeClearCalls[1][1], "ZUG", "replacement clears the newer table range")
 
+    -- Ulduar has only one instance range. Its shared misc/fine rows still
+    -- need an explicit full-table action instead of a misleading phase label.
+    BG.FBIDtable[603] = "ULDtitan"
+    BG.bossPositionStartEnd[603] = { 1, 14 }
+    currentInstanceID = 603
+    h.clearCalls, h.rangeClearCalls = {}, {}
+    fireCycle()
+    test.eq(h.visible["AUTO_QINGKONG_CONFIRM"].button3, "清空表格", "Ulduar offers a full clear")
+    h.alt("AUTO_QINGKONG_CONFIRM")
+    test.eq(#h.clearCalls, 1, "Ulduar complete action invokes the full cleanup")
+    test.eq(h.clearCalls[1], "ULDtitan", "Ulduar complete action captures its table")
+    test.eq(#h.rangeClearCalls, 0, "Ulduar complete action does not stop at boss 14")
+
+    -- Exercise the real full cleanup after accepting the new button, including
+    -- saved rows and visible controls at the ends of both misc columns.
+    BG.ClearBiaoGe, BG.ClearBiaoGeRange = realClear, realRange
+    Maxb.ULDtitan = 16
+    BG.Maxi, BG.playerClass = 40, {}
+    BG.GetMaxi = function(_, b) return b == 15 and 56 or (b == 17 and 20 or (b == 18 and 5 or 40)) end
+    BG.Frame.ULDtitan, BG.DuiZhangFrame = {}, { ULDtitan = {} }
+    BG.UpdateAuctionLogFrame = function() end
+    BG.auctionLogFrame = { changeFrame = fakeWidget() }
+    BG.IsTitan = true
+    BG.BGNext.DB = { settings = { roleOverviewScale = 1.25, roleOverviewEnabled = false },
+        ownCharacters = { marker = "personal snapshot" } }
+    local settlementCleared = 0
+    BG.BGNext.CurrentSettlementRuntime = { onTableCleared = function(_, fb)
+        test.eq(fb, "ULDtitan", "settlement cleanup is scoped to Ulduar")
+        settlementCleared = settlementCleared + 1
+    end }
+    local function seed()
+        BiaoGe.ULDtitan = { tradeTbl = { "old" }, auctionLog = { "old" }, raidRoster = {} }
+        for b = 1, 18 do
+            local saved, visible = {}, {}
+            BiaoGe.ULDtitan["boss" .. b] = saved
+            BG.Frame.ULDtitan["boss" .. b] = visible
+            BG.DuiZhangFrame.ULDtitan["boss" .. b] = {}
+            for i = 1, BG.GetMaxi("ULDtitan", b) do
+                for _, field in ipairs({ "zhuangbei", "maijia", "jine", "qiankuan", "guanzhu" }) do
+                    saved[field .. i] = "old"
+                    local w = fakeWidget()
+                    w.text = "old"
+                    function w:SetText(value) self.text = value end
+                    visible[field .. i] = w
+                end
+            end
+        end
+    end
+    seed()
+    local f = assert(io.open("Core/function1.lua", "rb"))
+    local source = f:read("*a"); f:close()
+    local first = assert(source:find("function BG.BiaoGeHavedItem", 1, true))
+    local last = assert(source:find("\n------------------", first, true))
+    setfenv(assert(loadstring(source:sub(first, last - 1))),
+        setmetatable({ BG = BG, BiaoGe = BiaoGe, Maxb = Maxb }, { __index = _G }))()
+    BiaoGe.MC = { marker = "another raid" }
+    fireCycle()
+    h.cancel("AUTO_QINGKONG_CONFIRM")
+    test.eq(BiaoGe.ULDtitan.boss15.zhuangbei56, "old", "cancel retains last misc row")
+    test.eq(settlementCleared, 0, "cancel retains settlement")
+    fireCycle()
+    currentInstanceID = 1234
+    h.alt("AUTO_QINGKONG_CONFIRM")
+    test.eq(BiaoGe.ULDtitan.boss15.zhuangbei56, "old", "leaving the instance rejects a stale complete clear")
+    currentInstanceID = 603
+    fireCycle()
+    h.alt("AUTO_QINGKONG_CONFIRM")
+    for _, b in ipairs({ 1, 14, 15, 16, 17 }) do
+        local last = b == 15 and 56 or (b == 17 and 20 or 40)
+        test.eq(BiaoGe.ULDtitan["boss" .. b]["jine" .. last], nil, "full action clears saved amounts")
+        test.eq(BG.Frame.ULDtitan["boss" .. b]["jine" .. last].text, "", "full action clears visible amounts")
+    end
+    test.eq(BiaoGe.ULDtitan.boss15.zhuangbei56, nil, "last misc equipment clears")
+    test.eq(BiaoGe.ULDtitan.raidRoster, nil, "full action clears previous roster")
+    test.eq(BiaoGe.ULDtitan.auctionLog, nil, "full action clears previous auction log")
+    test.eq(#BiaoGe.ULDtitan.tradeTbl, 0, "full action clears previous trades")
+    test.eq(settlementCleared, 1, "full action clears matching settlement once")
+    test.eq(BiaoGe.ULDtitan.boss18.jine4, 25, "full action resets salary headcount")
+    test.eq(BiaoGe.MC.marker, "another raid", "complete clear leaves other tables intact")
+    test.eq(BG.BGNext.DB.settings.roleOverviewScale, 1.25, "complete clear preserves overview scaling")
+    test.eq(BG.BGNext.DB.settings.roleOverviewEnabled, false, "complete clear never enables overview collection")
+    test.eq(BG.BGNext.DB.ownCharacters.marker, "personal snapshot", "complete clear preserves personal snapshots")
+    fireCycle()
+    test.eq(h.visible["AUTO_QINGKONG_CONFIRM"], nil, "cleared boss rows do not prompt again")
+    for _, keepMoney in ipairs({ 0, 1 }) do
+        seed()
+        BiaoGe.options.retainExpenses, BiaoGe.options.retainExpensesMoney = 1, keepMoney
+        fireCycle()
+        h.alt("AUTO_QINGKONG_CONFIRM")
+        test.eq(BiaoGe.ULDtitan.boss17.zhuangbei20, "old", "expense labels follow retention setting")
+        test.eq(BiaoGe.ULDtitan.boss17.jine20, keepMoney == 1 and "old" or nil,
+            "expense amounts follow retention setting")
+        test.eq(BiaoGe.ULDtitan.boss15.jine56, nil, "expense retention never retains misc amounts")
+    end
+
+    seed()
+    fireCycle()
+    h.accept("AUTO_QINGKONG_CONFIRM")
+    test.eq(BiaoGe.ULDtitan.boss14.jine40, nil, "current-raid action still clears boss rows")
+    test.eq(BiaoGe.ULDtitan.boss15.jine56, "old", "current-raid action still preserves misc")
+    test.eq(settlementCleared, 3, "partial action does not clear current settlement")
+
     -- 7. Missing guard must fail closed: no clear, a warning is announced.
     h.clearCalls = {}
     h.rangeClearCalls = {}
     h.messages = {}
     BG.BGNext.AutoClearGuard = nil
+    BG.BiaoGeHavedItem = function() return true end
     contentPresent = true
     fireCycle()
     test.eq(#h.clearCalls, 0, "missing guard never auto-clears")
