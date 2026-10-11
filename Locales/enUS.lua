@@ -3476,4 +3476,5 @@ do -- BGNext in-game guide
     L["清理所有%s副本"] = "Clear all %s raids"
     L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本时，其他副本、杂项、罚款、支出和当前团结算记录会保留；如需开始整个新阶段，请选择“清理所有%s副本”。"] = "A new lockout was detected, but table < %s > still has content in this raid range (Boss %s-%s). If only this raid is cleared, the other raid, shared miscellaneous rows, penalties, expenses, and the current settlement are kept. To start the whole phase fresh, choose Clear all %s raids."
     L["已清理所有%s副本，并清除共享的杂项、罚款和当前团结算记录；支出按现有清表设置处理。"] = "Cleared all %s raids, including shared miscellaneous rows, penalties, and the current settlement. Expenses follow the existing clear-table settings."
+    L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本会保留杂项、罚款、支出和当前团结算记录；选择“清空表格”可同时清除这些记录，支出按现有清表设置处理。"] = "A new lockout was detected, but < %s > still has content in this raid range (Boss %s-%s). Clear current raid only keeps miscellaneous rows, penalties, expenses and the current settlement. Clear table also removes these records; expenses follow your existing clear-table settings."
 end
