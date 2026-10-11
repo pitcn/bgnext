@@ -118,9 +118,12 @@ do -- BGNext 0.8.10 release text
     L["奥杜尔账单改为四列，杂项扩至56格，保留旧账位置；瓦兰奈尔碎片继续累加。"] = "Expand the Ulduar ledger to four columns and 56 miscellaneous slots while preserving existing entries; Valanyr fragments continue to accumulate."
     L["修复装备信息尚未缓存时自动拾取记账可能报错或漏记，以及新增杂项格子清不干净的问题。"] = "Fix automatic loot recording errors or missing entries while item information is uncached, and ensure all expanded miscellaneous slots clear correctly."
     L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"] = "Fix the Ulduar salary list overlapping announcement buttons; move the fines, expenses, overview and salary sections upward while keeping all 56 miscellaneous slots."
+    L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"] = "Added independent role overview scaling from 50% to 150%, saved preferences and reset; both the pinned window and hover preview use it."
+    L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"] = "Added Clear table to new-lockout prompts for single-raid tables such as Ulduar, including miscellaneous rows, penalties and the current settlement; expenses follow existing retention settings."
     ns.updateText_now = {
-        "BGNext 0.8.12",
-        L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"],
+        "BGNext 0.8.13",
+        L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"],
+        L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"],
     }
 end
 
