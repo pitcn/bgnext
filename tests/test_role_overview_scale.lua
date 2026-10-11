@@ -107,6 +107,22 @@ return function(test)
     entry.setPinned(false); entry.setPinned(true)
     test.eq(overview.point[4], 112, "reopening restores the dragged position without drift")
 
+    -- GetCenter uses each frame's own scaled coordinate system. Compare
+    -- centers only after conversion to UIParent units, as GetScaledCenter does.
+    for _, percent in ipairs({ 0.5, 1, 1.25, 1.5 }) do
+        settings.setScale(root, percent)
+        entry.RefreshScale()
+        overview.dragCenter = { 1060, 580 }
+        overview.scripts.OnDragStop(overview)
+        overview.dragCenter = nil
+        local x, y = overview:GetCenter()
+        local ratio = overview:GetEffectiveScale() / env.UIParent:GetEffectiveScale()
+        test.eq(math.abs(x * ratio - 1060) < 0.000001, true, "drag round trip retains physical x across scales")
+        test.eq(math.abs(y * ratio - 580) < 0.000001, true, "drag round trip retains physical y across scales")
+    end
+    settings.setScale(root, 1.25)
+    entry.RefreshScale()
+
     local panel = frame()
     settings.BuildPanel(panel)
     local slider, reset
@@ -147,6 +163,9 @@ return function(test)
     entry.setPinned(false)
     entry.RefreshScale()
     test.eq(overview:IsShown(), false, "applying scale never opens a hidden window")
+    overview.scripts.OnEvent(overview, "DISPLAY_SIZE_CHANGED")
+    overview.scripts.OnEvent(overview, "UI_SCALE_CHANGED")
+    test.eq(overview:IsShown(), false, "display and UI scale events never reveal a hidden window")
     env.C_Timer = { After = function(_, callback) callback() end }
     local minimap = frame(); minimap:Show()
     entry.hoverEnter(minimap, "minimap")
