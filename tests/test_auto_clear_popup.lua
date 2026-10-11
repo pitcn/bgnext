@@ -293,6 +293,8 @@ return function(test)
     BG.UpdateAuctionLogFrame = function() end
     BG.auctionLogFrame = { changeFrame = fakeWidget() }
     BG.IsTitan = true
+    BG.BGNext.DB = { settings = { roleOverviewScale = 1.25, roleOverviewEnabled = false },
+        ownCharacters = { marker = "personal snapshot" } }
     local settlementCleared = 0
     BG.BGNext.CurrentSettlementRuntime = { onTableCleared = function(_, fb)
         test.eq(fb, "ULDtitan", "settlement cleanup is scoped to Ulduar")
@@ -347,6 +349,9 @@ return function(test)
     test.eq(settlementCleared, 1, "full action clears matching settlement once")
     test.eq(BiaoGe.ULDtitan.boss18.jine4, 25, "full action resets salary headcount")
     test.eq(BiaoGe.MC.marker, "another raid", "complete clear leaves other tables intact")
+    test.eq(BG.BGNext.DB.settings.roleOverviewScale, 1.25, "complete clear preserves overview scaling")
+    test.eq(BG.BGNext.DB.settings.roleOverviewEnabled, false, "complete clear never enables overview collection")
+    test.eq(BG.BGNext.DB.ownCharacters.marker, "personal snapshot", "complete clear preserves personal snapshots")
     fireCycle()
     test.eq(h.visible["AUTO_QINGKONG_CONFIRM"], nil, "cleared boss rows do not prompt again")
     for _, keepMoney in ipairs({ 0, 1 }) do
