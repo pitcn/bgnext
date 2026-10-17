@@ -825,6 +825,7 @@ do
                         BG.DressUpLastButton = nil
                     end)
                     bt:SetScript("OnMouseDown", function(self, button)
+                        -- A pending link is not a request to erase the bill item.
                         if self.link then
                             -- 已移除「设为最佳价格」分支（第三方付费模块 BGV 提供的能力）
                             -- 已移除「Ctrl+点击跳转装备库」：装备库 UI 在 BGLite 中刻意移除（见 ItemLib.lua 头注释），无目标可跳
@@ -853,10 +854,6 @@ do
                                 end
                                 BG.FrameZhuangbeiList:Hide()
                             end
-                        else
-                            self.owner:SetText("")
-                            self.owner:ClearFocus()
-                            BG.FrameZhuangbeiList:Hide()
                         end
                     end)
                 end
