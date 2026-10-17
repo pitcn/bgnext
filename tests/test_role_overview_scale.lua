@@ -176,4 +176,49 @@ return function(test)
     test.eq(env.BiaoGe.options.scale, 0.7, "ledger preference is unchanged")
     test.eq(env.BiaoGe.options.autoAuctionScale, 0.9, "auction preference is unchanged")
     test.eq(root.ownCharacters.marker, true, "all window interactions preserve character snapshots")
+
+    -- The settings list must offer the same scoped confirmation as right-click
+    -- in the overview, including characters hidden from the main projection.
+    local model = load("Core/BGNext/OwnCharacters.lua")
+    local deletionRefreshes = 0
+    ui.Refresh = function() deletionRefreshes = deletionRefreshes + 1 end
+    bg.BGNext.OwnCharacters = model
+    -- Entry captured the model table at load time, before the fixture installed
+    -- the real storage model. Reload only the entry for this settings scenario.
+    entry = load("Core/BGNext/RoleOverviewEntry.lua")
+    model.upsert(root, "titan", { realmId = 123, realmName = "Realm A", player = "Alt", updatedAt = 1 })
+    model.upsert(root, "titan", { realmId = 456, realmName = "Realm B", player = "Alt", updatedAt = 1 })
+    model.upsert(root, "retail", { realmId = 123, player = "Alt", updatedAt = 1 })
+    env.StaticPopupDialogs = {}
+    local popupName
+    env.StaticPopup_Show = function(name) popupName = name end
+    local firstControl = #frames + 1
+    local deletePanel = frame()
+    settings.BuildPanel(deletePanel)
+    local function deleteButtons()
+        local buttons = {}
+        for i = firstControl, #frames do
+            local control = frames[i]
+            if control.kind == "Button" and control.text == "删除" and control.shown then
+                buttons[#buttons + 1] = control
+            end
+        end
+        return buttons
+    end
+    test.eq(#deleteButtons(), 2, "settings offers a delete button for each stored character")
+    deleteButtons()[1].scripts.OnClick()
+    test.eq(model.get(root, "titan", 123, "Alt") ~= nil, true, "click alone never deletes")
+    local dialog = env.StaticPopupDialogs[popupName]
+    test.eq(dialog.text:find("Realm A", 1, true) ~= nil, true, "confirmation identifies the exact realm")
+    model.moveCharacter(root, "titan", 123, "Alt", 1)
+    dialog.OnAccept()
+    test.eq(model.get(root, "titan", 123, "Alt"), nil, "confirmation deletes only selected character")
+    test.eq(model.get(root, "titan", 456, "Alt") ~= nil, true, "same-name character in another realm survives")
+    test.eq(model.get(root, "retail", 123, "Alt") ~= nil, true, "another client family survives")
+    test.eq(#deleteButtons(), 1, "settings list rebuilds immediately after confirmation")
+    test.eq(deletionRefreshes, 1, "confirmed deletion also refreshes the main overview")
+    test.eq(root.settings.roleOverviewScale, 1.5, "single deletion preserves display preference")
+    deleteButtons()[1].scripts.OnClick()
+    env.StaticPopupDialogs[popupName].OnAccept()
+    test.eq(#deleteButtons(), 0, "last deletion removes all stale row buttons")
 end

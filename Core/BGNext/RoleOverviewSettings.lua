@@ -208,7 +208,7 @@ function M.characterOrderRows(root, family, model)
             local realm = type(snapshot.realmName) == "string" and snapshot.realmName ~= ""
                 and snapshot.realmName or tostring(snapshot.realmId)
             rows[#rows + 1] = {
-                realmId = snapshot.realmId, player = snapshot.player,
+                realmId = snapshot.realmId, realmName = realm, player = snapshot.player,
                 label = counts[snapshot.player] > 1 and (realm .. "-" .. snapshot.player) or snapshot.player,
                 canMoveUp = index > 1, canMoveDown = index < #snapshots,
             }
@@ -398,21 +398,24 @@ function M.BuildPanel(parent)
         restoreOrder:SetSize(190, 25)
         local function rebuildOrderRows()
             local rows = M.characterOrderRows(root, family, Model)
-            for _, control in ipairs(orderControls) do control.label:Hide(); control.up:Hide(); control.down:Hide() end
+            for _, control in ipairs(orderControls) do control.label:Hide(); control.up:Hide(); control.down:Hide(); control.delete:Hide() end
             emptyOrder:SetShown(#rows == 0)
             for index, row in ipairs(rows) do
                 local control = orderControls[index]
                 if not control then
-                    control = { label = parent:CreateFontString(nil, "ARTWORK"), up = BG.CreateButton(parent), down = BG.CreateButton(parent) }
+                    control = { label = parent:CreateFontString(nil, "ARTWORK"), up = BG.CreateButton(parent), down = BG.CreateButton(parent), delete = BG.CreateButton(parent) }
                     control.label:SetFont(BIAOGE_TEXT_FONT, 14, "OUTLINE")
-                    control.up:SetSize(70, 22); control.down:SetSize(70, 22)
+                    control.label:SetWidth(150); control.label:SetWordWrap(false)
+                    control.up:SetSize(60, 22); control.down:SetSize(60, 22); control.delete:SetSize(60, 22)
                     orderControls[index] = control
                 end
                 local rowY = orderTop - (index - 1) * 26
                 control.label:ClearAllPoints(); control.label:SetPoint("TOPLEFT", parent, 20, rowY); control.label:SetText(row.label)
                 control.up:ClearAllPoints(); control.up:SetPoint("TOPLEFT", parent, 180, rowY + 3)
                 control.down:ClearAllPoints(); control.down:SetPoint("LEFT", control.up, "RIGHT", 5, 0)
+                control.delete:ClearAllPoints(); control.delete:SetPoint("LEFT", control.down, "RIGHT", 5, 0)
                 control.up:SetText(L["上移"]); control.down:SetText(L["下移"])
+                control.delete:SetText(L["删除"])
                 control.up:SetEnabled(row.canMoveUp); control.down:SetEnabled(row.canMoveDown)
                 control.up:SetScript("OnClick", function()
                     if Model and Model.moveCharacter(root, family, row.realmId, row.player, -1) then rebuildOrderRows(); refresh(); if BG.PlaySound then BG.PlaySound(1) end end
@@ -420,7 +423,13 @@ function M.BuildPanel(parent)
                 control.down:SetScript("OnClick", function()
                     if Model and Model.moveCharacter(root, family, row.realmId, row.player, 1) then rebuildOrderRows(); refresh(); if BG.PlaySound then BG.PlaySound(1) end end
                 end)
-                control.label:Show(); control.up:Show(); control.down:Show()
+                control.delete:SetScript("OnClick", function()
+                    local entry = BG.BGNext.RoleOverviewEntry
+                    if entry and type(entry.confirmDelete) == "function" then
+                        entry.confirmDelete({ family = family, realmId = row.realmId, player = row.player }, row, rebuildOrderRows)
+                    end
+                end)
+                control.label:Show(); control.up:Show(); control.down:Show(); control.delete:Show()
             end
             local layout = M.characterOrderLayout(#rows, orderTop)
             restoreOrder:ClearAllPoints(); restoreOrder:SetPoint("TOPLEFT", parent, 20, layout.restoreY)

@@ -9,6 +9,7 @@ return function(test)
         "BIAOGE_TEXT_FONT", "GetRealmName", "GetTime", "GetTimePreciseSec",
         "GetUnitName", "IsInRaid", "BiaoGe", "Locale", "strlen", "format",
         "strsplit", "tinsert", "tremove", "BGA", "UIParent", "SendChatMessage",
+        "GetItemInfo", "GetItemQualityColor", "GetItemCount",
     }
     local originalValues = {}
     for _, name in ipairs(watchedGlobals) do
@@ -61,6 +62,9 @@ return function(test)
             function frame:IsEnabled() return self.enabled end
             function frame:EnableMouse() end
             function frame:SetFrameLevel() end
+            function frame:GetFrameLevel() return 1 end
+            function frame:GetParent() return self.parent end
+            function frame:GetWrappedWidth() return self.width end
             function frame:SetFrameStrata() end
             function frame:SetClampedToScreen() end
             function frame:SetToplevel() end
@@ -109,7 +113,9 @@ return function(test)
                 self.children[#self.children + 1] = texture
                 return texture
             end
-            return frame
+            return setmetatable(frame, { __index = function(_, key)
+                if key:match("^Set") then return function() end end
+            end })
         end
 
         BG = {
@@ -127,7 +133,9 @@ return function(test)
         setGlobal("C_ChatInfo", { RegisterAddonMessagePrefix = function() end, SendAddonMessage = function() end })
         setGlobal("SOUNDKIT", { GS_TITLE_OPTION_OK = 1 })
         setGlobal("CreateFont", function() return makeFrame() end)
-        setGlobal("CreateFrame", function() return makeFrame() end)
+        setGlobal("CreateFrame", function(_, _, parent)
+            local f = makeFrame(); f.parent = parent; return f
+        end)
         setGlobal("BIAOGE_TEXT_FONT", "Fonts\\FRIZQT__.TTF")
         setGlobal("GetRealmName", function() return "MyRealm" end)
         setGlobal("GetTime", function() return nowValue end)
@@ -280,6 +288,37 @@ return function(test)
         f6.scripts.OnUpdate(f6, 2)
         test.eq(f6.shown, false, "the card is hidden after the bounded display")
         test.eq(BGA.Frames[f6.num], nil, "the card is released from the frame registry")
+
+        -- Replay rapid same-item restarts through the real constructor and
+        -- cancellation handler, including old delayed fades and compaction.
+        BGA.Frames = {}
+        setGlobal("GetItemInfo", function()
+            return "Test item", "|Hitem:10001|h[Test item]|h", 4, 100, 1, "Armor", "Plate", 1, "", "icon", 0, 0, 4, 4
+        end)
+        setGlobal("GetItemQualityColor", function() return 1, 1, 1 end)
+        setGlobal("GetItemCount", function() return 0 end)
+        wa.SetClassCFF = function(player) return player end
+        BG.options = {}
+        BiaoGe.options.autoAuctionUp = 1
+        wa.CreateAuction(2000, 10001, 100, 40, "", "normal")
+        for id = 2001, 2020 do
+            local old
+            for _, card in pairs(BGA.Frames) do if card.auctionID == id - 1 then old = card end end
+            test.eq(old ~= nil, true, "previous auction exists before cancellation")
+            local firstTimer = #afters + 1
+            fireCancel(id - 1, "主拾取者")
+            wa.CreateAuction(id, 10001, 200, 40, "", "normal")
+            local fresh
+            for _, card in pairs(BGA.Frames) do if card.auctionID == id then fresh = card end end
+            test.eq(fresh ~= nil, true, "same-item restart creates a new card")
+            for i = firstTimer, #afters do
+                if afters[i].delay == 15 then afters[i].callback() end
+            end
+            old.scripts.OnUpdate(old, 2)
+            test.eq(BGA.Frames[fresh.num], fresh, "old fade preserves restarted registry entry")
+            test.eq(fresh:IsShown(), true, "restarted equipment remains visible")
+            test.eq(fresh.IsEnd, nil, "restarted auction remains active")
+        end
     end)
 
     for _, name in ipairs(watchedGlobals) do
