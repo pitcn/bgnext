@@ -405,6 +405,7 @@ end
 --------------------------------------------------------------------------
 
 local frame
+local drawRevision = 0
 local provider
 local rowHandler
 local settingsHandler
@@ -641,10 +642,36 @@ local function cellText(cell, column)
     return cell.text or ""
 end
 
+-- Resolve display metadata from Blizzard's local item cache only. Owned-item
+-- snapshots remain counts; no extra equipment data is persisted for bag items.
+local function legendaryLevel(item)
+    local getInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo)
+    if type(getInfo) ~= "function" then return nil end
+    local ok, _, _, _, level = pcall(getInfo, item.itemId)
+    if ok and type(level) == "number" and level > 0 and level < math.huge then
+        return tostring(math.floor(level))
+    end
+end
+
+local function drawLegendaryLevel(overlay, item)
+    local text = legendaryLevel(item)
+    overlay:SetText(text or "?")
+    if text or not Item or type(Item.CreateFromItemID) ~= "function" then return end
+    local ok, object = pcall(Item.CreateFromItemID, Item, item.itemId)
+    if not ok or type(object) ~= "table" or type(object.ContinueOnItemLoad) ~= "function" then return end
+    local owner, revision = frame, drawRevision
+    pcall(object.ContinueOnItemLoad, object, function()
+        if frame ~= owner or drawRevision ~= revision or not M.IsVisible() then return end
+        local loaded = legendaryLevel(item)
+        if loaded then overlay:SetText(loaded) end
+    end)
+end
+
 -- Rebuilds the whole table from a layout. Reuses pooled regions so repeated
 -- refreshes do not leak frames.
 function M.Draw(layout)
     if not frame or type(layout) ~= "table" then return end
+    drawRevision = drawRevision + 1
     resetPool()
 
     frame:SetSize(layout.width, layout.height)
@@ -804,14 +831,19 @@ function M.Draw(layout)
                             icon.__item = item
                             icon.__section = section.key
                             icon.__row = row
-                            if item.itemLevel or (type(item.count) == "number" and item.count > 1) then
+                            local legendary = column.id == "legendaryItems"
+                            if legendary or item.itemLevel or (type(item.count) == "number" and item.count > 1) then
                                 local overlay = nextText()
                                 overlay:SetPoint("TOPLEFT", icon, "TOPLEFT", 0, 0)
                                 overlay:SetSize(M.metrics.iconSize, M.metrics.iconSize)
                                 overlay:SetFont(BIAOGE_TEXT_FONT, 10, "OUTLINE")
                                 overlay:SetJustifyH("RIGHT")
                                 overlay:SetJustifyV("BOTTOM")
-                                overlay:SetText(tostring(math.floor(item.itemLevel or item.count)))
+                                if legendary then
+                                    drawLegendaryLevel(overlay, item)
+                                else
+                                    overlay:SetText(tostring(math.floor(item.itemLevel or item.count)))
+                                end
                             end
                         end
                     elseif cell.state == "professions" then
@@ -887,6 +919,7 @@ function M.Draw(layout)
 end
 
 function M.SetFrame(target)
+    drawRevision = drawRevision + 1
     frame = target
 end
 
