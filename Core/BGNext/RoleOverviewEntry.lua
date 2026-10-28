@@ -573,7 +573,7 @@ function M.onRowRightClick(section, row)
     M.confirmDelete(request, row)
 end
 
-function M.confirmDelete(request, row)
+function M.confirmDelete(request, row, onDeleted)
     if type(StaticPopupDialogs) ~= "table" or type(StaticPopup_Show) ~= "function" then return end
     StaticPopupDialogs["BGNextRoleOverviewDelete"] = {
         text = M.deleteDialogText(request, row),
@@ -582,6 +582,7 @@ function M.confirmDelete(request, row)
         OnAccept = function()
             local root = BG.BGNext.DB
             if M.applyDelete(root, request, true) then
+                if type(onDeleted) == "function" then onDeleted() end
                 if BG.BGNext.OwnCharactersUI and BG.BGNext.OwnCharactersUI.Refresh then
                     BG.BGNext.OwnCharactersUI.Refresh()
                 end

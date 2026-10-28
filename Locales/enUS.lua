@@ -8,6 +8,9 @@ ns.enUS = true
 local L = ns.L
 L["角色总览缩放：%d%%"] = "Role overview scale: %d%%"
 L["恢复默认缩放"] = "Reset scale"
+L["修复装备链接未加载时，点击装备下拉条目重新开拍可能清空账单原装备的问题。"] = "Fixed the original bill item being cleared when restarting an auction from a dropdown entry whose item link has not loaded."
+L["角色总览设置新增逐角色删除，确认后仅删除选中的角色记录。"] = "Added individual character deletion in role overview settings; only the selected character record is removed after confirmation."
+L["角色总览“已有”橙武图标直接显示装等，物品信息加载后自动补全；升级材料继续显示数量。"] = "Owned legendary icons in the role overview now show item levels and update when item data loads; upgrade materials still show quantities."
 L["仅调整角色总览和悬停预览；超出屏幕时自动限制大小。"] = "Adjust only the role overview and hover preview; automatically limit the size to fit the screen."
 local c1 = ns.c1
 L["未能获取物品信息，未自动记账，请手动补记：%s"] = "Item information could not be loaded. Not recorded automatically; please add it manually: %s"
@@ -121,9 +124,10 @@ do -- BGNext 0.8.10 release text
     L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"] = "Added independent role overview scaling from 50% to 150%, saved preferences and reset; both the pinned window and hover preview use it."
     L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"] = "Added Clear table to new-lockout prompts for single-raid tables such as Ulduar, including miscellaneous rows, penalties and the current settlement; expenses follow existing retention settings."
     ns.updateText_now = {
-        "BGNext 0.8.13",
-        L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"],
-        L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"],
+        "BGNext 0.8.14",
+        L["修复装备链接未加载时，点击装备下拉条目重新开拍可能清空账单原装备的问题。"],
+        L["角色总览设置新增逐角色删除，确认后仅删除选中的角色记录。"],
+        L["角色总览“已有”橙武图标直接显示装等，物品信息加载后自动补全；升级材料继续显示数量。"],
     }
 end
 

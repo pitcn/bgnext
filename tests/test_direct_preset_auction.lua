@@ -717,6 +717,52 @@ return function(test)
         flushZeroTimers()
         test.eq(#sends, 1, "real table Alt+right-click direct-starts a duplicate item with explicit raid")
         test.eq(sends[1].money, 500, "table caller honors the single-item override")
+
+        -- A cancelled auction leaves the bill item intact. Reopening the item
+        -- selector before its asynchronous link load finishes must also do so.
+        resetAuction()
+        BGA.Frames = { { IsEnd = true, itemID = 1001 } }
+        setGlobal("IsAltKeyDown", function() return true end)
+        local pendingLoads = {}
+        setGlobal("Item", { CreateFromItemID = function()
+            return { ContinueOnItemLoad = function(_, cb) pendingLoads[#pendingLoads + 1] = cb end }
+        end })
+        local setText = slot.SetText
+        slot.SetText = function(self, text)
+            setText(self, text)
+            BiaoGe.ULD.boss1.zhuangbei1 = text ~= "" and text or nil
+        end
+        slot:SetText("item:1001")
+        BG.SetListzhuangbei(slot)
+        local pendingButton = BG.ZhuangbeiList.button1
+        test.eq(pendingButton.itemID, 1001, "pending selector knows the item id")
+        test.eq(pendingButton.link, nil, "link load is intentionally deferred")
+        pendingButton:GetScript("OnMouseDown")(pendingButton, "RightButton")
+        test.eq(slot:GetText(), "item:1001", "pending restart click never clears the bill equipment")
+        test.eq(BiaoGe.ULD.boss1.zhuangbei1, "item:1001", "pending restart preserves saved bill data")
+        test.eq(#sends, 0, "pending restart never sends an invalid auction")
+        test.eq(BG.FrameZhuangbeiList:IsShown(), true, "pending click keeps the selector available")
+        for _, altDown in ipairs({ false, true }) do
+            setGlobal("IsAltKeyDown", function() return altDown end)
+            for _, button in ipairs({ "LeftButton", "RightButton" }) do
+                pendingButton:GetScript("OnMouseDown")(pendingButton, button)
+                test.eq(slot:GetText(), "item:1001", "all unresolved selection gestures preserve bill equipment")
+            end
+        end
+        for _, complete in ipairs(pendingLoads) do complete() end
+        test.eq(pendingButton.link, "item:1001", "cache completion resolves the selector link")
+        setGlobal("IsAltKeyDown", function() return true end)
+        pendingButton:GetScript("OnMouseDown")(pendingButton, "RightButton")
+        flushZeroTimers()
+        test.eq(#sends, 1, "same selector can restart the cancelled auction once its link is ready")
+        test.eq(sends[1].money, 500, "cache protection preserves the configured starting price")
+        test.eq(slot:GetText(), "item:1001", "successful restart keeps visible bill equipment")
+        test.eq(BiaoGe.ULD.boss1.zhuangbei1, "item:1001", "successful restart keeps saved bill equipment")
+        setGlobal("IsAltKeyDown", function() return false end)
+        local loadedOther = BG.ZhuangbeiList.button2
+        loadedOther:GetScript("OnMouseDown")(loadedOther, "LeftButton")
+        test.eq(slot:GetText(), "item:2001", "normal loaded selection still changes equipment intentionally")
+        test.eq(BiaoGe.ULD.boss1.zhuangbei1, "item:2001", "normal loaded selection still saves the chosen item")
     end)
 
     for _, name in ipairs(watchedGlobals) do

@@ -62,6 +62,7 @@ local suites = {
     "tests/test_own_character_runtime.lua",
     "tests/test_own_character_view.lua",
     "tests/test_own_character_ui.lua",
+    "tests/test_own_character_legendary_display.lua",
     "tests/test_role_overview_entry.lua",
     "tests/test_role_overview_scale.lua",
     "tests/test_entry_interactions.lua",
