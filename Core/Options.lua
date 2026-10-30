@@ -2835,6 +2835,9 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                 SetParent(f, "tradeMSG")
             end
             h = h + 45
+            if BG.BGNext and BG.BGNext.RaidWelcome then
+                BG.BGNext.RaidWelcome.buildPanel(others, height - h)
+            end
         end
     end
 

@@ -110,6 +110,7 @@ function M.setEnabled(deps, value)
         -- enabled session. Do not let it survive a disable/re-enable cycle
         -- and become a false completion after the daily reset.
         deps._farmHarvestObservedAt = nil
+        deps._professionDailyResetAt = nil
         M.setVisible(deps, false)
     end
 end
@@ -133,7 +134,19 @@ function M.refreshVisible(deps)
     deps = deps or M.deps()
     if not M.isEnabled(deps) then return end
     local now = (type(deps.now) == "function" and deps.now) or defaultNow
-    if deps.model and deps.root then deps.model.expireRaidStates(deps.root, now()) end
+    local stamp = now()
+    if deps.family == "titan" and type(deps._professionDailyResetAt) == "number"
+        and stamp >= deps._professionDailyResetAt
+        and deps.ui and type(deps.ui.IsVisible) == "function" then
+        local ok, visible = pcall(deps.ui.IsVisible)
+        if ok and visible == true then
+            -- The existing visible countdown wakes this once at the deadline;
+            -- this is not a periodic profession/quest scan. Offline rows only expire.
+            deps._professionDailyResetAt = nil
+            return M.collectAndStore(deps, { activities = true })
+        end
+    end
+    if deps.model and deps.root then deps.model.expireRaidStates(deps.root, stamp) end
     refreshUIIfVisible(deps)
 end
 
@@ -239,6 +252,19 @@ function M.collectAndStore(deps, sections)
             model.upsert(root, family, snapshot)
         end
         if appliedFarmObservation then deps._farmHarvestObservedAt = nil end
+        if family == "titan" and (not scoped or sections.activities == true) then
+            deps._professionDailyResetAt = nil
+            for _, column in ipairs(catalog.resourceColumns or {}) do
+                local source = column.source or {}
+                local state = snapshot.activityStates and snapshot.activityStates[source.key or column.id]
+                local expires = type(state) == "table" and state.resetsAt or nil
+                if source.detector == "profession-daily" and type(expires) == "number"
+                    and expires > stamp and expires < math.huge
+                    and (not deps._professionDailyResetAt or expires < deps._professionDailyResetAt) then
+                    deps._professionDailyResetAt = expires
+                end
+            end
+        end
     end
     model.expireRaidStates(root, stamp)
 

@@ -6,7 +6,7 @@
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.2
-## X-BGNext-Version: 0.8.14
+## X-BGNext-Version: 0.8.15
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.2
@@ -28,6 +28,7 @@ Core\BGNext\FeatureCatalog.lua
 Core\BGNext\ConflictGuard.lua
 Core\BGNext\DataLifecycle.lua
 Core\BGNext\FeatureSettings.lua
+Core\BGNext\RaidWelcome.lua
 Core\BGNext\LeaderToolsStore.lua
 Core\BGNext\LeaderToolsView.lua
 Core\BGNext\AutoClearGuard.lua

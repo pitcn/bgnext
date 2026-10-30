@@ -1054,13 +1054,87 @@ local function containsToken(name, tokens)
     return false
 end
 
--- Reads a deliberately small MoP-only activity catalog. World-boss completion
+local function packResults(...) return { n = select("#", ...), ... } end
+
+-- Read all profession positions, including secondary skills. A short tuple
+-- cannot prove that an omitted secondary skill is unlearned. Older Titan APIs
+-- may expose skills only in the skill list; match Blizzard's localized spell
+-- name there, without expanding collapsed headers or using hardcoded names.
+local function dailyProfessionKnown(api, source)
+    local absent
+    if type(api.GetProfessions) == "function" and type(api.GetProfessionInfo) == "function" then
+        local values = packResults(pcall(api.GetProfessions))
+        local reliable, seen = values[1] == true, false
+        if reliable then
+            for index = 2, values.n do
+                local skillIndex = values[index]
+                if type(skillIndex) == "number" then
+                    seen = true
+                    local ok, _, _, _, _, _, _, skillId = callAll(api.GetProfessionInfo, skillIndex)
+                    if ok and skillId == source.professionSkillLineId then return true end
+                    if not ok or type(skillId) ~= "number" or not (skillId > 0 and skillId < math.huge)
+                        or skillId ~= math.floor(skillId) then reliable = false end
+                elseif skillIndex ~= nil then
+                    reliable = false
+                end
+            end
+            local complete = values.n >= 7
+                or (source.professionSkillLineId == 755 and values.n >= 3)
+            if reliable and complete then absent = true end
+            if not seen and type(api.GetNumSkillLines) == "function" then absent = nil end
+        end
+    end
+    local name = resolveSpellName(api, source.professionSpellId)
+    local count = M.safeCall(api.GetNumSkillLines)
+    if name and type(count) == "number" and count >= 0 and count <= 1000
+        and count == math.floor(count) and type(api.GetSkillLineInfo) == "function" then
+        for index = 1, count do
+            local ok, skillName, header = callAll(api.GetSkillLineInfo, index)
+            local nonHeader = header == false or header == nil or header == 0
+            if ok and nonHeader and skillName == name then return true end
+        end
+    end
+    if absent then return false end
+    return nil
+end
+
+local function readProfessionDaily(api, source, nowValue)
+    local state = { status = "unknown" }
+    if type(nowValue) ~= "number" or nowValue < 0 or nowValue >= math.huge
+        or nowValue ~= nowValue then return state end
+    state.observedAt = nowValue
+    local expires = resetAt(api, "daily", nowValue)
+    if type(expires) ~= "number" or not (expires > nowValue and expires < math.huge) then return state end
+    state.resetsAt = expires
+    local known = dailyProfessionKnown(api, source)
+    if known == false then state.status = "not-applicable"; return state end
+    if known ~= true then return state end
+    local ids = source.questIds
+    if type(source.questIdsByFaction) == "table" then
+        local faction = M.safeCall(api.UnitFactionGroup, "player")
+        ids = source.questIdsByFaction[faction]
+    end
+    if type(ids) ~= "table" or #ids == 0 then return state end
+    local questApi = api.C_QuestLog
+    local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted
+        or api.IsQuestFlaggedCompleted
+    local reliable = true
+    for _, id in ipairs(ids) do
+        local completed = M.safeCall(isComplete, id)
+        if completed == true then state.status = "completed"; return state end
+        if completed ~= false then reliable = false end
+    end
+    if reliable then state.status = "incomplete" end
+    return state
+end
+
+-- Reads Titan profession dailies and the deliberately small MoP catalog. World-boss completion
 -- uses BGLite's official quest ids, and the daily dungeon uses Blizzard's own
 -- random-dungeon `doneToday` result. The farm starts unknown and becomes
 -- complete only after the runtime observes the current player's localized
 -- self-loot line for a known crop at Sunsong Ranch.
 function M.readActivityStates(api, family, resourceColumns)
-    if family ~= "mop" or type(api) ~= "table" then return nil end
+    if (family ~= "mop" and family ~= "titan") or type(api) ~= "table" then return nil end
     local columns = activityColumns(resourceColumns)
     if #columns == 0 then return nil end
     local nowValue = M.safeCall(api.time or api.GetServerTime)
@@ -1069,7 +1143,9 @@ function M.readActivityStates(api, family, resourceColumns)
     for _, column in ipairs(columns) do
         local source = column.source
         local key = source.key or column.id
-        if source.detector == "farm-loot" then
+        if source.detector == "profession-daily" and family == "titan" then
+            states[key] = readProfessionDaily(api, source, nowValue)
+        elseif source.detector == "farm-loot" then
             states[key] = {
                 status = "unknown",
                 observedAt = type(nowValue) == "number" and nowValue or nil,
@@ -1214,6 +1290,13 @@ function M.canReadColumn(family, api, column)
             and resolveSpellName(api, source.spellId) ~= nil
     end
     if source.kind == "activity" then
+        if source.detector == "profession-daily" then
+            local questApi = api.C_QuestLog
+            local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted
+                or api.IsQuestFlaggedCompleted
+            return family == "titan" and type(isComplete) == "function"
+                and type(api.GetQuestResetTime) == "function"
+        end
         if family ~= "mop" then return false end
         if source.detector == "farm-loot" then
             local hasSelfLootFormat = type(api.LOOT_ITEM_SELF) == "string"

@@ -56,6 +56,12 @@ end
 
 return function(test)
     local required = {}
+    for _, key in ipairs({
+        "入团欢迎语", "启用入团欢迎语", "欢迎语已保存。",
+        "仅团长开启后，新人入团时自动发到团队频道；多人入团合并发送，至少间隔30秒。内容对全团可见，请勿填写个人敏感信息。",
+        "填写一行欢迎语（最多240字节），按回车保存；不支持换行或颜色链接。",
+        "请填写有效的一行欢迎语，最多240字节，不含颜色、链接或控制字符。",
+    }) do required[key] = true end
     for _, path in ipairs(trackedBGNextFiles()) do
         for key in pairs(staticLocaleKeys(read(path))) do required[key] = true end
     end
@@ -137,8 +143,13 @@ return function(test)
             test.eq(type(value), "string", "loaded UI translation must be text: " .. key)
         end
         test.eq(type(localized.L["存储与隐私"]), "string", "storage tab receives text, never a boolean")
+        for _, key in ipairs({ "钓鱼任务", "珠宝任务", "烹饪任务",
+            "达拉然钓鱼日常：今日交付状态", "达拉然珠宝日常：今日交付状态", "达拉然烹饪日常：今日交付状态",
+            "以今日交付日常任务为准；未学习对应专业时显示不适用。" }) do
+            test.eq(type(rawget(localized.L, key)), "string", "profession daily text is explicitly translated: " .. key)
+        end
         test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
-        test.eq(localized.updateText_now[1], "BGNext 0.8.14", "current in-game update notes use the release version")
+        test.eq(localized.updateText_now[1], "BGNext 0.8.15", "current in-game update notes use the release version")
         for index, value in ipairs(localized.updateText_now) do
             test.eq(type(value), "string", "current in-game update note is text at index " .. index)
         end
@@ -149,7 +160,7 @@ return function(test)
         BG = { BGNext = {} }
         dofile("Core/BGNext/Identity.lua")
         local releaseInfo = assert(loadfile("Core/BGNext/ReleaseInfo.lua"))("BGNext", localized)
-        test.eq(releaseInfo.changelog[1], localized.L["修复装备链接未加载时，点击装备下拉条目重新开拍可能清空账单原装备的问题。"],
+        test.eq(releaseInfo.changelog[1], localized.L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"],
             "in-game release notes use the selected locale")
         BG = previousBG
     end
