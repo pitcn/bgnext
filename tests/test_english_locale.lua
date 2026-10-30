@@ -149,7 +149,7 @@ return function(test)
             test.eq(type(rawget(localized.L, key)), "string", "profession daily text is explicitly translated: " .. key)
         end
         test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
-        test.eq(localized.updateText_now[1], "BGNext 0.8.14", "current in-game update notes use the release version")
+        test.eq(localized.updateText_now[1], "BGNext 0.8.15", "current in-game update notes use the release version")
         for index, value in ipairs(localized.updateText_now) do
             test.eq(type(value), "string", "current in-game update note is text at index " .. index)
         end
@@ -160,7 +160,7 @@ return function(test)
         BG = { BGNext = {} }
         dofile("Core/BGNext/Identity.lua")
         local releaseInfo = assert(loadfile("Core/BGNext/ReleaseInfo.lua"))("BGNext", localized)
-        test.eq(releaseInfo.changelog[1], localized.L["修复装备链接未加载时，点击装备下拉条目重新开拍可能清空账单原装备的问题。"],
+        test.eq(releaseInfo.changelog[1], localized.L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"],
             "in-game release notes use the selected locale")
         BG = previousBG
     end

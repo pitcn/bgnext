@@ -134,6 +134,8 @@ return function(test)
     api.GetMoney = function() return 987654 end
     api.IsQuestFlaggedCompleted = function(id) flagReads = flagReads + 1; return completed[id] == true end
     local root = {}
+    local Welcome = dofile("Core/BGNext/RaidWelcome.lua")
+    Welcome.configure(root, true, "Welcome YY 123")
     local deps = { family = "titan", catalog = catalog, root = root, api = api,
         adapters = Adapters, collector = Collector, model = Model, now = function() return now end,
         ui = { IsVisible = function() return visible end, Refresh = function() end } }
@@ -195,6 +197,15 @@ return function(test)
     test.eq(saved.money, 987654, "turn-in keeps existing gold")
     test.eq(saved.currencies.jewelcraftingToken, 9, "turn-in keeps jewelcrafting token quantities")
     test.eq(saved.currencies.cookingToken, 2, "turn-in keeps cooking token quantities")
+    test.eq(Welcome.read(root).enabled, true, "daily refresh preserves welcome enable setting")
+    test.eq(Welcome.read(root).text, "Welcome YY 123", "daily refresh preserves welcome text")
+    Welcome.configure(root, false, "")
+    test.eq(Model.get(root, "titan", 1, "Test").activityStates.fishingDaily.status,
+        "completed", "clearing welcome configuration preserves daily completion")
+    test.eq(Model.get(root, "titan", 1, "Test").money, 987654,
+        "welcome settings do not change recorded gold")
+    test.eq(Model.get(root, "titan", 1, "Test").currencies.jewelcraftingToken, 9,
+        "welcome settings do not change existing token columns")
     for field in pairs(saved.activityStates.fishingDaily) do
         test.eq(field == "status" or field == "observedAt" or field == "resetsAt", true,
             "daily snapshots contain no quest log, quest id or extra metadata")

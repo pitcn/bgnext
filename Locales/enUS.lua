@@ -6,6 +6,9 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"] = "Titan Character Overview now tracks Dalaran fishing, jewelcrafting and cooking dailies while keeping existing token counts."
+L["新增自定义入团欢迎语，默认关闭；在“其他功能”中开启后，仅团长在新人入团时发送，连续入团合并通知。"] = "Added a custom raid welcome, off by default. Enable it in Other Features; only the leader greets new raid members, grouping consecutive joins."
+L["欢迎语至少间隔30秒，关闭、离团、团长转让、战斗和切换世界会取消待发，登录或重载不补发。"] = "Welcome messages are at least 30 seconds apart. Disabling, leaving, leadership transfer, combat or world transitions cancel pending messages; login and reload do not replay them."
 L["入团欢迎语"] = "Raid welcome"
 L["启用入团欢迎语"] = "Enable raid welcome"
 L["仅团长开启后，新人入团时自动发到团队频道；多人入团合并发送，至少间隔30秒。内容对全团可见，请勿填写个人敏感信息。"] = "When enabled by the raid leader, greet new members in raid chat. Joins are grouped, at least 30 seconds apart. Everyone in the raid can see this text; avoid personal information."
@@ -137,10 +140,10 @@ do -- BGNext 0.8.10 release text
     L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"] = "Added independent role overview scaling from 50% to 150%, saved preferences and reset; both the pinned window and hover preview use it."
     L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"] = "Added Clear table to new-lockout prompts for single-raid tables such as Ulduar, including miscellaneous rows, penalties and the current settlement; expenses follow existing retention settings."
     ns.updateText_now = {
-        "BGNext 0.8.14",
-        L["修复装备链接未加载时，点击装备下拉条目重新开拍可能清空账单原装备的问题。"],
-        L["角色总览设置新增逐角色删除，确认后仅删除选中的角色记录。"],
-        L["角色总览“已有”橙武图标直接显示装等，物品信息加载后自动补全；升级材料继续显示数量。"],
+        "BGNext 0.8.15",
+        L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"],
+        L["新增自定义入团欢迎语，默认关闭；在“其他功能”中开启后，仅团长在新人入团时发送，连续入团合并通知。"],
+        L["欢迎语至少间隔30秒，关闭、离团、团长转让、战斗和切换世界会取消待发，登录或重载不补发。"],
     }
 end
 
