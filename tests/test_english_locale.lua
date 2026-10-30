@@ -56,6 +56,12 @@ end
 
 return function(test)
     local required = {}
+    for _, key in ipairs({
+        "入团欢迎语", "启用入团欢迎语", "欢迎语已保存。",
+        "仅团长开启后，新人入团时自动发到团队频道；多人入团合并发送，至少间隔30秒。内容对全团可见，请勿填写个人敏感信息。",
+        "填写一行欢迎语（最多240字节），按回车保存；不支持换行或颜色链接。",
+        "请填写有效的一行欢迎语，最多240字节，不含颜色、链接或控制字符。",
+    }) do required[key] = true end
     for _, path in ipairs(trackedBGNextFiles()) do
         for key in pairs(staticLocaleKeys(read(path))) do required[key] = true end
     end

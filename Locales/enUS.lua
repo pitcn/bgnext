@@ -6,6 +6,12 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["入团欢迎语"] = "Raid welcome"
+L["启用入团欢迎语"] = "Enable raid welcome"
+L["仅团长开启后，新人入团时自动发到团队频道；多人入团合并发送，至少间隔30秒。内容对全团可见，请勿填写个人敏感信息。"] = "When enabled by the raid leader, greet new members in raid chat. Joins are grouped, at least 30 seconds apart. Everyone in the raid can see this text; avoid personal information."
+L["填写一行欢迎语（最多240字节），按回车保存；不支持换行或颜色链接。"] = "Enter one line (up to 240 bytes) and press Enter to save. Line breaks and color or link markup are not supported."
+L["欢迎语已保存。"] = "Welcome message saved."
+L["请填写有效的一行欢迎语，最多240字节，不含颜色、链接或控制字符。"] = "Enter one valid line, up to 240 bytes, without colors, links or control characters."
 L["钓鱼任务"] = "Fishing"
 L["珠宝任务"] = "Jewelry"
 L["烹饪任务"] = "Cooking"

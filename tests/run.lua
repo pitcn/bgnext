@@ -1,5 +1,7 @@
 local T = dofile("tests/testlib.lua")
 local suites = {
+    "tests/test_raid_welcome.lua",
+    "tests/test_raid_welcome_events.lua",
     "tests/test_init.lua",
     "tests/test_ui_theme.lua",
     "tests/test_ui_style.lua",
