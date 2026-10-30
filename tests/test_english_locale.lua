@@ -137,6 +137,11 @@ return function(test)
             test.eq(type(value), "string", "loaded UI translation must be text: " .. key)
         end
         test.eq(type(localized.L["存储与隐私"]), "string", "storage tab receives text, never a boolean")
+        for _, key in ipairs({ "钓鱼任务", "珠宝任务", "烹饪任务",
+            "达拉然钓鱼日常：今日交付状态", "达拉然珠宝日常：今日交付状态", "达拉然烹饪日常：今日交付状态",
+            "以今日交付日常任务为准；未学习对应专业时显示不适用。" }) do
+            test.eq(type(rawget(localized.L, key)), "string", "profession daily text is explicitly translated: " .. key)
+        end
         test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
         test.eq(localized.updateText_now[1], "BGNext 0.8.14", "current in-game update notes use the release version")
         for index, value in ipairs(localized.updateText_now) do

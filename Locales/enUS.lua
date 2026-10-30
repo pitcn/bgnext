@@ -6,6 +6,13 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["钓鱼任务"] = "Fishing"
+L["珠宝任务"] = "Jewelry"
+L["烹饪任务"] = "Cooking"
+L["达拉然钓鱼日常：今日交付状态"] = "Dalaran fishing daily: turned in today"
+L["达拉然珠宝日常：今日交付状态"] = "Dalaran jewelcrafting daily: turned in today"
+L["达拉然烹饪日常：今日交付状态"] = "Dalaran cooking daily: turned in today"
+L["以今日交付日常任务为准；未学习对应专业时显示不适用。"] = "Completion means today's daily quest was turned in; unlearned professions show Not applicable."
 L["角色总览缩放：%d%%"] = "Role overview scale: %d%%"
 L["恢复默认缩放"] = "Reset scale"
 L["修复装备链接未加载时，点击装备下拉条目重新开拍可能清空账单原装备的问题。"] = "Fixed the original bill item being cleared when restarting an auction from a dropdown entry whose item link has not loaded."

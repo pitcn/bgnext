@@ -180,6 +180,9 @@ function M.installEvents(env, onSnapshot)
             for section in pairs(EVENT_SECTIONS[event] or {}) do
                 dirty[section] = true
             end
+            if env.family == "titan" and (event == "SKILL_LINES_CHANGED" or event == "TRADE_SKILL_UPDATE") then
+                dirty.activities = true
+            end
             for section, changed in pairs(type(observedSections) == "table" and observedSections or {}) do
                 if changed == true then dirty[section] = true end
             end
