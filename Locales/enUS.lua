@@ -168,11 +168,14 @@ do -- BGNext 0.8.10 release text
     L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"] = "Fix the Ulduar salary list overlapping announcement buttons; move the fines, expenses, overview and salary sections upward while keeping all 56 miscellaneous slots."
     L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"] = "Added independent role overview scaling from 50% to 150%, saved preferences and reset; both the pinned window and hover preview use it."
     L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"] = "Added Clear table to new-lockout prompts for single-raid tables such as Ulduar, including miscellaneous rows, penalties and the current settlement; expenses follow existing retention settings."
+    L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"] = "Browse wishlist drops by boss or equipment slot; selections still use the original wish slots."
+    L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"] = "Titan character overview adds raid and ZG weekly status; unavailable reliable APIs show unknown."
+    L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"] = "Fixed My Purchases filtering missing buyers whose names include a realm."
     ns.updateText_now = {
-        "BGNext 0.8.15",
-        L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"],
-        L["新增自定义入团欢迎语，默认关闭；在“其他功能”中开启后，仅团长在新人入团时发送，连续入团合并通知。"],
-        L["欢迎语至少间隔30秒，关闭、离团、团长转让、战斗和切换世界会取消待发，登录或重载不补发。"],
+        "BGNext 0.8.16",
+        L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"],
+        L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"],
+        L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"],
     }
 end
 
