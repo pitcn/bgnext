@@ -5,8 +5,10 @@ return function(test)
 
     test.eq(source:find('L["我买的"]', 1, true) ~= nil, true,
         "current purchase view retains the original My Purchases filter")
-    test.eq(source:find("IsMyPlayer(v.maijia)", 1, true) ~= nil, true,
-        "current purchase view includes only the player's own characters")
+    test.eq(source:find("LogFilter.include(v, BiaoGe.options.auctionLogChoose, BG.playerName, realmName", 1, true) ~= nil, true,
+        "current purchase view uses the identity-aware tested filter")
+    test.eq(source:find("BiaoGe.playerInfo[RealmID]", 1, true) ~= nil, true,
+        "current purchase view retains the existing same-realm own-character scope")
     test.eq(source:find("BiaoGe[FB].auctionLog", 1, true) ~= nil, true,
         "current purchase view reads the current table auction log")
     test.eq(source:find("BiaoGe.History", 1, true), nil,

@@ -1128,7 +1128,26 @@ local function readProfessionDaily(api, source, nowValue)
     return state
 end
 
--- Reads Titan profession dailies and the deliberately small MoP catalog. World-boss completion
+local function readWeeklyQuests(api, source, nowValue)
+    local state = { status = "unknown" }
+    if type(nowValue) ~= "number" or nowValue ~= nowValue or nowValue < 0 or nowValue >= math.huge then return state end
+    state.observedAt = nowValue
+    local expires = resetAt(api, "weekly", nowValue)
+    if type(expires) ~= "number" or not (expires > nowValue and expires < math.huge) then return state end
+    state.resetsAt = expires
+    local questApi = api.C_QuestLog
+    local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted or api.IsQuestFlaggedCompleted
+    local reliable = type(source.questIds) == "table" and #source.questIds > 0
+    for _, id in ipairs(source.questIds or {}) do
+        local value = M.safeCall(isComplete, id)
+        if value == true then state.status = "completed"; return state end
+        if value ~= false then reliable = false end
+    end
+    if reliable then state.status = "incomplete" end
+    return state
+end
+
+-- Reads Titan quest activities and the deliberately small MoP catalog. World-boss completion
 -- uses BGLite's official quest ids, and the daily dungeon uses Blizzard's own
 -- random-dungeon `doneToday` result. The farm starts unknown and becomes
 -- complete only after the runtime observes the current player's localized
@@ -1145,6 +1164,8 @@ function M.readActivityStates(api, family, resourceColumns)
         local key = source.key or column.id
         if source.detector == "profession-daily" and family == "titan" then
             states[key] = readProfessionDaily(api, source, nowValue)
+        elseif source.detector == "weekly-quest" and family == "titan" then
+            states[key] = readWeeklyQuests(api, source, nowValue)
         elseif source.detector == "farm-loot" then
             states[key] = {
                 status = "unknown",
@@ -1290,6 +1311,11 @@ function M.canReadColumn(family, api, column)
             and resolveSpellName(api, source.spellId) ~= nil
     end
     if source.kind == "activity" then
+        if source.detector == "weekly-quest" then
+            local questApi = api.C_QuestLog
+            local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted or api.IsQuestFlaggedCompleted
+            return family == "titan" and type(isComplete) == "function"
+        end
         if source.detector == "profession-daily" then
             local questApi = api.C_QuestLog
             local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted

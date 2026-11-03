@@ -543,6 +543,9 @@ local function showValueTooltip(self)
         if self.__cell.professionDaily then
             GameTooltip:AddLine(L["以今日交付日常任务为准；未学习对应专业时显示不适用。"], 1, 1, 1, true)
         end
+        if self.__cell.weeklyQuest then
+            GameTooltip:AddLine(L["以本周交付任务为准；缺少可靠的任务或周重置接口时显示未知。"], 1, 1, 1, true)
+        end
         if self.__cell.reason == "farm-observation-required" then
             GameTooltip:AddLine(L["仅在当前角色于日歌农场实际收获作物后标记完成；未捕获到收获时显示未知。"], 1, 1, 1, true)
         elseif self.__cell.state == "unknown" then
