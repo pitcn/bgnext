@@ -1863,10 +1863,7 @@ BG.Init(function()
         child:SetHeight(scroll:GetHeight())
     end
 
-    local playerInfo = BiaoGe.playerInfo[RealmID]
-    local function IsMyPlayer(player)
-        return playerInfo[player]
-    end
+    local LogFilter = assert(BG.BGNext.AuctionLogFilter, "AuctionLogFilter must load first")
 
     function BG.UpdateAuctionLogFrame(notSetDown, notSetUp)
         if BG.auctionLogFrame:IsVisible() then
@@ -1904,13 +1901,8 @@ BG.Init(function()
                 local num = 0
                 for i, v in ipairs(tbl) do
                     -- type 1：成功 2：流拍
-                    if (
-                            BiaoGe.options.auctionLogChoose == 1
-                            or (BiaoGe.options.auctionLogChoose == 2 and v.type == 1)
-                            or (BiaoGe.options.auctionLogChoose == 3 and v.type == 2)
-                            or (BiaoGe.options.auctionLogChoose == 5 and not v.trade and v.type == 1)
-                            or (BiaoGe.options.auctionLogChoose == 6 and v.type == 1 and IsMyPlayer(v.maijia))
-                        )
+                    if LogFilter.include(v, BiaoGe.options.auctionLogChoose, BG.playerName, realmName,
+                        type(BiaoGe.playerInfo) == "table" and BiaoGe.playerInfo[RealmID])
                         and SearchText(v)
                     then
                         num = num + 1

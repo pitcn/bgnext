@@ -5,6 +5,13 @@ BG.BGNext = BG.BGNext or {}
 
 local M = { tabNumber = 3 }
 local tabButton
+local activeBrowse
+
+function M.refreshBrowse()
+    if activeBrowse and activeBrowse.frame:IsVisible() and not activeBrowse.controller.acting then
+        activeBrowse:refresh()
+    end
+end
 
 function M.isFeatureEnabled()
     local settings = BG.BGNext and BG.BGNext.FeatureSettings
@@ -773,6 +780,7 @@ if runtimeReady() then
                     local raidFrame = BG["HopeFrame" .. raidId]
                     if raidFrame and raidFrame:IsShown() then raidFrame:Refresh() end
                 end
+                M.refreshBrowse()
             end
 
             local function applyConfirmed(data)
@@ -885,6 +893,7 @@ if runtimeReady() then
             if wishlist.clearRaid(root, realmId, player, raidId) then
                 local frame = BG["HopeFrame" .. raidId]
                 if frame then frame:Refresh() end
+                M.refreshBrowse()
                 local shortName = BG.GetFBinfo and BG.GetFBinfo(raidId, "shortName") or raidId
                 localMessage(string.format("已清空心愿< %s >", tostring(shortName)))
                 if BG.PlaySound then BG.PlaySound(2) end
@@ -910,17 +919,24 @@ if runtimeReady() then
             localMessage(string.format("有%d件旧测试版心愿无法可靠匹配首领，已保留但未自动放入心愿格。", quarantined))
         end
 
+        local browse
         local function showCurrentRaid()
             if not M.isFeatureEnabled() then BG.HopeMainFrame:Hide(); return end
             M.closePicker()
+            local bySlot = browse and browse.mode == "slots"
             for _, raidId in ipairs(BG.FBtable or {}) do
                 local frame = BG["HopeFrame" .. raidId]
-                if raidId == BG.FB1 then
+                if raidId == BG.FB1 and not bySlot then
                     frame:Show()
                     frame:Refresh()
                 else
                     frame:Hide()
                 end
+            end
+            if browse then
+                local wasVisible = browse.frame:IsVisible()
+                browse.frame:SetShown(bySlot)
+                if bySlot and wasVisible then browse:refresh() end
             end
         end
         BG.HopeMainFrame:SetScript("OnShow", showCurrentRaid)
@@ -953,6 +969,32 @@ if runtimeReady() then
         BG.ButtonHopeQingKong:SetPoint("BOTTOMLEFT", BG.MainFrame, "BOTTOMLEFT", 30, 38)
         BG.ButtonHopeQingKong:SetText("清空心愿")
         BG.ButtonHopeQingKong:SetScript("OnClick", confirmClearRaid)
+
+        if BG.BGNext.WishlistBrowse then
+            browse = BG.BGNext.WishlistBrowse.attach(BG.HopeMainFrame, {
+                main = BG.MainFrame, clearButton = BG.ButtonHopeQingKong,
+                enabled = M.isFeatureEnabled, closePicker = M.closePicker,
+                changed = showCurrentRaid,
+                context = function()
+                    local raidId = BG.FB1
+                    return { raidId = raidId, difficulties = BG.difficultyTable[raidId],
+                        loot = BG.Loot[raidId], bossLimit = hopeMaxb[raidId] or 0 }
+                end,
+                add = function(id, raidId) return BG.SetHope(id, raidId) end,
+                remove = function(id, raidId)
+                    if not BG.IsHope(id, raidId) then return false end
+                    BG.DeleteHope(id, raidId)
+                    return not BG.IsHope(id, raidId)
+                end,
+                contains = function(id, raidId) return BG.IsHope(id, raidId) end,
+                sourceLabel = function(raidId, source)
+                    local boss = BG.Boss and BG.Boss[raidId] and BG.Boss[raidId]["boss" .. source.bossIndex]
+                    return (boss and boss.name2 or ("Boss " .. source.bossIndex)) .. " "
+                        .. (difficultyLabel(raidId, source.difficultyIndex) or source.difficulty)
+                end,
+            })
+            activeBrowse = browse
+        end
 
         if hooksecurefunc and BG.ClickFBbutton then
             hooksecurefunc(BG, "ClickFBbutton", function()
@@ -999,6 +1041,10 @@ if runtimeReady() then
         BG.ToggleCurrentWish = function(value)
             if not M.isFeatureEnabled() then return false end
             return BG.SetHope(value, BG.FB1)
+        end
+        if browse and type(hooksecurefunc) == "function" then
+            hooksecurefunc(BG, "SetHope", M.refreshBrowse)
+            hooksecurefunc(BG, "DeleteHope", M.refreshBrowse)
         end
     end)
 end

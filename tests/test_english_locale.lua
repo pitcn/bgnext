@@ -57,6 +57,11 @@ end
 return function(test)
     local required = {}
     for _, key in ipairs({
+        "全部部位", "头部", "颈部", "肩部", "胸部", "腰部", "腿部", "脚部", "腕部", "手部", "手指", "饰品",
+        "背部", "武器", "副手", "远程", "兑换物/其他", "待分类", "按Boss", "按部位", "已选",
+        "周常", "祖格周常", "本周团本周常交付状态", "本周祖格周常交付状态",
+    }) do required[key] = true end
+    for _, key in ipairs({
         "入团欢迎语", "启用入团欢迎语", "欢迎语已保存。",
         "仅团长开启后，新人入团时自动发到团队频道；多人入团合并发送，至少间隔30秒。内容对全团可见，请勿填写个人敏感信息。",
         "填写一行欢迎语（最多240字节），按回车保存；不支持换行或颜色链接。",
@@ -149,7 +154,7 @@ return function(test)
             test.eq(type(rawget(localized.L, key)), "string", "profession daily text is explicitly translated: " .. key)
         end
         test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
-        test.eq(localized.updateText_now[1], "BGNext 0.8.15", "current in-game update notes use the release version")
+        test.eq(localized.updateText_now[1], "BGNext 0.8.16", "current in-game update notes use the release version")
         for index, value in ipairs(localized.updateText_now) do
             test.eq(type(value), "string", "current in-game update note is text at index " .. index)
         end
@@ -160,7 +165,7 @@ return function(test)
         BG = { BGNext = {} }
         dofile("Core/BGNext/Identity.lua")
         local releaseInfo = assert(loadfile("Core/BGNext/ReleaseInfo.lua"))("BGNext", localized)
-        test.eq(releaseInfo.changelog[1], localized.L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"],
+        test.eq(releaseInfo.changelog[1], localized.L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"],
             "in-game release notes use the selected locale")
         BG = previousBG
     end

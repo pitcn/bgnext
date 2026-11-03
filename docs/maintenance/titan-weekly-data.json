@@ -1,0 +1,93 @@
+{
+  "source": "Blizzard static CASC via wowdata",
+  "product": "wow_classic_titan",
+  "region": "cn",
+  "locale": "zhCN",
+  "version": "3.80.2.70522",
+  "buildConfig": "eed3978f9e962450c5a358ef0dcbcf64",
+  "table": "QuestV2",
+  "query": "SELECT ID, UniqueBitFlag FROM QuestV2 WHERE UniqueBitFlag IN (8139,71386) ORDER BY ID",
+  "rows": [
+    {
+      "ID": 24579,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24580,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24581,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24582,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24583,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24584,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24585,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24586,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24587,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24588,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24589,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 24590,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 93975,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 94577,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 94579,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 95037,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 96312,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 96315,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 96318,
+      "UniqueBitFlag": 8139
+    },
+    {
+      "ID": 98183,
+      "UniqueBitFlag": 71386
+    }
+  ],
+  "scope": "Static identifier existence and shared completion-bit groups only; not a live availability or server reset-policy guarantee."
+}

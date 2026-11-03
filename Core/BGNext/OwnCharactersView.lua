@@ -459,11 +459,12 @@ local function resourceCell(column, snapshot, now)
 
     if source.kind == "activity" then
         cell.professionDaily = source.detector == "profession-daily"
+        cell.weeklyQuest = source.detector == "weekly-quest"
         local key = source.key or column.id
         local activities = type(snapshot.activityStates) == "table" and snapshot.activityStates or nil
         local entry = activities and activities[key] or nil
         if type(entry) ~= "table" then
-            if source.detector == "farm-loot" or source.detector == "profession-daily" then
+            if source.detector == "farm-loot" or source.detector == "profession-daily" or cell.weeklyQuest then
                 cell.state = "unknown"
                 cell.text = "?"
                 if source.detector == "farm-loot" then cell.reason = "farm-observation-required" end

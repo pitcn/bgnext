@@ -6,6 +6,35 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["全部部位"] = "All slots"
+L["头部"] = "Head"
+L["颈部"] = "Neck"
+L["肩部"] = "Shoulder"
+L["胸部"] = "Chest"
+L["腰部"] = "Waist"
+L["腿部"] = "Legs"
+L["脚部"] = "Feet"
+L["腕部"] = "Wrist"
+L["手部"] = "Hands"
+L["手指"] = "Finger"
+L["饰品"] = "Trinket"
+L["背部"] = "Back"
+L["武器"] = "Weapon"
+L["副手"] = "Off-hand"
+L["远程"] = "Ranged"
+L["兑换物/其他"] = "Tokens / other"
+L["待分类"] = "Unclassified"
+L["按Boss"] = "By boss"
+L["按部位"] = "By slot"
+L["左键加入心愿，右键取消；未缓存装备保留在待分类。"] = "Left-click to add a wish, right-click to remove it. Uncached items remain unclassified."
+L["上一页"] = "Previous"
+L["下一页"] = "Next"
+L["第%d/%d页，共%d件"] = "Page %d/%d, %d items"
+L["该部位没有可添加的直接掉落。"] = "No direct drops for this slot."
+L["已选"] = "Selected"
+L["本周团本周常交付状态"] = "Raid weekly quest: turned in this week"
+L["本周祖格周常交付状态"] = "Zul'Gurub weekly quest: turned in this week"
+L["以本周交付任务为准；缺少可靠的任务或周重置接口时显示未知。"] = "Completion means a quest was turned in this week; unreliable quest or weekly-reset data shows Unknown."
 L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"] = "Titan Character Overview now tracks Dalaran fishing, jewelcrafting and cooking dailies while keeping existing token counts."
 L["新增自定义入团欢迎语，默认关闭；在“其他功能”中开启后，仅团长在新人入团时发送，连续入团合并通知。"] = "Added a custom raid welcome, off by default. Enable it in Other Features; only the leader greets new raid members, grouping consecutive joins."
 L["欢迎语至少间隔30秒，关闭、离团、团长转让、战斗和切换世界会取消待发，登录或重载不补发。"] = "Welcome messages are at least 30 seconds apart. Disabling, leaving, leadership transfer, combat or world transitions cancel pending messages; login and reload do not replay them."
@@ -139,11 +168,14 @@ do -- BGNext 0.8.10 release text
     L["修复奥杜尔工资列表遮挡通报按钮的问题；罚款、支出、总览和工资区域整体上移，杂项仍保留56格。"] = "Fix the Ulduar salary list overlapping announcement buttons; move the fines, expenses, overview and salary sections upward while keeping all 56 miscellaneous slots."
     L["角色总览新增独立缩放，支持50%–150%、保存设置和恢复默认；固定窗口与悬停预览同步生效。"] = "Added independent role overview scaling from 50% to 150%, saved preferences and reset; both the pinned window and hover preview use it."
     L["奥杜尔等单本的新进度提示新增“清空表格”，可一并清理杂项、罚款和当前团结算；支出遵循原有保留设置。"] = "Added Clear table to new-lockout prompts for single-raid tables such as Ulduar, including miscellaneous rows, penalties and the current settlement; expenses follow existing retention settings."
+    L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"] = "Browse wishlist drops by boss or equipment slot; selections still use the original wish slots."
+    L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"] = "Titan character overview adds raid and ZG weekly status; unavailable reliable APIs show unknown."
+    L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"] = "Fixed My Purchases filtering missing buyers whose names include a realm."
     ns.updateText_now = {
-        "BGNext 0.8.15",
-        L["时光服角色总览新增达拉然钓鱼、珠宝和烹饪日常状态，原有代币数量列保留。"],
-        L["新增自定义入团欢迎语，默认关闭；在“其他功能”中开启后，仅团长在新人入团时发送，连续入团合并通知。"],
-        L["欢迎语至少间隔30秒，关闭、离团、团长转让、战斗和切换世界会取消待发，登录或重载不补发。"],
+        "BGNext 0.8.16",
+        L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"],
+        L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"],
+        L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"],
     }
 end
 
@@ -2309,7 +2341,7 @@ do
     L["记账失败！表格里没有匹配到合适的装备！"] = "Record failed! No matching item found in the table!"
     L["你以|cffffff00%s金|r成功竞拍%s，需要记账进表格吗？"] = "You won the bid for %s at |cffffff00%s Gold|r. Record this to the table?"
     L["|cffffff00十字军宝珠"] = "|cffffff00Crusader's Orb"
-    L["祖格周常"] = "Zul'Gurub Weekly"
+    L["祖格周常"] = "ZG weekly"
     L["部分Boss自动切换分配品质"] = "Auto switch loot quality for certain bosses"
     L["比如进入祖格的疯狂之缘时，自动把分配品质切换为绿色。"] = "For example, loot quality will switch to green automatically at Madness's Edge in Zul'Gurub."
     L["Alt+点击才能生效"] = "Alt+Click to activate"
