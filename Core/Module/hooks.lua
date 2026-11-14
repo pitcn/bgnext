@@ -193,7 +193,7 @@ BG.Init2(function()
                     local i = 1
                     while _G["BagnonContainerItem" .. i] do
                         local bag = _G["BagnonContainerItem" .. i]
-                        if BG.IsRetail then
+                        if BG.IsRetail or type(ContainerFrameItemButton_OnLeave) ~= "function" then
                             bag:HookScript("OnLeave", GameTooltip_Hide)
                         else
                             bag:HookScript("OnLeave", ContainerFrameItemButton_OnLeave)
@@ -233,18 +233,12 @@ BG.Init2(function()
                     dalayFrame:Hide()
                     return
                 end
-                local b = self:GetParent():GetID()
-                local i = self:GetID()
-                link = C_Container.GetContainerItemLink(b, i)
+                link = BG.BGNext.ClientCompat.bagLink(self, _G)
                 dalayFrame.t = 0
                 dalayFrame:Show()
             end
-            hooksecurefunc("ContainerFrameItemButton_OnEnter", OnEnter)
-            if BG.IsRetail then
-                hooksecurefunc("GameTooltip_Hide", OnHide)
-            else
-                hooksecurefunc("ContainerFrameItemButton_OnLeave", OnHide)
-            end
+            BG.BGNext.ClientCompat.hookBagEvent("enter", OnEnter, _G, BG.IsRetail)
+            BG.BGNext.ClientCompat.hookBagEvent("leave", OnHide, _G, BG.IsRetail)
         end
     end
 

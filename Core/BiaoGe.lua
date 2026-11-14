@@ -1241,14 +1241,11 @@ BG.Init(function()
         -- 背包
         local function func(self, button)
             if not IsShiftKeyDown() then return end
-            local link = C_Container.GetContainerItemLink(self:GetParent():GetID(), self:GetID())
+            local link = BG.BGNext.ClientCompat.bagLink(self, _G)
+            if not link then return end
             Insert(link)
         end
-        if BG.IsRetail then
-            hooksecurefunc("ContainerFrameItemButton_OnClick", func)
-        else
-            hooksecurefunc("ContainerFrameItemButton_OnModifiedClick", func)
-        end
+        BG.BGNext.ClientCompat.hookBagEvent("click", func, _G, BG.IsRetail)
     end
     ----------离队入队染上职业颜色----------
     do

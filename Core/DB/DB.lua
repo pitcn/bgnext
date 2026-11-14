@@ -1227,23 +1227,7 @@ BG.Init(function()
         -- 天赋
         do
             local function GetTalent(_, event)
-                local specIndex
-                if BG.verOver4 then
-                    specIndex = C_SpecializationInfo.GetSpecialization()
-                    if specIndex == 0 or specIndex == 5 then
-                        specIndex = nil
-                    end
-                else
-                    local maxNum = 0
-                    for i = 1, 3 do
-                        local num = select(5, GetTalentTabInfo(i, nil, nil, GetActiveTalentGroup()))
-                        if num and num >= maxNum then
-                            maxNum = num
-                            specIndex = i
-                        end
-                    end
-                    if maxNum == 0 then specIndex = nil end
-                end
+                local specIndex = BG.BGNext.ClientCompat.talentIndex(BG, _G)
                 BiaoGe.playerInfo[realmID][player].talent = specIndex
             end
 
