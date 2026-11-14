@@ -68,6 +68,7 @@ function M.currentFamily(globals)
     if globals.IsTitan then return "titan" end
     if globals.IsWLK then return "wrath" end
     if globals.IsTBC then return "tbc" end
+    if globals.IsForever then return "forever" end
     if globals.IsVanilla then return "vanilla" end
 end
 
