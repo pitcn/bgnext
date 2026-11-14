@@ -255,11 +255,7 @@ BG.Init2(function()
                 fuc(self, unit, name)
             end
         end
-        if BG.IsRetail then
-            TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, UnitGo)
-        else
-            GameTooltip:HookScript("OnTooltipSetUnit", UnitGo)
-        end
+        BG.BGNext.ClientCompat.hookTooltip("Unit", UnitGo, _G)
 
         local function ItemGo(self)
             if self ~= GameTooltip  then return end
@@ -272,10 +268,6 @@ BG.Init2(function()
                 fuc(self, itemID, link, name)
             end
         end
-        if BG.IsRetail then
-            TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, ItemGo)
-        else
-            GameTooltip:HookScript("OnTooltipSetItem", ItemGo)
-        end
+        BG.BGNext.ClientCompat.hookTooltip("Item", ItemGo, _G)
     end
 end)

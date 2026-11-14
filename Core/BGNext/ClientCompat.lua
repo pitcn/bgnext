@@ -2,6 +2,25 @@
 BG.BGNext = BG.BGNext or {}
 local M = {}
 
+function M.hookTooltip(kind, callback, api)
+    api = api or _G
+    local processor = api.TooltipDataProcessor
+    local types = api.Enum and api.Enum.TooltipDataType
+    local tooltipType = types and types[kind]
+    if processor and type(processor.AddTooltipPostCall) == "function" and tooltipType ~= nil then
+        processor.AddTooltipPostCall(tooltipType, callback)
+        return true
+    end
+    local tooltip = api.GameTooltip
+    local script = "OnTooltipSet" .. kind
+    if tooltip and type(tooltip.HasScript) == "function" and tooltip:HasScript(script)
+        and type(tooltip.HookScript) == "function" then
+        tooltip:HookScript(script, callback)
+        return true
+    end
+    return false
+end
+
 function M.bagLink(button, api)
     api = api or _G
     if not button or type(button.GetID) ~= "function" then return nil end
