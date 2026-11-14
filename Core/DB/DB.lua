@@ -179,11 +179,11 @@ do
             for _, raid in ipairs(BG.ForeverRaids) do
                 local count = #raid.bosses
                 local slots = {}
-                for b = 1, count do slots[b] = 8 end
+                for b = 1, count do slots[b] = raid.rows and raid.rows[b] or 8 end
                 slots[count + 1], slots[count + 2] = 10, 8
                 local split = math.ceil((count + 1) / 2)
                 local wide = count > 10
-                AddDB(raid.id, wide and mainFrameWidth2 or mainFrameWidth, 960,
+                AddDB(raid.id, wide and mainFrameWidth2 or mainFrameWidth, raid.rows and 810 or 960,
                     wide and 4 or 3, count + 2,
                     wide and { 0, 5, 10, count + 1 } or { 0, split, count + 1 },
                     nil, nil, slots, nil, 8)

@@ -27,6 +27,8 @@ return function(test)
     test.eq(ownRaids[1].source.instanceIds[1], 3052, "Barrow Deeps lockout")
 
     BG = flags
+    local initCallbacks = {}
+    BG.Init = function(fn) initCallbacks[#initCallbacks + 1] = fn end
     local ns = { L = setmetatable({}, { __index = function(_, k) return k end }) }
     assert(loadfile("Core/BGNext/ForeverRaids.lua"))("BGNext", ns)
     local raids = BG.ForeverRaids
@@ -36,6 +38,8 @@ return function(test)
     test.eq(BG.Boss.BDforever.boss1.name2, "寒嚎", "client's Barrow Deeps name")
     test.eq(BG.Boss.HSforever.boss13.name2, "荒野之王", "client's Hyjal final boss")
     test.eq(BG.Boss.MC.legacy, true, "existing boss catalog is untouched")
+    test.eq(BG.Boss.UBRSforever.boss1.name, "烈焰\n卫士\n艾博\n希尔", "long Chinese label fits compact rows")
+    test.eq(BG.Boss.UBRSforever.boss1.name2, "烈焰卫士艾博希尔", "full boss name is retained")
     test.eq(#raids, 4, "exactly four Forever raids")
     test.eq(raids[1].phase, "P0", "UBRS is P0")
     test.eq(raids[1].id, "UBRSforever", "independent ledger key")
@@ -58,6 +62,17 @@ return function(test)
         end }, { __index = _G })
     local fn = assert(loadstring(blocks[1])); setfenv(fn, env); fn()
     test.eq(configs.HSforever.columns, 4, "Hyjal leaves room for long boss labels")
+    test.eq(configs.UBRSforever.slots[2], 3, "ordinary UBRS bosses use compact recording rows")
+    test.eq(configs.UBRSforever.slots[8], 4, "Drakkisath has a little extra room")
+    test.eq(configs.BDforever.slots[1], 8, "unopened P1 layouts stay unchanged")
+    ns.Maxi = { UBRSforever = configs.UBRSforever.slots }
+    BG.Maxi, BG.FBHeight = 40, { UBRSforever = 810 }
+    local previousSave = BiaoGe
+    BiaoGe = { UBRSforever = { boss2 = { zhuangbei7 = "item:12930", maijia7 = "Fixture" } } }
+    for _, callback in ipairs(initCallbacks) do callback() end
+    test.eq(ns.Maxi.UBRSforever[2], 7, "existing seventh row remains visible after upgrade")
+    test.eq(BiaoGe.UBRSforever.boss2.zhuangbei7, "item:12930", "existing records are not rewritten")
+    BiaoGe = previousSave
     BG.FBtable2, BG.FBfromBossPosition = {}, {}
     env.AddDB = function(id, map, phase, players, quality, _, range, shortName)
         registrations[id] = { map = map, phase = phase, players = players, quality = quality }

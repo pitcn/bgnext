@@ -4,7 +4,7 @@ local _, ns = ...
 local L = ns.L
 BG.ForeverRaids = {
     { id = "UBRSforever", mapID = 229, phase = "P0", players = 10,
-      name = L["黑石塔上层"], bosses = {
+      name = L["黑石塔上层"], rows = { 4, 3, 3, 3, 3, 4, 3, 4, 3 }, bosses = {
         L["烈焰卫士艾博希尔"],
         L["索拉卡·火冠"],
         L["杰德"],
@@ -47,3 +47,29 @@ BG.ForeverRaids = {
         L["奥妮克希亚"],
     } },
 }
+
+-- SavedVariables becomes available before ADDON_LOADED. Keep any occupied
+-- bill row visible rather than truncating a ledger when adopting compact rows.
+BG.Init(function()
+    local raid = BG.ForeverRaids[1]
+    local saved = type(BiaoGe) == "table" and BiaoGe[raid.id]
+    local slots = ns.Maxi and ns.Maxi[raid.id]
+    if type(saved) ~= "table" or not slots then return end
+    local fields = { zhuangbei = true, maijia = true, jine = true, qiankuan = true,
+        loot = true, itemLevel = true, bindOnEquip = true, guanzhu = true }
+    for b = 1, #raid.bosses do
+        local boss = saved["boss" .. b]
+        if type(boss) == "table" then
+            for key, value in pairs(boss) do
+                local field, row
+                if type(key) == "string" then field, row = key:match("^(%a+)(%d+)$") end
+                row = tonumber(row)
+                if fields[field] and row and row <= BG.Maxi and row > slots[b]
+                    and value ~= nil and value ~= "" and value ~= false then
+                    slots[b] = row
+                    BG.FBHeight[raid.id] = 960
+                end
+            end
+        end
+    end
+end)

@@ -12,6 +12,14 @@ for _, raid in ipairs(BG.ForeverRaids) do
     BG.Boss[raid.id] = {}
     for b, name in ipairs(names) do
         local formatted, count = BG.FormatBossName(name)
+        if raid.id == "UBRSforever" and b <= #raid.bosses and not ns.enUS then
+            local characters, lines = {}, {}
+            for character in name:gmatch(".[\128-\191]*") do characters[#characters + 1] = character end
+            for i = 1, #characters, 2 do
+                lines[#lines + 1] = characters[i] .. (characters[i + 1] or "")
+            end
+            formatted, count = table.concat(lines, "\n"), 0
+        end
         BG.Boss[raid.id]["boss" .. b] = {
             name = formatted, name2 = name:gsub("\n", ""), nCount = count,
             color = b == #names and "EE82EE" or b == #names - 1 and "00FF00" or "00BFFF",
