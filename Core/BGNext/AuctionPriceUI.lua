@@ -1,4 +1,6 @@
 local _, ns = ...
+local GetItemQualityColor = function(...) local api = _G.GetItemQualityColor or (C_Item and C_Item.GetItemQualityColor); if api then return api(...) end end
+local GetItemInfo = function(...) local api = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo); if api then return api(...) end end
 
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}

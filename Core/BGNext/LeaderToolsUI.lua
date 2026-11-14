@@ -1,4 +1,5 @@
 local _, ns = ...
+local GetItemInfo = function(...) local api = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo); if api then return api(...) end end
 
 BG = BG or {}
 BG.BGNext = BG.BGNext or {}

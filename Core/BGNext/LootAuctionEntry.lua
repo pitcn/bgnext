@@ -2,6 +2,7 @@ BG = BG or {}
 BG.BGNext = BG.BGNext or {}
 
 local AddonName, ns = ...
+local GetItemInfo = function(...) local api = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo); if api then return api(...) end end
 local L = ns and ns.L or setmetatable({}, { __index = function(_, key) return tostring(key) end })
 
 -- Visible boss-loot entry for the existing memory-only pending auction queue.

@@ -1,6 +1,7 @@
 if not BG.IsCTM then return end
 
 local _, ns = ...
+local GetItemInfo = function(...) local api = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo); if api then return api(...) end end
 
 local LibBG = ns.LibBG
 local L = ns.L

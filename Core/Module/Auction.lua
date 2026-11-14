@@ -1,5 +1,7 @@
 if BG.IsBlackListPlayer then return end
 local AddonName, ns = ...
+local GetItemQualityColor = function(...) local api = _G.GetItemQualityColor or (C_Item and C_Item.GetItemQualityColor); if api then return api(...) end end
+local GetItemInfo = function(...) local api = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo); if api then return api(...) end end
 
 local LibBG         = ns.LibBG
 local L             = ns.L

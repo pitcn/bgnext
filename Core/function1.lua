@@ -1,4 +1,5 @@
 local _, ns = ...
+local GetItemCount = function(...) local api = _G.GetItemCount or (C_Item and C_Item.GetItemCount); if api then return api(...) end end
 
 local LibBG = ns.LibBG
 local L = ns.L
