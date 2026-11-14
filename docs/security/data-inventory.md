@@ -1,5 +1,17 @@
 # BGNext data inventory
 
+## Forever client catalog (2026-11-13)
+
+The existing own-character snapshot and settings maps additionally accept the
+`forever` client-family key, isolated from `vanilla`. Existing ledger/wishlist
+keys additionally include `UBRSforever`, `BDforever`, `HSforever`, and
+`ONYforever`. These are catalog identifiers, not new player fields. Only the
+logged-in character's existing whitelisted data and opt-in raid-lock state are
+read. No new currency or item resource column is enabled. Existing local
+storage, retention, clear controls, seven-day settlement limit and recipients
+remain unchanged; no new message or external transmission is introduced.
+
+
 BGNext stores new data only under the existing local SavedVariables namespace `BiaoGe.BGNext`. No field listed here is transmitted outside the game. Existing BGLite fields outside this namespace are not migrated, searched, aggregated, or exposed by BGNext enhancement modules. The sole cleanup exception is a direct existence check and user-confirmed deletion of the four legacy history roots described below; their contents are never traversed.
 
 | Field | Subject/source | Purpose | Storage and retention | Recipients | User control | Risk |

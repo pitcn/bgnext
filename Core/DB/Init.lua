@@ -145,7 +145,9 @@ end
 if ver < 20000 then
     BG.IsVanilla = true
     BG.onlyOneHard = true
-    if (C_Engraving and C_Engraving.IsEngravingEnabled()) then
+    if ver >= 16000 and ver < 17000 then
+        BG.IsForever = true
+    elseif (C_Engraving and C_Engraving.IsEngravingEnabled()) then
         BG.IsVanilla_Sod = true
     else
         BG.IsVanilla_60 = true

@@ -80,6 +80,15 @@ local function baseResourceColumns()
 end
 
 local CATALOG = {
+    forever = {
+        status = "pending-in-game-verification",
+        raidColumns = {
+            raid("BDforever", 3052, "深穴", "深穴", nil, { 3052 }, true, "00BFFF"),
+            raid("HSforever", 2981, "海加尔峰", "海加尔峰", nil, { 2981 }, true, "00BFFF"),
+            raid("ONYforever", 249, "黑龙", "奥妮克希亚的巢穴", nil, { 249 }, true, "00BFFF"),
+        },
+        resourceColumns = baseResourceColumns(),
+    },
     vanilla = {
         status = "pending-in-game-verification",
         raidColumns = {

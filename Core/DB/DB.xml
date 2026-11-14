@@ -1,8 +1,10 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
     <Script file="Core\DB\Init.lua"/>
     <Script file="Core\DB\Init2.lua"/>
+    <Script file="Core\BGNext\ForeverRaids.lua"/>
     <Script file="Core\DB\DB.lua"/>
     <Script file="Core\DB\DB_BossName.lua"/>
+    <Script file="Core\DB\DB_BossName_Forever.lua"/>
     <Script file="Core\DB\DB_EncounterID.lua"/>
     <Script file="Core\DB\DB_Loot_Retail.lua"/>
     <Script file="Core\DB\DB_Loot_MOP.lua"/>
@@ -12,6 +14,7 @@
     <Script file="Core\DB\DB_Loot_TBC.lua"/>
     <Script file="Core\DB\DB_Loot_Vanilla_Sod.lua"/>
     <Script file="Core\DB\DB_Loot_Vanilla_60.lua"/>
+    <Script file="Core\DB\DB_Loot_Forever.lua"/>
     <Script file="Core\DB\DB_Loot_BlackWhiteList.lua"/>
     <Script file="Core\DB\DB_Loot_Titan_P6.lua"/>
 </Ui>

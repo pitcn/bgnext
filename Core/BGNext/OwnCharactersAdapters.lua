@@ -13,11 +13,12 @@ BG.BGNext = BG.BGNext or {}
 
 local M = {}
 
-M.families = { "vanilla", "tbc", "wrath", "titan", "cata", "mop", "retail" }
+M.families = { "vanilla", "forever", "tbc", "wrath", "titan", "cata", "mop", "retail" }
 
 -- Ordered because BGLite sets several flags at once: the anniversary client
 -- sets both IsWLK and IsTitan, and SoD sets both IsVanilla and IsVanilla_Sod.
 local FAMILY_ORDER = {
+    { flag = "IsForever", family = "forever" },
     { flag = "IsRetail", family = "retail" },
     { flag = "IsMOP", family = "mop" },
     { flag = "IsCTM", family = "cata" },
@@ -30,6 +31,7 @@ local FAMILY_ORDER = {
 -- Declared per family. `false` means BGNext must not render that column group
 -- on this client, even if a catalog entry exists.
 local CAPABILITIES = {
+    forever = { hasCurrencyApi = false, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
     vanilla = { hasCurrencyApi = false, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
     tbc     = { hasCurrencyApi = false, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
     wrath   = { hasCurrencyApi = true, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
