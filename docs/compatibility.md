@@ -47,3 +47,7 @@
 - **实机验证：**在对应游戏客户端完成加载、界面和交互测试并保存记录。
 
 版本发布说明必须按上述等级陈述证据，不得把“代码覆盖”或“模拟验证”写成“全面兼容”。
+
+### Forever overview activities (2026-11-15)
+
+Booty Bay weekly completion and five profession cooldown columns are code-covered and simulated, pending in-game testing. Verified local target: wowf / CN / zhCN / 1.60.1.70938. Versioned Blizzard source: wow-ui-source, forever, tag 1.60.1, commit ca8368f2f2380cbe696854f7f2646387c278a61b. Weeklies require a readable quest-completion API; missing or invalid official weekly reset produces unknown. Shared transmute recipes render one timer, while one-hour Iron to Gold and Mithril to Truesilver are separate. Missing learned-recipe evidence or missing Salt Shaker/Leatherworking evidence hides the unavailable timer rather than fabricating readiness. No separate daily is declared for the pictured weekly quest.

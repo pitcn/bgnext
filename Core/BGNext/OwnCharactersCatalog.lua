@@ -87,7 +87,26 @@ local CATALOG = {
             raid("HSforever", 2981, "海加尔峰", "海加尔峰", nil, { 2981 }, true, "00BFFF"),
             raid("ONYforever", 249, "黑龙", "奥妮克希亚的巢穴", nil, { 249 }, true, "00BFFF"),
         },
-        resourceColumns = baseResourceColumns(),
+        resourceColumns = (function()
+            local columns = baseResourceColumns()
+            table.insert(columns, 2, resource("bootyBayWeekly", "藏宝海湾周常", "status", "normal", false,
+                { kind = "activity", detector = "weekly-quest", cadence = "weekly",
+                    questIds = { 96075, 96076, 96087, 96088 } }, true, "ADFF2F"))
+            table.insert(columns, 3, resource("transmute", "炼金转化", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "transmute", spellId = 17187,
+                    spellIds = { 17187, 1317279, 17559, 17560, 17561, 17562, 17563, 17564, 17565, 17566, 25146 } },
+                true, "FFFFFF", "奥金、军团石与精华转化共用冷却，以已学会配方的实际剩余时间为准。"))
+            table.insert(columns, 4, resource("mooncloth", "月布", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "mooncloth", spellId = 18560 }, true, "FFFFFF"))
+            table.insert(columns, 5, resource("saltShaker", "筛盐", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "saltShaker", spellId = 19566,
+                    itemId = 15846, professionSpellId = 2108 }, true, "FFFFFF"))
+            table.insert(columns, 6, resource("ironToGold", "点铁成金", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "ironToGold", spellId = 11479 }, true, "FFFFFF"))
+            table.insert(columns, 7, resource("mithrilToTruesilver", "转化秘银", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "mithrilToTruesilver", spellId = 11480 }, true, "FFFFFF"))
+            return columns
+        end)(),
     },
     vanilla = {
         status = "pending-in-game-verification",

@@ -157,6 +157,7 @@ function M.columnHeader(column, currencyInfo, spellInfo)
         and L[column.fullTitle] or label
     local descriptor = { text = label, tooltip = tooltip }
     local source = type(column.source) == "table" and column.source or nil
+    if source and source.spellIds then return descriptor end
     -- A profession cooldown heading keeps its compact catalog title and, when
     -- the client can name the spell, surfaces Blizzard's own localized name as
     -- the tooltip rather than a hand-written translation.

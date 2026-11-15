@@ -110,7 +110,7 @@ function M.setEnabled(deps, value)
         -- enabled session. Do not let it survive a disable/re-enable cycle
         -- and become a false completion after the daily reset.
         deps._farmHarvestObservedAt = nil
-        deps._titanActivityResetAt = nil
+        deps._questActivityResetAt = nil
         M.setVisible(deps, false)
     end
 end
@@ -135,14 +135,14 @@ function M.refreshVisible(deps)
     if not M.isEnabled(deps) then return end
     local now = (type(deps.now) == "function" and deps.now) or defaultNow
     local stamp = now()
-    if deps.family == "titan" and type(deps._titanActivityResetAt) == "number"
-        and stamp >= deps._titanActivityResetAt
+    if (deps.family == "titan" or deps.family == "forever") and type(deps._questActivityResetAt) == "number"
+        and stamp >= deps._questActivityResetAt
         and deps.ui and type(deps.ui.IsVisible) == "function" then
         local ok, visible = pcall(deps.ui.IsVisible)
         if ok and visible == true then
             -- The existing visible countdown wakes this once at the deadline;
             -- this is not a periodic profession/quest scan. Offline rows only expire.
-            deps._titanActivityResetAt = nil
+            deps._questActivityResetAt = nil
             return M.collectAndStore(deps, { activities = true })
         end
     end
@@ -252,16 +252,16 @@ function M.collectAndStore(deps, sections)
             model.upsert(root, family, snapshot)
         end
         if appliedFarmObservation then deps._farmHarvestObservedAt = nil end
-        if family == "titan" and (not scoped or sections.activities == true) then
-            deps._titanActivityResetAt = nil
+        if (family == "titan" or family == "forever") and (not scoped or sections.activities == true) then
+            deps._questActivityResetAt = nil
             for _, column in ipairs(catalog.resourceColumns or {}) do
                 local source = column.source or {}
                 local state = snapshot.activityStates and snapshot.activityStates[source.key or column.id]
                 local expires = type(state) == "table" and state.resetsAt or nil
                 if (source.detector == "profession-daily" or source.detector == "weekly-quest") and type(expires) == "number"
                     and expires > stamp and expires < math.huge
-                    and (not deps._titanActivityResetAt or expires < deps._titanActivityResetAt) then
-                    deps._titanActivityResetAt = expires
+                    and (not deps._questActivityResetAt or expires < deps._questActivityResetAt) then
+                    deps._questActivityResetAt = expires
                 end
             end
         end

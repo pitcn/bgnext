@@ -1,0 +1,142 @@
+{
+  "target": "local/CN/wowf/1.60.1.70938/zhCN",
+  "questQuery": "SELECT * FROM QuestV2 WHERE ID IN (96075,96076,96087,96088)",
+  "quests": [
+    {
+      "ID": 96075,
+      "UiQuestDetailsThemeID": 0,
+      "UniqueBitFlag": 69516
+    },
+    {
+      "ID": 96076,
+      "UiQuestDetailsThemeID": 0,
+      "UniqueBitFlag": 69516
+    },
+    {
+      "ID": 96087,
+      "UiQuestDetailsThemeID": 0,
+      "UniqueBitFlag": 69516
+    },
+    {
+      "ID": 96088,
+      "UiQuestDetailsThemeID": 0,
+      "UniqueBitFlag": 69516
+    }
+  ],
+  "spellQuery": "SELECT s.ID,s.Name_lang,c.RecoveryTime,c.CategoryRecoveryTime,k.Category FROM SpellName s LEFT JOIN SpellCooldowns c ON c.SpellID=s.ID LEFT JOIN SpellCategories k ON k.SpellID=s.ID WHERE s.ID IN (17187,1317279,17559,17560,17561,17562,17563,17564,17565,17566,25146,18560,19566,11479,11480,2108)",
+  "spells": [
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 169200000,
+      "ID": 17187,
+      "Name_lang": "转化：奥金",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 169200000,
+      "ID": 1317279,
+      "Name_lang": "转化：军团石",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17559,
+      "Name_lang": "转化：点气成火",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17560,
+      "Name_lang": "转化：点火成土",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17561,
+      "Name_lang": "转化：转土成水",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17562,
+      "Name_lang": "转化：点水成气",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17563,
+      "Name_lang": "转化：死灵化水",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17564,
+      "Name_lang": "转化：水转死灵",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17565,
+      "Name_lang": "转化：生命归土",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 82800000,
+      "ID": 17566,
+      "Name_lang": "转化：土转生命",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": 310,
+      "CategoryRecoveryTime": 600000,
+      "ID": 25146,
+      "Name_lang": "转化：元素火焰",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": null,
+      "CategoryRecoveryTime": 0,
+      "ID": 18560,
+      "Name_lang": "月布",
+      "RecoveryTime": 342000000
+    },
+    {
+      "Category": 791,
+      "CategoryRecoveryTime": 255600000,
+      "ID": 19566,
+      "Name_lang": "筛盐器",
+      "RecoveryTime": 0
+    },
+    {
+      "Category": null,
+      "CategoryRecoveryTime": 0,
+      "ID": 11479,
+      "Name_lang": "点铁成金",
+      "RecoveryTime": 3600000
+    },
+    {
+      "Category": null,
+      "CategoryRecoveryTime": 0,
+      "ID": 11480,
+      "Name_lang": "转化秘银",
+      "RecoveryTime": 3600000
+    },
+    {
+      "Category": null,
+      "CategoryRecoveryTime": null,
+      "ID": 2108,
+      "Name_lang": "制皮",
+      "RecoveryTime": null
+    }
+  ],
+  "note": "Static DB2 establishes identifiers and cooldown categories; runtime APIs supply actual timer/reset values. QuestV2 alone does not establish weekly cadence; Blizzard hotfix notes confirm it."
+}

@@ -32,6 +32,7 @@ M.allowedEvents = {
     "CURRENCY_DISPLAY_UPDATE",
     "SKILL_LINES_CHANGED",
     "TRADE_SKILL_UPDATE",
+    "BAG_UPDATE_COOLDOWN",
     "QUEST_TURNED_IN",
     "QUEST_LOG_UPDATE",
     "LFG_UPDATE_RANDOM_INFO",
@@ -51,6 +52,7 @@ local EVENT_SECTIONS = {
     CURRENCY_DISPLAY_UPDATE = { currencies = true },
     SKILL_LINES_CHANGED = { professions = true, professionCooldowns = true },
     TRADE_SKILL_UPDATE = { professions = true, professionCooldowns = true },
+    BAG_UPDATE_COOLDOWN = { professionCooldowns = true },
     QUEST_TURNED_IN = { activities = true },
     QUEST_LOG_UPDATE = { activities = true },
     LFG_UPDATE_RANDOM_INFO = { activities = true },
@@ -152,7 +154,8 @@ function M.installEvents(env, onSnapshot)
     for _, event in ipairs(M.allowedEvents) do allowed[event] = true end
 
     for _, event in ipairs(M.allowedEvents) do
-        local relevant = event ~= "CHAT_MSG_LOOT" or env.family == "mop"
+        local relevant = (event ~= "CHAT_MSG_LOOT" or env.family == "mop")
+            and (event ~= "BAG_UPDATE_COOLDOWN" or env.family == "forever")
         if relevant and type(frame.RegisterEvent) == "function" then
             -- Blizzard's client families do not expose an identical event set.
             -- An unsupported allowlisted event must not abort the remaining
@@ -176,9 +179,13 @@ function M.installEvents(env, onSnapshot)
         frame:SetScript("OnEvent", function(_, event, ...)
             if not allowed[event] then return end
             local observedSections = safeCall(env.observeEvent, event, ...)
+            if event == "BAG_UPDATE_COOLDOWN" and env.family ~= "forever" then return end
             if EVENT_SECTIONS[event] == nil and type(observedSections) ~= "table" then return end
             for section in pairs(EVENT_SECTIONS[event] or {}) do
                 dirty[section] = true
+            end
+            if env.family == "forever" and event == "BAG_UPDATE_DELAYED" then
+                dirty.professionCooldowns = true
             end
             if env.family == "titan" and (event == "SKILL_LINES_CHANGED" or event == "TRADE_SKILL_UPDATE") then
                 dirty.activities = true

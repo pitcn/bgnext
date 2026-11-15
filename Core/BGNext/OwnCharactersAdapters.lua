@@ -378,6 +378,35 @@ function M.readProfessionCooldown(api, spellId)
     return { endsAt = epochNow + remaining }
 end
 
+-- A shared category needs one learned recipe, not a separate ready indicator
+-- for every recipe. Salt Shaker is an owned item, not a learnable recipe.
+local function knownCooldownSpell(api, source)
+    for _, id in ipairs(source.spellIds or {source.spellId}) do
+        if M.isProfessionRecipeKnown(api, id) then return id end
+    end
+end
+
+local function ownsProfessionItem(api, source)
+    if not M.isProfessionRecipeKnown(api, source.professionSpellId) then return false end
+    local items = api.C_Item
+    local count = M.safeCall(api.GetItemCount or (type(items) == "table" and items.GetItemCount), source.itemId, true)
+    return type(count) == "number" and count > 0
+end
+
+local function readProfessionItemCooldown(api, source)
+    if not ownsProfessionItem(api, source) then return nil end
+    local items = api.C_Item
+    local get = type(items) == "table" and items.GetItemCooldown or api.GetItemCooldown
+    local ok, start, duration, enabled = callAll(get, source.itemId)
+    if not ok or type(start) ~= "number" or type(duration) ~= "number"
+        or start < 0 or start >= math.huge or duration < 0 or duration >= math.huge
+        or start ~= start or duration ~= duration or (enabled ~= true and enabled ~= 1) then return nil end
+    if duration == 0 then return {ready = true} end
+    local epoch, relative = M.readNow(api), M.safeCall(api.GetTime)
+    if type(epoch) ~= "number" or type(relative) ~= "number" then return nil end
+    return {endsAt = epoch + math.max(0, start + duration - relative)}
+end
+
 -- Resolves a spell ID to a non-empty localized name via the Blizzard spell
 -- APIs, or nil when the name cannot be confirmed. A profession cooldown is
 -- only offered when its spell resolves, so a bare cooldown API surface alone
@@ -830,6 +859,9 @@ local function resourceWhitelist(columns)
                 cooldownSpells[source.key or column.id] = {
                     spellId = source.spellId,
                     professionSkillLineId = source.professionSkillLineId,
+                    spellIds = source.spellIds,
+                    itemId = source.itemId,
+                    professionSpellId = source.professionSpellId,
                 }
             end
         end
@@ -953,7 +985,11 @@ function M.readResources(api, family, resourceColumns, selection)
         for key, spec in pairs(allowedCooldowns) do
             local entry
             if hasPrimaryProfession(api, spec.professionSkillLineId) then
-                entry = M.readProfessionCooldown(api, spec.spellId)
+                if spec.itemId then
+                    entry = readProfessionItemCooldown(api, spec)
+                else
+                    entry = M.readProfessionCooldown(api, knownCooldownSpell(api, spec))
+                end
             end
             if type(entry) == "table" and next(entry) ~= nil then
                 cooldowns[key] = entry
@@ -1149,13 +1185,13 @@ local function readWeeklyQuests(api, source, nowValue)
     return state
 end
 
--- Reads Titan quest activities and the deliberately small MoP catalog. World-boss completion
+-- Reads Titan/Forever quest activities and the deliberately small MoP catalog. World-boss completion
 -- uses BGLite's official quest ids, and the daily dungeon uses Blizzard's own
 -- random-dungeon `doneToday` result. The farm starts unknown and becomes
 -- complete only after the runtime observes the current player's localized
 -- self-loot line for a known crop at Sunsong Ranch.
 function M.readActivityStates(api, family, resourceColumns)
-    if (family ~= "mop" and family ~= "titan") or type(api) ~= "table" then return nil end
+    if (family ~= "mop" and family ~= "titan" and family ~= "forever") or type(api) ~= "table" then return nil end
     local columns = activityColumns(resourceColumns)
     if #columns == 0 then return nil end
     local nowValue = M.safeCall(api.time or api.GetServerTime)
@@ -1166,7 +1202,7 @@ function M.readActivityStates(api, family, resourceColumns)
         local key = source.key or column.id
         if source.detector == "profession-daily" and family == "titan" then
             states[key] = readProfessionDaily(api, source, nowValue)
-        elseif source.detector == "weekly-quest" and family == "titan" then
+        elseif source.detector == "weekly-quest" and (family == "titan" or family == "forever") then
             states[key] = readWeeklyQuests(api, source, nowValue)
         elseif source.detector == "farm-loot" then
             states[key] = {
@@ -1305,18 +1341,25 @@ function M.canReadColumn(family, api, column)
         return false
     end
     if source.kind == "profession-cooldown" then
+        if source.itemId then
+            local items = api.C_Item
+            return ownsProfessionItem(api, source)
+                and type(type(items) == "table" and items.GetItemCooldown or api.GetItemCooldown) == "function"
+                and resolveSpellName(api, source.spellId) ~= nil
+        end
+        local spellId = knownCooldownSpell(api, source)
         return type(source.spellId) == "number"
             and hasPrimaryProfession(api, source.professionSkillLineId)
-            and M.isProfessionRecipeKnown(api, source.spellId)
+            and spellId ~= nil
             and (type(api.GetSpellCooldown) == "function"
                 or (type(api.C_Spell) == "table" and type(api.C_Spell.GetSpellCooldown) == "function"))
-            and resolveSpellName(api, source.spellId) ~= nil
+            and resolveSpellName(api, spellId) ~= nil
     end
     if source.kind == "activity" then
         if source.detector == "weekly-quest" then
             local questApi = api.C_QuestLog
             local isComplete = type(questApi) == "table" and questApi.IsQuestFlaggedCompleted or api.IsQuestFlaggedCompleted
-            return family == "titan" and type(isComplete) == "function"
+            return (family == "titan" or family == "forever") and type(isComplete) == "function"
         end
         if source.detector == "profession-daily" then
             local questApi = api.C_QuestLog
