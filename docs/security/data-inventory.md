@@ -7,7 +7,7 @@ The existing own-character snapshot and settings maps additionally accept the
 keys additionally include `UBRSforever`, `BDforever`, `HSforever`, and
 `ONYforever`. These are catalog identifiers, not new player fields. Only the
 logged-in character's existing whitelisted data and opt-in raid-lock state are
-read. No new currency or item resource column is enabled. Existing local
+read. Later currency additions are documented below. Existing local
 storage, retention, clear controls, seven-day settlement limit and recipients
 remain unchanged; no new message or external transmission is introduced.
 
@@ -128,3 +128,5 @@ The leader pending-auction queue (待拍队列) is memory-only and scoped to the
 Forever own-character overview adds `activityStates.bootyBayWeekly` with only `status`, `observedAt`, and the official weekly `resetsAt`. The public quest IDs 96075/96076/96087/96088 are a shared completion rotation and stay in the catalog, never in character records. Only the logged-in player is queried. Current-player quest events and one visible reset refresh update this field; offline rows only expire. There is no separate Booty Bay daily: the user-supplied quest was confirmed to be weekly.
 
 Forever declares five `professionCooldowns` keys: `transmute` (shared category 310: Arcanite, Legionite, essences, elemental fire), `mooncloth`, `saltShaker`, `ironToGold`, and `mithrilToTruesilver`. Each stores only `ready` or `endsAt`. Spell timers require a learned recipe; Salt Shaker requires learned Leatherworking and ownership of public item 15846, then reads its item cooldown. Item count is checked transiently and is not stored. No cooldown duration is hardcoded. Existing debounced profession/bag events update only relevant sections. No messages, history, external service, account scan, migration or other-player data is introduced.
+
+Forever currency columns (2026-11-15): `currencies.undermineReal` reads public currency 3469 and is visible by default. `currencies.honorPoints` (1792) and `currencies.merchantsFavor` (3402) are optional columns hidden by default. Only the logged-in character's current numeric balance is retained in the existing own-character snapshot; declaration authorizes collection independent of column visibility, as for existing resource columns. No earnings/spending history or currency API payload is stored. Existing currency-update events, feature disable/clear controls and per-family visibility preferences apply. IDs/names are independently confirmed in local Blizzard CurrencyTypes for wowf/CN/zhCN/1.60.1.70938; no other currencies are added.

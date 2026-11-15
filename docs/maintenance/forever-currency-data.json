@@ -1,0 +1,33 @@
+{
+  "target": "local/CN/wowf/1.60.1.70938/zhCN",
+  "query": "SELECT ID,Name_lang,InventoryIconFileID,MaxQty,MaxEarnablePerWeek FROM CurrencyTypes WHERE ID IN (3469,1792,3402)",
+  "rows": [
+    {
+      "ID": 3469,
+      "InventoryIconFileID": 133799,
+      "MaxEarnablePerWeek": 0,
+      "MaxQty": 165,
+      "Name_lang": "褪色的安德麦雷亚尔"
+    },
+    {
+      "ID": 1792,
+      "InventoryIconFileID": 0,
+      "MaxEarnablePerWeek": 0,
+      "MaxQty": 25000,
+      "Name_lang": "荣誉点数"
+    },
+    {
+      "ID": 3402,
+      "InventoryIconFileID": 135725,
+      "MaxEarnablePerWeek": 0,
+      "MaxQty": 0,
+      "Name_lang": "商人青睐"
+    }
+  ],
+  "apiSource": "wow-ui-source/forever/1.60.1@ca8368f2f2380cbe696854f7f2646387c278a61b",
+  "api": {
+    "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/CurrencyInfoDocumentation.lua",
+    "line": 249,
+    "excerpt": "249: \t\t\tName = \"GetCurrencyInfo\",\n250: \t\t\tType = \"Function\",\n251: \t\t\tMayReturnNothing = true,\n252: \t\t\tSecretArguments = \"AllowedWhenUntainted\",\n253: \n254: \t\t\tArguments =\n255: \t\t\t{\n256: \t\t\t\t{ Name = \"type\", Type = \"number\", Nilable = false },\n257: \t\t\t},\n258: \n259: \t\t\tReturns =\n260: \t\t\t{\n261: \t\t\t\t{ Name = \"info\", Type = \"CurrencyInfo\", Nilable = false },\n262: \t\t\t},\n263: \t\t},"
+  }
+}

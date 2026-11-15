@@ -31,7 +31,7 @@ local FAMILY_ORDER = {
 -- Declared per family. `false` means BGNext must not render that column group
 -- on this client, even if a catalog entry exists.
 local CAPABILITIES = {
-    forever = { hasCurrencyApi = false, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
+    forever = { hasCurrencyApi = true, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
     vanilla = { hasCurrencyApi = false, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
     tbc     = { hasCurrencyApi = false, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
     wrath   = { hasCurrencyApi = true, hasProfessionApi = true, hasItemLevelApi = true, hasHonorApi = true },
@@ -43,11 +43,16 @@ local CAPABILITIES = {
 
 -- Stable BGNext column key -> numeric currency ID, per family.
 --
--- Only entries confirmed against a live client belong here. Keys that are not
+-- Only entries confirmed against versioned Blizzard data or a live client belong here. Keys that are not
 -- listed are reported as unverified by isVerifiedColumn() and produce no value,
 -- so their column stays hidden. Do not guess IDs to "fill in" a family: an
 -- unverified column must render blank, never wrong.
 local CURRENCY_IDS = {
+    forever = {
+        undermineReal = 3469,
+        honorPoints = 1792,
+        merchantsFavor = 3402,
+    },
     vanilla = {},
     tbc = {
         arenaPoints = 1900,

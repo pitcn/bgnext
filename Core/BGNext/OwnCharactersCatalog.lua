@@ -89,6 +89,13 @@ local CATALOG = {
         },
         resourceColumns = (function()
             local columns = baseResourceColumns()
+            columns[#columns + 1] = resource("undermineReal", "安德麦雷亚尔", "number", "narrow", true,
+                { kind = "currency", key = "undermineReal", currencyId = 3469, showHeaderIcon = true },
+                true, "FFFFFF", "褪色的安德麦雷亚尔")
+            columns[#columns + 1] = resource("honorPoints", "荣誉点数", "number", "narrow", true,
+                { kind = "currency", key = "honorPoints", currencyId = 1792, showHeaderIcon = true }, false, "FFFFFF")
+            columns[#columns + 1] = resource("merchantsFavor", "商人青睐", "number", "narrow", true,
+                { kind = "currency", key = "merchantsFavor", currencyId = 3402, showHeaderIcon = true }, false, "FFFFFF")
             table.insert(columns, 2, resource("bootyBayWeekly", "藏宝海湾周常", "status", "normal", false,
                 { kind = "activity", detector = "weekly-quest", cadence = "weekly",
                     questIds = { 96075, 96076, 96087, 96088 } }, true, "ADFF2F"))

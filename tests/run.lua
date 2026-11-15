@@ -1,5 +1,6 @@
 local T = dofile("tests/testlib.lua")
 local suites = {
+    "tests/test_forever_currencies.lua",
     "tests/test_forever_profession_cooldowns.lua",
     "tests/test_forever_activities.lua",
     "tests/test_forever_feature_entries.lua",
