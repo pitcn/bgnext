@@ -330,7 +330,9 @@ end
 
 -- Repair only BGNext's own old short-name keys. Filter keys are identity hints
 -- only: no filter rules, other-player data or legacy BiaoGe records are copied.
--- A second possible owner (including one of unknown class) makes us abstain.
+-- Forever only coalesces equivalent COMPLETE surname identities. A first name
+-- cannot prove ownership, even when its cached class matches today's player.
+-- Other clients abstain on a second possible owner (including unknown class).
 function M.migrateShortNames(root, clientFamily, current, shortName)
     if type(current) ~= "table" then return end
     local realm = realmTable(root, clientFamily, current.realmId, false)
@@ -339,6 +341,19 @@ function M.migrateShortNames(root, clientFamily, current, shortName)
     local candidates = {}
     local function add(name, class)
         if type(name) ~= "string" then return end
+        if clientFamily == "forever" then
+            local function fullKey(value)
+                if type(value) ~= "string" then return nil end
+                local key = value:lower():gsub("%-", " ")
+                if not key:find(" ", 1, true) then return nil end
+                return key
+            end
+            local key = fullKey(name)
+            if name ~= current.player and key and key == fullKey(current.player) then
+                candidates[name] = { [current.player] = current.class or false }
+            end
+            return
+        end
         local short = name:match("^([^%s%-]+)[%s%-]")
         if name == current.player then short = shortName or short end
         if not short or short == name then return end

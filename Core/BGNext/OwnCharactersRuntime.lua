@@ -196,10 +196,18 @@ function M.collectAndStore(deps, sections, equipmentRetry)
     local env = adapters.readers(family, api, catalog.raidColumns, catalog.resourceColumns)
     env.now = function() return stamp end
 
-    -- Use the exact current-character key shared with equipment filters.
-    -- This also handles client-specific full-name separators on Forever.
-    if type(adapters.validatedIdentity) == "function" then
+    -- A live Forever surname identity takes precedence over an init-time key
+    -- that may have lost the surname. Other clients retain their filter key.
+    local hasSurname
+    if family == "forever" and type(adapters.readPlayerName) == "function" then
+        local ignored
+        ignored, hasSurname = adapters.readPlayerName(api, family)
+    end
+    if not hasSurname and type(adapters.validatedIdentity) == "function" then
         local identity = adapters.validatedIdentity(deps.globals)
+        if family == "forever" and identity and not identity.playerName:find("[%s%-]") then
+            identity = nil
+        end
         if identity and (family == "retail" or identity.realmId == adapters.readRealmId(api)) then
             env.playerName = function() return identity.playerName end
             env.realmId = function() return identity.realmId end

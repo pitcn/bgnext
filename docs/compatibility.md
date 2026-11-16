@@ -1,5 +1,18 @@
 # BGNext 兼容性矩阵
 
+Forever 两段名补充修复（2026-11-16）：当前角色的名、姓两项返回值组成完整
+空格键，优先于可能截短的初始化键。仅同一完整名的大小写/连字符别名归并；
+单段旧键不猜归属，需用户在插件内确认删除。两种姓氏、重复切换、完整别名、
+歧义短键、缺姓降级及两行投影由 Lua 模拟测试覆盖，尚未实机验证。
+同一版本源码证据 `wow-ui-source` / `forever` / tag `1.60.1` / commit
+`ca8368f2f2380cbe696854f7f2646387c278a61b`：
+`Interface/AddOns/Blizzard_UnitFrame/Mainline/UnitFrame.lua:1094` 的
+`GetUnitName` 委托给 NameUtil；
+`Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua:4` 与 `:23`
+使用 `UnitName` 的名、姓两项组成完整名。通用 NameUtil 的第二段按 realm
+分隔符处理，不能用该通用含义解释 Forever 姓氏。此为静态源码与受控接口
+证据，不证明当前游戏会话的 API 实际返回值或最终显示已通过验收。
+
 角色总览键与装备缓存修复（2026-11-16）：完整角色键、保守短键迁移、
 link 未缓存保留、槽位合并、物品信息事件及有界后备重试由 Lua 5.1
 模拟回归覆盖，尚未实机验证。版本化证据：`wow-ui-source`，product

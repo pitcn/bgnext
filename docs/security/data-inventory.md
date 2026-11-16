@@ -71,17 +71,26 @@ The Storage & Privacy settings page may check only whether each of those four to
 
 ## Own-character overview data
 
-Identity/cache repair (2026-11-16): `player` and the innermost `ownCharacters`
-key use the exact logged-in `BG.playerName` identity also used by equipment
-filters (with the live `GetUnitName("player", true)` reader as fallback).
-Client-specific separators are preserved. Only BGNext's own short-key snapshots
-are relocated, within the same family and realm bucket, when the current
-identity or existing full snapshot/filter keys leave one possible owner.
-Known class mismatches exclude candidates; unknown or multiple possible owners
-are retained unchanged. Filter rules are neither copied nor changed. Existing
-aliases coalesce into one latest snapshot, preserving missing equipment slots;
-saved ordering references follow the relocated key. This adds no identity field,
-history, recipient, other-player read, or old BiaoGe migration.
+Identity/cache repair (2026-11-16, surname follow-up): on Forever, the logged-in
+`UnitName("player")` first-name/surname tuple supplies the complete space-separated
+`player` and innermost `ownCharacters` key, ahead of an init-time identity that
+may have lost its surname. Letter case follows the live tuple. A complete
+`GetUnitName` or validated init key remains a fallback; a short display/init key
+alone is rejected when the full-name API exists. Without that API, the legacy
+UnitName-only reader remains available. No realm is inferred from the surname.
+Only equivalent COMPLETE own-character names (ASCII case and space/hyphen
+variants) coalesce within the same family/realm; known class mismatches abstain.
+Forever short-name snapshots are retained unchanged even with a matching class:
+they may already contain observations from multiple surnames and cannot recover
+automatically. The user can delete the ambiguous row through the existing
+confirmed in-addon control and re-login to each character to observe it afresh.
+Other families retain the prior unique-candidate short-key migration using
+existing own snapshot/filter keys; unknown or multiple possible owners abstain.
+Filter rules are neither copied nor changed. Complete aliases preserve missing
+equipment slots and update saved ordering references. No identity field, history,
+recipient, other-player read, or old BiaoGe migration is added. Storage remains
+local last-seen snapshots under the existing per-character/family/all controls;
+the risk is an extra ambiguous legacy row, preferable to misassigned data.
 
 An observed equipment link survives a cold item cache. Each slot keeps its last
 observation until a new link replaces it or the user clears the character;

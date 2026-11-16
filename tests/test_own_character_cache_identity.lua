@@ -4,9 +4,9 @@ return function(test)
     local C = dofile("Core/BGNext/OwnCharactersCollector.lua")
     local M = dofile("Core/BGNext/OwnCharacters.lua")
     local R = dofile("Core/BGNext/OwnCharactersRuntime.lua")
-    local function build(root)
+    local function build(root, family)
         local d = {
-            family = "forever", globals = {}, root = root or {},
+            family = family or "forever", globals = {}, root = root or {},
             catalog = { status = "pending-in-game-verification", resourceColumns = {{ id = "weapons" }} },
             adapters = A, collector = C, model = M, now = function() return 100 end,
             api = {
@@ -19,6 +19,26 @@ return function(test)
         return d
     end
     local cases = {}
+    cases.forever_surname_tuple = function()
+        local d = build()
+        local surname, class = "lock", "WARLOCK"
+        d.globals = { playerName = "Pit", realmID = 1 }
+        d.api.UnitName = function(unit)
+            test.eq(unit, "player")
+            return "pit", surname
+        end
+        d.api.GetUnitName = function() return "Pit" end
+        d.api.UnitClass = function() return class, class end
+        R.collectAndStore(d)
+        surname, class = "pal", "PALADIN"
+        R.collectAndStore(d)
+        surname, class = "lock", "WARLOCK"
+        R.collectAndStore(d)
+        test.eq(#M.list(d.root, "forever"), 2, "two surnames survive repeated logins")
+        test.eq(M.get(d.root, "forever", 1, "pit lock").class, "WARLOCK")
+        test.eq(M.get(d.root, "forever", 1, "pit pal").class, "PALADIN")
+        test.eq(M.get(d.root, "forever", 1, "Pit"), nil, "never store the first name alone")
+    end
     cases.full_identity = function()
         local d = build()
         R.collectAndStore(d)
@@ -27,6 +47,63 @@ return function(test)
         R.collectAndStore(d)
         test.eq(#M.list(d.root, "forever"), 2, "same short name preserves both snapshots")
         test.eq(M.get(d.root, "forever", 1, "Hero-RealmA").class, "WARLOCK")
+    end
+    cases.forever_ambiguous_first_name = function()
+        local d = build()
+        M.upsert(d.root, "forever", { realmId = 1, player = "Pit", class = "WARLOCK",
+            equipment = { [16] = { link = "item:101", icon = 101 } } })
+        d.root.equipmentFilters = { [1] = { ["pit lock"] = {}, ["pit pal"] = {} } }
+        d.api.UnitName = function() return "Pit", "lock" end
+        R.collectAndStore(d)
+        test.eq(M.get(d.root, "forever", 1, "Pit") ~= nil, true, "ambiguous first name stays untouched")
+        test.eq(M.get(d.root, "forever", 1, "Pit lock").equipment, nil, "do not guess legacy equipment ownership")
+        d.api.UnitName = function() return "Pit", "pal" end
+        d.api.UnitClass = function() return "Paladin", "PALADIN" end
+        R.collectAndStore(d)
+        test.eq(#M.list(d.root, "forever"), 3, "two full names plus retained ambiguous legacy snapshot")
+    end
+    cases.forever_complete_aliases_and_view = function()
+        local d = build()
+        M.upsert(d.root, "forever", { realmId = 1, player = "Pit-Lock", class = "WARLOCK",
+            updatedAt = 10, equipment = { [13] = { link = "item:13", icon = 13 } } })
+        M.upsert(d.root, "forever", { realmId = 1, player = "pit lock", class = "WARLOCK",
+            updatedAt = 20, equipment = { [16] = { link = "item:16", icon = 16 } } })
+        M.upsert(d.root, "forever", { realmId = 1, player = "Pit-Pal", class = "PALADIN" })
+        d.root.roleOverviewCharacterOrder = { forever = {{ realmId = 1, player = "Pit-Lock" }} }
+        d.globals = { playerName = "Pit-Lock", realmID = 1 }
+        d.api.UnitName = function() return "pit", "lock" end
+        R.collectAndStore(d, { equipment = true })
+        local lock = M.get(d.root, "forever", 1, "pit lock")
+        test.eq(lock.equipment[13] ~= nil, true, "complete alias fills an unobserved slot")
+        test.eq(lock.equipment[13].icon, 13, "complete alias retains trinket cache")
+        test.eq(lock.equipment[16].icon, 16, "complete alias retains weapon cache")
+        test.eq(M.get(d.root, "forever", 1, "Pit-Lock"), nil)
+        test.eq(d.root.roleOverviewCharacterOrder.forever[1].player, "pit lock")
+        d.globals.playerName = "Pit-Pal"
+        d.api.UnitName = function() return "pit", "pal" end
+        d.api.UnitClass = function() return "Paladin", "PALADIN" end
+        R.collectAndStore(d)
+        R.collectAndStore(d)
+        test.eq(M.get(d.root, "forever", 1, "Pit-Pal"), nil)
+        test.eq(#M.list(d.root, "forever"), 2, "directory-shaped names coalesce with complete space names only")
+        local V = dofile("Core/BGNext/OwnCharactersView.lua")
+        local view = V.project({ family = "forever", catalog = d.catalog,
+            snapshots = M.list(d.root, "forever"), currentRealmId = 1, now = 100 })
+        test.eq(view.characterCount, 2, "projection keeps both rows")
+        test.eq(view.resource.rows[1].display, "pit lock")
+        test.eq(view.resource.rows[2].display, "pit pal")
+    end
+    cases.forever_missing_surname = function()
+        local d = build()
+        d.globals = { playerName = "Pit", realmID = 1 }
+        d.api.UnitName = function() return "Pit" end
+        d.api.GetUnitName = function() return "Pit" end
+        test.eq(R.collectAndStore(d), nil, "unavailable surname cannot recreate a colliding short key")
+        test.eq(#M.list(d.root, "forever"), 0)
+        d.globals.playerName = "pit lock"
+        R.collectAndStore(d)
+        test.eq(M.get(d.root, "forever", 1, "pit lock") ~= nil, true,
+            "a readable complete init identity still works")
     end
     cases.filter_identity = function()
         local d = build()
@@ -43,25 +120,25 @@ return function(test)
         test.eq(#M.list(d.root, "forever"), 0)
     end
     cases.migrate_current = function()
-        local d = build()
-        M.upsert(d.root, "forever", { realmId = 1, player = "Hero", class = "WARLOCK",
+        local d = build(nil, "titan")
+        M.upsert(d.root, "titan", { realmId = 1, player = "Hero", class = "WARLOCK",
             equipment = { [16] = { link = "item:101", icon = 101 } } })
-        d.root.roleOverviewCharacterOrder = { forever = {{ realmId = 1, player = "Hero" }} }
+        d.root.roleOverviewCharacterOrder = { titan = {{ realmId = 1, player = "Hero" }} }
         R.collectAndStore(d)
         R.collectAndStore(d)
-        test.eq(M.get(d.root, "forever", 1, "Hero"), nil, "remove migrated alias")
-        test.eq(#M.list(d.root, "forever"), 1, "migration is idempotent")
-        test.eq(M.get(d.root, "forever", 1, "Hero-RealmA").equipment[16].icon, 101,
+        test.eq(M.get(d.root, "titan", 1, "Hero"), nil, "remove migrated alias")
+        test.eq(#M.list(d.root, "titan"), 1, "migration is idempotent")
+        test.eq(M.get(d.root, "titan", 1, "Hero-RealmA").equipment[16].icon, 101,
             "migration preserves cached equipment")
-        test.eq(d.root.roleOverviewCharacterOrder.forever[1].player, "Hero-RealmA")
+        test.eq(d.root.roleOverviewCharacterOrder.titan[1].player, "Hero-RealmA")
     end
     cases.migrate_unique_profile = function()
-        local d = build()
+        local d = build(nil, "titan")
         d.root.equipmentFilters = { [1] = { ["Other RealmB"] = {} } }
-        M.upsert(d.root, "forever", { realmId = 1, player = "Other", class = "PALADIN", level = 60 })
+        M.upsert(d.root, "titan", { realmId = 1, player = "Other", class = "PALADIN", level = 60 })
         R.collectAndStore(d)
-        test.eq(M.get(d.root, "forever", 1, "Other"), nil)
-        test.eq(M.get(d.root, "forever", 1, "Other RealmB").level, 60)
+        test.eq(M.get(d.root, "titan", 1, "Other"), nil)
+        test.eq(M.get(d.root, "titan", 1, "Other RealmB").level, 60)
     end
     cases.ambiguous_legacy = function()
         local d = build()
@@ -72,14 +149,14 @@ return function(test)
         test.eq(M.get(d.root, "forever", 1, "Hero-RealmB"), nil, "ambiguous alias stays intact")
     end
     cases.existing_full_alias = function()
-        local d = build()
-        M.upsert(d.root, "forever", { realmId = 1, player = "Hero", class = "WARLOCK",
+        local d = build(nil, "titan")
+        M.upsert(d.root, "titan", { realmId = 1, player = "Hero", class = "WARLOCK",
             updatedAt = 10, equipment = { [13] = { link = "item:13", icon = 13 } } })
-        M.upsert(d.root, "forever", { realmId = 1, player = "Hero-RealmA", class = "WARLOCK",
+        M.upsert(d.root, "titan", { realmId = 1, player = "Hero-RealmA", class = "WARLOCK",
             updatedAt = 20, level = 60, equipment = { [16] = { link = "item:16", icon = 16 } } })
-        M.migrateShortNames(d.root, "forever", { realmId = 1, player = "Hero-RealmA", class = "WARLOCK" }, "Hero")
-        test.eq(#M.list(d.root, "forever"), 1)
-        local s = M.get(d.root, "forever", 1, "Hero-RealmA")
+        M.migrateShortNames(d.root, "titan", { realmId = 1, player = "Hero-RealmA", class = "WARLOCK" }, "Hero")
+        test.eq(#M.list(d.root, "titan"), 1)
+        local s = M.get(d.root, "titan", 1, "Hero-RealmA")
         test.eq(s.level, 60)
         test.eq(s.equipment[13].icon, 13)
         test.eq(s.equipment[16].icon, 16)
