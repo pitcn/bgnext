@@ -25,6 +25,7 @@ local function familyFromGlobals()
     if BG.IsTitan then return "titan" end
     if BG.IsWLK then return "wrath" end
     if BG.IsTBC then return "tbc" end
+    if BG.IsForever then return "forever" end
     if BG.IsVanilla then return "vanilla" end
 end
 

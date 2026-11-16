@@ -175,6 +175,20 @@ do
             AddDB("Worldsod", mainFrameWidth, 810, 3, 10, { 0, 4, 9 }, nil, nil,
                 { 10, 5, 5, 5, 5, 5, 5, 5, 4, 5 })
         end
+        if BG.IsForever then
+            for _, raid in ipairs(BG.ForeverRaids) do
+                local count = #raid.bosses
+                local slots = {}
+                for b = 1, count do slots[b] = raid.rows and raid.rows[b] or 8 end
+                slots[count + 1], slots[count + 2] = 10, 8
+                local split = math.ceil((count + 1) / 2)
+                local wide = count > 10
+                AddDB(raid.id, wide and mainFrameWidth2 or mainFrameWidth, raid.rows and 810 or 960,
+                    wide and 4 or 3, count + 2,
+                    wide and { 0, 5, 10, count + 1 } or { 0, split, count + 1 },
+                    nil, nil, slots, nil, 8)
+            end
+        end
         if BG.IsVanilla_60 then
             AddDB("MC", mainFrameWidth, 810, 3, 13, { 0, 7, 12 }, nil, nil,
                 { 4, 4, 4, 4, 4, 4, 4, 4, 4, 6, 8, 15, 10, }, 8, 6)
@@ -352,6 +366,19 @@ do
             AddOneBoss("Worldsod", 2789, 3, "TTS")
             -- 水晶谷
             AddOneBoss("Worldsod", 2804, 4, "TCV")
+        end
+        if BG.IsForever then
+            BG.FB1 = "UBRSforever"
+            BG.fullLevel = 60
+            BG.fullLevel_RoleOverview = 35
+            for _, raid in ipairs(BG.ForeverRaids) do
+                AddDB(raid.id, raid.mapID, raid.phase, raid.players, 3,
+                    nil, { 1, #raid.bosses }, raid.name)
+                BG.FBtable2[#BG.FBtable2].localName = raid.name
+                for _, position in pairs(BG.FBfromBossPosition[raid.id]) do
+                    position.localName = raid.name
+                end
+            end
         end
         if BG.IsVanilla_60 then
             BG.FB1 = "MC"
@@ -589,6 +616,10 @@ do
                 { name = L["专业"], name2 = "profession", },
                 { name = L["世界掉落"], name2 = "world", },
                 { name = L["PVP"], name2 = "pvp", },
+            }
+        elseif BG.IsForever then
+            BG.itemLibGetFiter = {
+                { name = L["团本"], name2 = "raid" },
             }
         elseif BG.IsVanilla_60 then
             BG.itemLibGetFiter = {
@@ -1196,23 +1227,7 @@ BG.Init(function()
         -- 天赋
         do
             local function GetTalent(_, event)
-                local specIndex
-                if BG.verOver4 then
-                    specIndex = C_SpecializationInfo.GetSpecialization()
-                    if specIndex == 0 or specIndex == 5 then
-                        specIndex = nil
-                    end
-                else
-                    local maxNum = 0
-                    for i = 1, 3 do
-                        local num = select(5, GetTalentTabInfo(i, nil, nil, GetActiveTalentGroup()))
-                        if num and num >= maxNum then
-                            maxNum = num
-                            specIndex = i
-                        end
-                    end
-                    if maxNum == 0 then specIndex = nil end
-                end
+                local specIndex = BG.BGNext.ClientCompat.talentIndex(BG, _G)
                 BiaoGe.playerInfo[realmID][player].talent = specIndex
             end
 

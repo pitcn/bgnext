@@ -157,6 +157,7 @@ function M.columnHeader(column, currencyInfo, spellInfo)
         and L[column.fullTitle] or label
     local descriptor = { text = label, tooltip = tooltip }
     local source = type(column.source) == "table" and column.source or nil
+    if source and source.spellIds then return descriptor end
     -- A profession cooldown heading keeps its compact catalog title and, when
     -- the client can name the spell, surfaces Blizzard's own localized name as
     -- the tooltip rather than a hand-written translation.
@@ -387,13 +388,19 @@ function M.layout(projection)
     local raid = layoutSection(projection.raid, "raid", top)
     local resource = layoutSection(projection.resource, "resource", raid.bottom - metrics.sectionGap)
 
+    local emptyText = L["尚无本地角色记录，登录角色后自动记录。"]
+    local hidden = projection.hiddenByLevelCount
+    if projection.unsupported == true then
+        emptyText = L["该版本角色总览适配中。"]
+    elseif projection.isEmpty == true and type(hidden) == "number" and hidden > 0 then
+        emptyText = string.format(L["已记录 %d 个未满级角色，当前被“只看满级角色”过滤。可在“设置 → 角色总览”取消勾选“只看满级角色”。"], hidden)
+    end
+
     return {
         width = projection.width,
         height = projection.height,
         isEmpty = projection.isEmpty == true,
-        emptyText = projection.unsupported == true
-            and L["该版本角色总览适配中。"]
-            or L["尚无本地角色记录，登录角色后自动记录。"],
+        emptyText = emptyText,
         characterCount = projection.characterCount,
         sections = { raid, resource },
     }

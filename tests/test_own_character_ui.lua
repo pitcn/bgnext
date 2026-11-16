@@ -382,6 +382,33 @@ return function(test)
     test.eq(emptyLayout.emptyText ~= "", true, "empty message is not blank")
     test.eq(#emptyLayout.sections[1].rows, 0, "empty layout draws no character rows")
 
+    -- A leveling character is stored but hidden by the max-level filter: the
+    -- empty state must say so instead of claiming nothing was recorded.
+    local levelingInput = {
+        family = "forever", catalog = Catalog.forFamily("forever"),
+        snapshots = { snapshot({ level = 12 }) },
+        currentRealmId = 123, now = 1000, visibility = {}, maxLevel = 60,
+    }
+    test.eq(View.project(levelingInput).isEmpty, false, "a leveling character is shown by default")
+    levelingInput.maxLevelOnly = true
+    local hiddenProjection = View.project(levelingInput)
+    test.eq(hiddenProjection.isEmpty, true, "a leveling character is filtered when max-level-only is on")
+    test.eq(hiddenProjection.hiddenByLevelCount, 1, "the projection counts level-hidden characters")
+    local hiddenLayout = UI.layout(hiddenProjection)
+    test.eq(hiddenLayout.emptyText ~= "尚无本地角色记录，登录角色后自动记录。", true,
+        "level-hidden characters never get the 'no records' message")
+    test.eq(string.find(hiddenLayout.emptyText, "未满级", 1, true) ~= nil, true,
+        "the message explains that non-max-level characters are hidden")
+    test.eq(string.find(hiddenLayout.emptyText, "1", 1, true) ~= nil, true,
+        "the message states how many characters are hidden")
+    test.eq(string.find(hiddenLayout.emptyText, "取消勾选“只看满级角色”", 1, true) ~= nil, true,
+        "the filtered empty state tells users how to restore leveling characters")
+    test.eq(string.find(hiddenLayout.emptyText, "设置 → 角色总览", 1, true) ~= nil, true,
+        "the filtered empty state names the settings location")
+    levelingInput.snapshots = {}
+    test.eq(UI.layout(View.project(levelingInput)).emptyText, "尚无本地角色记录，登录角色后自动记录。",
+        "a truly empty store keeps the original message")
+
     local unsupportedLayout = UI.layout(View.project({
         family = "wrath",
         catalog = Catalog.forFamily("wrath"),

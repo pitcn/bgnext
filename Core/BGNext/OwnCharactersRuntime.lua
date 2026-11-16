@@ -110,7 +110,7 @@ function M.setEnabled(deps, value)
         -- enabled session. Do not let it survive a disable/re-enable cycle
         -- and become a false completion after the daily reset.
         deps._farmHarvestObservedAt = nil
-        deps._titanActivityResetAt = nil
+        deps._questActivityResetAt = nil
         M.setVisible(deps, false)
     end
 end
@@ -135,14 +135,14 @@ function M.refreshVisible(deps)
     if not M.isEnabled(deps) then return end
     local now = (type(deps.now) == "function" and deps.now) or defaultNow
     local stamp = now()
-    if deps.family == "titan" and type(deps._titanActivityResetAt) == "number"
-        and stamp >= deps._titanActivityResetAt
+    if (deps.family == "titan" or deps.family == "forever") and type(deps._questActivityResetAt) == "number"
+        and stamp >= deps._questActivityResetAt
         and deps.ui and type(deps.ui.IsVisible) == "function" then
         local ok, visible = pcall(deps.ui.IsVisible)
         if ok and visible == true then
             -- The existing visible countdown wakes this once at the deadline;
             -- this is not a periodic profession/quest scan. Offline rows only expire.
-            deps._titanActivityResetAt = nil
+            deps._questActivityResetAt = nil
             return M.collectAndStore(deps, { activities = true })
         end
     end
@@ -175,7 +175,7 @@ end
 
 -- The one safe collection path. Returns the stored snapshot, or nil when the
 -- module is disabled or the client cannot identify the logged-in character.
-function M.collectAndStore(deps, sections)
+function M.collectAndStore(deps, sections, equipmentRetry)
     deps = deps or M.deps()
     if not M.isEnabled(deps) or not M.isAvailable(deps) then return nil end
 
@@ -196,14 +196,19 @@ function M.collectAndStore(deps, sections)
     local env = adapters.readers(family, api, catalog.raidColumns, catalog.resourceColumns)
     env.now = function() return stamp end
 
-    -- On retail only, prefer the init-time identity over a live re-read. There
-    -- the live UnitName/GetRealmID calls can be secret-protected even though BG
-    -- already holds the validated current-character identity from load time.
-    -- Every other family keeps the original live readers; the identity is
-    -- re-read on every collect so a later event can succeed (no lockout).
-    if family == "retail" and type(adapters.validatedIdentity) == "function" then
+    -- A live Forever surname identity takes precedence over an init-time key
+    -- that may have lost the surname. Other clients retain their filter key.
+    local hasSurname
+    if family == "forever" and type(adapters.readPlayerName) == "function" then
+        local ignored
+        ignored, hasSurname = adapters.readPlayerName(api, family)
+    end
+    if not hasSurname and type(adapters.validatedIdentity) == "function" then
         local identity = adapters.validatedIdentity(deps.globals)
-        if identity then
+        if family == "forever" and identity and not identity.playerName:find("[%s%-]") then
+            identity = nil
+        end
+        if identity and (family == "retail" or identity.realmId == adapters.readRealmId(api)) then
             env.playerName = function() return identity.playerName end
             env.realmId = function() return identity.realmId end
             if identity.realmName ~= nil then
@@ -214,6 +219,14 @@ function M.collectAndStore(deps, sections)
 
     local scoped = type(sections) == "table" and sections.full ~= true
     local snapshot = collector.collect(env, sections)
+    if snapshot and type(model.migrateShortNames) == "function" then
+        -- Read class even on an equipment-only event; otherwise an old snapshot
+        -- of another same-short-name character could be assigned to this one.
+        model.migrateShortNames(root, family, {
+            player = snapshot.player, realmId = snapshot.realmId,
+            class = adapters.readClass(api),
+        }, adapters.safeCall(api.UnitName, "player"))
+    end
     local existing = snapshot and type(model.get) == "function"
         and model.get(root, family, snapshot.realmId, snapshot.player) or nil
     if snapshot and scoped then
@@ -252,16 +265,16 @@ function M.collectAndStore(deps, sections)
             model.upsert(root, family, snapshot)
         end
         if appliedFarmObservation then deps._farmHarvestObservedAt = nil end
-        if family == "titan" and (not scoped or sections.activities == true) then
-            deps._titanActivityResetAt = nil
+        if (family == "titan" or family == "forever") and (not scoped or sections.activities == true) then
+            deps._questActivityResetAt = nil
             for _, column in ipairs(catalog.resourceColumns or {}) do
                 local source = column.source or {}
                 local state = snapshot.activityStates and snapshot.activityStates[source.key or column.id]
                 local expires = type(state) == "table" and state.resetsAt or nil
                 if (source.detector == "profession-daily" or source.detector == "weekly-quest") and type(expires) == "number"
                     and expires > stamp and expires < math.huge
-                    and (not deps._titanActivityResetAt or expires < deps._titanActivityResetAt) then
-                    deps._titanActivityResetAt = expires
+                    and (not deps._questActivityResetAt or expires < deps._questActivityResetAt) then
+                    deps._questActivityResetAt = expires
                 end
             end
         end
@@ -269,6 +282,44 @@ function M.collectAndStore(deps, sections)
     model.expireRaidStates(root, stamp)
 
     refreshUIIfVisible(deps)
+    if snapshot and type(api.GetInventoryItemLink) == "function"
+        and type(model.get) == "function" and (not scoped or sections.equipment == true) then
+        -- Three bounded rescans also work when this client rejects or never
+        -- fires GET_ITEM_INFO_RECEIVED. No periodic scan and no persisted state.
+        local attempt = equipmentRetry or 0
+        deps._equipmentRetryToken = {}
+        local token = deps._equipmentRetryToken
+        local stored = model.get(root, family, snapshot.realmId, snapshot.player)
+        local observed = snapshot.equipment or {}
+        local incomplete = next(observed) == nil
+        for _, item in pairs(observed) do
+            if not item.icon or not item.itemLevel or not item.quality then incomplete = true end
+        end
+        for slot in pairs(stored and stored.equipment or {}) do
+            if not observed[slot] then incomplete = true end
+        end
+        if incomplete and attempt < 3 then
+            local function retry()
+                if deps._equipmentRetryToken ~= token or not M.isEnabled(deps) then return end
+                if not model.get(root, family, snapshot.realmId, snapshot.player) then return end
+                if adapters.safeCall(env.playerName) ~= snapshot.player then return end
+                M.collectAndStore(deps, { equipment = true }, attempt + 1)
+            end
+            local delay = 2 ^ (attempt + 1)
+            if type(deps.after) == "function" then
+                deps.after(delay, retry)
+            elseif deps.frame and type(deps.frame.SetScript) == "function" then
+                local elapsed = 0
+                deps.frame:SetScript("OnUpdate", function(frame, delta)
+                    elapsed = elapsed + delta
+                    if elapsed >= delay then
+                        frame:SetScript("OnUpdate", nil)
+                        retry()
+                    end
+                end)
+            end
+        end
+    end
     return snapshot
 end
 
@@ -340,6 +391,7 @@ function M.install(deps)
     installed = true
 
     local frame = deps.frame or (type(CreateFrame) == "function" and CreateFrame("Frame") or nil)
+    deps.frame = frame
 
     if deps.collector and frame then
         deps.collector.installEvents({

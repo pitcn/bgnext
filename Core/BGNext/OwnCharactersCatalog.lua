@@ -80,6 +80,41 @@ local function baseResourceColumns()
 end
 
 local CATALOG = {
+    forever = {
+        status = "pending-in-game-verification",
+        raidColumns = {
+            raid("BDforever", 3052, "深穴", "深穴", nil, { 3052 }, true, "00BFFF"),
+            raid("HSforever", 2981, "海加尔峰", "海加尔峰", nil, { 2981 }, true, "00BFFF"),
+            raid("ONYforever", 249, "黑龙", "奥妮克希亚的巢穴", nil, { 249 }, true, "00BFFF"),
+        },
+        resourceColumns = (function()
+            local columns = baseResourceColumns()
+            columns[#columns + 1] = resource("undermineReal", "安德麦雷亚尔", "number", "narrow", true,
+                { kind = "currency", key = "undermineReal", currencyId = 3469, showHeaderIcon = true },
+                true, "FFFFFF", "褪色的安德麦雷亚尔")
+            columns[#columns + 1] = resource("honorPoints", "荣誉点数", "number", "narrow", true,
+                { kind = "currency", key = "honorPoints", currencyId = 1792, showHeaderIcon = true }, false, "FFFFFF")
+            columns[#columns + 1] = resource("merchantsFavor", "商人青睐", "number", "narrow", true,
+                { kind = "currency", key = "merchantsFavor", currencyId = 3402, showHeaderIcon = true }, false, "FFFFFF")
+            table.insert(columns, 2, resource("bootyBayWeekly", "藏宝海湾周常", "status", "normal", false,
+                { kind = "activity", detector = "weekly-quest", cadence = "weekly",
+                    questIds = { 96075, 96076, 96087, 96088 } }, true, "ADFF2F"))
+            table.insert(columns, 3, resource("transmute", "炼金转化", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "transmute", spellId = 17187,
+                    spellIds = { 17187, 1317279, 17559, 17560, 17561, 17562, 17563, 17564, 17565, 17566, 25146 } },
+                true, "FFFFFF", "奥金、军团石与精华转化共用冷却，以已学会配方的实际剩余时间为准。"))
+            table.insert(columns, 4, resource("mooncloth", "月布", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "mooncloth", spellId = 18560 }, true, "FFFFFF"))
+            table.insert(columns, 5, resource("saltShaker", "筛盐", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "saltShaker", spellId = 19566,
+                    itemId = 15846, professionSpellId = 2108 }, true, "FFFFFF"))
+            table.insert(columns, 6, resource("ironToGold", "点铁成金", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "ironToGold", spellId = 11479 }, true, "FFFFFF"))
+            table.insert(columns, 7, resource("mithrilToTruesilver", "转化秘银", "cooldown", "normal", false,
+                { kind = "profession-cooldown", key = "mithrilToTruesilver", spellId = 11480 }, true, "FFFFFF"))
+            return columns
+        end)(),
+    },
     vanilla = {
         status = "pending-in-game-verification",
         raidColumns = {

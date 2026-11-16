@@ -1,5 +1,7 @@
 if BG.IsBlackListPlayer then return end
 local AddonName, ns = ...
+local GetItemInfo = function(...) local api = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo); if api then return api(...) end end
+local GetItemInfoInstant = function(...) local api = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant); if api then return api(...) end end
 
 local LibBG = ns.LibBG
 local L = ns.L
@@ -54,7 +56,7 @@ function BG.ApplyMainFrameScale()
 end
 
 BG.Init(function()
-    pcall(function()
+    xpcall(function()
     ----------主界面----------
     do
         BG.MainFrame = CreateFrame("Frame", "BG.MainFrame", UIParent, "BackdropTemplate")
@@ -1241,14 +1243,11 @@ BG.Init(function()
         -- 背包
         local function func(self, button)
             if not IsShiftKeyDown() then return end
-            local link = C_Container.GetContainerItemLink(self:GetParent():GetID(), self:GetID())
+            local link = BG.BGNext.ClientCompat.bagLink(self, _G)
+            if not link then return end
             Insert(link)
         end
-        if BG.IsRetail then
-            hooksecurefunc("ContainerFrameItemButton_OnClick", func)
-        else
-            hooksecurefunc("ContainerFrameItemButton_OnModifiedClick", func)
-        end
+        BG.BGNext.ClientCompat.hookBagEvent("click", func, _G, BG.IsRetail)
     end
     ----------离队入队染上职业颜色----------
     do
@@ -1855,7 +1854,7 @@ BG.Init(function()
     end
     -- abc:Hide()
     BG.MainFrame.ErrorText:Hide()
-end)
+end, geterrorhandler())
 
 ----------刷新团队成员信息----------
 do

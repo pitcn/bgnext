@@ -6,6 +6,13 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["藏宝海湾周常"] = "Booty Bay weekly"
+L["奥金、军团石与精华转化共用冷却，以已学会配方的实际剩余时间为准。"] = "Arcanite, Legionite and essence transmutes share a cooldown. Shows the actual remaining time of a learned recipe."
+L["点铁成金"] = "Iron to Gold"
+L["转化秘银"] = "Mithril to Truesilver"
+L["安德麦雷亚尔"] = "Undermine Real"
+L["荣誉点数"] = "Honor Points"
+L["商人青睐"] = "Merchant's Favor"
 L["全部部位"] = "All slots"
 L["头部"] = "Head"
 L["颈部"] = "Neck"
@@ -171,11 +178,18 @@ do -- BGNext 0.8.10 release text
     L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"] = "Browse wishlist drops by boss or equipment slot; selections still use the original wish slots."
     L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"] = "Titan character overview adds raid and ZG weekly status; unavailable reliable APIs show unknown."
     L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"] = "Fixed My Purchases filtering missing buyers whose names include a realm."
+    L["新增无限服（Interface 16001）适配基础：团本目录、角色总览活动和货币列；尚未完成游戏内实测。"] = "Adds Forever (Interface 16001) groundwork: raid catalogs, overview activities and currency columns; in-game testing is not yet complete."
+    L["无限服角色总览现在完整识别带姓氏的角色名，并保留已缓存的装备，避免角色混淆或装备栏位丢失。"] = "Forever character overview now keeps full names with surnames and preserves cached equipment, preventing mixed-up characters and lost slots."
+    L["角色总览新增“只看满级角色”开关；仅无限服默认显示练级角色，其他客户端默认仍只显示满级角色，已有设置保留。"] = "Character overview adds a Max-Level Characters Only option. Only Forever shows leveling characters by default; other clients still default to max-level only. Existing choices are kept."
+    L["练级角色被满级过滤隐藏时，空列表会提示原因和取消勾选的位置。"] = "When the max-level filter hides leveling characters, the empty list explains why and where to clear the option."
+    L["无限服新建拍卖价格方案的基础价默认为10g，已有方案价格不变。"] = "New Forever auction price schemes now start at a 10g base price; existing schemes keep their prices."
     ns.updateText_now = {
-        "BGNext 0.8.16",
-        L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"],
-        L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"],
-        L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"],
+        "BGNext 0.8.17",
+        L["新增无限服（Interface 16001）适配基础：团本目录、角色总览活动和货币列；尚未完成游戏内实测。"],
+        L["无限服角色总览现在完整识别带姓氏的角色名，并保留已缓存的装备，避免角色混淆或装备栏位丢失。"],
+        L["角色总览新增“只看满级角色”开关；仅无限服默认显示练级角色，其他客户端默认仍只显示满级角色，已有设置保留。"],
+        L["练级角色被满级过滤隐藏时，空列表会提示原因和取消勾选的位置。"],
+        L["无限服新建拍卖价格方案的基础价默认为10g，已有方案价格不变。"],
     }
 end
 
@@ -2040,6 +2054,7 @@ do
     L["中键或 Ctrl+左键固定，按住 Shift 显示全部服务器"] = "Middle-click or Ctrl+Left-click to pin, hold Shift for all realms"
     L["合计"] = "Total"
     L["尚无本地角色记录，登录角色后自动记录。"] = "No local characters yet. Log into a character to record it."
+    L["已记录 %d 个未满级角色，当前被“只看满级角色”过滤。可在“设置 → 角色总览”取消勾选“只看满级角色”。"] = "%d non-max-level character(s) recorded but filtered out by \"Max-Level Characters Only\". Clear that option in Settings → Role Overview."
     L["|cffffffff< UI缩放 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的大小"] = "|cffffffff< UI Zoom >|r|cff808080 (right-click to restore settings)|r\n\n1, 'Improved Gouge' Form UI size"
     L["|cffffffff< UI透明度 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的透明度"] = "|cffffffff< UI Transparency >|r|cff808080 (right-click to restore settings)|r\n\n1, 'Improved Gouge' Form UI Transparency"
     L["UI透明度"] = "UI Transparency"
@@ -3451,7 +3466,7 @@ do -- BGNext character overview
     L["当前数量"] = "Current"
     L["总上限"] = "Total cap"
     L["每周上限"] = "Weekly cap"
-    L["显示非满级角色"] = "Show Non-Max-Level Characters"
+    L["只看满级角色"] = "Max-Level Characters Only"
     L["启用角色总览"] = "Enable Character Overview"
     L["清空"] = "Clear"
     L["清空当前版本角色数据"] = "Clear This Client's Character Data"
@@ -3536,3 +3551,34 @@ do -- BGNext in-game guide
     L["已清理所有%s副本，并清除共享的杂项、罚款和当前团结算记录；支出按现有清表设置处理。"] = "Cleared all %s raids, including shared miscellaneous rows, penalties, and the current settlement. Expenses follow the existing clear-table settings."
     L["检测到新副本进度，表格< %s >的当前副本区间（Boss %s-%s）仍有内容。只清当前副本会保留杂项、罚款、支出和当前团结算记录；选择“清空表格”可同时清除这些记录，支出按现有清表设置处理。"] = "A new lockout was detected, but < %s > still has content in this raid range (Boss %s-%s). Clear current raid only keeps miscellaneous rows, penalties, expenses and the current settlement. Clear table also removes these records; expenses follow your existing clear-table settings."
 end
+
+-- Forever raid names.
+L["黑石塔上层"] = "Upper Blackrock Spire"
+L["深穴"] = "Barrow Deeps"
+L["海加尔峰"] = "Hyjal Summit"
+L["烈焰卫士艾博希尔"] = "Pyroguard Emberseer"
+L["索拉卡·火冠"] = "Solakar Flamewreath"
+L["盖斯"] = "Gyth"
+L["大酋长雷德·黑手"] = "Warchief Rend Blackhand"
+L["寒嚎"] = "Chillhowl"
+L["长者纠爪"] = "Elder Tangleclaw"
+L["恐网者卡利斯"] = "Khalith the Dreadspinner"
+L["悲伤之井"] = "Well of Sorrow"
+L["阿梅斯拉克斯"] = "Amethrax"
+L["德利纳尔·歌木"] = "Del'lynar Songwood"
+L["拉弗斯与达莉莎"] = "Ravus and Darlissa"
+L["索尼娅·暗影之谷"] = "Sonya Darkhallow"
+L["班达拉尔"] = "Bandalar"
+L["腐朽古树"] = "Ancient of Decay"
+L["迷时军团"] = "Time-Lost Battalion"
+L["希尔维斯翠丝·暮歌"] = "Sylvestris Dusksong"
+L["老暮暗潜伏者"] = "Old Gloomlurker"
+L["深渊者加拉里斯"] = "Gharalis the Abyssal"
+L["鬼影缠身的卡斯里斯"] = "Kathris the Haunted"
+L["阿娜拉·寒风"] = "Anara Chillwind"
+L["长者敏德雷尔"] = "Elder Minderel"
+L["追踪者静风"] = "Tracker Stillwind"
+L["荆棘议会"] = "Council of Thorns"
+L["缚梦者尼苏斯"] = "Nythus the Dreambound"
+L["荒野之王"] = "The Wild King"
+L["奥妮克希亚的巢穴"] = "Onyxia's Lair"

@@ -42,7 +42,7 @@ return function(test)
     local hooks = read("Core/Module/hooks.lua")
     local onEnterAt = assert(hooks:find("local function OnEnter(self, button)", 1, true))
     local disabledAt = assert(hooks:find('BiaoGe.options["HighOnterItem"] ~= 1', onEnterAt, true))
-    local linkReadAt = assert(hooks:find("C_Container.GetContainerItemLink", onEnterAt, true))
+    local linkReadAt = assert(hooks:find("ClientCompat.bagLink", onEnterAt, true))
     test.eq(disabledAt < linkReadAt, true,
         "disabled bag highlighting returns before reading the item link")
     local onUpdateAt = assert(hooks:find("local function OnUpdate(self, t)", 1, true))

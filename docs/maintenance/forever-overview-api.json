@@ -1,0 +1,50 @@
+{
+  "sourceId": "wow-ui-source",
+  "product": "forever",
+  "tag": "1.60.1",
+  "commit": "ca8368f2f2380cbe696854f7f2646387c278a61b",
+  "results": [
+    {
+      "symbol": "C_QuestLog.IsQuestFlaggedCompleted",
+      "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua",
+      "line": 916,
+      "excerpt": "916: \t\t\tName = \"IsQuestFlaggedCompleted\",\n917: \t\t\tType = \"Function\",\n918: \t\t\tSecretArguments = \"AllowedWhenUntainted\",\n919: \n920: \t\t\tArguments =\n921: \t\t\t{\n922: \t\t\t\t{ Name = \"questID\", Type = \"number\", Nilable = false },\n923: \t\t\t},\n924: \n925: \t\t\tReturns =\n926: \t\t\t{\n927: \t\t\t\t{ Name = \"isCompleted\", Type = \"bool\", Nilable = false },\n928: \t\t\t},\n929: \t\t},"
+    },
+    {
+      "symbol": "C_DateAndTime.GetSecondsUntilWeeklyReset",
+      "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/DateAndTimeDocumentation.lua",
+      "line": 108,
+      "excerpt": "108: \t\t\tName = \"GetSecondsUntilWeeklyReset\",\n109: \t\t\tType = \"Function\",\n110: \n111: \t\t\tReturns =\n112: \t\t\t{\n113: \t\t\t\t{ Name = \"seconds\", Type = \"time_t\", Nilable = false },\n114: \t\t\t},\n115: \t\t},"
+    },
+    {
+      "symbol": "C_Spell.GetSpellCooldown",
+      "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellDocumentation.lua",
+      "line": 309,
+      "excerpt": "309: \t\t\tName = \"GetSpellCooldown\",\n310: \t\t\tType = \"Function\",\n311: \t\t\tMayReturnNothing = true,\n312: \t\t\tSecretWhenCooldownsRestricted = true,\n313: \t\t\tSecretArguments = \"AllowedWhenTainted\",\n314: \t\t\tDocumentation = { \"Returns nil if spell is not found\" },\n315: \n316: \t\t\tArguments =\n317: \t\t\t{\n318: \t\t\t\t{ Name = \"spellIdentifier\", Type = \"SpellIdentifier\", Nilable = false },\n319: \t\t\t},\n320: \n321: \t\t\tReturns =\n322: \t\t\t{\n323: \t\t\t\t{ Name = \"spellCooldownInfo\", Type = \"SpellCooldownInfo\", Nilable = false },\n324: \t\t\t},\n325: \t\t},"
+    },
+    {
+      "symbol": "C_SpellBook.IsSpellKnown",
+      "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellBookDocumentation.lua",
+      "line": 738,
+      "excerpt": "738: \t\t\tName = \"IsSpellKnown\",\n739: \t\t\tType = \"Function\",\n740: \t\t\tSecretArguments = \"AllowedWhenUntainted\",\n741: \t\t\tDocumentation = { \"Returns true if a player knows a spell. This function can also return true for spells that aren't in the spellbook, such as temporarily-granted abilities\" },\n742: \n743: \t\t\tArguments =\n744: \t\t\t{\n745: \t\t\t\t{ Name = \"spellID\", Type = \"number\", Nilable = false },\n746: \t\t\t\t{ Name = \"spellBank\", Type = \"SpellBookSpellBank\", Nilable = false, Default = \"Player\" },\n747: \t\t\t},\n748: \n749: \t\t\tReturns =\n750: \t\t\t{\n751: \t\t\t\t{ Name = \"isKnown\", Type = \"bool\", Nilable = false },\n752: \t\t\t},\n753: \t\t},"
+    },
+    {
+      "symbol": "C_Item.GetItemCount",
+      "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua",
+      "line": 451,
+      "excerpt": "451: \t\t\tName = \"GetItemCount\",\n452: \t\t\tType = \"Function\",\n453: \t\t\tSecretArguments = \"AllowedWhenUntainted\",\n454: \n455: \t\t\tArguments =\n456: \t\t\t{\n457: \t\t\t\t{ Name = \"itemInfo\", Type = \"ItemInfo\", Nilable = false },\n458: \t\t\t\t{ Name = \"includeBank\", Type = \"bool\", Nilable = false, Default = false },\n459: \t\t\t\t{ Name = \"includeUses\", Type = \"bool\", Nilable = false, Default = false },\n460: \t\t\t\t{ Name = \"includeReagentBank\", Type = \"bool\", Nilable = false, Default = false },\n461: \t\t\t\t{ Name = \"includeAccountBank\", Type = \"bool\", Nilable = false, Default = false },\n462: \t\t\t},\n463: \n464: \t\t\tReturns =\n465: \t\t\t{\n466: \t\t\t\t{ Name = \"count\", Type = \"number\", Nilable = false },\n467: \t\t\t},\n468: \t\t},"
+    },
+    {
+      "symbol": "C_Item.GetItemCooldown",
+      "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua",
+      "line": 434,
+      "excerpt": "434: \t\t\tName = \"GetItemCooldown\",\n435: \t\t\tType = \"Function\",\n436: \t\t\tSecretArguments = \"AllowedWhenUntainted\",\n437: \n438: \t\t\tArguments =\n439: \t\t\t{\n440: \t\t\t\t{ Name = \"itemInfo\", Type = \"ItemInfo\", Nilable = false },\n441: \t\t\t},\n442: \n443: \t\t\tReturns =\n444: \t\t\t{\n445: \t\t\t\t{ Name = \"startTimeSeconds\", Type = \"number\", Nilable = false },\n446: \t\t\t\t{ Name = \"durationSeconds\", Type = \"number\", Nilable = false },\n447: \t\t\t\t{ Name = \"enableCooldownTimer\", Type = \"bool\", Nilable = false },\n448: \t\t\t},\n449: \t\t},"
+    },
+    {
+      "symbol": "BAG_UPDATE_COOLDOWN",
+      "path": "Interface/AddOns/Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua",
+      "line": 671,
+      "excerpt": "668: \t\t{\n669: \t\t\tName = \"BagUpdateCooldown\",\n670: \t\t\tType = \"Event\",\n671: \t\t\tLiteralName = \"BAG_UPDATE_COOLDOWN\",\n672: \t\t\tUniqueEvent = true,\n673: \t\t},\n674: \t\t{"
+    }
+  ]
+}

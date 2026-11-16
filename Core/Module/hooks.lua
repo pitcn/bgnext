@@ -1,5 +1,6 @@
 if BG.IsBlackListPlayer then return end
 local AddonName, ns = ...
+local GetItemQualityColor = function(...) local api = _G.GetItemQualityColor or (C_Item and C_Item.GetItemQualityColor); if api then return api(...) end end
 
 local L = ns.L
 
@@ -193,7 +194,7 @@ BG.Init2(function()
                     local i = 1
                     while _G["BagnonContainerItem" .. i] do
                         local bag = _G["BagnonContainerItem" .. i]
-                        if BG.IsRetail then
+                        if BG.IsRetail or type(ContainerFrameItemButton_OnLeave) ~= "function" then
                             bag:HookScript("OnLeave", GameTooltip_Hide)
                         else
                             bag:HookScript("OnLeave", ContainerFrameItemButton_OnLeave)
@@ -233,18 +234,12 @@ BG.Init2(function()
                     dalayFrame:Hide()
                     return
                 end
-                local b = self:GetParent():GetID()
-                local i = self:GetID()
-                link = C_Container.GetContainerItemLink(b, i)
+                link = BG.BGNext.ClientCompat.bagLink(self, _G)
                 dalayFrame.t = 0
                 dalayFrame:Show()
             end
-            hooksecurefunc("ContainerFrameItemButton_OnEnter", OnEnter)
-            if BG.IsRetail then
-                hooksecurefunc("GameTooltip_Hide", OnHide)
-            else
-                hooksecurefunc("ContainerFrameItemButton_OnLeave", OnHide)
-            end
+            BG.BGNext.ClientCompat.hookBagEvent("enter", OnEnter, _G, BG.IsRetail)
+            BG.BGNext.ClientCompat.hookBagEvent("leave", OnHide, _G, BG.IsRetail)
         end
     end
 
@@ -261,11 +256,7 @@ BG.Init2(function()
                 fuc(self, unit, name)
             end
         end
-        if BG.IsRetail then
-            TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, UnitGo)
-        else
-            GameTooltip:HookScript("OnTooltipSetUnit", UnitGo)
-        end
+        BG.BGNext.ClientCompat.hookTooltip("Unit", UnitGo, _G)
 
         local function ItemGo(self)
             if self ~= GameTooltip  then return end
@@ -278,10 +269,6 @@ BG.Init2(function()
                 fuc(self, itemID, link, name)
             end
         end
-        if BG.IsRetail then
-            TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, ItemGo)
-        else
-            GameTooltip:HookScript("OnTooltipSetItem", ItemGo)
-        end
+        BG.BGNext.ClientCompat.hookTooltip("Item", ItemGo, _G)
     end
 end)

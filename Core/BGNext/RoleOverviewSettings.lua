@@ -109,17 +109,28 @@ function M.visibilityFor(root, family)
     return visibility
 end
 
--- Display preference only. Missing or malformed saved values keep the compact
--- default without changing or deleting any stored character snapshot.
-function M.showNonMaxLevel(root)
+-- Display preference only: true limits the overview to max-level characters.
+-- Only Forever defaults to showing leveling characters. Explicit booleans
+-- take priority on every client, with the new key winning over the legacy
+-- roleOverviewShowNonMaxLevel key. Reading never rewrites either preference
+-- or touches a stored character snapshot.
+function M.maxLevelOnly(root)
     local settings = type(root) == "table" and root.settings or nil
-    return type(settings) == "table" and settings.roleOverviewShowNonMaxLevel == true
+    if type(settings) == "table" then
+        if type(settings.roleOverviewMaxLevelOnly) == "boolean" then
+            return settings.roleOverviewMaxLevelOnly
+        end
+        if type(settings.roleOverviewShowNonMaxLevel) == "boolean" then
+            return not settings.roleOverviewShowNonMaxLevel
+        end
+    end
+    return BG.IsForever ~= true
 end
 
-function M.setShowNonMaxLevel(root, value)
+function M.setMaxLevelOnly(root, value)
     if type(root) ~= "table" or type(value) ~= "boolean" then return end
     root.settings = type(root.settings) == "table" and root.settings or {}
-    root.settings.roleOverviewShowNonMaxLevel = value
+    root.settings.roleOverviewMaxLevelOnly = value
 end
 
 local function normalizeScale(value)
@@ -445,25 +456,25 @@ function M.BuildPanel(parent)
         y = M.characterOrderLayout(#M.characterOrderRows(root, family, Model), orderTop).lowerY
 
         -- This changes only the visible projection. Collection and saved
-        -- snapshots continue unchanged, so hidden alts reappear immediately
-        -- when enabled or after reaching the current client's max level.
+        -- snapshots continue unchanged, so filtered alts reappear immediately
+        -- when the box is cleared or after reaching the current client's max level.
         local showNonMaxCheck = CreateFrame("CheckButton", nil, parent, "ChatConfigCheckButtonTemplate")
         showNonMaxCheck:SetSize(30, 30)
         showNonMaxCheck:SetPoint("TOPLEFT", parent, 20, y)
         showNonMaxCheck.Text:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
-        showNonMaxCheck.Text:SetText(L["显示非满级角色"])
+        showNonMaxCheck.Text:SetText(L["只看满级角色"])
         showNonMaxCheck.Text:SetWordWrap(false)
         showNonMaxCheck.Text:SetWidth(180)
         showNonMaxCheck:SetHitRectInsets(0, -showNonMaxCheck.Text:GetWidth(), 0, 0)
-        local function updateShowNonMaxLevel()
-            showNonMaxCheck:SetChecked(M.showNonMaxLevel(root))
+        local function updateMaxLevelOnly()
+            showNonMaxCheck:SetChecked(M.maxLevelOnly(root))
         end
-        updateShowNonMaxLevel()
+        updateMaxLevelOnly()
         showNonMaxCheck:SetScript("OnClick", function(self)
-            M.setShowNonMaxLevel(root, self:GetChecked() and true or false)
+            M.setMaxLevelOnly(root, self:GetChecked() and true or false)
             refresh()
         end)
-        showNonMaxCheck:SetScript("OnShow", updateShowNonMaxLevel)
+        showNonMaxCheck:SetScript("OnShow", updateMaxLevelOnly)
         y = y - 40
 
         -- Disabling the module stops collection and refresh; no data is

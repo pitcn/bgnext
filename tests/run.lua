@@ -1,5 +1,16 @@
 local T = dofile("tests/testlib.lua")
 local suites = {
+    "tests/test_forever_short_key_cleanup.lua",
+    "tests/test_own_character_cache_identity.lua",
+    "tests/test_forever_currencies.lua",
+    "tests/test_forever_profession_cooldowns.lua",
+    "tests/test_forever_activities.lua",
+    "tests/test_forever_feature_entries.lua",
+    "tests/test_item_api_namespace.lua",
+    "tests/test_main_frame_error_reporting.lua",
+    "tests/test_forever_tooltip_hooks.lua",
+    "tests/test_forever_client_compat.lua",
+    "tests/test_forever_raids.lua",
     "tests/test_auction_log_filter.lua",
     "tests/test_titan_weeklies.lua",
     "tests/test_wishlist_browse.lua",

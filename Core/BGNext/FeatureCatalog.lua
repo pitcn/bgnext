@@ -11,7 +11,7 @@ local groups = {
 }
 
 local allClients = {
-    vanilla = true, tbc = true, wrath = true, cata = true,
+    vanilla = true, forever = true, tbc = true, wrath = true, cata = true,
     titan = true, mop = true, retail = true,
 }
 

@@ -343,6 +343,7 @@ return function(test)
 
         -- --- Load and initialise the real module ------------------------------
 
+        dofile("Core/BGNext/ClientCompat.lua")
         local chunk = assert(loadfile("Core/Module/Auction.lua"))
         chunk("BGNEXT", ns)
         for _, fn in ipairs(initCallbacks) do fn() end

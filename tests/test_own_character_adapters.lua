@@ -68,9 +68,9 @@ return function(test)
 
     -- Every declared family is covered.
     local families = Adapters.families
-    test.eq(#families, 7, "seven client families are declared")
+    test.eq(#families, 8, "eight client families are declared")
     local expectedFamilies = {
-        vanilla = true, tbc = true, wrath = true, titan = true,
+        vanilla = true, forever = true, tbc = true, wrath = true, titan = true,
         cata = true, mop = true, retail = true,
     }
     for _, family in ipairs(families) do

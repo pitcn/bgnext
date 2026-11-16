@@ -367,6 +367,61 @@ return function(test)
         test.eq(wrapped.capacity, 24, "the wrapped height yields 24 rows")
         test.eq(main.rows[24].shown, true, "rows within the wrapped capacity stay visible")
         test.eq(main.rows[25].shown, false, "rows beyond the wrapped capacity are hidden")
+
+        -- Exercise real scheme storage through the page's actual callbacks.
+        -- Forever still uses the existing vanilla price namespace: preserve it
+        -- so old schemes remain visible without a migration.
+        local store = dofile("Core/BGNext/AuctionPriceStore.lua")
+        BG.IsVanilla = true
+        local function buildPricePage(forever, globalPrice)
+            BG.IsForever = forever
+            BG.BGNext.DB = {}
+            BiaoGe.Auction.money = globalPrice
+            BG.PricePresetMainFrame = nil
+            ui = assert(loadfile("Core/BGNext/AuctionPriceUI.lua"))("BGNEXT", { L = {} })
+            initCallback()
+            main = BG.PricePresetMainFrame
+            main:Show()
+            return BG.BGNext.DB.leaderAuctionPricePresets.vanilla.ICC
+        end
+        local function createScheme()
+            for _, button in ipairs(main.toolbar.children) do
+                if button.text == "新建" then
+                    button.scripts.OnClick(button)
+                    StaticPopupDialogs.BGNEXT_AUCTION_PRICE_EDIT.OnAccept({
+                        editBox = { GetText = function() return "New scheme" end },
+                    })
+                    return
+                end
+            end
+            error("new scheme button missing")
+        end
+
+        local normal = buildPricePage(false, 100)
+        test.eq(normal.presets.p1.basePrice, 100, "ordinary vanilla default remains 100g")
+        createScheme()
+        test.eq(normal.presets.p2.basePrice, 100, "ordinary vanilla new scheme remains 100g")
+        local customNormal = buildPricePage(false, 777)
+        test.eq(customNormal.presets.p1.basePrice, 777, "other clients still inherit their local global price")
+        local forever = buildPricePage(true, 100)
+        test.eq(forever.presets.p1.basePrice, 10, "Forever fresh default is 10g despite legacy global 100g")
+        createScheme()
+        test.eq(forever.presets.p2.basePrice, 10, "Forever new scheme starts at 10g")
+        for _, savedPrice in ipairs({ 0, 37, 100 }) do
+            store.setBasePrice(BG.BGNext.DB, "vanilla", "ICC", "p1", savedPrice)
+            store.selectPreset(BG.BGNext.DB, "vanilla", "ICC", "p1")
+            main:Hide()
+            main:Show()
+            test.eq(forever.presets.p1.basePrice, savedPrice, "reopen preserves saved base " .. savedPrice)
+            ui.openLeaderPriceEditor(1001, "ICC")
+            test.eq(forever.presets.p1.basePrice, savedPrice, "shortcut preserves saved base " .. savedPrice)
+        end
+        test.eq(BiaoGe.Auction.money, 100, "scheme defaults never overwrite global auction price")
+        BiaoGe.Auction.money = 777
+        createScheme()
+        test.eq(forever.presets.p3.basePrice, 10, "new Forever scheme is independent of custom global price")
+        test.eq(forever.presets.p1.basePrice, 100, "creating a scheme leaves existing 100g untouched")
+        test.eq(BiaoGe.Auction.money, 777, "custom global price is preserved")
     end)
 
     for _, name in ipairs(watchedGlobals) do

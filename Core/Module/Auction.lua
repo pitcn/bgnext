@@ -1,5 +1,7 @@
 if BG.IsBlackListPlayer then return end
 local AddonName, ns = ...
+local GetItemQualityColor = function(...) local api = _G.GetItemQualityColor or (C_Item and C_Item.GetItemQualityColor); if api then return api(...) end end
+local GetItemInfo = function(...) local api = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo); if api then return api(...) end end
 
 local LibBG         = ns.LibBG
 local L             = ns.L
@@ -758,14 +760,11 @@ BG.Init(function()
         -- ALT点击背包生效
         local function func(self, button)
             if not IsAltKeyDown() then return end
-            local link = C_Container.GetContainerItemLink(self:GetParent():GetID(), self:GetID())
+            local link = BG.BGNext.ClientCompat.bagLink(self, _G)
+            if not link then return end
             BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "backpack" })
         end
-        if BG.IsRetail then
-            hooksecurefunc("ContainerFrameItemButton_OnClick", func)
-        else
-            hooksecurefunc("ContainerFrameItemButton_OnModifiedClick", func)
-        end
+        BG.BGNext.ClientCompat.hookBagEvent("click", func, _G, BG.IsRetail)
     end
 
     -- 插件版本

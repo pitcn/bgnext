@@ -1,5 +1,17 @@
 # BGNext data inventory
 
+## Forever client catalog (2026-11-13)
+
+The existing own-character snapshot and settings maps additionally accept the
+`forever` client-family key, isolated from `vanilla`. Existing ledger/wishlist
+keys additionally include `UBRSforever`, `BDforever`, `HSforever`, and
+`ONYforever`. These are catalog identifiers, not new player fields. Only the
+logged-in character's existing whitelisted data and opt-in raid-lock state are
+read. Later currency additions are documented below. Existing local
+storage, retention, clear controls, seven-day settlement limit and recipients
+remain unchanged; no new message or external transmission is introduced.
+
+
 BGNext stores new data only under the existing local SavedVariables namespace `BiaoGe.BGNext`. No field listed here is transmitted outside the game. Existing BGLite fields outside this namespace are not migrated, searched, aggregated, or exposed by BGNext enhancement modules. The sole cleanup exception is a direct existence check and user-confirmed deletion of the four legacy history roots described below; their contents are never traversed.
 
 | Field | Subject/source | Purpose | Storage and retention | Recipients | User control | Risk |
@@ -9,7 +21,8 @@ BGNext stores new data only under the existing local SavedVariables namespace `B
 | `settings.uiTheme` | Explicit user choice (`classic` or `preview`) | Select the reversible ledger appearance; absence and invalid values behave as `classic` and are not migrated automatically | Local until changed or all BGNext data is cleared | None | Appearance settings buttons / existing full reset | Low |
 | `settings.roleOverviewEnabled` | User toggle | Enable/disable the own-character overview module; disables collection and refresh, deletes nothing | Local until changed or cleared | None | Settings checkbox | Low |
 | `settings.roleOverviewScale` | Explicit user scale choice; finite positive number bounded to 0.5–1.5 with 0.01 steps | Size only the own-character overview and hover preview; default 1 without writing absent/invalid settings; screen fit limits actual scale without overwriting the preference | Local until changed, reset to 1, or all BGNext data is cleared | None | Role overview scale slider / reset button | Low |
-| `settings.roleOverviewShowNonMaxLevel` | Explicit user display choice, boolean only | Show locally stored non-max-level own characters in the role overview; absence and invalid values keep them hidden | Local until changed or all BGNext data is cleared; never deletes snapshots | None | Role overview settings checkbox | Low |
+| `settings.roleOverviewShowNonMaxLevel` | Legacy explicit user display choice, boolean only | Read-only fallback when the new key is absent/invalid: false means max-level-only; true, absence and malformed values show all levels. The old checkbox wrote only on clicks, so absence means untouched rather than an explicit opt-out | Existing local SavedVariables until all BGNext data is cleared; never rewritten by migration, never deletes snapshots | None | New max-level-only checkbox overrides this legacy preference | Low |
+| `settings.roleOverviewMaxLevelOnly` | Current user's explicit local display preference, boolean only | Filter the own-character overview to max-level characters only when true; default false shows leveling characters. A valid new value overrides the legacy key. Reads do not write migration data | Local `BiaoGe.BGNext.settings` until changed or all BGNext data is cleared; does not change snapshot retention | None | Settings → Role Overview → Max-Level Characters Only; clearing restores all levels immediately | Low: display preference only, no player profile, message, export or external transmission |
 | `settings.features[featureId]` | Explicit user choice, boolean only | Enable or hide optional BGNext feature domains and select the reversible Full/Basic/Custom mode; required compatibility, safety, lifecycle and privacy features cannot be disabled | Local until changed, reset, or all BGNext data is cleared; disabling a feature does not delete its data | None | Feature Management settings | Low |
 | `settings.roleOverviewPoint` | Window anchor (point, relativePoint, x, y only) | Restore the overview window position; frame references are never written | Local until moved or cleared | None | Drag window | Low |
 | `roleOverviewColumns[clientFamily][section][columnId]` | User-hidden column choices, booleans only | Per-family column visibility | Local until reset or cleared | None | Settings checkboxes/reset | Low |
@@ -58,6 +71,54 @@ Return-marker records may contain only `tradeIndex`, `itemId`, `boss`, `slot`, `
 The Storage & Privacy settings page may check only whether each of those four top-level keys exists. It does not inspect their values. Nothing is deleted during login, upgrade, reload, detection, or cancellation. Only after the player selects “清理 BGNext 中的旧历史数据” and accepts a second irreversible-action warning are those exact four keys set to `nil`. Current bills, settings, wishlists, current-settlement records, and own-character overview data are outside the deletion whitelist and remain untouched. The cleanup creates no replacement copy or persistent marker and sends no message.
 
 ## Own-character overview data
+
+Identity/cache repair (2026-11-16, surname follow-up): on Forever, the logged-in
+`UnitName("player")` first-name/surname tuple supplies the complete space-separated
+`player` and innermost `ownCharacters` key, ahead of an init-time identity that
+may have lost its surname. Letter case follows the live tuple. A complete
+`GetUnitName` or validated init key remains a fallback; a short display/init key
+alone is rejected when the full-name API exists. Without that API, the legacy
+UnitName-only reader remains available. No realm is inferred from the surname.
+Only equivalent COMPLETE own-character names (ASCII case and space/hyphen
+variants) coalesce within the same family/realm; known class mismatches abstain.
+Forever invalid-single-name cleanup (2026-11-16 r3, explicitly requested):
+`DataLifecycle.ensureRoot` runs the migration only when `BG.IsForever` is set,
+including when overview collection is disabled or the live name is unavailable.
+Within `ownCharacters.forever`, it removes character records whose key has no
+whitespace or hyphen, and whose `player` and `realmId` match their storage keys.
+Their nested raid completion/activity snapshots disappear with the record; there
+is no separate per-character completion store. The matching single-name entries
+in `roleOverviewCharacterOrder.forever` are removed, including orphan references.
+`equipmentFilters` has no family dimension: only the current Forever realm and
+realms evidenced by Forever character records or ordering identities are visited.
+Only single-name entries with the established character-state `profiles`/`order`
+table shape are removed there, including filter-only orphan keys. Complete
+space/hyphen names, their filter profiles, metadata fields, other family subtrees
+and unrelated realms remain unchanged. Non-Forever loads do not run this cleanup.
+No backup, migration marker, persistent field, message or recipient is added.
+Deletion is idempotent and irreversible: these invalid snapshots may contain
+mixed observations from multiple surnames, so none of their data is merged into
+a complete identity. Valid observations must come from logging into that character.
+Other families retain the prior unique-candidate short-key migration using
+existing own snapshot/filter keys; unknown or multiple possible owners abstain.
+Surviving filter rules are neither copied nor changed. Complete aliases preserve missing
+equipment slots and update saved ordering references. No identity field, history,
+recipient, other-player read, or old BiaoGe migration is added. Storage remains
+local last-seen snapshots under the existing per-character/family/all controls;
+the migration risk is discarding an invalid first-name record, never assigning
+its potentially mixed observations to a valid character. This narrow cleanup
+supersedes r2's retention of ambiguous Forever single-name rows only.
+
+An observed equipment link survives a cold item cache. Each slot keeps its last
+observation until a new link replaces it or the user clears the character;
+missing cache fields are filled from the same link only. A temporarily missing
+slot cannot erase an existing observation; an empty slot cannot currently be
+distinguished from an unavailable inventory response and may remain last-seen.
+`GET_ITEM_INFO_RECEIVED` requests an equipment-only scan. Incomplete scans also
+get at most three delayed retries (2/4/8 seconds), using `C_Timer.After` or a
+temporary frame `OnUpdate` callback. Retry counters/tokens exist in memory only,
+do not restore cleared characters, and stop after disabling or identity change.
+All data remains local with the existing per-character/family/all clear controls.
 
 Titan weeklies add `activityStates.raidWeekly` and `activityStates.zgWeekly` to the existing own-character snapshot, each allowing only `status`, `observedAt`, and the official weekly `resetsAt`. The source is the logged-in player's quest completion flags and `C_DateAndTime.GetSecondsUntilWeeklyReset`; fixed public quest identifiers are declared in source and independently checked against Blizzard QuestV2 data, with the primary-data evidence in docs/maintenance/titan-weekly-data.json. They are not saved in per-character records. No task title, quest log, other-player state, new raw payload or recipient is stored. Missing/abnormal completion or reset evidence remains unknown. Current-character events and the existing visible maintenance ticker perform scoped activity refreshes; offline rows expire without being queried, disabling stops collection, and old snapshots are not migrated. The memory-only Titan activity deadline now covers both profession dailies and weeklies. Existing gold, token counts, daily states, wishes and welcome settings remain intact.
 
@@ -112,3 +173,9 @@ Equipment-filter profiles are not read from or migrated into the legacy `BiaoGe.
 The leader starting-price schemes (`leaderAuctionPricePresets`) and per-character personal expectations (`personalAuctionExpectations`) are local-only: neither field has recipients, is transmitted, or is aggregated across raids or sessions, and neither keeps a history. Prefill reads these fields and writes into the existing auction/bid input boxes only. Opening the auction window remains manual; the explicit leader gesture Alt+right-click may reuse the existing validated start button after the preset has been written, while an unresolved price leaves the window open without starting. Import/export uses only manual, previewed, cancellable copy/paste text (`BGNP-L1` / `BGNP-P1`). Leader import additionally accepts the previous BGLite one-raid price string as a one-way compatibility input and converts it into a sanitized BGNext scheme; BGNext never exports that legacy format. These paths never call clipboard, HTTP, telemetry, or chat APIs. The retired `BiaoGe.BGNext.auctionPresets` field is never read or migrated.
 
 The leader pending-auction queue (待拍队列) is memory-only and scoped to the current session and current raid table. Its rows hold only the queued item id, quantity and resolved starting-price source, and it writes no SavedVariables field, no history and no cross-raid aggregate. Resolving a row's expected starting price only reads the active leader scheme read-only (never writes it back), and a price the runtime cannot resolve requires an explicit manual entry before the row can be confirmed. Every confirmed row is sent through the existing `BG.StartAuction` path, so no new auction protocol, chat message or background polling is introduced. The queue is discarded on raid leave, table clear or reload.
+
+Forever own-character overview adds `activityStates.bootyBayWeekly` with only `status`, `observedAt`, and the official weekly `resetsAt`. The public quest IDs 96075/96076/96087/96088 are a shared completion rotation and stay in the catalog, never in character records. Only the logged-in player is queried. Current-player quest events and one visible reset refresh update this field; offline rows only expire. There is no separate Booty Bay daily: the user-supplied quest was confirmed to be weekly.
+
+Forever declares five `professionCooldowns` keys: `transmute` (shared category 310: Arcanite, Legionite, essences, elemental fire), `mooncloth`, `saltShaker`, `ironToGold`, and `mithrilToTruesilver`. Each stores only `ready` or `endsAt`. Spell timers require a learned recipe; Salt Shaker requires learned Leatherworking and ownership of public item 15846, then reads its item cooldown. Item count is checked transiently and is not stored. No cooldown duration is hardcoded. Existing debounced profession/bag events update only relevant sections. No messages, history, external service, account scan, migration or other-player data is introduced.
+
+Forever currency columns (2026-11-15): `currencies.undermineReal` reads public currency 3469 and is visible by default. `currencies.honorPoints` (1792) and `currencies.merchantsFavor` (3402) are optional columns hidden by default. Only the logged-in character's current numeric balance is retained in the existing own-character snapshot; declaration authorizes collection independent of column visibility, as for existing resource columns. No earnings/spending history or currency API payload is stored. Existing currency-update events, feature disable/clear controls and per-family visibility preferences apply. IDs/names are independently confirmed in local Blizzard CurrencyTypes for wowf/CN/zhCN/1.60.1.70938; no other currencies are added.

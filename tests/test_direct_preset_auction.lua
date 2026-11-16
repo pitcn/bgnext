@@ -23,7 +23,7 @@ return function(test)
         "SlashCmdList", "StaticPopupDialogs", "StaticPopup_Hide", "StaticPopup_Show",
         "StaticPopup_Visible", "hooksecurefunc", "LibStub", "UnitInRaid", "IsAltKeyDown",
         "UpdateFrame", "ClearAllFocus", "wipe", "unpack", "random", "YES", "NO",
-        "InCombatLockdown",
+        "InCombatLockdown", "ContainerFrameItemButton_OnModifiedClick",
     }
     -- WoW stat/item globals that function2.lua reads at load time, plus the extra
     -- globals the real chat and table callers need. These are saved and restored
@@ -399,6 +399,7 @@ return function(test)
         setGlobal("StaticPopup_Show", function() end)
         setGlobal("StaticPopup_Visible", function() return nil end)
         setGlobal("hooksecurefunc", function(name, func) hookedFuncs[#hookedFuncs + 1] = { name = name, func = func } end)
+        setGlobal("ContainerFrameItemButton_OnModifiedClick", function() end)
         setGlobal("LibStub", function()
             return { PixelGlow_Start = function() end, PixelGlow_Stop = function() end }
         end)
@@ -471,6 +472,7 @@ return function(test)
         -- wrappers then wrap it inside their own Init callbacks (registered later,
         -- so they run after the original is defined). AuctionQueueRuntime is the
         -- outermost layer.
+        dofile("Core/BGNext/ClientCompat.lua")
         assert(loadfile("Core/Module/Auction.lua"))("BGNEXT", ns)
         assert(loadfile("Core/BGNext/AuctionPriceRuntime.lua"))("BGNEXT", ns)
         dofile("Core/BGNext/AuctionQueue.lua")

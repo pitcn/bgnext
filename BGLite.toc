@@ -1,4 +1,4 @@
-## Interface: 11508, 11509, 20506, 30405, 38002, 40402, 50503, 50504, 50505, 120005, 120007, 120100
+## Interface: 11508, 11509, 16001, 20506, 30405, 38002, 40402, 50503, 50504, 50505, 120005, 120007, 120100
 ## Title: <BGNext> |cff00BFFFBGNext|r 金团表格
 ## Notes: /bgn or /bgnext
 ## IconTexture: Interface\AddOns\BGNext\Media\icon\icon.tga
@@ -6,7 +6,7 @@
 ## X-Upstream-Author: CQZS (Lite)
 ## X-Project: BGNext
 ## X-Upstream: BGLite 2.4.2
-## X-BGNext-Version: 0.8.16
+## X-BGNext-Version: 0.8.17
 ## LoadOnDemand: 0
 ## SavedVariables: BiaoGe
 ## Version: 2.4.2
