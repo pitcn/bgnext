@@ -80,17 +80,33 @@ alone is rejected when the full-name API exists. Without that API, the legacy
 UnitName-only reader remains available. No realm is inferred from the surname.
 Only equivalent COMPLETE own-character names (ASCII case and space/hyphen
 variants) coalesce within the same family/realm; known class mismatches abstain.
-Forever short-name snapshots are retained unchanged even with a matching class:
-they may already contain observations from multiple surnames and cannot recover
-automatically. The user can delete the ambiguous row through the existing
-confirmed in-addon control and re-login to each character to observe it afresh.
+Forever invalid-single-name cleanup (2026-11-16 r3, explicitly requested):
+`DataLifecycle.ensureRoot` runs the migration only when `BG.IsForever` is set,
+including when overview collection is disabled or the live name is unavailable.
+Within `ownCharacters.forever`, it removes character records whose key has no
+whitespace or hyphen, and whose `player` and `realmId` match their storage keys.
+Their nested raid completion/activity snapshots disappear with the record; there
+is no separate per-character completion store. The matching single-name entries
+in `roleOverviewCharacterOrder.forever` are removed, including orphan references.
+`equipmentFilters` has no family dimension: only the current Forever realm and
+realms evidenced by Forever character records or ordering identities are visited.
+Only single-name entries with the established character-state `profiles`/`order`
+table shape are removed there, including filter-only orphan keys. Complete
+space/hyphen names, their filter profiles, metadata fields, other family subtrees
+and unrelated realms remain unchanged. Non-Forever loads do not run this cleanup.
+No backup, migration marker, persistent field, message or recipient is added.
+Deletion is idempotent and irreversible: these invalid snapshots may contain
+mixed observations from multiple surnames, so none of their data is merged into
+a complete identity. Valid observations must come from logging into that character.
 Other families retain the prior unique-candidate short-key migration using
 existing own snapshot/filter keys; unknown or multiple possible owners abstain.
-Filter rules are neither copied nor changed. Complete aliases preserve missing
+Surviving filter rules are neither copied nor changed. Complete aliases preserve missing
 equipment slots and update saved ordering references. No identity field, history,
 recipient, other-player read, or old BiaoGe migration is added. Storage remains
 local last-seen snapshots under the existing per-character/family/all controls;
-the risk is an extra ambiguous legacy row, preferable to misassigned data.
+the migration risk is discarding an invalid first-name record, never assigning
+its potentially mixed observations to a valid character. This narrow cleanup
+supersedes r2's retention of ambiguous Forever single-name rows only.
 
 An observed equipment link survives a cold item cache. Each slot keeps its last
 observation until a new link replaces it or the user clears the character;

@@ -24,6 +24,53 @@ local function emptySettlement()
     }
 end
 
+-- Forever requires a surname. Discard ambiguous first-name observations,
+-- never transfer them to a guessed complete identity. Work only at known
+-- character boundaries; snapshot fields and filter profile names are not keys.
+local function pruneForeverShortKeys(root)
+    local function singleName(name)
+        return type(name) == "string" and name:match("^[^%s%-]+$") ~= nil
+    end
+    local function realmKey(value)
+        return type(value) == "number" or (type(value) == "string" and value ~= "")
+    end
+    local realms = {}
+    if realmKey(BG.realmID) then realms[BG.realmID] = true end
+    local family = root.ownCharacters.forever
+    for realmId, characters in pairs(type(family) == "table" and family or {}) do
+        if realmKey(realmId) and type(characters) == "table" then
+            for player, snapshot in pairs(characters) do
+                if type(snapshot) == "table" and snapshot.player == player
+                    and snapshot.realmId == realmId then
+                    realms[realmId] = true
+                    if singleName(player) then characters[player] = nil end
+                end
+            end
+        end
+    end
+    local order = root.roleOverviewCharacterOrder.forever
+    if type(order) == "table" then
+        for index = #order, 1, -1 do
+            local entry = order[index]
+            if type(entry) == "table" and realmKey(entry.realmId) and type(entry.player) == "string" then
+                realms[entry.realmId] = true
+                if singleName(entry.player) then table.remove(order, index) end
+            end
+        end
+    end
+    -- Filters have no family dimension: touch only realms evidenced above or
+    -- the current Forever realm, and only the established character-state shape.
+    for realmId in pairs(realms) do
+        local filters = root.equipmentFilters[realmId]
+        for player, state in pairs(type(filters) == "table" and filters or {}) do
+            if singleName(player) and type(state) == "table"
+                and type(state.profiles) == "table" and type(state.order) == "table" then
+                filters[player] = nil
+            end
+        end
+    end
+end
+
 function M.ensureRoot(saved)
     saved.BGNext = type(saved.BGNext) == "table" and saved.BGNext or {}
     local root = saved.BGNext
@@ -34,6 +81,7 @@ function M.ensureRoot(saved)
     root.ownCharacters = type(root.ownCharacters) == "table" and root.ownCharacters or {}
     root.roleOverviewCharacterOrder = type(root.roleOverviewCharacterOrder) == "table"
         and root.roleOverviewCharacterOrder or {}
+    if BG.IsForever then pruneForeverShortKeys(root) end
     root.leaderAuctionPricePresets = type(root.leaderAuctionPricePresets) == "table"
         and root.leaderAuctionPricePresets or {}
     root.personalAuctionExpectations = type(root.personalAuctionExpectations) == "table"
