@@ -71,6 +71,29 @@ The Storage & Privacy settings page may check only whether each of those four to
 
 ## Own-character overview data
 
+Identity/cache repair (2026-11-16): `player` and the innermost `ownCharacters`
+key use the exact logged-in `BG.playerName` identity also used by equipment
+filters (with the live `GetUnitName("player", true)` reader as fallback).
+Client-specific separators are preserved. Only BGNext's own short-key snapshots
+are relocated, within the same family and realm bucket, when the current
+identity or existing full snapshot/filter keys leave one possible owner.
+Known class mismatches exclude candidates; unknown or multiple possible owners
+are retained unchanged. Filter rules are neither copied nor changed. Existing
+aliases coalesce into one latest snapshot, preserving missing equipment slots;
+saved ordering references follow the relocated key. This adds no identity field,
+history, recipient, other-player read, or old BiaoGe migration.
+
+An observed equipment link survives a cold item cache. Each slot keeps its last
+observation until a new link replaces it or the user clears the character;
+missing cache fields are filled from the same link only. A temporarily missing
+slot cannot erase an existing observation; an empty slot cannot currently be
+distinguished from an unavailable inventory response and may remain last-seen.
+`GET_ITEM_INFO_RECEIVED` requests an equipment-only scan. Incomplete scans also
+get at most three delayed retries (2/4/8 seconds), using `C_Timer.After` or a
+temporary frame `OnUpdate` callback. Retry counters/tokens exist in memory only,
+do not restore cleared characters, and stop after disabling or identity change.
+All data remains local with the existing per-character/family/all clear controls.
+
 Titan weeklies add `activityStates.raidWeekly` and `activityStates.zgWeekly` to the existing own-character snapshot, each allowing only `status`, `observedAt`, and the official weekly `resetsAt`. The source is the logged-in player's quest completion flags and `C_DateAndTime.GetSecondsUntilWeeklyReset`; fixed public quest identifiers are declared in source and independently checked against Blizzard QuestV2 data, with the primary-data evidence in docs/maintenance/titan-weekly-data.json. They are not saved in per-character records. No task title, quest log, other-player state, new raw payload or recipient is stored. Missing/abnormal completion or reset evidence remains unknown. Current-character events and the existing visible maintenance ticker perform scoped activity refreshes; offline rows expire without being queried, disabling stops collection, and old snapshots are not migrated. The memory-only Titan activity deadline now covers both profession dailies and weeklies. Existing gold, token counts, daily states, wishes and welcome settings remain intact.
 
 Wishlist slot browsing adds no persistent field: mode, selected equipment category, candidate/source rows, pagination, requested item IDs and cancellable cache-refresh timer exist only in memory. It reads the current raid's already loaded direct-drop arrays and Blizzard item metadata, reuses the current player's original wishlist add/remove paths, and never promotes exchange products into direct drops. Unknown metadata remains visible in an unclassified group. Only a visible enabled page responds to item-cache events; hidden/changed scope rejects stale callbacks and clicks. Original store capacity and duplicate protection apply, and import/clear/original add/remove paths update visible selection markers. It exports or sends nothing and does not migrate the saved wishlist.

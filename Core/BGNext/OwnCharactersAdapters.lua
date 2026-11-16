@@ -199,7 +199,12 @@ end
 --------------------------------------------------------------------------
 
 function M.readPlayerName(api)
-    local name = M.safeCall(api and api.UnitName, "player")
+    local name = M.safeCall(api and api.GetUnitName, "player", true)
+    -- A temporarily unavailable full identity must not fall back to a colliding
+    -- short key. UnitName remains only for clients without GetUnitName at all.
+    if type(api and api.GetUnitName) ~= "function" then
+        name = M.safeCall(api and api.UnitName, "player")
+    end
     if type(name) ~= "string" or name == "" then return nil end
     return name
 end
@@ -488,7 +493,9 @@ function M.readEquipment(api)
                 end
             end
 
-            if itemId or itemLevel or quality or icon then
+            -- The inventory link is already a valid observation, even before
+            -- the item cache (or GetItemInfoInstant on older clients) is ready.
+            if link then
                 slots[slot] = {
                     itemId = itemId,
                     itemLevel = itemLevel,
