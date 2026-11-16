@@ -184,7 +184,7 @@ do -- BGNext 0.8.10 release text
     L["练级角色被满级过滤隐藏时，空列表会提示原因和取消勾选的位置。"] = "When the max-level filter hides leveling characters, the empty list explains why and where to clear the option."
     L["无限服新建拍卖价格方案的基础价默认为10g，已有方案价格不变。"] = "New Forever auction price schemes now start at a 10g base price; existing schemes keep their prices."
     ns.updateText_now = {
-        "BGNext 0.8.17",
+        "BGNext 0.8.17 无限服版",
         L["新增无限服（Interface 16001）适配基础：团本目录、角色总览活动和货币列；尚未完成游戏内实测。"],
         L["无限服角色总览现在完整识别带姓氏的角色名，并保留已缓存的装备，避免角色混淆或装备栏位丢失。"],
         L["角色总览默认显示练级角色，新增“只看满级角色”开关；此前主动选择隐藏的设置会保留。"],

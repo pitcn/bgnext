@@ -154,7 +154,7 @@ return function(test)
             test.eq(type(rawget(localized.L, key)), "string", "profession daily text is explicitly translated: " .. key)
         end
         test.eq(type(localized.updateText_now), "table", "current in-game update notes are available")
-        test.eq(localized.updateText_now[1], "BGNext 0.8.17", "current in-game update notes use the release version")
+        test.eq(localized.updateText_now[1], "BGNext 0.8.17 无限服版", "current in-game update notes use the release version")
         for index, value in ipairs(localized.updateText_now) do
             test.eq(type(value), "string", "current in-game update note is text at index " .. index)
         end
