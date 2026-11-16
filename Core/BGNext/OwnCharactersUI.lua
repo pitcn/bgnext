@@ -388,13 +388,19 @@ function M.layout(projection)
     local raid = layoutSection(projection.raid, "raid", top)
     local resource = layoutSection(projection.resource, "resource", raid.bottom - metrics.sectionGap)
 
+    local emptyText = L["尚无本地角色记录，登录角色后自动记录。"]
+    local hidden = projection.hiddenByLevelCount
+    if projection.unsupported == true then
+        emptyText = L["该版本角色总览适配中。"]
+    elseif projection.isEmpty == true and type(hidden) == "number" and hidden > 0 then
+        emptyText = string.format(L["已记录 %d 个未满级角色，默认隐藏。可在“设置 → 角色总览”勾选“显示非满级角色”。"], hidden)
+    end
+
     return {
         width = projection.width,
         height = projection.height,
         isEmpty = projection.isEmpty == true,
-        emptyText = projection.unsupported == true
-            and L["该版本角色总览适配中。"]
-            or L["尚无本地角色记录，登录角色后自动记录。"],
+        emptyText = emptyText,
         characterCount = projection.characterCount,
         sections = { raid, resource },
     }

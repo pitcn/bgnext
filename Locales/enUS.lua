@@ -2047,6 +2047,7 @@ do
     L["中键或 Ctrl+左键固定，按住 Shift 显示全部服务器"] = "Middle-click or Ctrl+Left-click to pin, hold Shift for all realms"
     L["合计"] = "Total"
     L["尚无本地角色记录，登录角色后自动记录。"] = "No local characters yet. Log into a character to record it."
+    L["已记录 %d 个未满级角色，默认隐藏。可在“设置 → 角色总览”勾选“显示非满级角色”。"] = "%d non-max-level character(s) recorded but hidden by default. Enable \"Show Non-Max-Level Characters\" in Settings → Role Overview."
     L["|cffffffff< UI缩放 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的大小"] = "|cffffffff< UI Zoom >|r|cff808080 (right-click to restore settings)|r\n\n1, 'Improved Gouge' Form UI size"
     L["|cffffffff< UI透明度 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的透明度"] = "|cffffffff< UI Transparency >|r|cff808080 (right-click to restore settings)|r\n\n1, 'Improved Gouge' Form UI Transparency"
     L["UI透明度"] = "UI Transparency"

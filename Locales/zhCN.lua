@@ -1980,6 +1980,7 @@ do
     L["中键或 Ctrl+左键固定，按住 Shift 显示全部服务器"] = true
     L["合计"] = true
     L["尚无本地角色记录，登录角色后自动记录。"] = true
+    L["已记录 %d 个未满级角色，默认隐藏。可在“设置 → 角色总览”勾选“显示非满级角色”。"] = true
     L["|cffffffff< UI缩放 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的大小"] = true
     L["|cffffffff< UI透明度 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的透明度"] = true
     L["UI透明度"] = true
