@@ -4,14 +4,14 @@ return function(test)
     local info = dofile("Core/BGNext/ReleaseInfo.lua")
 
     test.eq(info.projectName, "BGNext", "project name")
-    test.eq(info.version, "0.8.17-forever", "BGNext version is independent")
+    test.eq(info.version, "0.8.17", "BGNext version is independent")
     test.eq(info.upstreamVersion, "2.4.2", "official upstream version remains disclosed")
     test.eq(info.protocolVersion, "2.4.0", "mixed-group protocol version remains compatible")
     test.eq(info.author, "国服社区共创", "community author")
     test.eq(info.official, false, "independent project")
     test.eq(type(info.changelog), "table", "local changelog")
     local changelogItems = table.concat(info.changelog, "\n")
-    for _, text in ipairs({ "无限服", "Interface 16001", "姓氏", "装备", "练级角色", "只看满级角色", "10g" }) do
+    for _, text in ipairs({ "无限服", "Interface 16001", "姓氏", "装备", "练级角色", "只看满级角色", "仅无限服默认显示练级角色", "其他客户端默认仍只显示满级角色", "10g" }) do
         test.eq(changelogItems:find(text, 1, true) ~= nil, true, "in-game release notes cover " .. text)
     end
     test.eq(type(info.history), "table", "historical release notes are available")
