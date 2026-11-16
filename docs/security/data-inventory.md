@@ -72,6 +72,54 @@ The Storage & Privacy settings page may check only whether each of those four to
 
 ## Own-character overview data
 
+Identity/cache repair (2026-11-16, surname follow-up): on Forever, the logged-in
+`UnitName("player")` first-name/surname tuple supplies the complete space-separated
+`player` and innermost `ownCharacters` key, ahead of an init-time identity that
+may have lost its surname. Letter case follows the live tuple. A complete
+`GetUnitName` or validated init key remains a fallback; a short display/init key
+alone is rejected when the full-name API exists. Without that API, the legacy
+UnitName-only reader remains available. No realm is inferred from the surname.
+Only equivalent COMPLETE own-character names (ASCII case and space/hyphen
+variants) coalesce within the same family/realm; known class mismatches abstain.
+Forever invalid-single-name cleanup (2026-11-16 r3, explicitly requested):
+`DataLifecycle.ensureRoot` runs the migration only when `BG.IsForever` is set,
+including when overview collection is disabled or the live name is unavailable.
+Within `ownCharacters.forever`, it removes character records whose key has no
+whitespace or hyphen, and whose `player` and `realmId` match their storage keys.
+Their nested raid completion/activity snapshots disappear with the record; there
+is no separate per-character completion store. The matching single-name entries
+in `roleOverviewCharacterOrder.forever` are removed, including orphan references.
+`equipmentFilters` has no family dimension: only the current Forever realm and
+realms evidenced by Forever character records or ordering identities are visited.
+Only single-name entries with the established character-state `profiles`/`order`
+table shape are removed there, including filter-only orphan keys. Complete
+space/hyphen names, their filter profiles, metadata fields, other family subtrees
+and unrelated realms remain unchanged. Non-Forever loads do not run this cleanup.
+No backup, migration marker, persistent field, message or recipient is added.
+Deletion is idempotent and irreversible: these invalid snapshots may contain
+mixed observations from multiple surnames, so none of their data is merged into
+a complete identity. Valid observations must come from logging into that character.
+Other families retain the prior unique-candidate short-key migration using
+existing own snapshot/filter keys; unknown or multiple possible owners abstain.
+Surviving filter rules are neither copied nor changed. Complete aliases preserve missing
+equipment slots and update saved ordering references. No identity field, history,
+recipient, other-player read, or old BiaoGe migration is added. Storage remains
+local last-seen snapshots under the existing per-character/family/all controls;
+the migration risk is discarding an invalid first-name record, never assigning
+its potentially mixed observations to a valid character. This narrow cleanup
+supersedes r2's retention of ambiguous Forever single-name rows only.
+
+An observed equipment link survives a cold item cache. Each slot keeps its last
+observation until a new link replaces it or the user clears the character;
+missing cache fields are filled from the same link only. A temporarily missing
+slot cannot erase an existing observation; an empty slot cannot currently be
+distinguished from an unavailable inventory response and may remain last-seen.
+`GET_ITEM_INFO_RECEIVED` requests an equipment-only scan. Incomplete scans also
+get at most three delayed retries (2/4/8 seconds), using `C_Timer.After` or a
+temporary frame `OnUpdate` callback. Retry counters/tokens exist in memory only,
+do not restore cleared characters, and stop after disabling or identity change.
+All data remains local with the existing per-character/family/all clear controls.
+
 Titan weeklies add `activityStates.raidWeekly` and `activityStates.zgWeekly` to the existing own-character snapshot, each allowing only `status`, `observedAt`, and the official weekly `resetsAt`. The source is the logged-in player's quest completion flags and `C_DateAndTime.GetSecondsUntilWeeklyReset`; fixed public quest identifiers are declared in source and independently checked against Blizzard QuestV2 data, with the primary-data evidence in docs/maintenance/titan-weekly-data.json. They are not saved in per-character records. No task title, quest log, other-player state, new raw payload or recipient is stored. Missing/abnormal completion or reset evidence remains unknown. Current-character events and the existing visible maintenance ticker perform scoped activity refreshes; offline rows expire without being queried, disabling stops collection, and old snapshots are not migrated. The memory-only Titan activity deadline now covers both profession dailies and weeklies. Existing gold, token counts, daily states, wishes and welcome settings remain intact.
 
 Wishlist slot browsing adds no persistent field: mode, selected equipment category, candidate/source rows, pagination, requested item IDs and cancellable cache-refresh timer exist only in memory. It reads the current raid's already loaded direct-drop arrays and Blizzard item metadata, reuses the current player's original wishlist add/remove paths, and never promotes exchange products into direct drops. Unknown metadata remains visible in an unclassified group. Only a visible enabled page responds to item-cache events; hidden/changed scope rejects stale callbacks and clicks. Original store capacity and duplicate protection apply, and import/clear/original add/remove paths update visible selection markers. It exports or sends nothing and does not migrate the saved wishlist.

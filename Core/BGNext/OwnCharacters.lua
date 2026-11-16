@@ -297,6 +297,21 @@ local function realmTable(root, clientFamily, realmId, create)
     return realm
 end
 
+-- Keep unobserved slots and cached fields of the SAME item. A changed link is
+-- a new observation and must not inherit the previous item's icon or level.
+local function mergeEquipment(previous, observed)
+    local merged = copyRecordMap(previous, EQUIPMENT_FIELDS) or {}
+    for slot, item in pairs(copyRecordMap(observed, EQUIPMENT_FIELDS) or {}) do
+        local old = merged[slot]
+        if old and type(item.link) == "string" and old.link == item.link then
+            for key, value in pairs(item) do old[key] = value end
+        else
+            merged[slot] = item
+        end
+    end
+    return next(merged) and merged or nil
+end
+
 -- Replaces the stored snapshot for one own character. Returns the stored copy,
 -- or nil when the input is not a usable own-character snapshot.
 function M.upsert(root, clientFamily, snapshot)
@@ -305,8 +320,90 @@ function M.upsert(root, clientFamily, snapshot)
     if not clean then return nil end
     local realm = realmTable(root, clientFamily, clean.realmId, true)
     if not realm then return nil end
+    local previous = realm[clean.player]
+    if type(previous) == "table" then
+        clean.equipment = mergeEquipment(previous.equipment, clean.equipment)
+    end
     realm[clean.player] = clean
     return clean
+end
+
+-- Repair only BGNext's own old short-name keys. Filter keys are identity hints
+-- only: no filter rules, other-player data or legacy BiaoGe records are copied.
+-- Forever only coalesces equivalent COMPLETE surname identities. A first name
+-- cannot prove ownership, even when its cached class matches today's player.
+-- Other clients abstain on a second possible owner (including unknown class).
+function M.migrateShortNames(root, clientFamily, current, shortName)
+    if type(current) ~= "table" then return end
+    local realm = realmTable(root, clientFamily, current.realmId, false)
+    if not realm then return end
+    local filters = type(root.equipmentFilters) == "table" and root.equipmentFilters[current.realmId]
+    local candidates = {}
+    local function add(name, class)
+        if type(name) ~= "string" then return end
+        if clientFamily == "forever" then
+            local function fullKey(value)
+                if type(value) ~= "string" then return nil end
+                local key = value:lower():gsub("%-", " ")
+                if not key:find(" ", 1, true) then return nil end
+                return key
+            end
+            local key = fullKey(name)
+            if name ~= current.player and key and key == fullKey(current.player) then
+                candidates[name] = { [current.player] = current.class or false }
+            end
+            return
+        end
+        local short = name:match("^([^%s%-]+)[%s%-]")
+        if name == current.player then short = shortName or short end
+        if not short or short == name then return end
+        candidates[short] = candidates[short] or {}
+        local known = candidates[short][name]
+        candidates[short][name] = class or known or false
+    end
+    for name, record in pairs(realm) do
+        add(name, type(record) == "table" and record.class or nil)
+    end
+    for name in pairs(type(filters) == "table" and filters or {}) do add(name) end
+    add(current.player, current.class)
+    for short, names in pairs(candidates) do
+        local old = realm[short]
+        if type(old) == "table" and old.player == short then
+            local target, count = nil, 0
+            for name, class in pairs(names) do
+                if not old.class or not class or old.class == class then
+                    target, count = name, count + 1
+                end
+            end
+            if count == 1 then
+                local moved = sanitize(old)
+                if moved then
+                    moved.player = target
+                    local existing = sanitize(realm[target])
+                    if type(existing) == "table" then
+                        -- Preserve the newer observation, filling only absent
+                        -- fields from its alias; equipment stays slot-merged.
+                        local newer, older = existing, moved
+                        if (moved.updatedAt or 0) > (existing.updatedAt or 0) then newer, older = moved, existing end
+                        local combined = {}
+                        for key, value in pairs(older) do combined[key] = value end
+                        for key, value in pairs(newer) do combined[key] = value end
+                        combined.player = target
+                        combined.equipment = mergeEquipment(older.equipment, newer.equipment)
+                        moved = sanitize(combined)
+                    end
+                    realm[target], realm[short] = moved, nil
+                    local order = type(root.roleOverviewCharacterOrder) == "table"
+                        and root.roleOverviewCharacterOrder[clientFamily]
+                    for _, entry in ipairs(type(order) == "table" and order or {}) do
+                        if type(entry) == "table" and entry.realmId == current.realmId and entry.player == short then
+                            entry.player = target
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 local SECTION_FIELDS = {

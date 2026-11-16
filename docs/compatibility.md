@@ -1,5 +1,31 @@
 # BGNext 兼容性矩阵
 
+Forever 两段名补充修复（2026-11-16）：当前角色的名、姓两项返回值组成完整
+空格键，优先于可能截短的初始化键。仅同一完整名的大小写/连字符别名归并；
+单段旧键不猜归属，需用户在插件内确认删除。两种姓氏、重复切换、完整别名、
+歧义短键、缺姓降级及两行投影由 Lua 模拟测试覆盖，尚未实机验证。
+同一版本源码证据 `wow-ui-source` / `forever` / tag `1.60.1` / commit
+`ca8368f2f2380cbe696854f7f2646387c278a61b`：
+`Interface/AddOns/Blizzard_UnitFrame/Mainline/UnitFrame.lua:1094` 的
+`GetUnitName` 委托给 NameUtil；
+`Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua:4` 与 `:23`
+使用 `UnitName` 的名、姓两项组成完整名。通用 NameUtil 的第二段按 realm
+分隔符处理，不能用该通用含义解释 Forever 姓氏。此为静态源码与受控接口
+证据，不证明当前游戏会话的 API 实际返回值或最终显示已通过验收。
+
+角色总览键与装备缓存修复（2026-11-16）：完整角色键、保守短键迁移、
+link 未缓存保留、槽位合并、物品信息事件及有界后备重试由 Lua 5.1
+模拟回归覆盖，尚未实机验证。版本化证据：`wow-ui-source`，product
+`forever`，tag `1.60.1`，commit
+`ca8368f2f2380cbe696854f7f2646387c278a61b`；
+`Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua:1815`
+声明 `GET_ITEM_INFO_RECEIVED`，
+`Interface/AddOns/Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua:11`
+声明 `C_Timer.After`。事件注册失败仍继续安装；缓存未完整时最多延迟重试
+三次，缺少计时器则临时使用帧 `OnUpdate`。静态 API 声明不等于实机事件
+已确认触发。暂时缺失与真正空槽未区分，旧槽位保留最后观察值，直到新 link
+替换或手动清空；不会生成装备历史。
+
 无限服（未发布）：同一 BGNext 包增加 Interface 16001 与独立 Forever 路由，P0 黑石塔上层、P1 深穴/海加尔峰/奥妮克希亚首领目录由自动化测试覆盖；名称及已知事件核对本地 wowf 1.60.1.70938。P0 掉落仅为初始装备参考，P1 掉落留空。角色总览单独隔离 Forever。未进行无限服游戏内加载、拾取、拍卖、清空或周锁验证，不宣称正式支持；P1 两个新团本的完整事件行缺失，自动归属待验证。
 
 未发布的本轮改动：心愿按部位浏览、时光服周常及“我买的”身份匹配由本机模拟与回归测试覆盖，尚未实机验证。周常候选 ID 与共享完成位已通过国服 wow_classic_titan 3.80.2.70522 静态数据核对；这不证明当前可接任务、奖励或服务器策略。周重置使用官方接口，缺失或异常时为未知，不用本地日期推算。部位浏览缺少物品信息时保留待分类，原有心愿直接掉落限制和容量规则不变。

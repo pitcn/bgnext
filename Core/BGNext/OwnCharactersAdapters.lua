@@ -198,9 +198,26 @@ end
 -- a player name, or any parameter that could address another player.
 --------------------------------------------------------------------------
 
-function M.readPlayerName(api)
-    local name = M.safeCall(api and api.UnitName, "player")
-    if type(name) ~= "string" or name == "" then return nil end
+function M.readPlayerName(api, family)
+    if family == "forever" then
+        -- Forever's second UnitName result is a surname, not a realm.
+        -- Use both readable parts even if an init/display helper kept only one.
+        local ok, first, surname = callAll(api and api.UnitName, "player")
+        if ok and type(first) == "string" and type(surname) == "string"
+            and not M.isSecretValue(api, first) and not M.isSecretValue(api, surname)
+            and first ~= "" and surname ~= "" then
+            return first .. " " .. surname, true
+        end
+    end
+    local name = M.safeCall(api and api.GetUnitName, "player", true)
+    -- A temporarily unavailable full identity must not fall back to a colliding
+    -- short key. UnitName remains only for clients without GetUnitName at all.
+    if type(api and api.GetUnitName) ~= "function" then
+        name = M.safeCall(api and api.UnitName, "player")
+    end
+    if type(name) ~= "string" or M.isSecretValue(api, name) or name == "" then return nil end
+    if family == "forever" and type(api and api.GetUnitName) == "function"
+        and not name:find("[%s%-]") then return nil end
     return name
 end
 
@@ -488,7 +505,9 @@ function M.readEquipment(api)
                 end
             end
 
-            if itemId or itemLevel or quality or icon then
+            -- The inventory link is already a valid observation, even before
+            -- the item cache (or GetItemInfoInstant on older clients) is ready.
+            if link then
                 slots[slot] = {
                     itemId = itemId,
                     itemLevel = itemLevel,
@@ -1280,7 +1299,7 @@ end
 -- reader so the collector can treat missing APIs and protected values uniformly.
 function M.readers(family, api, raidColumns, resourceColumns)
     return {
-        playerName = function() return M.readPlayerName(api) end,
+        playerName = function() return M.readPlayerName(api, family) end,
         realmId = function() return M.readRealmId(api) end,
         realmName = function() return M.readRealmName(api) end,
         faction = function() return M.readFaction(api) end,
