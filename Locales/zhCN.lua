@@ -1980,6 +1980,7 @@ do
     L["中键或 Ctrl+左键固定，按住 Shift 显示全部服务器"] = true
     L["合计"] = true
     L["尚无本地角色记录，登录角色后自动记录。"] = true
+    L["已记录 %d 个未满级角色，当前被“只看满级角色”过滤。可在“设置 → 角色总览”取消勾选“只看满级角色”。"] = true
     L["|cffffffff< UI缩放 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的大小"] = true
     L["|cffffffff< UI透明度 >|r|cff808080（右键还原设置）|r\n\n1、调整表格UI的透明度"] = true
     L["UI透明度"] = true
@@ -3381,7 +3382,7 @@ do -- BGNext character overview
     L["当前数量"] = true
     L["总上限"] = true
     L["每周上限"] = true
-    L["显示非满级角色"] = true
+    L["只看满级角色"] = true
     L["启用角色总览"] = true
     L["清空"] = true
     L["清空当前版本角色数据"] = true

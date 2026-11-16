@@ -10,8 +10,8 @@ return function(test)
         "provider passes model order to the projection")
     test.eq(string.find(providerSource, "maxLevel = BG.fullLevel,", 1, true) ~= nil, true,
         "provider passes the actual current client level cap to the projection")
-    test.eq(string.find(providerSource, "settings.showNonMaxLevel(root)", 1, true) ~= nil, true,
-        "provider passes the explicit non-max display preference")
+    test.eq(string.find(providerSource, "settings.maxLevelOnly(root)", 1, true) ~= nil, true,
+        "provider passes the explicit max-level-only display preference")
 
     -- Hover previews, leaving hides again, unless the window was pinned.
     test.eq(Entry.intent("hover", {}), "preview", "hover previews the overview")

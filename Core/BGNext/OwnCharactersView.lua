@@ -571,17 +571,18 @@ local function resourceCell(column, snapshot, now)
     return cell
 end
 
-local function levelVisible(snapshot, maxLevel, showNonMaxLevel)
-    if showNonMaxLevel == true then return true end
+local function levelVisible(snapshot, maxLevel, maxLevelOnly)
+    if maxLevelOnly ~= true then return true end
     if type(maxLevel) ~= "number" or maxLevel <= 0 then return true end
     return type(snapshot.level) == "number" and snapshot.level >= maxLevel
 end
 
 -- Rows are ordered current realm first, then realm, then character name, so
 -- the table does not reshuffle between logins.
-local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder, maxLevel, showNonMaxLevel)
+local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder, maxLevel, maxLevelOnly)
     local rows = {}
     local ranks = {}
+    local hiddenByLevel = 0
     for index, identity in ipairs(type(characterOrder) == "table" and characterOrder or {}) do
         if type(identity) == "table" and type(identity.realmId) == "number"
             and isNonEmptyString(identity.player) then
@@ -592,12 +593,16 @@ local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrde
     for _, snapshot in ipairs(snapshots or {}) do
         if isValidSnapshot(snapshot) then
             local isCurrentRealm = snapshot.realmId == currentRealmId
-            if (showAllRealms or isCurrentRealm) and levelVisible(snapshot, maxLevel, showNonMaxLevel) then
-                rows[#rows + 1] = {
-                    snapshot = snapshot,
-                    isCurrentRealm = isCurrentRealm,
-                    rank = ranks[tostring(snapshot.realmId) .. "\031" .. snapshot.player],
-                }
+            if showAllRealms or isCurrentRealm then
+                if levelVisible(snapshot, maxLevel, maxLevelOnly) then
+                    rows[#rows + 1] = {
+                        snapshot = snapshot,
+                        isCurrentRealm = isCurrentRealm,
+                        rank = ranks[tostring(snapshot.realmId) .. "\031" .. snapshot.player],
+                    }
+                else
+                    hiddenByLevel = hiddenByLevel + 1
+                end
             end
         end
     end
@@ -610,7 +615,7 @@ local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrde
         if ra ~= rb then return ra < rb end
         return tostring(a.snapshot.player) < tostring(b.snapshot.player)
     end)
-    return rows
+    return rows, hiddenByLevel
 end
 
 -- A short realm prefix appears only where a character name is ambiguous, so
@@ -701,8 +706,8 @@ function M.project(input)
     local raidColumns = visibleColumns(catalog.raidColumns, "raid", input.visibility, available)
     local resourceColumns = visibleColumns(catalog.resourceColumns, "resource", input.visibility, available)
 
-    local entries = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true,
-        input.characterOrder, input.maxLevel, input.showNonMaxLevel)
+    local entries, hiddenByLevel = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true,
+        input.characterOrder, input.maxLevel, input.maxLevelOnly)
     markAmbiguousNames(entries)
 
     local raidRows, resourceRows = {}, {}
@@ -768,6 +773,7 @@ function M.project(input)
         verificationStatus = catalog.status,
         isEmpty = count == 0,
         characterCount = count,
+        hiddenByLevelCount = hiddenByLevel,
         showAllRealms = input.showAllRealms == true,
         raid = {
             title = M.titles.raid,
