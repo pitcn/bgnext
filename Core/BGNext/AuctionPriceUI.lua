@@ -366,6 +366,10 @@ if runtimeReady() then
     -- Read the player's current global starting price lazily; BiaoGe.Auction is
     -- not available at BG.Init time because Auction.lua loads after this file.
     local function globalMoney()
+        -- Forever's new schemes start at 10g independently of the legacy
+        -- global auction price. Existing schemes keep their saved base price;
+        -- retain the vanilla storage namespace so none need to be migrated.
+        if BG.IsForever then return 10 end
         if type(BiaoGe) == "table" and type(BiaoGe.Auction) == "table" then
             return BiaoGe.Auction.money
         end
