@@ -178,11 +178,18 @@ do -- BGNext 0.8.10 release text
     L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"] = "Browse wishlist drops by boss or equipment slot; selections still use the original wish slots."
     L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"] = "Titan character overview adds raid and ZG weekly status; unavailable reliable APIs show unknown."
     L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"] = "Fixed My Purchases filtering missing buyers whose names include a realm."
+    L["新增无限服（Interface 16001）适配基础：团本目录、角色总览活动和货币列；尚未完成游戏内实测。"] = "Adds Forever (Interface 16001) groundwork: raid catalogs, overview activities and currency columns; in-game testing is not yet complete."
+    L["无限服角色总览现在完整识别带姓氏的角色名，并保留已缓存的装备，避免角色混淆或装备栏位丢失。"] = "Forever character overview now keeps full names with surnames and preserves cached equipment, preventing mixed-up characters and lost slots."
+    L["角色总览默认显示练级角色，新增“只看满级角色”开关；此前主动选择隐藏的设置会保留。"] = "Character overview now shows leveling characters by default and adds a Max-Level Characters Only option; earlier explicit hiding choices are kept."
+    L["练级角色被满级过滤隐藏时，空列表会提示原因和取消勾选的位置。"] = "When the max-level filter hides leveling characters, the empty list explains why and where to clear the option."
+    L["无限服新建拍卖价格方案的基础价默认为10g，已有方案价格不变。"] = "New Forever auction price schemes now start at a 10g base price; existing schemes keep their prices."
     ns.updateText_now = {
-        "BGNext 0.8.16",
-        L["心愿界面新增按Boss或按部位查看，加入后仍保存到原心愿格。"],
-        L["时光服角色总览新增团本周常和祖格周常状态，缺少可靠接口时显示未知。"],
-        L["修复拍卖记录“我买的”可能漏掉带服务器名买家的问题。"],
+        "BGNext 0.8.17",
+        L["新增无限服（Interface 16001）适配基础：团本目录、角色总览活动和货币列；尚未完成游戏内实测。"],
+        L["无限服角色总览现在完整识别带姓氏的角色名，并保留已缓存的装备，避免角色混淆或装备栏位丢失。"],
+        L["角色总览默认显示练级角色，新增“只看满级角色”开关；此前主动选择隐藏的设置会保留。"],
+        L["练级角色被满级过滤隐藏时，空列表会提示原因和取消勾选的位置。"],
+        L["无限服新建拍卖价格方案的基础价默认为10g，已有方案价格不变。"],
     }
 end
 
