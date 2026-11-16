@@ -644,9 +644,9 @@ return function(test)
         snapshot({ player = "Max", level = 80, money = 10000 }),
         snapshot({ player = "Alt", level = 1, money = 90000 }),
     }
-    local defaultView = View.project(input({ snapshots = levelSnapshots, maxLevel = 80 }))
-    test.eq(defaultView.characterCount, 2, "leveling characters are shown by default")
-    test.eq(defaultView.hiddenByLevelCount, 0, "nothing is level-hidden by default")
+    local defaultView = View.project(input({ snapshots = levelSnapshots, maxLevel = 80, maxLevelOnly = false }))
+    test.eq(defaultView.characterCount, 2, "an explicit unfiltered projection shows leveling characters")
+    test.eq(defaultView.hiddenByLevelCount, 0, "an explicit unfiltered projection hides no characters by level")
     local maxOnly = View.project(input({ snapshots = levelSnapshots, maxLevel = 80, maxLevelOnly = true }))
     test.eq(maxOnly.characterCount, 1, "the max-level-only filter hides non-max characters")
     test.eq(maxOnly.hiddenByLevelCount, 1, "the filter counts what it hid")
@@ -765,52 +765,75 @@ return function(test)
     Settings.setVisible(root, nil, "raid", "MCtitan", false)
     test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "a missing family writes nothing")
 
-    local preferenceRoot = {}
-    test.eq(Settings.maxLevelOnly(preferenceRoot), false, "leveling characters are shown by default")
-    test.eq(Settings.maxLevelOnly(nil), false, "a missing root shows everything")
-    Settings.setMaxLevelOnly(preferenceRoot, true)
-    test.eq(Settings.maxLevelOnly(preferenceRoot), true, "the user can opt in to max-level-only")
-    Settings.setMaxLevelOnly(preferenceRoot, "yes")
-    test.eq(Settings.maxLevelOnly(preferenceRoot), true, "invalid values cannot overwrite the preference")
-    Settings.setMaxLevelOnly(preferenceRoot, false)
-    test.eq(Settings.maxLevelOnly(preferenceRoot), false, "the filter can be turned off again")
-
-    -- Migration from the 0.8.10 key roleOverviewShowNonMaxLevel (old default: hidden).
-    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = true } }), false,
-        "an old explicit opt-in keeps showing leveling characters")
-    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = false } }), true,
-        "an old explicit opt-out is kept as max-level-only")
-    test.eq(Settings.maxLevelOnly({ settings = {} }), false, "an untouched old save gets the new default")
-    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = false, roleOverviewMaxLevelOnly = false } }), false,
-        "the new key wins over the old key")
-    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = "x" } }), false,
-        "a malformed old value is ignored")
-
-    -- Exercise migration through the actual projection, including toggles and reload.
-    for _, case in ipairs({
-        { settings = {}, expected = 2 },
-        { settings = { roleOverviewShowNonMaxLevel = true }, expected = 2 },
-        { settings = { roleOverviewShowNonMaxLevel = false }, expected = 1 },
-        { settings = { roleOverviewShowNonMaxLevel = true, roleOverviewMaxLevelOnly = true }, expected = 1 },
-        { settings = { roleOverviewShowNonMaxLevel = false, roleOverviewMaxLevelOnly = "bad" }, expected = 1 },
+    local originalForever = BG.IsForever
+    for _, flavor in ipairs({
+        { forever = true, default = false },
+        { forever = false, default = true },
+        { default = true }, -- A missing flavor flag is not Forever.
     }) do
-        local saved = { settings = case.settings, ownCharacters = levelSnapshots }
-        local oldValue = saved.settings.roleOverviewShowNonMaxLevel
-        local function projectSaved()
-            return View.project(input({ snapshots = saved.ownCharacters, maxLevel = 80,
-                maxLevelOnly = Settings.maxLevelOnly(saved) }))
+        BG.IsForever = flavor.forever
+        local preferenceRoot = {}
+        test.eq(Settings.maxLevelOnly(preferenceRoot), flavor.default, "missing settings use the flavor default")
+        test.eq(preferenceRoot.settings, nil, "reading the default writes no settings")
+        test.eq(Settings.maxLevelOnly(nil), flavor.default, "missing root uses the flavor default")
+        test.eq(Settings.maxLevelOnly({ settings = {} }), flavor.default, "untouched settings use the flavor default")
+        test.eq(Settings.maxLevelOnly({ settings = "bad" }), flavor.default, "invalid settings use the flavor default")
+        test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = "bad" } }), flavor.default,
+            "an invalid legacy type without a new preference uses the flavor default")
+        for _, value in ipairs({ true, false }) do
+            local legacy = { settings = { roleOverviewShowNonMaxLevel = value } }
+            test.eq(Settings.maxLevelOnly(legacy), not value, "legacy booleans retain their meaning on every flavor")
+            test.eq(legacy.settings.roleOverviewShowNonMaxLevel, value, "reading never rewrites the legacy key")
+            legacy.settings.roleOverviewMaxLevelOnly = value
+            test.eq(Settings.maxLevelOnly(legacy), value, "explicit new booleans win over conflicting legacy booleans")
         end
-        test.eq(projectSaved().characterCount, case.expected, "migration preserves explicit choices in the view")
-        Settings.setMaxLevelOnly(saved, true)
-        test.eq(projectSaved().characterCount, 1, "checking max-level-only filters the view")
-        Settings.setMaxLevelOnly(saved, false)
-        local reloaded = dofile("Core/BGNext/RoleOverviewSettings.lua")
-        test.eq(reloaded.maxLevelOnly(saved), false, "the new false choice survives module reload")
-        test.eq(projectSaved().characterCount, 2, "clearing the filter restores leveling characters")
-        test.eq(saved.settings.roleOverviewShowNonMaxLevel, oldValue, "migration never rewrites the old key")
-        test.eq(saved.ownCharacters, levelSnapshots, "migration preserves the snapshot collection")
-        test.eq(levelSnapshots[2].level, 1, "migration preserves the leveling snapshot")
+        for _, invalid in ipairs({ "bad", 0, {} }) do
+            for _, legacy in ipairs({ true, false, "bad" }) do
+                local expected = flavor.default
+                if type(legacy) == "boolean" then expected = not legacy end
+                test.eq(Settings.maxLevelOnly({ settings = {
+                    roleOverviewMaxLevelOnly = invalid, roleOverviewShowNonMaxLevel = legacy,
+                } }), expected, "invalid new types fall through to legacy booleans or the flavor default")
+            end
+            test.eq(Settings.maxLevelOnly({ settings = { roleOverviewMaxLevelOnly = invalid } }), flavor.default,
+                "invalid new types without a legacy preference use the flavor default")
+        end
+        Settings.setMaxLevelOnly(preferenceRoot, true)
+        test.eq(preferenceRoot.settings.roleOverviewMaxLevelOnly, true, "checking the box persists true")
+        test.eq(Settings.maxLevelOnly(preferenceRoot), true, "the user can select max-level-only on every flavor")
+        Settings.setMaxLevelOnly(preferenceRoot, "yes")
+        test.eq(Settings.maxLevelOnly(preferenceRoot), true, "invalid values cannot overwrite the preference")
+        Settings.setMaxLevelOnly(preferenceRoot, false)
+        test.eq(preferenceRoot.settings.roleOverviewMaxLevelOnly, false, "clearing the box persists false")
+        test.eq(Settings.maxLevelOnly(preferenceRoot), false, "the filter can be turned off on every flavor")
+
+        -- Exercise preferences through the actual projection, including toggles and reload.
+        for _, case in ipairs({
+            { settings = {}, expected = flavor.default and 1 or 2 },
+            { settings = { roleOverviewShowNonMaxLevel = true }, expected = 2 },
+            { settings = { roleOverviewShowNonMaxLevel = false }, expected = 1 },
+            { settings = { roleOverviewShowNonMaxLevel = true, roleOverviewMaxLevelOnly = true }, expected = 1 },
+            { settings = { roleOverviewShowNonMaxLevel = false, roleOverviewMaxLevelOnly = "bad" }, expected = 1 },
+        }) do
+            local saved = { settings = case.settings, ownCharacters = levelSnapshots }
+            local oldValue = saved.settings.roleOverviewShowNonMaxLevel
+            local function projectSaved()
+                return View.project(input({ snapshots = saved.ownCharacters, maxLevel = 80,
+                    maxLevelOnly = Settings.maxLevelOnly(saved) }))
+            end
+            test.eq(projectSaved().characterCount, case.expected, "migration preserves explicit choices in the view")
+            Settings.setMaxLevelOnly(saved, true)
+            test.eq(projectSaved().characterCount, 1, "checking max-level-only filters the view")
+            Settings.setMaxLevelOnly(saved, false)
+            local reloaded = dofile("Core/BGNext/RoleOverviewSettings.lua")
+            test.eq(reloaded.maxLevelOnly(saved), false, "the new false choice survives module reload")
+            test.eq(projectSaved().characterCount, 2, "clearing the filter restores leveling characters")
+            test.eq(saved.settings.roleOverviewShowNonMaxLevel, oldValue, "migration never rewrites the old key")
+            test.eq(saved.ownCharacters, levelSnapshots, "migration preserves the snapshot collection")
+            test.eq(levelSnapshots[2].level, 1, "migration preserves the leveling snapshot")
+        end
     end
+    BG.IsForever = originalForever
     local untouched = {}
     Settings.maxLevelOnly(untouched)
     test.eq(untouched.settings, nil, "reading the new default writes no settings")

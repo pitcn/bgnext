@@ -110,18 +110,21 @@ function M.visibilityFor(root, family)
 end
 
 -- Display preference only: true limits the overview to max-level characters.
--- The default shows every recorded character. The legacy key
--- roleOverviewShowNonMaxLevel (default hidden) is read, never rewritten:
--- an explicit `false` was stored when a user unchecked the old box,
--- so it maps to max-level-only; `true` and absence both
--- mean "show everything". Nothing here touches a stored character snapshot.
+-- Only Forever defaults to showing leveling characters. Explicit booleans
+-- take priority on every client, with the new key winning over the legacy
+-- roleOverviewShowNonMaxLevel key. Reading never rewrites either preference
+-- or touches a stored character snapshot.
 function M.maxLevelOnly(root)
     local settings = type(root) == "table" and root.settings or nil
-    if type(settings) ~= "table" then return false end
-    if type(settings.roleOverviewMaxLevelOnly) == "boolean" then
-        return settings.roleOverviewMaxLevelOnly
+    if type(settings) == "table" then
+        if type(settings.roleOverviewMaxLevelOnly) == "boolean" then
+            return settings.roleOverviewMaxLevelOnly
+        end
+        if type(settings.roleOverviewShowNonMaxLevel) == "boolean" then
+            return not settings.roleOverviewShowNonMaxLevel
+        end
     end
-    return settings.roleOverviewShowNonMaxLevel == false
+    return BG.IsForever ~= true
 end
 
 function M.setMaxLevelOnly(root, value)
