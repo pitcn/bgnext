@@ -49,9 +49,9 @@ return function(test)
     test.eq(string.find(settingsSource, "Model.moveCharacter", 1, true) ~= nil, true, "settings moves through model")
     test.eq(string.find(settingsSource, "Model.resetCharacterOrder", 1, true) ~= nil, true, "settings resets through model")
     test.eq(string.find(settingsSource, "RegisterForDrag", 1, true), nil, "settings registers no drag behavior")
-    test.eq(string.find(settingsSource, "显示非满级角色", 1, true) ~= nil, true,
-        "settings exposes the non-max character display switch")
-    test.eq(string.find(settingsSource, "M.setShowNonMaxLevel(root", 1, true) ~= nil, true,
+    test.eq(string.find(settingsSource, "只看满级角色", 1, true) ~= nil, true,
+        "settings exposes the max-level-only display switch")
+    test.eq(string.find(settingsSource, "M.setMaxLevelOnly(root", 1, true) ~= nil, true,
         "the display switch writes only through the validated setting helper")
     local layout = Settings.characterOrderLayout(3, -100)
     test.eq(layout.lowerY < layout.restoreY, true, "dynamic order layout leaves space below restore")
@@ -644,23 +644,27 @@ return function(test)
         snapshot({ player = "Max", level = 80, money = 10000 }),
         snapshot({ player = "Alt", level = 1, money = 90000 }),
     }
-    local maxOnly = View.project(input({ snapshots = levelSnapshots, maxLevel = 80 }))
-    test.eq(maxOnly.characterCount, 1, "non-max characters are hidden by default")
+    local defaultView = View.project(input({ snapshots = levelSnapshots, maxLevel = 80 }))
+    test.eq(defaultView.characterCount, 2, "leveling characters are shown by default")
+    test.eq(defaultView.hiddenByLevelCount, 0, "nothing is level-hidden by default")
+    local maxOnly = View.project(input({ snapshots = levelSnapshots, maxLevel = 80, maxLevelOnly = true }))
+    test.eq(maxOnly.characterCount, 1, "the max-level-only filter hides non-max characters")
+    test.eq(maxOnly.hiddenByLevelCount, 1, "the filter counts what it hid")
     test.eq(maxOnly.resource.rows[1].player, "Max", "the max-level character remains visible")
     test.eq(maxOnly.resource.totals.money, 10000, "totals exclude hidden non-max characters")
     test.eq(levelSnapshots[2].level, 1, "filtering never mutates hidden snapshots")
     local allLevels = View.project(input({
-        snapshots = levelSnapshots, maxLevel = 80, showNonMaxLevel = true,
+        snapshots = levelSnapshots, maxLevel = 80, maxLevelOnly = false,
     }))
-    test.eq(allLevels.characterCount, 2, "the opt-in setting restores non-max characters")
-    test.eq(allLevels.resource.totals.money, 100000, "opt-in totals include restored characters")
+    test.eq(allLevels.characterCount, 2, "turning the filter off shows non-max characters")
+    test.eq(allLevels.resource.totals.money, 100000, "unfiltered totals include leveling characters")
     local missingThreshold = View.project(input({ snapshots = levelSnapshots }))
     test.eq(missingThreshold.characterCount, 2, "a missing client max level fails open")
     local zeroThreshold = View.project(input({ snapshots = levelSnapshots, maxLevel = 0 }))
     test.eq(zeroThreshold.characterCount, 2, "a non-positive client max level fails open")
     local unknownLevel = snapshot({ player = "Unknown" })
     unknownLevel.level = nil
-    local unknownLevelView = View.project(input({ snapshots = { unknownLevel }, maxLevel = 80 }))
+    local unknownLevelView = View.project(input({ snapshots = { unknownLevel }, maxLevel = 80, maxLevelOnly = true }))
     test.eq(unknownLevelView.characterCount, 0, "a snapshot without a numeric level cannot impersonate max level")
     local allRealmMaxOnly = View.project(input({
         snapshots = {
@@ -668,6 +672,7 @@ return function(test)
             snapshot({ player = "RemoteAlt", realmId = 456, realmName = "时光III", level = 1 }),
         },
         maxLevel = 80,
+        maxLevelOnly = true,
         showAllRealms = true,
     }))
     test.eq(allRealmMaxOnly.characterCount, 1, "all-realm view uses the same max-level filter")
@@ -761,11 +766,54 @@ return function(test)
     test.eq(Settings.isVisible(root, "titan", "raid", "MCtitan", titanCatalog), true, "a missing family writes nothing")
 
     local preferenceRoot = {}
-    test.eq(Settings.showNonMaxLevel(preferenceRoot), false, "non-max characters default to hidden")
-    Settings.setShowNonMaxLevel(preferenceRoot, true)
-    test.eq(Settings.showNonMaxLevel(preferenceRoot), true, "the user can opt in to non-max characters")
-    Settings.setShowNonMaxLevel(preferenceRoot, "yes")
-    test.eq(Settings.showNonMaxLevel(preferenceRoot), true, "invalid values cannot overwrite the preference")
+    test.eq(Settings.maxLevelOnly(preferenceRoot), false, "leveling characters are shown by default")
+    test.eq(Settings.maxLevelOnly(nil), false, "a missing root shows everything")
+    Settings.setMaxLevelOnly(preferenceRoot, true)
+    test.eq(Settings.maxLevelOnly(preferenceRoot), true, "the user can opt in to max-level-only")
+    Settings.setMaxLevelOnly(preferenceRoot, "yes")
+    test.eq(Settings.maxLevelOnly(preferenceRoot), true, "invalid values cannot overwrite the preference")
+    Settings.setMaxLevelOnly(preferenceRoot, false)
+    test.eq(Settings.maxLevelOnly(preferenceRoot), false, "the filter can be turned off again")
+
+    -- Migration from the 0.8.10 key roleOverviewShowNonMaxLevel (old default: hidden).
+    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = true } }), false,
+        "an old explicit opt-in keeps showing leveling characters")
+    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = false } }), true,
+        "an old explicit opt-out is kept as max-level-only")
+    test.eq(Settings.maxLevelOnly({ settings = {} }), false, "an untouched old save gets the new default")
+    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = false, roleOverviewMaxLevelOnly = false } }), false,
+        "the new key wins over the old key")
+    test.eq(Settings.maxLevelOnly({ settings = { roleOverviewShowNonMaxLevel = "x" } }), false,
+        "a malformed old value is ignored")
+
+    -- Exercise migration through the actual projection, including toggles and reload.
+    for _, case in ipairs({
+        { settings = {}, expected = 2 },
+        { settings = { roleOverviewShowNonMaxLevel = true }, expected = 2 },
+        { settings = { roleOverviewShowNonMaxLevel = false }, expected = 1 },
+        { settings = { roleOverviewShowNonMaxLevel = true, roleOverviewMaxLevelOnly = true }, expected = 1 },
+        { settings = { roleOverviewShowNonMaxLevel = false, roleOverviewMaxLevelOnly = "bad" }, expected = 1 },
+    }) do
+        local saved = { settings = case.settings, ownCharacters = levelSnapshots }
+        local oldValue = saved.settings.roleOverviewShowNonMaxLevel
+        local function projectSaved()
+            return View.project(input({ snapshots = saved.ownCharacters, maxLevel = 80,
+                maxLevelOnly = Settings.maxLevelOnly(saved) }))
+        end
+        test.eq(projectSaved().characterCount, case.expected, "migration preserves explicit choices in the view")
+        Settings.setMaxLevelOnly(saved, true)
+        test.eq(projectSaved().characterCount, 1, "checking max-level-only filters the view")
+        Settings.setMaxLevelOnly(saved, false)
+        local reloaded = dofile("Core/BGNext/RoleOverviewSettings.lua")
+        test.eq(reloaded.maxLevelOnly(saved), false, "the new false choice survives module reload")
+        test.eq(projectSaved().characterCount, 2, "clearing the filter restores leveling characters")
+        test.eq(saved.settings.roleOverviewShowNonMaxLevel, oldValue, "migration never rewrites the old key")
+        test.eq(saved.ownCharacters, levelSnapshots, "migration preserves the snapshot collection")
+        test.eq(levelSnapshots[2].level, 1, "migration preserves the leveling snapshot")
+    end
+    local untouched = {}
+    Settings.maxLevelOnly(untouched)
+    test.eq(untouched.settings, nil, "reading the new default writes no settings")
 
     -- Only booleans are stored, so a corrupted save cannot smuggle in data.
     Settings.setVisible(root, "titan", "raid", "MCtitan", "yes")

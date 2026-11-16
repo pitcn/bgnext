@@ -393,7 +393,7 @@ function M.layout(projection)
     if projection.unsupported == true then
         emptyText = L["该版本角色总览适配中。"]
     elseif projection.isEmpty == true and type(hidden) == "number" and hidden > 0 then
-        emptyText = string.format(L["已记录 %d 个未满级角色，默认隐藏。可在“设置 → 角色总览”勾选“显示非满级角色”。"], hidden)
+        emptyText = string.format(L["已记录 %d 个未满级角色，当前被“只看满级角色”过滤。可在“设置 → 角色总览”取消勾选“只看满级角色”。"], hidden)
     end
 
     return {

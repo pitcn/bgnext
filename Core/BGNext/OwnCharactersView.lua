@@ -571,15 +571,15 @@ local function resourceCell(column, snapshot, now)
     return cell
 end
 
-local function levelVisible(snapshot, maxLevel, showNonMaxLevel)
-    if showNonMaxLevel == true then return true end
+local function levelVisible(snapshot, maxLevel, maxLevelOnly)
+    if maxLevelOnly ~= true then return true end
     if type(maxLevel) ~= "number" or maxLevel <= 0 then return true end
     return type(snapshot.level) == "number" and snapshot.level >= maxLevel
 end
 
 -- Rows are ordered current realm first, then realm, then character name, so
 -- the table does not reshuffle between logins.
-local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder, maxLevel, showNonMaxLevel)
+local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder, maxLevel, maxLevelOnly)
     local rows = {}
     local ranks = {}
     local hiddenByLevel = 0
@@ -594,7 +594,7 @@ local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrde
         if isValidSnapshot(snapshot) then
             local isCurrentRealm = snapshot.realmId == currentRealmId
             if showAllRealms or isCurrentRealm then
-                if levelVisible(snapshot, maxLevel, showNonMaxLevel) then
+                if levelVisible(snapshot, maxLevel, maxLevelOnly) then
                     rows[#rows + 1] = {
                         snapshot = snapshot,
                         isCurrentRealm = isCurrentRealm,
@@ -707,7 +707,7 @@ function M.project(input)
     local resourceColumns = visibleColumns(catalog.resourceColumns, "resource", input.visibility, available)
 
     local entries, hiddenByLevel = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true,
-        input.characterOrder, input.maxLevel, input.showNonMaxLevel)
+        input.characterOrder, input.maxLevel, input.maxLevelOnly)
     markAmbiguousNames(entries)
 
     local raidRows, resourceRows = {}, {}

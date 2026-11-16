@@ -339,7 +339,7 @@ local function provider()
         snapshots = snapshots,
         characterOrder = Model and Model.customCharacterOrder(root, family) or nil,
         maxLevel = BG.fullLevel,
-        showNonMaxLevel = settings and settings.showNonMaxLevel(root) or false,
+        maxLevelOnly = settings and settings.maxLevelOnly(root) or false,
         currentRealmId = BG.realmID or (type(GetRealmID) == "function" and GetRealmID()),
         showAllRealms = state.shift,
         now = type(time) == "function" and time() or nil,
