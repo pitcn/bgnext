@@ -27,6 +27,10 @@ M.allowedEvents = {
     "PLAYER_EQUIPMENT_CHANGED",
     "GET_ITEM_INFO_RECEIVED",
     "PLAYER_LEVEL_UP",
+    "PLAYER_XP_UPDATE",
+    "UPDATE_EXHAUSTION",
+    "PLAYER_UPDATE_RESTING",
+    "PLAYER_LOGOUT",
     "PLAYER_MONEY",
     "UPDATE_INSTANCE_INFO",
     "BAG_UPDATE_DELAYED",
@@ -47,7 +51,11 @@ local EVENT_SECTIONS = {
     PLAYER_ENTERING_WORLD = { full = true },
     PLAYER_EQUIPMENT_CHANGED = { equipment = true },
     GET_ITEM_INFO_RECEIVED = { equipment = true },
-    PLAYER_LEVEL_UP = { identity = true },
+    PLAYER_LEVEL_UP = { identity = true, rested = true },
+    PLAYER_XP_UPDATE = { identity = true, rested = true },
+    UPDATE_EXHAUSTION = { rested = true },
+    PLAYER_UPDATE_RESTING = { rested = true },
+    PLAYER_LOGOUT = { identity = true, rested = true },
     PLAYER_MONEY = { money = true },
     UPDATE_INSTANCE_INFO = { raid = true },
     BAG_UPDATE_DELAYED = { items = true },
@@ -114,6 +122,14 @@ function M.collect(env, sections)
     if wants("raid") then snapshot.raidStates = read(env, "raidStates", "table") end
     if wants("professions") then snapshot.professions = read(env, "professions", "table") end
     if wants("activities") then snapshot.activityStates = read(env, "activities", "table") end
+    if wants("rested") then
+        local rested = read(env, "rested", "table")
+        if rested then
+            snapshot.restXpPercent = rested.restXpPercent
+            snapshot.restXpObservedAt = rested.restXpObservedAt
+            snapshot.restXpResting = rested.restXpResting
+        end
+    end
 
     -- Currencies and item counts share one reader so a client family that
     -- exposes neither simply contributes nothing.
@@ -174,12 +190,14 @@ function M.installEvents(env, onSnapshot)
         pending = false
         local sections = dirty
         dirty = {}
+        if next(sections) == nil then return end
         onSnapshot(sections)
     end
 
     if type(frame.SetScript) == "function" then
         frame:SetScript("OnEvent", function(_, event, ...)
             if not allowed[event] then return end
+            if event == "PLAYER_XP_UPDATE" and (...) ~= "player" then return end
             local observedSections = safeCall(env.observeEvent, event, ...)
             if event == "BAG_UPDATE_COOLDOWN" and env.family ~= "forever" then return end
             if EVENT_SECTIONS[event] == nil and type(observedSections) ~= "table" then return end
@@ -196,6 +214,9 @@ function M.installEvents(env, onSnapshot)
                 if changed == true then dirty[section] = true end
             end
             if next(dirty) == nil then return end
+            -- Deferred timers may never execute once logout begins. Flush the
+            -- final rested/level observation now, including any pending sections.
+            if event == "PLAYER_LOGOUT" then flush(); return end
             if pending then return end
             pending = true
             if after then

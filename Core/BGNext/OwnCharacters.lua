@@ -30,6 +30,9 @@ local SNAPSHOT_FIELDS = {
     professions = "table",
     professionCooldowns = "table",
     activityStates = "table",
+    restXpPercent = "number",
+    restXpObservedAt = "number",
+    restXpResting = "boolean",
 }
 
 local TEXTURE_TYPES = { string = true, number = true }
@@ -407,6 +410,7 @@ function M.migrateShortNames(root, clientFamily, current, shortName)
 end
 
 local SECTION_FIELDS = {
+    rested = { "restXpPercent", "restXpObservedAt", "restXpResting" },
     identity = { "realmName", "faction", "class", "level" },
     equipment = { "itemLevel", "equipment" },
     money = { "money" },

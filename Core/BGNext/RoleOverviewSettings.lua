@@ -17,6 +17,35 @@ local M = {}
 
 local SECTIONS = { raid = "raidColumns", resource = "resourceColumns" }
 
+M.sortOptions = {
+    { id = "default", title = "默认" },
+    { id = "class", title = "职业-装等-名字" },
+    { id = "itemLevel", title = "装等高到低" },
+    { id = "level", title = "等级高到低" },
+    { id = "name", title = "名字" },
+    { id = "updatedAt", title = "最近更新" },
+}
+
+local function validSortMode(value)
+    for _, option in ipairs(M.sortOptions) do
+        if value == option.id then return true end
+    end
+    return false
+end
+
+function M.sortMode(root)
+    local settings = type(root) == "table" and root.settings
+    local mode = type(settings) == "table" and settings.roleOverviewSortMode
+    return validSortMode(mode) and mode or "default"
+end
+
+function M.setSortMode(root, mode)
+    if type(root) ~= "table" or not validSortMode(mode) then return false end
+    root.settings = type(root.settings) == "table" and root.settings or {}
+    root.settings.roleOverviewSortMode = mode
+    return true
+end
+
 local function isFamily(family)
     return type(family) == "string" and family ~= ""
 end
@@ -344,6 +373,40 @@ function M.BuildPanel(parent)
         scaleHint:SetText(L["仅调整角色总览和悬停预览；超出屏幕时自动限制大小。"])
         y = y - 115
 
+        local rebuildOrderRows
+        local sortHeading = parent:CreateFontString(nil, "ARTWORK")
+        sortHeading:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
+        sortHeading:SetPoint("TOPLEFT", parent, 15, y)
+        sortHeading:SetText(L["角色自动排序"])
+        y = y - 25
+        local sortButtons = {}
+        local function syncSortButtons()
+            for index, option in ipairs(M.sortOptions) do
+                local selected = M.sortMode(root) == option.id
+                local button = sortButtons[index]
+                button:SetText(L[option.title])
+                if selected then button:LockHighlight() else button:UnlockHighlight() end
+            end
+        end
+        for index, option in ipairs(M.sortOptions) do
+            local mode = option.id
+            local button = BG.CreateButton(parent)
+            sortButtons[index] = button
+            button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+            button:SetSize(180, 25)
+            button:SetPoint("TOPLEFT", parent, 20 + ((index - 1) % 2) * 185,
+                y - math.floor((index - 1) / 2) * 30)
+            button:SetScript("OnClick", function()
+                M.setSortMode(root, mode)
+                syncSortButtons()
+                if rebuildOrderRows then rebuildOrderRows() end
+                refresh()
+            end)
+        end
+        syncSortButtons()
+        if parent.HookScript then parent:HookScript("OnShow", syncSortButtons) end
+        y = y - 100
+
         for _, group in ipairs(PANEL_SECTIONS) do
             local heading = parent:CreateFontString(nil, "ARTWORK")
             heading:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
@@ -407,7 +470,7 @@ function M.BuildPanel(parent)
         emptyOrder:SetText(L["暂无角色数据"])
         local restoreOrder = BG.CreateButton(parent)
         restoreOrder:SetSize(190, 25)
-        local function rebuildOrderRows()
+        rebuildOrderRows = function()
             local rows = M.characterOrderRows(root, family, Model)
             for _, control in ipairs(orderControls) do control.label:Hide(); control.up:Hide(); control.down:Hide(); control.delete:Hide() end
             emptyOrder:SetShown(#rows == 0)
@@ -427,7 +490,8 @@ function M.BuildPanel(parent)
                 control.delete:ClearAllPoints(); control.delete:SetPoint("LEFT", control.down, "RIGHT", 5, 0)
                 control.up:SetText(L["上移"]); control.down:SetText(L["下移"])
                 control.delete:SetText(L["删除"])
-                control.up:SetEnabled(row.canMoveUp); control.down:SetEnabled(row.canMoveDown)
+                control.up:SetEnabled(row.canMoveUp and M.sortMode(root) == "default")
+                control.down:SetEnabled(row.canMoveDown and M.sortMode(root) == "default")
                 control.up:SetScript("OnClick", function()
                     if Model and Model.moveCharacter(root, family, row.realmId, row.player, -1) then rebuildOrderRows(); refresh(); if BG.PlaySound then BG.PlaySound(1) end end
                 end)
@@ -449,7 +513,10 @@ function M.BuildPanel(parent)
         end
         restoreOrder:SetText(L["恢复默认排序"])
         restoreOrder:SetScript("OnClick", function()
-            if Model and Model.resetCharacterOrder(root, family) then rebuildOrderRows(); refresh(); if BG.PlaySound then BG.PlaySound(1) end end
+            M.setSortMode(root, "default")
+            if Model then Model.resetCharacterOrder(root, family) end
+            syncSortButtons(); rebuildOrderRows(); refresh()
+            if BG.PlaySound then BG.PlaySound(1) end
         end)
         rebuildOrderRows()
         if type(parent.HookScript) == "function" then parent:HookScript("OnShow", rebuildOrderRows) end
