@@ -383,13 +383,16 @@ function M.BuildPanel(parent)
         local function syncSortButtons()
             for index, option in ipairs(M.sortOptions) do
                 local selected = M.sortMode(root) == option.id
-                sortButtons[index]:SetText((selected and "✓ " or "") .. L[option.title])
+                local button = sortButtons[index]
+                button:SetText(L[option.title])
+                if selected then button:LockHighlight() else button:UnlockHighlight() end
             end
         end
         for index, option in ipairs(M.sortOptions) do
             local mode = option.id
             local button = BG.CreateButton(parent)
             sortButtons[index] = button
+            button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
             button:SetSize(180, 25)
             button:SetPoint("TOPLEFT", parent, 20 + ((index - 1) % 2) * 185,
                 y - math.floor((index - 1) / 2) * 30)

@@ -31,13 +31,22 @@ return function(test)
     local function frame(kind, name, parent)
         local f = { kind = kind, name = name, parent = parent, scripts = {}, scale = 1, shown = false }
         function f:SetScript(event, callback) self.scripts[event] = callback end
-        function f:HookScript(event, callback) self.scripts[event] = callback end
+        function f:HookScript(event, callback)
+            local previous = self.scripts[event]
+            self.scripts[event] = function(...)
+                if previous then previous(...) end
+                callback(...)
+            end
+        end
         function f:SetSize(w, h) self.width, self.height = w, h end
         function f:SetWidth(w) self.width = w end
         function f:SetHeight(h) self.height = h end
         function f:GetWidth() return self.width end
         function f:GetHeight() return self.height end
         function f:SetText(text) self.text = text end
+        function f:SetHighlightTexture(texture) self.highlightTexture = texture end
+        function f:LockHighlight() self.highlightLocked = true end
+        function f:UnlockHighlight() self.highlightLocked = false end
         function f:GetStringWidth() return #(self.text or "") * 7 end
         function f:SetScale(value) self.scale = value end
         function f:GetScale() return self.scale end
@@ -137,18 +146,31 @@ return function(test)
     local sortButton, defaultSortButton
     for _, control in ipairs(frames) do
         if control.text == "装等高到低" then sortButton = control end
-        if control.text == "✓ 默认" then defaultSortButton = control end
+        if control.text == "默认" then defaultSortButton = control end
     end
     test.eq(type(sortButton), "table", "settings offers automatic sort")
+    test.eq(type(defaultSortButton), "table", "default sort label contains no special glyph")
+    test.eq(defaultSortButton.highlightLocked, true, "initial selection stays highlighted")
+    test.eq(sortButton.highlightLocked, false, "unselected option uses normal style")
+    test.eq(type(sortButton.highlightTexture), "string", "sort buttons have a native highlight texture")
     local previousRefresh = ui.Refresh
     local sortRefreshes = 0
     ui.Refresh = function() sortRefreshes = sortRefreshes + 1 end
     sortButton.scripts.OnClick()
     test.eq(settings.sortMode(root), "itemLevel", "settings button persists sort")
-    test.eq(sortButton.text, "✓ 装等高到低", "selected sort is visibly marked")
+    test.eq(sortButton.text, "装等高到低", "selected label contains no special glyph")
+    test.eq(sortButton.highlightLocked, true, "new selection stays highlighted")
+    test.eq(defaultSortButton.highlightLocked, false, "previous selection returns to normal")
     test.eq(sortRefreshes, 1, "sort change immediately refreshes projection")
     defaultSortButton.scripts.OnClick()
     test.eq(settings.sortMode(root), "default", "default button restores existing order")
+    test.eq(defaultSortButton.highlightLocked, true, "default selection regains highlight")
+    test.eq(sortButton.highlightLocked, false, "automatic option returns to normal")
+    settings.setSortMode(root, "itemLevel")
+    panel.scripts.OnShow(panel)
+    test.eq(sortButton.highlightLocked, true, "reopening settings reflects saved selection")
+    test.eq(defaultSortButton.highlightLocked, false, "reopening clears stale selection")
+    defaultSortButton.scripts.OnClick()
     ui.Refresh = previousRefresh
     slider:SetValue(140)
     test.eq(settings.scale(root), 1.4, "slider change persists immediately")
