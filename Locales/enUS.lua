@@ -190,13 +190,14 @@ do -- BGNext 0.8.10 release text
     L["角色总览新增“只看满级角色”开关；仅无限服默认显示练级角色，其他客户端默认仍只显示满级角色，已有设置保留。"] = "Character overview adds a Max-Level Characters Only option. Only Forever shows leveling characters by default; other clients still default to max-level only. Existing choices are kept."
     L["练级角色被满级过滤隐藏时，空列表会提示原因和取消勾选的位置。"] = "When the max-level filter hides leveling characters, the empty list explains why and where to clear the option."
     L["无限服新建拍卖价格方案的基础价默认为10g，已有方案价格不变。"] = "New Forever auction price schemes now start at a 10g base price; existing schemes keep their prices."
+    L["角色总览新增自动排序：默认、职业-装等-名字、装等高到低、等级高到低、名字、最近更新；默认保持原顺序。"] = "Character overview adds automatic sorting: Default, Class–Item Level–Name, Item Level (High to Low), Level (High to Low), Name, and Recently Updated. Default keeps the existing order."
+    L["角色总览新增休息经验百分比，10级及以上未满级角色默认显示，满级角色不显示；此前隐藏该列的设置保留。"] = "Character overview adds rested XP percentages, shown by default for non-max-level characters at level 10 or above and hidden at max level. Existing choices to hide the column are kept."
+    L["离线角色的休息经验为估算值，显示“约”；登录后以实际值更新。"] = "Offline rested XP is estimated and marked Approx.; logging into the character refreshes the actual value."
     ns.updateText_now = {
-        "BGNext 0.8.17",
-        L["新增无限服（Interface 16001）适配基础：团本目录、角色总览活动和货币列；尚未完成游戏内实测。"],
-        L["无限服角色总览现在完整识别带姓氏的角色名，并保留已缓存的装备，避免角色混淆或装备栏位丢失。"],
-        L["角色总览新增“只看满级角色”开关；仅无限服默认显示练级角色，其他客户端默认仍只显示满级角色，已有设置保留。"],
-        L["练级角色被满级过滤隐藏时，空列表会提示原因和取消勾选的位置。"],
-        L["无限服新建拍卖价格方案的基础价默认为10g，已有方案价格不变。"],
+        "BGNext 0.8.18",
+        L["角色总览新增自动排序：默认、职业-装等-名字、装等高到低、等级高到低、名字、最近更新；默认保持原顺序。"],
+        L["角色总览新增休息经验百分比，10级及以上未满级角色默认显示，满级角色不显示；此前隐藏该列的设置保留。"],
+        L["离线角色的休息经验为估算值，显示“约”；登录后以实际值更新。"],
     }
 end
 
