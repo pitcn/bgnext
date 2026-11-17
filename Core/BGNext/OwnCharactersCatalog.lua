@@ -141,8 +141,6 @@ local CATALOG = {
                 { kind = "profession-cooldown", key = "saltShaker", spellId = 19566 }, true, "FFFFFF"),
             resource("mooncloth", "月布", "cooldown", "normal", false,
                 { kind = "profession-cooldown", key = "mooncloth", spellId = 18560 }, true, "FFFFFF"),
-            resource("restXp", "休息经验", "number", "narrow", false,
-                { kind = "currency", key = "restXp" }, false, "FFFFFF"),
             resource("money", "金币", "money", "normal", true,
                 { kind = "money" }, true, "FFD700"),
             resource("equipmentDetails", "装备详情", "items", "dynamic-items", false,
@@ -175,8 +173,6 @@ local CATALOG = {
                 { kind = "currency", key = "honor" }, true, "FFFFFF"),
             resource("arenaPoints", "竞技场点数", "number", "narrow", true,
                 { kind = "currency", key = "arenaPoints" }, false, "FFFFFF"),
-            resource("restXp", "休息经验", "number", "narrow", false,
-                { kind = "currency", key = "restXp" }, false, "FFFFFF"),
             resource("money", "金币", "money", "normal", true,
                 { kind = "money" }, true, "FFD700"),
             resource("equipmentDetails", "装备详情", "items", "dynamic-items", false,
@@ -391,6 +387,14 @@ local CATALOG = {
         end)(),
     },
 }
+
+-- Common rested column across all catalogs, including Forever. Unreadable
+-- observations render blank rather than a guessed percentage.
+for _, catalog in pairs(CATALOG) do
+    local columns = catalog.resourceColumns
+    columns[#columns + 1] = resource("restXp", "休息经验", "number", "narrow", false,
+        { kind = "rested-xp" }, true, "FFFFFF")
+end
 
 local function clone(value, seen)
     if type(value) ~= "table" then return value end

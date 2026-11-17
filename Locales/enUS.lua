@@ -6,6 +6,13 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["约"] = "~"
+L["角色自动排序"] = "Automatic character sorting"
+L["职业-装等-名字"] = "Class / item level / name"
+L["装等高到低"] = "Item level (descending)"
+L["等级高到低"] = "Level (descending)"
+L["名字"] = "Name"
+L["最近更新"] = "Recently updated"
 L["藏宝海湾周常"] = "Booty Bay weekly"
 L["奥金、军团石与精华转化共用冷却，以已学会配方的实际剩余时间为准。"] = "Arcanite, Legionite and essence transmutes share a cooldown. Shows the actual remaining time of a learned recipe."
 L["点铁成金"] = "Iron to Gold"

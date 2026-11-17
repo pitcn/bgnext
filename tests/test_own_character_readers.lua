@@ -255,7 +255,7 @@ return function(test)
             return 0, 0
         end,
     }), vanillaCatalog.raidColumns, vanillaCatalog.resourceColumns).resources()
-    test.eq(vanillaFull.currencies.restXp, 4200, "vanilla reads rested XP via GetXPExhaustion")
+    test.eq(vanillaFull.currencies.restXp, nil, "raw rested XP is replaced by the independent percentage snapshot")
     test.eq(vanillaFull.items.atieshFragment, 12, "vanilla reads the Atiesh fragment by item id")
     test.eq(vanillaFull.professionCooldowns.transmute.endsAt, 12200,
         "a cooling transmute converts the relative cooldown end into epoch time")

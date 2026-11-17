@@ -336,6 +336,51 @@ function M.readRestExperience(api)
     return xp
 end
 
+local function finiteNumber(value)
+    local secret = type(issecretvalue) == "function" and issecretvalue(value)
+    return not secret and type(value) == "number" and value == value
+        and value > -math.huge and value < math.huge
+end
+
+-- Resolve the current client's cap rather than embedding expansion levels.
+function M.readMaxLevel(api)
+    if type(api) ~= "table" then return nil end
+    for _, key in ipairs({ "GetMaxPlayerLevel", "GetMaxLevelForPlayerExpansion", "GetMaxLevelForLatestExpansion" }) do
+        local cap = M.safeCall(api[key])
+        if finiteNumber(cap) and cap > 0 then return cap end
+    end
+    local expansion = M.safeCall(api.GetExpansionLevel)
+    if finiteNumber(expansion) and type(api.MAX_PLAYER_LEVEL_TABLE) == "table" then
+        local cap = api.MAX_PLAYER_LEVEL_TABLE[expansion]
+        if finiteNumber(cap) and cap > 0 then return cap end
+    end
+    if finiteNumber(api.MAX_PLAYER_LEVEL) and api.MAX_PLAYER_LEVEL > 0 then return api.MAX_PLAYER_LEVEL end
+end
+
+function M.readRestedSnapshot(api)
+    if type(api) ~= "table" then return nil end
+    local reader = api.GetXPExhaustion
+    if type(reader) ~= "function" then
+        reader = type(api.C_PlayerInfo) == "table" and api.C_PlayerInfo.GetRestExperience
+    end
+    local ok, xp = callAll(reader)
+    -- A successful nil from the exhaustion API means no rested XP. An absent
+    -- or throwing API must never be turned into a zero observation.
+    if not ok then return nil end
+    if type(issecretvalue) == "function" and issecretvalue(xp) then return nil end
+    if xp == nil then xp = 0 end
+    local maxXp = M.safeCall(api.UnitXPMax, "player")
+    if not finiteNumber(xp) or xp < 0 or not finiteNumber(maxXp) or maxXp <= 0 then return nil end
+    local resting = M.safeCall(api.IsResting)
+    if type(issecretvalue) == "function" and issecretvalue(resting) then resting = nil end
+    if type(resting) ~= "boolean" then resting = nil end
+    return {
+        restXpPercent = math.min(150, xp / maxXp * 100),
+        restXpObservedAt = M.readNow(api),
+        restXpResting = resting,
+    }
+end
+
 -- Spell metadata and cooldown values are globally queryable, so neither proves
 -- that this character learned the configured recipe. Prefer the modern spell
 -- book ownership API, then the Classic-compatible spell-known calls. Missing
@@ -1313,6 +1358,7 @@ function M.readers(family, api, raidColumns, resourceColumns)
         professions = function() return M.readProfessions(api) end,
         resources = function(selection) return M.readResources(api, family, resourceColumns, selection) end,
         activities = function() return M.readActivityStates(api, family, resourceColumns) end,
+        rested = function() return M.readRestedSnapshot(api) end,
     }
 end
 
@@ -1333,6 +1379,8 @@ end
 function M.canReadColumn(family, api, column)
     if not M.isFamily(family) or type(api) ~= "table" or type(column) ~= "table" then return false end
     local source = column.source or {}
+    -- Missing APIs leave blank cells, while the preference remains available.
+    if source.kind == "rested-xp" then return true end
     if source.kind == "raid" then
         return source.readable == true and type(source.instanceIds) == "table" and #source.instanceIds > 0
             and type(api.GetNumSavedInstances) == "function"

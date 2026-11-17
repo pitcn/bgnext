@@ -86,7 +86,8 @@ return function(test)
         test.eq(Catalog.status(family), "unverified", family .. " remains unverified")
         local catalog = Catalog.forFamily(family)
         test.eq(#catalog.raidColumns, 0, family .. " exposes no unreliable raid placeholders")
-        test.eq(#catalog.resourceColumns, 0, family .. " exposes no unreliable resource placeholders")
+        test.eq(#catalog.resourceColumns, 1, family .. " declares only common rested column")
+        test.eq(catalog.resourceColumns[1].id, "restXp", "rested declaration does not claim client support")
     end
 
     for _, family in ipairs({ "vanilla", "tbc", "mop", "retail" }) do
@@ -120,7 +121,7 @@ return function(test)
     test.eq(vanillaResources.atieshFragment.source.key, "atieshFragment", "the Atiesh fragment uses its own whitelist key")
     test.eq(Adapters.currencyId("vanilla", "atieshFragment"), nil, "the Atiesh fragment is an item, not a currency")
     test.eq(vanillaResources.restXp ~= nil, true, "vanilla exposes rested XP")
-    test.eq(Catalog.defaultVisible("vanilla", "resource", "restXp"), false, "rested XP stays hidden until verified")
+    test.eq(Catalog.defaultVisible("vanilla", "resource", "restXp"), true, "rested XP is default visible")
     test.eq(vanillaResources.transmute ~= nil, true, "vanilla exposes the transmute cooldown")
     test.eq(vanillaResources.transmute.kind, "cooldown", "transmute is a cooldown column")
     test.eq(vanillaResources.transmute.source.spellId, 17187, "transmute uses the verified spell id")

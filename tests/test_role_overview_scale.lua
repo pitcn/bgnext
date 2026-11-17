@@ -134,6 +134,22 @@ return function(test)
     test.eq(slider:GetValue(), 125, "slider reflects saved percentage")
     test.eq(slider.low, 50, "slider starts at 50 percent")
     test.eq(slider.high, 150, "slider stops at 150 percent")
+    local sortButton, defaultSortButton
+    for _, control in ipairs(frames) do
+        if control.text == "装等高到低" then sortButton = control end
+        if control.text == "✓ 默认" then defaultSortButton = control end
+    end
+    test.eq(type(sortButton), "table", "settings offers automatic sort")
+    local previousRefresh = ui.Refresh
+    local sortRefreshes = 0
+    ui.Refresh = function() sortRefreshes = sortRefreshes + 1 end
+    sortButton.scripts.OnClick()
+    test.eq(settings.sortMode(root), "itemLevel", "settings button persists sort")
+    test.eq(sortButton.text, "✓ 装等高到低", "selected sort is visibly marked")
+    test.eq(sortRefreshes, 1, "sort change immediately refreshes projection")
+    defaultSortButton.scripts.OnClick()
+    test.eq(settings.sortMode(root), "default", "default button restores existing order")
+    ui.Refresh = previousRefresh
     slider:SetValue(140)
     test.eq(settings.scale(root), 1.4, "slider change persists immediately")
     test.eq(overview:GetScale(), 1.4, "slider updates an already open window")

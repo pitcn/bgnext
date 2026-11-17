@@ -403,7 +403,7 @@ local function trackedItemsCell(column, snapshot)
     return cell
 end
 
-local function resourceCell(column, snapshot, now)
+local function resourceCell(column, snapshot, now, context)
     local source = column.source or {}
     if source.kind == "equipment" then
         return equipmentCell(column, snapshot)
@@ -413,6 +413,26 @@ local function resourceCell(column, snapshot, now)
     end
 
     local cell = { columnId = column.id, state = "empty", text = "" }
+
+    if source.kind == "rested-xp" then
+        local cap, level = context.maxLevel, snapshot.level
+        if type(cap) ~= "number" or cap ~= cap or cap <= 0 or cap >= math.huge
+            or type(level) ~= "number" or level ~= level or level < 10 or level >= cap then return cell end
+        local percent = snapshot.restXpPercent
+        if type(percent) ~= "number" or percent ~= percent or percent < 0 or percent >= math.huge then return cell end
+        local current = snapshot.realmId == context.currentRealmId and snapshot.player == context.currentPlayer
+        local observedAt = snapshot.restXpObservedAt
+        if not current and type(now) == "number" and type(observedAt) == "number"
+            and observedAt >= 0 and observedAt < math.huge and type(snapshot.restXpResting) == "boolean" then
+            local rate = snapshot.restXpResting and 5 or 1.25
+            percent = percent + math.max(0, now - observedAt) / 28800 * rate
+        end
+        percent = math.min(150, percent)
+        cell.state, cell.value, cell.estimated = "value", percent, not current
+        local text = string.format("%.2f", percent):gsub("0+$", ""):gsub("%.$", "")
+        cell.text = (current and "" or L["约"]) .. text .. "%"
+        return cell
+    end
 
     if source.kind == "money" then
         if type(snapshot.money) == "number" then
@@ -579,7 +599,18 @@ end
 
 -- Rows are ordered current realm first, then realm, then character name, so
 -- the table does not reshuffle between logins.
-local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder, maxLevel, maxLevelOnly)
+local CLASS_ORDER = { WARRIOR = 1, PALADIN = 2, HUNTER = 3, ROGUE = 4, PRIEST = 5,
+    DEATHKNIGHT = 6, SHAMAN = 7, MAGE = 8, WARLOCK = 9, MONK = 10, DRUID = 11,
+    DEMONHUNTER = 12, EVOKER = 13 }
+
+local function sortNumber(value)
+    if type(value) == "number" and value == value and value > -math.huge and value < math.huge then
+        return value
+    end
+    return -math.huge
+end
+
+local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrder, maxLevel, maxLevelOnly, sortMode)
     local rows = {}
     local ranks = {}
     local hiddenByLevel = 0
@@ -607,6 +638,21 @@ local function buildRows(snapshots, currentRealmId, showAllRealms, characterOrde
         end
     end
     table.sort(rows, function(a, b)
+        local sa, sb = a.snapshot, b.snapshot
+        if sortMode == "class" or sortMode == "itemLevel" or sortMode == "level"
+            or sortMode == "name" or sortMode == "updatedAt" then
+            if sortMode == "class" then
+                local ca, cb = CLASS_ORDER[sa.class] or 99, CLASS_ORDER[sb.class] or 99
+                if ca ~= cb then return ca < cb end
+            end
+            local key = sortMode == "class" and "itemLevel" or sortMode
+            if key ~= "name" then
+                local va, vb = sortNumber(sa[key]), sortNumber(sb[key])
+                if va ~= vb then return va > vb end
+            end
+            if sa.player ~= sb.player then return sa.player < sb.player end
+            return tostring(sa.realmId) < tostring(sb.realmId)
+        end
         if a.rank and b.rank and a.rank ~= b.rank then return a.rank < b.rank end
         if a.rank ~= nil and b.rank == nil then return true end
         if a.rank == nil and b.rank ~= nil then return false end
@@ -707,7 +753,7 @@ function M.project(input)
     local resourceColumns = visibleColumns(catalog.resourceColumns, "resource", input.visibility, available)
 
     local entries, hiddenByLevel = buildRows(input.snapshots, input.currentRealmId, input.showAllRealms == true,
-        input.characterOrder, input.maxLevel, input.maxLevelOnly)
+        input.characterOrder, input.maxLevel, input.maxLevelOnly, input.sortMode)
     markAmbiguousNames(entries)
 
     local raidRows, resourceRows = {}, {}
@@ -725,7 +771,7 @@ function M.project(input)
 
         local resourceRow = baseRow(entry, family, index)
         for position, column in ipairs(resourceColumns) do
-            local cell = resourceCell(column, snapshot, now)
+            local cell = resourceCell(column, snapshot, now, input)
             resourceRow.cells[#resourceRow.cells + 1] = cell
             if column.total == true and type(cell.value) == "number" then
                 totals[column.id] = (totals[column.id] or 0) + cell.value

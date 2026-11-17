@@ -33,15 +33,15 @@ return function(T)
             snapshots = {{realmId = 1, player = 'Player', level = 60, currencies = result.currencies}}})
     end
     local view = project()
-    T.eq(#view.resource.columns, 1, 'only reals default visible with currency-only API')
+    T.eq(#view.resource.columns, 2, 'reals and blank rested column are default visible')
     T.eq(view.resource.columns[1].id, 'undermineReal')
     T.eq(view.resource.rows[1].cells[1].value, 107)
     Settings.setVisible(root, 'forever', 'resource', 'honorPoints', true)
     Settings.setVisible(root, 'forever', 'resource', 'merchantsFavor', true)
     view = project()
-    T.eq(#view.resource.columns, 3, 'optional currencies can be enabled')
+    T.eq(#view.resource.columns, 4, 'optional currencies can be enabled')
     Settings.setVisible(root, 'forever', 'resource', 'undermineReal', false)
-    T.eq(#project().resource.columns, 2, 'explicit hide overrides reals default')
+    T.eq(#project().resource.columns, 3, 'explicit hide overrides reals default')
     quantities[3469] = 0
     T.eq(Adapters.readResources(api, 'forever', catalog.resourceColumns).currencies.undermineReal, 0, 'zero balance is valid')
     api.C_CurrencyInfo.GetCurrencyInfo = function() return nil end
