@@ -235,6 +235,8 @@ local function updateProfileRows()
                 GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
                 if resolved and resolved.name then
                     GameTooltip:AddLine(L["跟随当前专精"] .. "：" .. resolved.name, 1, .82, 0)
+                elseif BG.IsForever then
+                    GameTooltip:AddLine(L["无限服专精默认方案待验证，沿用当前方案"], 1, .82, 0, true)
                 else
                     GameTooltip:AddLine(L["未识别当前专精，沿用当前方案"], 1, .82, 0)
                 end
@@ -285,6 +287,10 @@ local function updateProfileRows()
     local width = math.max(1, (#current.order + 2) * 35)
     BG.EquipmentFilterShortcutFrame:SetWidth(width)
     BG.FilterClassItemMainFrame.ProfileRow:SetWidth(width)
+end
+
+function M.refreshSpecialization()
+    if BG.EquipmentFilterShortcutFrame and BG.FilterClassItemMainFrame then updateProfileRows() end
 end
 
 local function sortedRules(values)

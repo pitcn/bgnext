@@ -3,6 +3,7 @@ local AddonName, ns = ...
 if (GetLocale() ~= "zhTW") then return end
 
 local L = ns.L
+L["无限服专精默认方案待验证，沿用当前方案"] = "無限服專精預設方案待驗證，沿用目前方案"
 L["约"] = "約"
 L["角色自动排序"] = "角色自動排序"
 L["职业-装等-名字"] = "職業-裝等-名字"

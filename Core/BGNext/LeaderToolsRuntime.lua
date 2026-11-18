@@ -217,7 +217,9 @@ end
 function M.captureCurrentHistory()
     local context = M.currentContext()
     if not context or not featureEnabled("local_history") then return 0 end
-    local myName = type(UnitName) == "function" and UnitName("player") or nil
+    local myName
+    if BG.IsForever then myName = BG.GN()
+    else myName = type(UnitName) == "function" and UnitName("player") or nil end
     local realm = type(GetRealmName) == "function" and GetRealmName() or nil
     local identity = BG.BGNext.PlayerIdentity
     context.enabled = true

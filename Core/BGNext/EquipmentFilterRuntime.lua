@@ -18,9 +18,9 @@ function M.resolveBuiltIn(adapter, catalog, family, classToken, api)
     local resolved = adapter.resolve(family, api, classToken)
     if resolved and resolved.specKey then
         local profile = catalog and catalog.getDefault(family, classToken, resolved.specKey)
-        if profile then return profile.builtInKey end
+        if profile then return profile.builtInKey, resolved.specKey end
     end
-    return nil
+    return nil, resolved and (resolved.specKey or resolved.reason)
 end
 
 local function specKeyFromBuiltIn(family, classToken, builtInKey)
@@ -66,12 +66,14 @@ function M.new(deps)
     local function resolveNow()
         local family = deps.adapter and deps.adapter.detect(deps.globals or BG)
         local classToken = deps.getClassToken and deps.getClassToken()
-        return M.resolveBuiltIn(deps.adapter, deps.catalog, family, classToken, deps.api), family, classToken
+        local builtInId, specStatus = M.resolveBuiltIn(deps.adapter, deps.catalog, family, classToken, deps.api)
+        return builtInId, family, classToken, specStatus
     end
 
     function c:onEvent(event)
         if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_LOGIN"
-            or event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_SPECIALIZATION_CHANGED" then
+            or event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_SPECIALIZATION_CHANGED"
+            or event == "ACTIVE_TALENT_GROUP_CHANGED" then
             self.pending = true
         end
     end
@@ -80,7 +82,9 @@ function M.new(deps)
         if not self.pending then return end
         self.pending = false
         if self.deps.enabled and not self.deps.enabled() then return end
-        local builtInId, family, classToken = resolveNow()
+        local builtInId, family, classToken, specStatus = resolveNow()
+        local statusChanged = family == "forever" and specStatus ~= self.lastSpecStatus
+        self.lastSpecStatus = specStatus
         local model = self.deps.model
         local state = self.deps.getState and self.deps.getState()
         local defaults
@@ -104,7 +108,7 @@ function M.new(deps)
             end
             self.lastBuiltInId = builtInId
         end
-        if (selectionChanged or upgraded) and self.deps.refresh then
+        if (selectionChanged or upgraded or statusChanged) and self.deps.refresh then
             self.deps.refresh()
         end
     end
@@ -150,6 +154,8 @@ if BG.Init then
                 end,
                 refresh = function()
                     if BG.UpdateAllFilter then BG.UpdateAllFilter() end
+                    local ui = BG.BGNext.EquipmentFilterUI
+                    if ui and ui.refreshSpecialization then ui.refreshSpecialization() end
                 end,
                 enabled = function()
                     local settings = BG.BGNext.FeatureSettings
@@ -162,8 +168,9 @@ if BG.Init then
             local frame = CreateFrame("Frame")
             frame:RegisterEvent("PLAYER_ENTERING_WORLD")
             frame:RegisterEvent("PLAYER_TALENT_UPDATE")
-            if BG.IsRetail or BG.IsMOP then
+            if BG.IsRetail or BG.IsMOP or BG.IsForever then
                 frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+                frame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
             end
             frame:SetScript("OnEvent", function(_, event) controller:onEvent(event) end)
             local accumulator = 0

@@ -6,6 +6,7 @@ if locale == "zhCN" or locale == "zhTW" then return end
 ns.enUS = true
 
 local L = ns.L
+L["无限服专精默认方案待验证，沿用当前方案"] = "Forever specialization defaults are unverified; keeping the current profile"
 L["约"] = "~"
 L["角色自动排序"] = "Automatic character sorting"
 L["职业-装等-名字"] = "Class / item level / name"
