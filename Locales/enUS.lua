@@ -193,11 +193,10 @@ do -- BGNext 0.8.10 release text
     L["角色总览新增自动排序：默认、职业-装等-名字、装等高到低、等级高到低、名字、最近更新；默认保持原顺序。"] = "Character overview adds automatic sorting: Default, Class–Item Level–Name, Item Level (High to Low), Level (High to Low), Name, and Recently Updated. Default keeps the existing order."
     L["角色总览新增休息经验百分比，10级及以上未满级角色默认显示，满级角色不显示；此前隐藏该列的设置保留。"] = "Character overview adds rested XP percentages, shown by default for non-max-level characters at level 10 or above and hidden at max level. Existing choices to hide the column are kept."
     L["离线角色的休息经验为估算值，显示“约”；登录后以实际值更新。"] = "Offline rested XP is estimated and marked Approx.; logging into the character refreshes the actual value."
+    L["修复切换角色后，其他角色的休息经验百分比不显示；离线角色按下线地点估算，旅店或主城每 8 小时约 5%，野外约 1.25%，上限 150%，标「约」。"] = "Fixed rested XP percentages disappearing for other characters after switching characters. Offline estimates use the last observed logout area: about 5% per 8 hours in an inn or city, or outdoors at 1.25%, capped at 150% and marked Approx."
     ns.updateText_now = {
-        "BGNext 0.8.18",
-        L["角色总览新增自动排序：默认、职业-装等-名字、装等高到低、等级高到低、名字、最近更新；默认保持原顺序。"],
-        L["角色总览新增休息经验百分比，10级及以上未满级角色默认显示，满级角色不显示；此前隐藏该列的设置保留。"],
-        L["离线角色的休息经验为估算值，显示“约”；登录后以实际值更新。"],
+        "BGNext 0.8.19",
+        L["修复切换角色后，其他角色的休息经验百分比不显示；离线角色按下线地点估算，旅店或主城每 8 小时约 5%，野外约 1.25%，上限 150%，标「约」。"],
     }
 end
 
