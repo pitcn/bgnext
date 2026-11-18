@@ -18,6 +18,14 @@ approximation, not a claim of live verification on any client. No other-player
 query, new messages, external transmission, raw API payload, XP denominator,
 account scan, filesystem SavedVariables access or migration is introduced.
 
+Offline-rested correction (2026-11-18): a failed/unavailable rested read, including
+a non-positive XP denominator at logout, preserves the existing percentage,
+observation time and rest-area flag together. Full and scoped refreshes use the
+same rule; only a successful observation replaces this triplet (including a real
+zero). Characters never successfully observed remain blank. No field, retention
+period, recipient, identity key or schema migration is added. Estimates remain
+view-only and retain the original observation anchor after a failed read.
+
 ## Forever client catalog (2026-11-13)
 
 The existing own-character snapshot and settings maps additionally accept the
