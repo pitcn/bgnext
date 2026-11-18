@@ -236,6 +236,15 @@ function M.collectAndStore(deps, sections, equipmentRetry)
         end
     end
 
+    -- Missing/protected XP APIs (including a zero denominator during logout)
+    -- are not a new observation. Keep the last actual rested snapshot as one
+    -- unit, without moving its time anchor or persisting an offline estimate.
+    if snapshot and snapshot.restXpPercent == nil and type(existing) == "table" then
+        snapshot.restXpPercent = existing.restXpPercent
+        snapshot.restXpObservedAt = existing.restXpObservedAt
+        snapshot.restXpResting = existing.restXpResting
+    end
+
     local appliedFarmObservation = false
     if snapshot and family == "mop" and type(snapshot.activityStates) == "table" then
         local pendingAt = deps._farmHarvestObservedAt
