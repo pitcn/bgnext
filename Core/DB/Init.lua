@@ -224,6 +224,15 @@ function BG.GN(unit)
     if unit == "t" then
         unit = "target"
     end
+    if BG.IsForever then
+        local first, surname = UnitName(unit)
+        if type(first) == "string" and first ~= "" and type(surname) == "string" and surname ~= "" then
+            return first .. " " .. surname
+        end
+        local full = GetUnitName(unit, true)
+        -- Never substitute a colliding first name when the surname is unavailable.
+        return type(full) == "string" and full:find("%s") and full or nil
+    end
     return GetUnitName(unit, true)
 end
 

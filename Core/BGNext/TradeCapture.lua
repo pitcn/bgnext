@@ -91,6 +91,7 @@ end
 -- depends on frames unrelated to freezing a snapshot. This collector instead
 -- reads the same Blizzard trade API synchronously, with no UI side effects.
 local function readTradeTarget()
+    if BG.IsForever then return BG.GN("NPC") end
     if type(GetUnitName) == "function" then
         local ok, name = pcall(GetUnitName, "NPC", true)
         if ok and type(name) == "string" and name:find("%S") then

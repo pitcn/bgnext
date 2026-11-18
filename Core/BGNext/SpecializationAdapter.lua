@@ -20,6 +20,7 @@ local M = {}
 -- anniversary client sets both IsWLK and IsTitan, and SoD sets both IsVanilla
 -- and IsVanilla_Sod.
 local FAMILY_ORDER = {
+    { flag = "IsForever", family = "forever" },
     { flag = "IsRetail", family = "retail" },
     { flag = "IsMOP", family = "mop" },
     { flag = "IsCTM", family = "cata" },
@@ -29,7 +30,7 @@ local FAMILY_ORDER = {
     { flag = "IsVanilla", family = "vanilla" },
 }
 
-local MODERN_FAMILIES = { mop = true, retail = true, cata = true }
+local MODERN_FAMILIES = { forever = true, mop = true, retail = true, cata = true }
 local TREE_FAMILIES = { vanilla = true, tbc = true, wrath = true, titan = true }
 
 function M.familyFromFlags(flags)

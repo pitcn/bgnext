@@ -13,7 +13,7 @@ local GetText_T = ns.GetText_T
 local AddTexture = ns.AddTexture
 local SendSystemMessage = BG.SendSystemMessage
 local After = C_Timer.After
-local player = UnitName("player")
+local player = (BG.IsForever and BG.GN or UnitName)("player")
 local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
 local MailSendAttempt = assert(BG.BGNext and BG.BGNext.MailSendAttempt,
     "BGNext MailSendAttempt must load before SendMail")

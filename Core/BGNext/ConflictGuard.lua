@@ -144,7 +144,9 @@ local function createWoWRuntime()
     }
 
     runtime.getEnableState = function(name)
-        local player = UnitName and UnitName("player") or nil
+        local player
+        if BG.IsForever then player = BG.GN()
+        else player = UnitName and UnitName("player") or nil end
         if modern and type(modern.GetAddOnEnableState) == "function" then
             return modern.GetAddOnEnableState(name, player)
         elseif type(GetAddOnEnableState) == "function" then
@@ -154,7 +156,9 @@ local function createWoWRuntime()
     end
 
     runtime.disableAddon = function(name)
-        local player = UnitName and UnitName("player") or nil
+        local player
+        if BG.IsForever then player = BG.GN()
+        else player = UnitName and UnitName("player") or nil end
         if modern and type(modern.DisableAddOn) == "function" then
             return pcall(modern.DisableAddOn, name, player)
         elseif type(DisableAddOn) == "function" then

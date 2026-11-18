@@ -731,6 +731,7 @@ do
     end
 
     local function UnitRealm(unit)
+        if BG.IsForever then return realmName end
         local realm = select(2, UnitName(unit))
         if not realm or realm == "" then
             realm = realmName
@@ -1234,8 +1235,9 @@ BG.Init(function()
             local f = CreateFrame("Frame")
             f:RegisterEvent("PLAYER_TALENT_UPDATE")
             f:RegisterEvent("PLAYER_ENTERING_WORLD")
-            if BG.verOver4 then
+            if BG.verOver4 or BG.IsForever then
                 f:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+                f:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
             end
             f:SetScript("OnEvent", function(self, event, ...)
                 if event == "PLAYER_ENTERING_WORLD" then
