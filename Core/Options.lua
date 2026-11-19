@@ -2665,6 +2665,19 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                     BG.options["button" .. name] = f
                     SetParent(f, "allLootToMe")
                 end
+
+                h = h + 30
+                local name = "autoMasterLoot"
+                BG.options[name .. "reset"] = 0
+                BiaoGe.options[name] = BiaoGe.options[name] or BG.options[name .. "reset"]
+                local ontext = {
+                    L["进本自动改为队长分配"],
+                    L["你是团长时，进入团队副本后自动把分配方式改为队长分配（即使团里有人之前手动改过也会覆盖）。"],
+                    " ",
+                    L["每进入一个新的副本只改一次，之后你手动修改不会被覆盖；战斗中会等脱战后再改。默认关闭。"],
+                }
+                local f = O.CreateCheckButton(name, L["进本自动改为队长分配"], others, 15, height - h, ontext, true)
+                BG.options["button" .. name] = f
             end
 
             -- 牌子拾取增强

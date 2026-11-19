@@ -222,6 +222,68 @@ BG.Init(function()
         end)
     end
 
+    -- 进本自动改为队长分配（默认关闭，仅团长；每个新副本实例只改一次，仅内存状态）
+    do
+        local handledKey, pending
+        local function isMasterMethod(method)
+            return method == "master" or (Enum and Enum.LootMethod and method == Enum.LootMethod.Masterlooter) or method == 2
+        end
+        local function readMethod()
+            local get = _G.GetLootMethod or (C_PartyInfo and C_PartyInfo.GetLootMethod)
+            if not get then return nil end
+            local ok, method = pcall(get)
+            return ok and method or nil
+        end
+        local function raidKey()
+            local _, instanceType, _, _, _, _, _, mapID = GetInstanceInfo()
+            if instanceType ~= "raid" then return nil end
+            return mapID or 0
+        end
+        local function check()
+            local key = raidKey()
+            if not key then
+                handledKey, pending = nil, nil
+                return
+            end
+            if handledKey == key then return end
+            if BiaoGe.options.autoMasterLoot ~= 1 then return end
+            if not IsInRaid() or not UnitIsGroupLeader("player") then return end
+            if InCombatLockdown() then
+                pending = true -- 脱战后再改
+                return
+            end
+            pending = nil
+            local method = readMethod()
+            if method == nil then return end
+            if isMasterMethod(method) then
+                handledKey = key
+                return
+            end
+            -- 无限服名字为「名 姓」，BG.GN 已处理
+            local name = BG.GN and BG.GN("player")
+            if type(name) ~= "string" or name == "" then return end
+            handledKey = key
+            if _G.SetLootMethod then
+                pcall(_G.SetLootMethod, "master", name)
+            elseif C_PartyInfo and C_PartyInfo.SetLootMethod then
+                local master = Enum and Enum.LootMethod and Enum.LootMethod.Masterlooter or 2
+                pcall(C_PartyInfo.SetLootMethod, master, name)
+            else
+                return
+            end
+            BG.After(1, function()
+                if raidKey() == key and isMasterMethod(readMethod()) then
+                    BG.SendSystemMessage(L["已自动把分配方式改为队长分配。"])
+                end
+            end)
+        end
+        BG.RegisterEvent({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" }, function() check() end)
+        BG.RegisterEvent("PLAYER_REGEN_ENABLED", function()
+            if pending then check() end
+        end)
+        BG.RegisterEvent({ "GROUP_LEFT", "PLAYER_LEAVING_WORLD" }, function() pending = nil end)
+    end
+
     local trade
     local buy
     local quest
