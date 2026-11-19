@@ -75,12 +75,11 @@ function M.hookBagEvent(event, callback, api, retail)
                 for _, button in frame:EnumerateItems() do attach(button) end
             end
         end
-        if type(api.ContainerFrameUtil_EnumerateContainerFrames) == "function" then
-            for _, frame in api.ContainerFrameUtil_EnumerateContainerFrames() do scan(frame) end
-        else
-            scan(api.ContainerFrameCombinedBags)
-            for i = 1, api.NUM_CONTAINER_FRAMES or 13 do scan(api["ContainerFrame" .. i]) end
-        end
+        -- Read-only scan of named frames. Never call Blizzard's lazily
+        -- initialised ContainerFrameUtil_EnumerateContainerFrames: running it
+        -- at login taints its cached upvalues and blocks HideUIPanel in combat.
+        scan(api.ContainerFrameCombinedBags)
+        for i = 1, api.NUM_CONTAINER_FRAMES or 13 do scan(api["ContainerFrame" .. i]) end
         return true
     end
     return false
