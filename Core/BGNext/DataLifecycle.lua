@@ -71,6 +71,28 @@ local function pruneForeverShortKeys(root)
     end
 end
 
+-- Single scalar dedupe marker of the Forever "clear previous bill?" prompt.
+-- Rebuilt from its whitelisted fields only, so nothing else can persist there,
+-- and dropped when malformed or older than the seven-day retention limit.
+local function sanitizeBillResetPrompt(root)
+    local marker = root.billResetPrompt
+    if marker == nil then return end
+    local now = serverNow()
+    if type(marker) ~= "table" or type(marker.fb) ~= "string" or marker.fb == ""
+        or type(marker.billStamp) ~= "number" or type(marker.at) ~= "number"
+        or now - marker.at >= MAX_AGE then
+        root.billResetPrompt = nil
+        return
+    end
+    root.billResetPrompt = {
+        fb = marker.fb,
+        billStamp = marker.billStamp,
+        newTeamAsked = marker.newTeamAsked == true or nil,
+        resetAskedKey = type(marker.resetAskedKey) == "string" and marker.resetAskedKey or nil,
+        at = marker.at,
+    }
+end
+
 function M.ensureRoot(saved)
     saved.BGNext = type(saved.BGNext) == "table" and saved.BGNext or {}
     local root = saved.BGNext
@@ -95,6 +117,7 @@ function M.ensureRoot(saved)
         and root.leaderTools.historyRetentionDays ~= 180 then
         root.leaderTools.historyRetentionDays = 90
     end
+    sanitizeBillResetPrompt(root)
     root.currentRaid = type(root.currentRaid) == "table" and root.currentRaid or {}
     root.currentRaid.purchases = type(root.currentRaid.purchases) == "table" and root.currentRaid.purchases or {}
     root.currentSettlement = type(root.currentSettlement) == "table" and root.currentSettlement or emptySettlement()

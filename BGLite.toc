@@ -32,6 +32,8 @@ Core\BGNext\RaidWelcome.lua
 Core\BGNext\LeaderToolsStore.lua
 Core\BGNext\LeaderToolsView.lua
 Core\BGNext\AutoClearGuard.lua
+Core\BGNext\BillResetPrompt.lua
+Core\BGNext\BillResetPromptUI.lua
 Core\BGNext\AuctionPriceStore.lua
 Core\BGNext\AuctionPriceCatalog.lua
 Core\BGNext\AuctionPriceCodec.lua
