@@ -1489,16 +1489,23 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
         h = h + 15
         -- 进本自动清空表格
         do
-            local name = "autoQingKong"
+            -- Forever replaces the lockout popup with its own prompt and switch;
+            -- every other client keeps the original option untouched.
+            local name = BG.IsForever and "foreverBillResetPrompt" or "autoQingKong"
+            local title = BG.IsForever and L["新团队/进度重置后询问清空账单"] or L["进本自动清空表格"]
+            if BG.IsForever and BiaoGe.options[name] == nil and BiaoGe.options["autoQingKong"] == 0 then
+                BiaoGe.options[name] = 0 -- keep an earlier "off" choice
+            end
             BG.options[name .. "reset"] = 1
             BiaoGe.options[name] = BiaoGe.options[name] or BG.options[name .. "reset"]
             local ontext = {
-                L["进本自动清空表格"],
-                L["当你进入一个新CD团本时，表格会自动清空。"],
+                title,
+                BG.IsForever and L["进入新团队，或副本进度重置后第一次进本时，弹窗询问是否清空上次账单。只询问，不会自动清空；战斗中不弹，脱战后再判断。"]
+                    or L["当你进入一个新CD团本时，表格会自动清空。"],
                 -- " ",
                 -- L[""],
             }
-            local f = O.CreateCheckButton(name, L["进本自动清空表格"], biaoge, 15, height - h, ontext)
+            local f = O.CreateCheckButton(name, title, biaoge, 15, height - h, ontext, BG.IsForever and 300 or nil)
             BG.options["button" .. name] = f
             -- 删除旧设置
             if BiaoGe.options["showQingKong"] then
@@ -2134,6 +2141,12 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                 normal = L["常规模式"],
             }
 
+            -- An unset value (resetThreshold has no default) must not reach
+            -- EditBox:SetText(nil); numbers are shown as their text.
+            local function AuctionEditText(value)
+                return value == nil and "" or tostring(value)
+            end
+
             -- 控制第一代/第二代切换时启用/禁用关联控件
             local modDropDown, modText, resetText, resetEdit
             local function UpdateGen2State()
@@ -2151,7 +2164,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                     if isGen2 then
                         resetEdit:Enable()
                         resetEdit:SetTextColor(1, 1, 1)
-                        resetEdit:SetText(BiaoGe.Auction.resetThreshold)
+                        resetEdit:SetText(AuctionEditText(BiaoGe.Auction.resetThreshold))
                     else
                         resetEdit:Disable()
                         resetEdit:SetTextColor(0.5, 0.5, 0.5)
@@ -2262,7 +2275,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                     BiaoGe.Auction[name] = self:GetText()
                 end)
                 edit:SetScript("OnShow", function(self)
-                    edit:SetText(BiaoGe.Auction[name])
+                    edit:SetText(AuctionEditText(BiaoGe.Auction[name]))
                 end)
             end
 
@@ -2287,7 +2300,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                     BiaoGe.Auction[name] = self:GetText()
                 end)
                 edit:SetScript("OnShow", function(self)
-                    edit:SetText(BiaoGe.Auction[name])
+                    edit:SetText(AuctionEditText(BiaoGe.Auction[name]))
                 end)
                 resetEdit = edit
             end
@@ -2312,7 +2325,7 @@ t:SetText("|cff" .. "00BFFF" .. "BGNext" .. "|r")
                     BiaoGe.Auction[name] = self:GetText()
                 end)
                 edit:SetScript("OnShow", function(self)
-                    edit:SetText(BiaoGe.Auction[name])
+                    edit:SetText(AuctionEditText(BiaoGe.Auction[name]))
                 end)
             end
 

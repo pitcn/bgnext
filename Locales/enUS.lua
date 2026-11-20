@@ -3598,3 +3598,14 @@ L["荆棘议会"] = "Council of Thorns"
 L["缚梦者尼苏斯"] = "Nythus the Dreambound"
 L["荒野之王"] = "The Wild King"
 L["奥妮克希亚的巢穴"] = "Onyxia's Lair"
+
+do -- BGNext Forever bill reset prompt
+    L["新团队/进度重置后询问清空账单"] = "Ask to clear the previous bill"
+    L["进入新团队，或副本进度重置后第一次进本时，弹窗询问是否清空上次账单。只询问，不会自动清空；战斗中不弹，脱战后再判断。"] = "Asks whether to clear the previous bill when you join a new raid group, or enter a raid for the first time after its progress reset. It only asks and never clears by itself; it stays hidden in combat and is re-checked afterwards."
+    L["清空上次账单？"] = "Clear the previous bill?"
+    L["清空上次账单"] = "Clear Previous Bill"
+    L["保留"] = "Keep"
+    L["检测到你进入了新团队。表格< %s >仍有上次的账单内容，要清空上次账单吗？"] = "You joined a new raid group. Table <%s> still holds the previous bill. Clear the previous bill?"
+    L["检测到副本进度已重置。表格< %s >仍有上次的账单内容，要清空上次账单吗？"] = "The raid progress was reset. Table <%s> still holds the previous bill. Clear the previous bill?"
+    L["检测到你进入了新团队，且副本进度已重置。表格< %s >仍有上次的账单内容，要清空上次账单吗？"] = "You joined a new raid group and the raid progress was reset. Table <%s> still holds the previous bill. Clear the previous bill?"
+end

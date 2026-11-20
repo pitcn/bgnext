@@ -106,6 +106,9 @@ function BG.ClearBiaoGeUI()
             end
             BiaoGe[FB].auctionLog = nil
             BiaoGe[FB].leaderInfo = nil
+            if BG.IsForever and BG.BGNext and BG.BGNext.BillResetPrompt and type(BG.BGNext.DB) == "table" then
+                BG.BGNext.BillResetPrompt.onTableCleared(BG.BGNext.DB, FB)
+            end
             BG.UpdateAuctionLogFrame()
             BG.auctionLogFrame.changeFrame:Hide()
 
@@ -394,8 +397,195 @@ function BG.ClearBiaoGeUI()
 
         local notCheckMaxPlayer = BG.verOver4
         local notCheckDiff = not BG.IsRetail
+        -- Forever only: the lockout popup above is replaced by an addon-owned
+        -- "clear the previous bill?" question (BillResetPrompt/BillResetPromptUI).
+        -- It only asks; clearing reuses DoAutoClear -> BG.ClearBiaoGe after the
+        -- guard re-checks the table. Other clients never reach this code.
+        local function ForeverPromptEnabled()
+            local value = BiaoGe.options["foreverBillResetPrompt"]
+            if value == nil then
+                -- Not chosen yet: inherit the old switch, defaulting to on.
+                return BiaoGe.options["autoQingKong"] ~= 0
+            end
+            return value == 1
+        end
+
+        local promptState
+        local function GetPrompt()
+            local N = BG.BGNext
+            local root = N and N.DB
+            if N and N.BillResetPrompt and N.BillResetPromptUI and type(root) == "table" then
+                promptState = promptState or N.BillResetPrompt.newState()
+                return N.BillResetPrompt, N.BillResetPromptUI, root, promptState
+            end
+        end
+
+        local function FindLastBillFB()
+            local ids = {}
+            for _, raid in ipairs(BG.ForeverRaids or {}) do ids[#ids + 1] = raid.id end
+            if #ids == 0 then ids = BG.FBtable or {} end
+            local best, bestTime
+            for _, fb in ipairs(ids) do
+                local t = BiaoGe[fb] and BiaoGe[fb].raidRoster and BiaoGe[fb].raidRoster.time
+                if type(t) == "number" and (not bestTime or t > bestTime) and BG.BiaoGeHavedItem(fb, "onlyboss") then
+                    best, bestTime = fb, t
+                end
+            end
+            if not best and BG.FB1 and BiaoGe[BG.FB1] and BG.BiaoGeHavedItem(BG.FB1, "onlyboss") then
+                best = BG.FB1
+            end
+            return best
+        end
+
+        -- Existing timestamps only; never player data.
+        local function BillStamp(fb)
+            local t = BiaoGe[fb].raidRoster and BiaoGe[fb].raidRoster.time
+            if type(t) ~= "number" then
+                local m = BiaoGe.clearBiaoGeMoney and BiaoGe.clearBiaoGeMoney[fb]
+                t = m and m.time
+            end
+            return type(t) == "number" and t or 0
+        end
+
+        local function EvaluateBillPrompt(spec)
+            local P, UI, root, state = GetPrompt()
+            if not P or not ForeverPromptEnabled() then return end
+            if InCombatLockdown() then
+                P.defer(state, spec)
+                return
+            end
+            local ok = pcall(function()
+                local lastBill = FindLastBillFB()
+                local fb = spec.kind == "reset" and spec.fb or lastBill
+                if not fb or not BiaoGe[fb] then return end
+                -- The new-team question belongs to the last bill only. A reset
+                -- of another raid's table asks about the reset alone, so the
+                -- two answers never overwrite each other.
+                local c = {
+                    forever = true,
+                    enabled = true,
+                    fb = fb,
+                    hasContent = BG.BiaoGeHavedItem(fb, "onlyboss") and true or false,
+                    billStamp = BillStamp(fb),
+                    newTeam = (fb == lastBill and IsInRaid(1) and type(BG.raidRosterInfo) == "table"
+                        and #BG.raidRosterInfo > 0 and IsNotSameTeam(fb)) and true or false,
+                }
+                if spec.kind == "reset" then
+                    c.reset = { instanceID = spec.instanceID, locked = spec.locked, lockoutId = spec.lockoutId }
+                end
+                local req, observe = P.shouldAsk(c, root.billResetPrompt)
+                if observe then P.observe(root, c, observe, GetServerTime()) end
+                if not req then return end
+                local Guard = BG.BGNext.AutoClearGuard
+                if not Guard or not P.begin(state, req) then return end
+                local function answered()
+                    P.finish(state)
+                    P.markAsked(root, req, GetServerTime())
+                end
+                local shown = UI.show({
+                    fbName = BG.GetFBinfo(fb, "shortName"),
+                    newTeam = req.newTeam,
+                    reset = req.reset,
+                    onClear = function()
+                        answered()
+                        local pending = Guard.createPending(fb, 4)
+                        if Guard.accept(pending, StillHasAnyContent(pending), nil) == "clear" then
+                            DoAutoClear(fb, 4)
+                        end
+                    end,
+                    onKeep = answered,
+                })
+                if not shown then P.finish(state) end
+            end)
+            if not ok and not UI.isShown() then P.finish(state) end
+        end
+
+        local function SpecStillValid(spec)
+            if spec.kind == "reset" then
+                return IsInInstance() and select(8, GetInstanceInfo()) == spec.instanceID
+            end
+            return IsInRaid(1) and true or false
+        end
+
+        local notCheckMaxPlayerF, notCheckDiffF = BG.verOver4, not BG.IsRetail
+        local function ForeverCheckCD()
+            -- Every game call is guarded: a missing or odd API means no prompt.
+            local ok, spec = pcall(function()
+                local _, _, diffID, _, maxPlayers, _, _, instanceID = GetInstanceInfo()
+                local FB = BG.FBIDtable[instanceID]
+                if not (FB and IsInInstance()) then return nil end
+                local locked, lockoutId = false, nil
+                local rows, rowsWithId = GetNumSavedInstances(), 0
+                for i = 1, rows do
+                    local _, _lockId, _, _diffID, _locked, _, _, _, _maxPlayers, _, _, _, _, _instanceID = GetSavedInstanceInfo(i)
+                    if type(_instanceID) == "number" then rowsWithId = rowsWithId + 1 end
+                    if _locked and instanceID == _instanceID
+                        and (notCheckMaxPlayerF or maxPlayers == _maxPlayers)
+                        and (notCheckDiffF or diffID == _diffID)
+                    then
+                        locked, lockoutId = true, _lockId
+                        break
+                    end
+                end
+                -- Rows without a numeric instance id (unverified Forever return
+                -- layout) cannot tell locked from unlocked: fail closed.
+                if rows > 0 and rowsWithId == 0 then return nil end
+                if not locked then BG.ClickFBbutton(FB) end
+                return { kind = "reset", fb = FB, instanceID = instanceID, locked = locked,
+                    lockoutId = type(lockoutId) == "number" and lockoutId or nil }
+            end)
+            if ok and spec then EvaluateBillPrompt(spec) end
+        end
+
+        if BG.IsForever then
+            local wasInRaid, lastCount, debounce = false, 0, 0
+            local function QueueTeamCheck()
+                debounce = debounce + 1
+                local mine = debounce
+                BG.After(3, function()
+                    if mine == debounce then EvaluateBillPrompt({ kind = "team" }) end
+                end)
+            end
+            BG.RegisterEvent("GROUP_ROSTER_UPDATE", function()
+                local inRaid = IsInRaid(1) and true or false
+                local count = inRaid and (GetNumGroupMembers() or 0) or 0
+                local joined = inRaid and (not wasInRaid or math.abs(count - lastCount) >= 5)
+                wasInRaid, lastCount = inRaid, count
+                if joined and ForeverPromptEnabled() then QueueTeamCheck() end
+            end)
+            BG.RegisterEvent("GROUP_LEFT", function()
+                wasInRaid, lastCount = false, 0
+                local P, _, root, state = GetPrompt()
+                if P then
+                    P.onGroupLeft(root)
+                    P.clearDeferred(state)
+                end
+            end)
+            BG.RegisterEvent("PLAYER_ENTERING_WORLD", function()
+                wasInRaid = IsInRaid(1) and true or false
+                lastCount = wasInRaid and (GetNumGroupMembers() or 0) or 0
+                -- Leaving while offline or logging in another character never
+                -- fires GROUP_LEFT: arriving outside any group ends the party.
+                local grouped = wasInRaid or (type(IsInGroup) == "function" and IsInGroup()) or false
+                if not grouped then
+                    local P, _, root = GetPrompt()
+                    if P then P.onGroupLeft(root) end
+                end
+                if wasInRaid and ForeverPromptEnabled() then QueueTeamCheck() end
+            end)
+            BG.RegisterEvent("PLAYER_REGEN_ENABLED", function()
+                local P, _, _, state = GetPrompt()
+                local spec = P and P.takeDeferred(state)
+                if spec and SpecStillValid(spec) then EvaluateBillPrompt(spec) end
+            end)
+        end
+
         local needCheck
         local function CheckCD()
+            if BG.IsForever then
+                BG.After(3, ForeverCheckCD)
+                return
+            end
             BG.After(3, function()
                 local _, _, diffID, _, maxPlayers, _, _, instanceID = GetInstanceInfo()
                 local FB = BG.FBIDtable[instanceID]
@@ -441,9 +631,13 @@ function BG.ClearBiaoGeUI()
             end)
         end
         BG.RegisterEvent("RAID_INSTANCE_WELCOME", function(self, event, ...)
-            if BiaoGe.options["autoQingKong"] ~= 1 then return end
+            if BG.IsForever then
+                if not ForeverPromptEnabled() then return end
+            elseif BiaoGe.options["autoQingKong"] ~= 1 then
+                return
+            end
             needCheck = true
-            RequestRaidInfo()
+            if BG.IsForever then pcall(RequestRaidInfo) else RequestRaidInfo() end
         end)
         BG.RegisterEvent("UPDATE_INSTANCE_INFO", function()
             if needCheck then
