@@ -14,6 +14,7 @@ local suites = {
     "tests/test_main_frame_error_reporting.lua",
     "tests/test_forever_tooltip_hooks.lua",
     "tests/test_forever_client_compat.lua",
+    "tests/test_client_compat_bag_scan.lua",
     "tests/test_forever_raids.lua",
     "tests/test_auction_log_filter.lua",
     "tests/test_titan_weeklies.lua",

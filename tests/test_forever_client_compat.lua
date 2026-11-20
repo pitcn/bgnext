@@ -33,8 +33,10 @@ return function(test)
         HookScript = function(_, method, callback) hooks[#hooks + 1] = { method = method, callback = callback } end,
         GetParent = function() return { GetID = function() return 99 end } end }
     env.ContainerFrameUtil_EnumerateContainerFrames = function()
-        return ipairs({ { EnumerateItems = function() return ipairs({ button }) end } })
+        error("addon code must not initialize Blizzard lazy container enumerator")
     end
+    env.NUM_CONTAINER_FRAMES = 1
+    env.ContainerFrame1 = { EnumerateItems = function() return ipairs({ button }) end }
     local function run(block)
         local fn = assert(loadstring(block)); setfenv(fn, env); fn()
     end
