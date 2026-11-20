@@ -196,9 +196,12 @@ do -- BGNext 0.8.10 release text
     L["离线角色的休息经验为估算值，显示“约”；登录后以实际值更新。"] = "Offline rested XP is estimated and marked Approx.; logging into the character refreshes the actual value."
     L["修复切换角色后，其他角色的休息经验百分比不显示；离线角色按下线地点估算，旅店或主城每 8 小时约 5%，野外约 1.25%，上限 150%，标「约」。"] = "Fixed rested XP percentages disappearing for other characters after switching characters. Offline estimates use the last observed logout area: about 5% per 8 hours in an inn or city, or outdoors at 1.25%, capped at 150% and marked Approx."
     L["无限服：团长工具「我买的」、批量发信、交易对象和插件冲突检查改用完整「名 姓」匹配；换专精或换天赋组后装备筛选自动刷新，无法识别专精时会提示。"] = "Forever: Leader tools (My purchases), bulk mail, trade partner and addon conflict checks now match full two-part character names; the equipment filter refreshes after a spec or talent group change and shows a notice when the spec cannot be identified."
+    L["修复战斗中按 ESC 关不掉人物面板等窗口的问题。"] = "Fixed ESC failing to close the character panel and other windows during combat."
+    L["新增可选功能：进团本时自动改为队长分配（默认关闭，待游戏内验收）。"] = "New optional feature: automatically switch the loot method to Master Looter when you enter a raid instance as leader (off by default; awaiting in-game verification)."
     ns.updateText_now = {
-        "BGNext 0.8.20",
-        L["无限服：团长工具「我买的」、批量发信、交易对象和插件冲突检查改用完整「名 姓」匹配；换专精或换天赋组后装备筛选自动刷新，无法识别专精时会提示。"],
+        "BGNext 0.8.21",
+        L["修复战斗中按 ESC 关不掉人物面板等窗口的问题。"],
+        L["新增可选功能：进团本时自动改为队长分配（默认关闭，待游戏内验收）。"],
     }
 end
 
