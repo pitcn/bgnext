@@ -198,10 +198,12 @@ do -- BGNext 0.8.10 release text
     L["无限服：团长工具「我买的」、批量发信、交易对象和插件冲突检查改用完整「名 姓」匹配；换专精或换天赋组后装备筛选自动刷新，无法识别专精时会提示。"] = "Forever: Leader tools (My purchases), bulk mail, trade partner and addon conflict checks now match full two-part character names; the equipment filter refreshes after a spec or talent group change and shows a notice when the spec cannot be identified."
     L["修复战斗中按 ESC 关不掉人物面板等窗口的问题。"] = "Fixed ESC failing to close the character panel and other windows during combat."
     L["新增可选功能：进团本时自动改为队长分配（默认关闭，待游戏内验收）。"] = "New optional feature: automatically switch the loot method to Master Looter when you enter a raid instance as leader (off by default; awaiting in-game verification)."
+    L["新增（仅无限服）：进入新团队或副本进度重置后，弹窗询问是否清空之前的账单，可在设置里关闭；战斗中不会弹出。每个副本第一次重置只记录不询问。"] = "New (Forever only): after joining a new team or a raid lockout reset, a popup asks whether to clear the previous bill; it can be turned off in settings and never appears in combat. The first reset of each instance is only recorded, without asking."
+    L["修复自动拍卖设置页打开时偶尔报错。"] = "Fixed an occasional error when opening the auto-auction settings page."
     ns.updateText_now = {
-        "BGNext 0.8.21",
-        L["修复战斗中按 ESC 关不掉人物面板等窗口的问题。"],
-        L["新增可选功能：进团本时自动改为队长分配（默认关闭，待游戏内验收）。"],
+        "BGNext 0.8.22",
+        L["新增（仅无限服）：进入新团队或副本进度重置后，弹窗询问是否清空之前的账单，可在设置里关闭；战斗中不会弹出。每个副本第一次重置只记录不询问。"],
+        L["修复自动拍卖设置页打开时偶尔报错。"],
     }
 end
 
