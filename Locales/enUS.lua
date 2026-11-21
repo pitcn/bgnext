@@ -200,10 +200,14 @@ do -- BGNext 0.8.10 release text
     L["新增可选功能：进团本时自动改为队长分配（默认关闭，待游戏内验收）。"] = "New optional feature: automatically switch the loot method to Master Looter when you enter a raid instance as leader (off by default; awaiting in-game verification)."
     L["新增（仅无限服）：进入新团队或副本进度重置后，弹窗询问是否清空之前的账单，可在设置里关闭；战斗中不会弹出。每个副本第一次重置只记录不询问。"] = "New (Forever only): after joining a new team or a raid lockout reset, a popup asks whether to clear the previous bill; it can be turned off in settings and never appears in combat. The first reset of each instance is only recorded, without asking."
     L["修复自动拍卖设置页打开时偶尔报错。"] = "Fixed an occasional error when opening the auto-auction settings page."
+    L["修复无限服团长无法发起拍卖、团员看不到拍卖的问题（团长和团员都需要更新到本版本）。"] = "Fixed Forever raid leaders being unable to start auctions and raid members not seeing auctions (both the leader and members need to update to this version)."
+    L["没有权限时的提示改为“只有团长或物品分配者可以发起拍卖”；非团长在背包 Alt+点击物品时，不在团队中不提示，在团队中每次登录最多提示一次。"] = "The no-permission message now reads \"Only the raid leader or master looter can start an auction\"; a non-leader Alt+clicking a bag item gets no message outside a raid and at most one per login inside a raid."
+    L["无限服新用户普通拍卖窗口默认起拍价改为 10G，已保存的起拍价不变。"] = "Forever: the plain auction window now defaults to a 10G starting price for new users; saved starting prices are unchanged."
     ns.updateText_now = {
-        "BGNext 0.8.22",
-        L["新增（仅无限服）：进入新团队或副本进度重置后，弹窗询问是否清空之前的账单，可在设置里关闭；战斗中不会弹出。每个副本第一次重置只记录不询问。"],
-        L["修复自动拍卖设置页打开时偶尔报错。"],
+        "BGNext 0.8.23",
+        L["修复无限服团长无法发起拍卖、团员看不到拍卖的问题（团长和团员都需要更新到本版本）。"],
+        L["没有权限时的提示改为“只有团长或物品分配者可以发起拍卖”；非团长在背包 Alt+点击物品时，不在团队中不提示，在团队中每次登录最多提示一次。"],
+        L["无限服新用户普通拍卖窗口默认起拍价改为 10G，已保存的起拍价不变。"],
     }
 end
 
