@@ -34,8 +34,16 @@ end
 
 BG.Init(function()
     BiaoGe.Auction = BiaoGe.Auction or {}
+    -- 默认起拍价
     if BG.verLess2 then
-        BiaoGe.Auction.money = BiaoGe.Auction.money or 100
+        if BG.IsForever then
+            -- 无限服：没有有效起拍价时默认 10G，已保存的起拍价不变
+            if not tonumber(BiaoGe.Auction.money) then
+                BiaoGe.Auction.money = 10
+            end
+        else
+            BiaoGe.Auction.money = BiaoGe.Auction.money or 100
+        end
         BiaoGe.Auction.fastMoney = BiaoGe.Auction.fastMoney or { 100, 300, 500, 1000, 2000 }
     elseif BG.IsTitan then
         BG.Once("fastMoney", 251201, function()
@@ -61,6 +69,7 @@ BG.Init(function()
         BiaoGe.Auction.money = BiaoGe.Auction.money or 100000
         BiaoGe.Auction.fastMoney = BiaoGe.Auction.fastMoney or { 10000, 50000, 100000, 200000, 500000 }
     end
+    -- 默认起拍价结束
 
     local sending = {}
     local sendDone = {}
