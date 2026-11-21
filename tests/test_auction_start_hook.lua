@@ -16,6 +16,7 @@ return function(test)
         "UIErrorsFrame", "ITEM_CLASSES_ALLOWED", "ERR_IGNORE_ADDED_S",
         "SlashCmdList", "StaticPopupDialogs", "StaticPopup_Hide", "StaticPopup_Show",
         "StaticPopup_Visible", "hooksecurefunc", "LibStub", "UnitInRaid", "IsAltKeyDown",
+        "UnitIsGroupLeader", "IsMasterLooter", "UnitIsUnit",
         "UpdateFrame", "ClearAllFocus", "wipe", "unpack", "random", "YES", "NO",
     }
     local originalValues = {}
@@ -360,8 +361,26 @@ return function(test)
         -- drive the real BG.StartAuction entry rather than a parallel gate.
         BG.IsML = false
         BG.StartAuction("item:1001", nil, nil, true)
-        test.eq(messages[#messages], "无权限发起拍卖",
+        test.eq(messages[#messages], "只有团长或物品分配者可以发起拍卖",
             "a non-controller sees why the auction did not open")
+        -- A stale roster cache never refuses the live raid leader or master looter.
+        dofile("Core/BGNext/RaidAuthority.lua")
+        local before = #messages
+        setGlobal("UnitIsGroupLeader", function(unit) return unit == "player" end)
+        BG.StartAuction("item:1001", nil, nil, true)
+        test.eq(#messages, before, "the live raid leader is not refused")
+        test.eq(BG.StartAucitonFrame ~= nil, true, "the live raid leader opens the auction panel")
+        setGlobal("UnitIsGroupLeader", function() return false end)
+        setGlobal("IsMasterLooter", function() return true end)
+        BG.StartAuction("item:1001", nil, nil, true)
+        test.eq(#messages, before, "the live master looter is not refused")
+        setGlobal("IsMasterLooter", function() return false end)
+        BG.StartAuction("item:1001", nil, nil, true)
+        test.eq(messages[#messages], "只有团长或物品分配者可以发起拍卖",
+            "an assistant or member is still refused")
+        BG.IsAuctionController = nil
+        setGlobal("UnitIsGroupLeader", nil)
+        setGlobal("IsMasterLooter", nil)
         BG.IsML = true
 
         BiaoGe.options.autoAuctionStart = 0

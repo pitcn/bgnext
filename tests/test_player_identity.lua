@@ -16,8 +16,10 @@ return function(test)
         "the same remote realm tolerates display formatting differences")
     test.eq(Identity.same(nil, "Alice", "My Realm"), false, "a missing name fails closed")
     test.eq(Identity.same("", "Alice", "My Realm"), false, "an empty name fails closed")
-    test.eq(Identity.same("Alice", "Alice", nil), false,
-        "two bare names without a known realm do not create an ambiguous identity")
+    test.eq(Identity.same("Alice", "Alice", nil), true,
+        "two bare names match when the local realm is unknown (Forever reports an empty realm)")
+    test.eq(Identity.same("Alice-RealmA", "Alice", nil), false,
+        "an explicit realm never merges with an unknown-realm bare name")
 
     local roster = {
         { name = "Alice-MyRealm", class = "MAGE", color = { 0.25, 0.78, 0.92 } },
@@ -42,8 +44,8 @@ return function(test)
     test.eq(Identity.canonical("Reader-OtherRealm", "时光"), "Reader-OtherRealm",
         "canonical form preserves a cross-realm suffix")
     test.eq(Identity.canonical(nil, "时光"), nil, "canonical form of a missing value fails closed")
-    test.eq(Identity.canonical("Reader", nil), nil,
-        "a bare name without a known realm has no canonical identity")
+    test.eq(Identity.canonical("Reader", nil), "Reader",
+        "a bare name without a known realm stays bare")
 
     for _, family in ipairs({ "vanilla", "tbc", "wrath", "titan", "cata", "mop" }) do
         test.eq(Identity.display("Reader-时光", "时光", family), "Reader",

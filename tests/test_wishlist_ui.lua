@@ -131,7 +131,7 @@ return function(test)
     local mainFile = assert(io.open("Core/BiaoGe.lua", "rb"))
     local mainSource = mainFile:read("*a")
     mainFile:close()
-    test.eq(mainSource:find("shortcutAction(BG.IsML, button, true)", 1, true) ~= nil, true,
+    test.eq(mainSource:find("shortcutAction((BG.CanStartAuction and BG.CanStartAuction() or BG.IsML), button, true)", 1, true) ~= nil, true,
         "alt-click call site passes the explicit modifier state")
 
     local billFile = assert(io.open("Core/FBUI/FBUIfunction.lua", "rb"))

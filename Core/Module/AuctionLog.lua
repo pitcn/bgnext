@@ -1511,7 +1511,7 @@ BG.Init(function()
                 return
             end
             -- 已移除「设为最佳价格」分支（第三方付费模块 BGV 提供的能力）
-            if IsAltKeyDown() and BG.IsML then
+            if IsAltKeyDown() and (BG.CanStartAuction and BG.CanStartAuction() or BG.IsML) then
                 if v.type == 1 or v.type == 2 then
                     AddNeedDeleteItem(index, v)
                 end

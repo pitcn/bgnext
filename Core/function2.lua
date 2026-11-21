@@ -834,7 +834,7 @@ do
                             if IsShiftKeyDown() then
                                 BG.InsertLink(self.link, true)
                             elseif IsAltKeyDown() then
-                                if BG.IsML then -- 开始拍卖
+                                if (BG.CanStartAuction and BG.CanStartAuction() or BG.IsML) then -- 开始拍卖
                                     local link = self.link
                                     self.owner:ClearFocus()
                                     BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "table", raidId = FB })
