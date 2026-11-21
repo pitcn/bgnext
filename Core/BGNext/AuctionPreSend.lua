@@ -42,6 +42,8 @@ end
 
 function M.isController()
     if BG.IsML == true then return true end
+    local authority = BG.BGNext and BG.BGNext.RaidAuthority
+    if authority and authority.isController(_G, BG.IsML) then return true end
     if type(BG.ImMLorLeader) == "function" then return BG.ImMLorLeader() end
     return false
 end

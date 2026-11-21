@@ -434,7 +434,7 @@ function BG.FBZhuangBeiUI(FB, t, b, bb, i, ii, scrollFrame)
     -- 鼠标按下时
     bt:SetScript("OnMouseDown", function(self, button)
         local shortcut = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(
-            BG.IsML, button, IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown())
+            (BG.CanStartAuction and BG.CanStartAuction() or BG.IsML), button, IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown())
         if shortcut == "leader-price" then
             local itemID = GetItemID(self:GetText())
             if itemID and BG.GetLeiTingItem then itemID = BG.GetLeiTingItem(itemID, FB) end

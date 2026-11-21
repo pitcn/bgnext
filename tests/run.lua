@@ -135,6 +135,8 @@ local suites = {
     "tests/test_leader_tools_runtime.lua",
     "tests/test_leader_tools_layout.lua",
     "tests/test_leader_tools_ui.lua",
+    "tests/test_raid_authority.lua",
+    "tests/test_raid_roster_authority.lua",
 }
 
 for _, path in ipairs(suites) do

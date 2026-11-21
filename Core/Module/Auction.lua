@@ -363,12 +363,22 @@ BG.Init(function()
             end
         end
 
+        -- Leader or master looter, re-checked live so a stale roster cache
+        -- never refuses the real leader. Assistants and members never qualify.
+        local function CanStartAuction()
+            if type(BG.IsAuctionController) == "function" then
+                return BG.IsAuctionController() and true or false
+            end
+            return BG.IsML and true or false
+        end
+        BG.CanStartAuction = CanStartAuction
+
         function BG.StartAuction(link, bt, isNotAuctioned, notAlt, isRightButton, noSound, callback)
             if BiaoGe.options["autoAuctionStart"] ~= 1 and not notAlt then
                 return RejectAuctionStart(L["组合键拍卖已在设置中关闭"])
             end
             if not link then return RejectAuctionStart(L["物品无效"]) end
-            if not BG.IsML then return RejectAuctionStart(L["无权限发起拍卖"]) end
+            if not CanStartAuction() then return RejectAuctionStart(L["只有团长或物品分配者可以发起拍卖"]) end
             local link = BG.Copy(link)
             local items = {}
             if type(link) == "table" then
@@ -758,10 +768,21 @@ BG.Init(function()
         end
 
         -- ALT点击背包生效
+        -- Without permission: silent outside a raid; inside a raid the reason
+        -- is shown at most once per login (Alt+click in bags is common).
+        local bagRefusalShown
         local function func(self, button)
             if not IsAltKeyDown() then return end
             local link = BG.BGNext.ClientCompat.bagLink(self, _G)
             if not link then return end
+            if not CanStartAuction() then
+                local authority = BG.BGNext.RaidAuthority
+                if not bagRefusalShown and authority and authority.inRaid(_G) then
+                    bagRefusalShown = true
+                    RejectAuctionStart(L["只有团长或物品分配者可以发起拍卖"])
+                end
+                return
+            end
             BG.StartAuction(link, self, nil, nil, button == "RightButton", nil, nil, { source = "backpack" })
         end
         BG.BGNext.ClientCompat.hookBagEvent("click", func, _G, BG.IsRetail)

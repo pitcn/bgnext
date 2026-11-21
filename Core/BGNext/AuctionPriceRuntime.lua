@@ -142,7 +142,7 @@ if runtimeReady() then
     -- is always left open for the leader to confirm manually. The gate reasons
     -- reuse the shared pre-send reason codes.
     local DIRECT_REASON_TEXT = {
-        [PreSend.REASON_NO_PERMISSION] = L["无权限发起拍卖"],
+        [PreSend.REASON_NO_PERMISSION] = L["只有团长或物品分配者可以发起拍卖"],
         [PreSend.REASON_COMBAT] = L["战斗状态下无法发起拍卖"],
         [PreSend.REASON_AUCTION_BUSY] = L["已有拍卖进行中"],
         [PreSend.REASON_PRICE_UNRESOLVED] = L["请手动输入起拍价"],

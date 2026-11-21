@@ -27,6 +27,9 @@ return function(test)
         OnHide = function() calls.hide = true end,
         BiaoGe = { options = { HighOnterItem = 1 } },
         dalayFrame = { Show = function() calls.enter = true end, Hide = function() end },
+        CanStartAuction = function() return calls.allowed ~= false end,
+        RejectAuctionStart = function(message) calls.messages = (calls.messages or 0) + 1; calls.message = message end,
+        L = setmetatable({}, { __index = function(_, key) return key end }),
     }, { __index = _G })
     env._G = env
     local button = { GetID = function() return 2 end, GetBagID = function() return 4 end,
@@ -55,6 +58,20 @@ return function(test)
     hooks[1].callback(button, "RightButton")
     test.eq(calls.auction, "item:12930", "Alt-click still starts the existing manual flow")
     test.eq(calls.right, true, "right-click choice survives")
+    -- Without permission: silent outside a raid, at most one notice per login inside one.
+    calls.allowed, calls.auction = false, nil
+    local inRaid = false
+    BG.BGNext.RaidAuthority = { inRaid = function() return inRaid end }
+    hooks[1].callback(button, "LeftButton")
+    test.eq(calls.auction, nil, "no auction opens without permission")
+    test.eq(calls.messages, nil, "bag Alt+click outside a raid stays silent")
+    inRaid = true
+    hooks[1].callback(button, "LeftButton")
+    hooks[1].callback(button, "LeftButton")
+    test.eq(calls.messages, 1, "inside a raid the refusal is shown once per login")
+    test.eq(calls.message, "只有团长或物品分配者可以发起拍卖", "the refusal explains who may start auctions")
+    test.eq(calls.auction, nil, "still no auction without permission")
+    calls.allowed = true
 
     hooks = {}
     source = read("Core/BiaoGe.lua")

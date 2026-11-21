@@ -1230,7 +1230,7 @@ BG.Init(function()
             local item, link, quality, level, _, _, _, _, _, Texture, _, typeID = GetItemInfo(link)
             if not link then return end
             if IsAltKeyDown() then
-                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction(BG.IsML, button, true)
+                local action = BG.BGNext.WishlistUI and BG.BGNext.WishlistUI.shortcutAction((BG.CanStartAuction and BG.CanStartAuction() or BG.IsML), button, true)
                 if action == "auction" then
                     BG.StartAuction(link, nil, nil, nil, button == "RightButton", nil, nil, { source = "chat" })
                 elseif action == "wishlist" and BG.ToggleCurrentWish then
@@ -1873,6 +1873,23 @@ do
     BG.raidRosterName = {}
     BG.raidRosterIsOnline = {}
 
+    -- Self is decided by unit token (RaidAuthority), not by comparing display
+    -- names: Forever two-part names and other name formats cannot be trusted to
+    -- match the roster string. Permission is computed before any per-row field
+    -- collection so a failing field reader can never leave the leader without
+    -- auction permission. Assistants and regular members never qualify.
+    local function RaidAuthority()
+        return BG.BGNext and BG.BGNext.RaidAuthority
+    end
+
+    local function IsSelfRow(index, name)
+        local authority = RaidAuthority()
+        if authority then
+            return authority.isSelfRow(_G, index, name, BG.playerName, BG.realmName, PlayerIdentity)
+        end
+        return IsSamePlayer(name, BG.playerName), "name"
+    end
+
     function BG.UpdateRaidRosterInfo()
         wipe(BG.raidRosterInfo)
         wipe(BG.groupRosterInfo)
@@ -1885,48 +1902,70 @@ do
         BG.IsML = nil
         BG.IsLeader = nil
 
+        local selfFound, selfMethod, failedAt = false, nil, nil
         if IsInRaid(1) then
             for i = 1, GetNumGroupMembers() do
                 local name, rank, subgroup, level, class2, class, zone, online, isDead, role, isML, combatRole =
                     GetRaidRosterInfo(i)
                 if name then
-                    local a = {
-                        name = name,
-                        rank = rank,
-                        subgroup = subgroup,
-                        level = level,
-                        class2 = class2,
-                        class = class,
-                        zone = zone,
-                        online = online,
-                        isDead = isDead,
-                        role = role,
-                        isML = isML,
-                        combatRole = combatRole,
-                        unitIndex = i,
-                    }
-                    for k, v in pairs(BG.playerClass) do
-                        a[k] = select(v.select, v.func("raid" .. i))
+                    local isSelf, method = IsSelfRow(i, name)
+                    if isSelf then
+                        selfFound, selfMethod = true, method
+                        if rank == 2 or isML then
+                            BG.IsML = true
+                        end
+                        if rank == 2 then
+                            BG.IsLeader = true
+                        end
                     end
-                    table.insert(BG.raidRosterInfo, a)
                     if rank == 2 then
                         BG.raidLeader = name
                     end
                     if isML then
                         BG.masterLooter = name
                     end
-                    if IsSamePlayer(name, BG.playerName) and (rank == 2 or isML) then
-                        BG.IsML = true
+                    local ok, err = pcall(function()
+                        local a = {
+                            name = name,
+                            rank = rank,
+                            subgroup = subgroup,
+                            level = level,
+                            class2 = class2,
+                            class = class,
+                            zone = zone,
+                            online = online,
+                            isDead = isDead,
+                            role = role,
+                            isML = isML,
+                            combatRole = combatRole,
+                            unitIndex = i,
+                        }
+                        for k, v in pairs(BG.playerClass) do
+                            a[k] = select(v.select, v.func("raid" .. i))
+                        end
+                        table.insert(BG.raidRosterInfo, a)
+                        local guid = UnitGUID("raid" .. i)
+                        if guid then
+                            BG.raidRosterGUID[guid] = name
+                        end
+                        BG.raidRosterName[name] = true
+                        BG.raidRosterIsOnline[name] = online
+                    end)
+                    if not ok and not failedAt then
+                        local authority = RaidAuthority()
+                        failedAt = authority and authority.errorLocation(err) or "unknown"
                     end
-                    if IsSamePlayer(name, BG.playerName) and (rank == 2) then
-                        BG.IsLeader = true
-                    end
-                    local guid = UnitGUID("raid" .. i)
-                    if guid then
-                        BG.raidRosterGUID[guid] = name
-                    end
-                    BG.raidRosterName[name] = true
-                    BG.raidRosterIsOnline[name] = online
+                end
+            end
+            -- Live client state is authoritative for the player's own role.
+            local authority = RaidAuthority()
+            if authority then
+                if authority.liveIsLeader(_G) then
+                    BG.IsLeader = true
+                    BG.IsML = true
+                end
+                if authority.liveIsMasterLooter(_G) then
+                    BG.IsML = true
                 end
             end
         elseif IsInGroup(1) then
@@ -1937,6 +1976,8 @@ do
                 table.insert(BG.groupRosterInfo, a)
             end
         end
+        local authority = RaidAuthority()
+        if authority then authority.recordRefresh(selfFound, selfMethod, failedAt) end
     end
 
     function BG.ImMLorLeader()
@@ -1989,6 +2030,16 @@ do
             BG.UpdateRaidRosterInfo()
         end)
     end)
+    -- Leader or loot-method changes alter auction permission without
+    -- necessarily changing the roster; refresh on them too. Guarded because a
+    -- client may not know one of these events.
+    for _, event in ipairs({ "PARTY_LEADER_CHANGED", "PARTY_LOOT_METHOD_CHANGED" }) do
+        pcall(BG.RegisterEvent, event, function()
+            C_Timer.After(0.5, function()
+                BG.UpdateRaidRosterInfo()
+            end)
+        end)
+    end
 end
 
 -- 插件命令

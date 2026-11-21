@@ -86,7 +86,7 @@ local function maxVisibleRows()
 end
 
 local REASON_TEXT = {
-    [Queue.REASON_NO_PERMISSION] = L["无权限发起拍卖"],
+    [Queue.REASON_NO_PERMISSION] = L["只有团长或物品分配者可以发起拍卖"],
     [Queue.REASON_COMBAT] = L["战斗状态下无法发起拍卖"],
     [Queue.REASON_INVALID_ITEM] = L["物品无效"],
     [Queue.REASON_PRICE_UNRESOLVED] = L["请手动输入起拍价"],

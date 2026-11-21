@@ -216,6 +216,8 @@ BG.Init(function()
   end
   function wa.IsML(player)
    if not player then
+    -- Own controls (cancel/pause): live leader/master-looter check first.
+    if BG.CanStartAuction and BG.CanStartAuction() then return true end
     player = wa.GN()
    end
    if (player == wa.raidLeader) or (player == wa.masterLooter) then

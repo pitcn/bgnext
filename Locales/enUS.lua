@@ -3437,7 +3437,7 @@ do -- BGNext auction price presets
     L["移除"] = "Remove"
     L["上移"] = "Up"
     L["下移"] = "Down"
-    L["无权限发起拍卖"] = "You don't have permission to start an auction"
+    L["只有团长或物品分配者可以发起拍卖"] = "Only the raid leader or master looter can start an auction"
     L["组合键拍卖已在设置中关闭"] = "Shortcut auctions are disabled in settings"
     L["战斗状态下无法发起拍卖"] = "Cannot start an auction in combat"
     L["物品无效"] = "Invalid item"
