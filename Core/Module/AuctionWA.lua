@@ -46,6 +46,8 @@ BG.Init(function()
    if unit == "t" then
     unit = "target"
    end
+   -- Forever: same "First Surname" form as BG.playerName and addon senders.
+   if BG.IsForever and BG.GN then return BG.GN(unit) end
    return GetUnitName(unit, true)
   end
   function wa.IsMe(bidFrame)

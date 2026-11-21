@@ -4,7 +4,8 @@ BG.BGNext = BG.BGNext or {}
 -- Pure player-name identity helpers shared by auction and trade code. WoW may
 -- expose the same local player as either "Name" or "Name-Realm", while realm
 -- display names can contain spaces or separators. Identity always keeps the
--- realm component so cross-realm players with the same short name stay apart.
+-- realm component so cross-realm players with the same short name stay apart;
+-- an unknown/empty local realm becomes an empty component, never a wildcard.
 local M = {}
 
 local function normalizePart(value, removeSeparators)
@@ -18,17 +19,20 @@ local function normalizePart(value, removeSeparators)
     return value
 end
 
+-- Some clients (Forever) report an empty realm name. A bare name then keys as
+-- "name-" (empty realm component), and that key maps to itself, so same-name
+-- matching works while names with an explicit realm stay distinct. Clients with
+-- a real realm keep the exact "name-realm" format.
 function M.key(value, localRealm)
     if type(value) ~= "string" or value == "" then return nil end
-    local name, realm = value:match("^([^%-]+)%-(.+)$")
+    local name, realm = value:match("^([^%-]+)%-(.*)$")
     if not name then
         name = value
         realm = localRealm
     end
     name = normalizePart(name, false)
-    realm = normalizePart(realm, true)
-    if not name or not realm then return nil end
-    return name .. "-" .. realm
+    if not name then return nil end
+    return name .. "-" .. (normalizePart(realm, true) or "")
 end
 
 function M.same(left, right, localRealm)
@@ -68,13 +72,14 @@ end
 
 -- The canonical full "Name-Realm" identity used for storage and comparison. A
 -- bare name gains the local realm; an existing realm is preserved verbatim
--- (including case). Returns nil when the value is unparseable or no realm can
--- be determined.
+-- (including case). Returns nil when the value is unparseable; a bare name
+-- stays bare when the local realm is empty.
 function M.canonical(value, localRealm)
     local name, realm = splitIdentity(value)
     if not name then return nil end
     realm = realm or localRealm
-    if type(realm) ~= "string" or realm == "" then return nil end
+    -- Empty-realm clients (Forever) keep the bare name, matching AuctionSender.
+    if type(realm) ~= "string" or realm == "" then return name end
     return name .. "-" .. realm
 end
 
