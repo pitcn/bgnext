@@ -32,7 +32,8 @@ end
 function M.isValidRealmId(value)
     if type(value) ~= "number" then return false end
     if value ~= value or value == math.huge or value == -math.huge then return false end
-    return value % 1 == 0 and value > 0
+    -- Forever 1.60.1 reports realm 0; keep that numeric key, without migration.
+    return value % 1 == 0 and (value > 0 or (value == 0 and BG.IsForever == true))
 end
 
 local function validItemId(value)
