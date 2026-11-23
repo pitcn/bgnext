@@ -103,6 +103,45 @@ return function(test)
     test.eq(runtime.applyLeaderPrefill(unresolvedDirect, nil, true), false, "unresolved price cannot direct start")
     test.eq(unresolvedDirect.starts, 0, "unresolved price stays manual")
 
+    -- Exercise the installed bidder hook with the real store and client-family
+    -- resolver, including an already saved zero-realm record after reload.
+    local previousBG = BG
+    local ok, err = pcall(function()
+        for _, scenario in ipairs({
+            { forever = true, realm = 0, prefilled = true },
+            { forever = true, realm = 123, prefilled = true },
+            { forever = false, realm = 0, prefilled = false },
+            { forever = false, realm = 123, prefilled = true },
+        }) do
+            BG = { BGNext = {}, IsForever = scenario.forever, IsVanilla = true,
+                realmID = scenario.realm, playerName = "<fixture>", FB1 = "MC",
+                Init = function(callback) callback() end }
+            dofile("Core/BGNext/AuctionPriceStore.lua")
+            dofile("Core/BGNext/AuctionPreSend.lua")
+            BG.BGNext.AuctionPriceCatalog = {}
+            BG.BGNext.DB = { personalAuctionExpectations = { vanilla = {
+                [scenario.realm] = { [BG.playerName] = { MC = { itemPrices = { [1001] = 17 } } } },
+            } } }
+            local originalCalls = 0
+            BG.HookCreateAuction = function() originalCalls = originalCalls + 1 end
+            assert(loadfile("Core/BGNext/AuctionPriceRuntime.lua"))("BGNext", {})
+            local bidFrame = fakeFrame("untouched")
+            bidFrame.itemID, bidFrame.money = 1001, 1
+            BG.HookCreateAuction(bidFrame)
+            test.eq(bidFrame.myMoneyEdit.text == "17", scenario.prefilled, "client-specific realm prefill")
+            test.eq(originalCalls, 1, "existing bidder hook still called")
+            test.eq(bidFrame.sendClicks, 0, "preset never sends")
+            test.eq(bidFrame.autoToggles, 0, "preset never arms auto bid")
+            test.eq(BG.BGNext.DB.personalAuctionExpectations.vanilla[scenario.realm][BG.playerName].MC.itemPrices[1001] == 17, true, "prefill does not rewrite saved data")
+            bidFrame.money = 18
+            bidFrame.myMoneyEdit.text = "untouched"
+            BG.HookCreateAuction(bidFrame)
+            test.eq(bidFrame.myMoneyEdit.text, "untouched", "below-floor preset leaves box unchanged")
+        end
+    end)
+    BG = previousBG
+    if not ok then error(err, 0) end
+
     -- The runtime wraps the existing leader hook, calls it first, and only ever
     -- touches the existing price EditBox. It must never bypass the permission
     -- gates, toggle auto-bid, or send anything itself.

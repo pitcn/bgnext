@@ -159,6 +159,8 @@ return function(test)
             env.GameTooltip_Hide = function() end
             env.BIAOGE_TEXT_FONT = "font"
             env.GetRealmName = function() return forever and "" or me.realm end
+            env.GetRealmID = function() return forever and 0 or 123 end
+            BG.realmID = env.GetRealmID()
             env.GetNormalizedRealmName = function() return (not forever) and me.realm or nil end
             env.GetTime = function() return world.now end
             env.GetTimePreciseSec = nil

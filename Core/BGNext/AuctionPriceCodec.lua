@@ -23,7 +23,8 @@ local PREFIX_PERSONAL = "BGNP-P1"
 local function validRealmId(value)
     if type(value) ~= "number" then return false end
     if value ~= value or value == math.huge or value == -math.huge then return false end
-    return value % 1 == 0 and value > 0
+    -- Match the store: realm 0 is valid only on the Forever client.
+    return value % 1 == 0 and (value > 0 or (value == 0 and BG.IsForever == true))
 end
 
 local function escape(value)

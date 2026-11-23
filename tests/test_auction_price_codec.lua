@@ -151,6 +151,43 @@ return function(test)
     test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 1001), 1, "known item applied")
     test.eq(store.getPersonalPrice(pdst, "titan", 123, "Leader", "ULD", 9999), nil, "unknown item skipped")
 
+    -- Export/import at Forever's numeric zero realm uses the existing format
+    -- and namespace. No migration or replacement of positive realm keys.
+    BG.IsForever = true
+    local fixture = "<fixture>"
+    local zeroRoot = freshRoot()
+    zeroRoot.personalAuctionExpectations.vanilla = {
+        [0] = { [fixture] = { MC = { itemPrices = { [1001] = 17 } } } },
+        [123] = { [fixture] = { MC = { itemPrices = { [1001] = 23 } } } },
+    }
+    local zeroCtx = { clientFamily = "vanilla", realmId = 0, player = fixture, raidId = "MC" }
+    local zeroPreview = codec.parse(codec.exportPersonal("vanilla", "MC", { [1002] = 0 }), "personal", knownItems)
+    test.eq(codec.applyPersonal(zeroRoot, zeroCtx, zeroPreview, { mode = "merge" }), true, "Forever imports at zero realm")
+    test.eq(store.getPersonalPrice(zeroRoot, "vanilla", 0, fixture, "MC", 1001) == 17, true, "merge retains existing zero-realm preset")
+    test.eq(store.getPersonalPrice(zeroRoot, "vanilla", 123, fixture, "MC", 1001) == 23, true, "import preserves positive realm")
+    local exported = codec.exportPersonal("vanilla", "MC", zeroRoot.personalAuctionExpectations.vanilla[0][fixture].MC.itemPrices)
+    test.eq(exported == codec.exportPersonal("vanilla", "MC", { [1001] = 17, [1002] = 0 }), true, "zero realm exports stable existing format")
+    test.eq(exported:find(fixture, 1, true), nil, "export excludes identity")
+    local destination = freshRoot()
+    test.eq(codec.applyPersonal(destination, zeroCtx, codec.parse(exported, "personal", knownItems)), true, "Forever export imports into fresh root")
+    test.eq(store.getPersonalPrice(destination, "vanilla", 0, fixture, "MC", 1002) == 0, true, "explicit zero round trips")
+    test.eq(codec.applyPersonal(zeroRoot, zeroCtx, zeroPreview, { mode = "replace" }), true, "Forever replace import works")
+    test.eq(store.getPersonalPrice(zeroRoot, "vanilla", 0, fixture, "MC", 1001), nil, "replace affects selected raid only")
+    for _, forever in ipairs({ true, false }) do
+        BG.IsForever = forever
+        for _, invalid in ipairs({ -1, 0.5, "0", math.huge, -math.huge, 0 / 0, false }) do
+            zeroCtx.realmId = invalid
+            test.eq(codec.applyPersonal(zeroRoot, zeroCtx, zeroPreview), false, "import rejects invalid realm")
+        end
+    end
+    zeroCtx.realmId = 0
+    test.eq(codec.applyPersonal(zeroRoot, zeroCtx, zeroPreview), false, "other clients reject zero-realm import")
+    zeroCtx.realmId = 123
+    test.eq(codec.applyPersonal(zeroRoot, zeroCtx, zeroPreview), true, "other clients still import positive realm")
+    BG.IsForever = nil
+    zeroCtx.realmId = 0
+    test.eq(codec.applyPersonal(zeroRoot, zeroCtx, zeroPreview), false, "missing Forever flag rejects zero-realm import")
+
     -- Same-name suffix on leader import.
     local src2 = freshRoot()
     local raid2 = store.ensureLeaderRaid(src2, "titan", "ULD", 100)

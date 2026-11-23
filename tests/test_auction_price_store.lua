@@ -159,6 +159,37 @@ return function(test)
     test.eq(store.setPersonalPrice(root, "titan", 123, "Leader", "ULD", 1001, -1), false, "negative price refused")
     test.eq(root.personalAuctionExpectations, snapshot, "root unchanged on invalid personal input")
 
+    -- Forever keeps the numeric zero realm key in the existing vanilla namespace.
+    -- All values here are synthetic fixtures, never live character data.
+    local fixture = "<fixture>"
+    local persisted = { BGNext = { personalAuctionExpectations = { vanilla = {
+        [0] = { [fixture] = { MC = { itemPrices = { [1001] = 17 } } } },
+        [123] = { [fixture] = { MC = { itemPrices = { [1001] = 23 } } } },
+    } } } }
+    BG.IsForever = true
+    local reloaded = life.ensureRoot(persisted)
+    test.eq(store.getPersonalPrice(reloaded, "vanilla", 0, fixture, "MC", 1001) ~= nil, true, "Forever loads existing zero-realm preset")
+    test.eq(store.setPersonalPrice(reloaded, "vanilla", 0, fixture, "MC", 1002, 0), true, "Forever saves explicit zero at zero realm")
+    test.eq(store.getPersonalPrice(reloaded, "vanilla", 0, fixture, "MC", 1002) == 0, true, "Forever reads explicit zero")
+    test.eq(store.getPersonalPrice(reloaded, "vanilla", 123, fixture, "MC", 1001) == 23, true, "existing positive realm stays separate")
+    test.eq(store.countPersonalPrices(reloaded, "vanilla", 0, fixture, "MC"), 2, "Forever counts saved presets")
+    test.eq(store.clearPersonalPrice(reloaded, "vanilla", 0, fixture, "MC", 1002), true, "Forever clears one preset")
+    test.eq(store.clearPersonalRaid(reloaded, "vanilla", 0, fixture, "MC"), true, "Forever clears selected raid")
+    test.eq(reloaded.personalAuctionExpectations.vanilla[0], nil, "empty zero-realm branch pruned")
+    for _, forever in ipairs({ true, false }) do
+        BG.IsForever = forever
+        for _, invalid in ipairs({ -1, 0.5, "0", "123", math.huge, -math.huge, 0 / 0, false }) do
+            test.eq(store.isValidRealmId(invalid), false, "invalid realm remains rejected")
+        end
+        test.eq(store.isValidRealmId(nil), false, "missing realm rejected")
+        test.eq(store.isValidRealmId(123), true, "positive realm remains accepted")
+        if not forever then
+            test.eq(store.setPersonalPrice(reloaded, "vanilla", 0, fixture, "MC", 1001, 1), false, "other clients reject zero realm")
+        end
+    end
+    BG.IsForever = nil
+    test.eq(store.isValidRealmId(0), false, "absent Forever flag rejects zero realm")
+
     -- 500-item ceiling on personal prices.
     test.eq(store.setPersonalPrice(root, "titan", 123, "Leader", "Naxx", 1, 1), true, "seed personal ceiling")
     for i = 2, store.MAX_ITEMS do
