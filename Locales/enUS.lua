@@ -203,11 +203,10 @@ do -- BGNext 0.8.10 release text
     L["修复无限服团长无法发起拍卖、团员看不到拍卖的问题（团长和团员都需要更新到本版本）。"] = "Fixed Forever raid leaders being unable to start auctions and raid members not seeing auctions (both the leader and members need to update to this version)."
     L["没有权限时的提示改为“只有团长或物品分配者可以发起拍卖”；非团长在背包 Alt+点击物品时，不在团队中不提示，在团队中每次登录最多提示一次。"] = "The no-permission message now reads \"Only the raid leader or master looter can start an auction\"; a non-leader Alt+clicking a bag item gets no message outside a raid and at most one per login inside a raid."
     L["无限服新用户普通拍卖窗口默认起拍价改为 10G，已保存的起拍价不变。"] = "Forever: the plain auction window now defaults to a 10G starting price for new users; saved starting prices are unchanged."
+    L["修复无限服 1.60.1 服务器 ID 为 0 时个人心理价无法保存的问题；其他服不受影响。"] = "Fixed personal price expectations failing to save on Forever 1.60.1 when the realm ID is 0; other clients are unaffected."
     ns.updateText_now = {
-        "BGNext 0.8.23",
-        L["修复无限服团长无法发起拍卖、团员看不到拍卖的问题（团长和团员都需要更新到本版本）。"],
-        L["没有权限时的提示改为“只有团长或物品分配者可以发起拍卖”；非团长在背包 Alt+点击物品时，不在团队中不提示，在团队中每次登录最多提示一次。"],
-        L["无限服新用户普通拍卖窗口默认起拍价改为 10G，已保存的起拍价不变。"],
+        "BGNext 0.8.24",
+        L["修复无限服 1.60.1 服务器 ID 为 0 时个人心理价无法保存的问题；其他服不受影响。"],
     }
 end
 
