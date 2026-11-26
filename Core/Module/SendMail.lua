@@ -81,8 +81,13 @@ local function RoadSendMail()
                         end)
                     else
                         tab:HookScript("OnClick", function(self)
+                            local wasBatchShown = mainFrame:IsShown()
                             mainFrame:Hide()
                             MailFrameInset:Show()
+                            -- The native tab click lays out attachments before the batch window restores its width.
+                            if wasBatchShown and SendMailFrame:IsShown() and type(SendMailFrame_Update) == "function" then
+                                SendMailFrame_Update()
+                            end
                         end)
                     end
                 end
@@ -126,6 +131,11 @@ local function RoadSendMail()
         BG.SendMailButton.frame = mainFrame
         mainFrame:SetScript("OnShow", function(self)
             MailFrame:SetSize(width, h)
+            if type(MailFrame.SetTitle) == "function" then
+                MailFrame:SetTitle(L["批量邮寄工资"])
+            elseif MailFrameTitleText and type(MailFrameTitleText.SetText) == "function" then
+                MailFrameTitleText:SetText(L["批量邮寄工资"])
+            end
             self:RegisterEvent("PLAYER_MONEY")
             mainFrame:UpdateGZFrame()
         end)
@@ -139,11 +149,6 @@ local function RoadSendMail()
                 UpdateMailFrame()
             end
         end)
-
-        local t = mainFrame:CreateFontString()
-        t:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
-        t:SetPoint("CENTER", MailFrame, "TOP", 0, -11)
-        t:SetText(L["批量邮寄工资"])
 
         -- 禁用此功能
         do
