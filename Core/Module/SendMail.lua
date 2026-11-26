@@ -161,6 +161,7 @@ local function RoadSendMail()
     do
         local width = 600
         local w, h = MailFrame:GetSize()
+        local previousTitle
         mainFrame = CreateFrame("Frame", nil, MailFrame, "BackdropTemplate")
         mainFrame:SetPoint("TOPLEFT", 0, -58)
         mainFrame:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -172,6 +173,12 @@ local function RoadSendMail()
             if type(MailFrame.SetTitle) == "function" then
                 MailFrame:SetTitle(L["批量邮寄工资"])
             elseif MailFrameTitleText and type(MailFrameTitleText.SetText) == "function" then
+                if type(MailFrameTitleText.GetText) == "function" then
+                    local currentTitle = MailFrameTitleText:GetText()
+                    if currentTitle ~= L["批量邮寄工资"] then
+                        previousTitle = currentTitle
+                    end
+                end
                 MailFrameTitleText:SetText(L["批量邮寄工资"])
             end
             self:RegisterEvent("PLAYER_MONEY")
@@ -179,6 +186,12 @@ local function RoadSendMail()
         end)
         mainFrame:SetScript("OnHide", function(self)
             MailFrame:SetSize(w, h)
+            if previousTitle ~= nil and MailFrameTitleText and type(MailFrameTitleText.SetText) == "function" then
+                if type(MailFrameTitleText.GetText) ~= "function" or MailFrameTitleText:GetText() == L["批量邮寄工资"] then
+                    MailFrameTitleText:SetText(previousTitle)
+                end
+            end
+            previousTitle = nil
             StaticPopup_Hide("BiaoGe_SendMail")
             self:UnregisterEvent("PLAYER_MONEY")
         end)
