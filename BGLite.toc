@@ -74,6 +74,7 @@ Core\BGNext\RaidAuthority.lua
 Core\BGNext\AuctionLogFilter.lua
 Core\BGNext\TradeAuctionState.lua
 Core\BGNext\AuctionTradeAccounting.lua
+Core\BGNext\AlertThrottle.lua
 Core\BGNext\LedgerCapture.lua
 Core\BGNext\BillBuyer.lua
 Core\BGNext\AuctionSender.lua

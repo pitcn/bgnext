@@ -514,6 +514,7 @@ function BG.ClearBiaoGeUI()
                 local _, _, diffID, _, maxPlayers, _, _, instanceID = GetInstanceInfo()
                 local FB = BG.FBIDtable[instanceID]
                 if not (FB and IsInInstance()) then return nil end
+                if BG.ForeverRaidActive and not BG.ForeverRaidActive(FB, IsInRaid()) then return nil end
                 local locked, lockoutId = false, nil
                 local rows, rowsWithId = GetNumSavedInstances(), 0
                 for i = 1, rows do

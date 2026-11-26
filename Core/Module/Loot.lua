@@ -18,6 +18,7 @@ local player = BG.playerName
 
 local saveZaXiangNum = 0
 local saveZaXiangTbl = {}
+local fullTableSoundThrottle
 
 local r, g, b = GetClassRGB(nil, "player")
 
@@ -416,7 +417,6 @@ BG.Init(function()
     end
 
     -- 记录物品进表格
-    local biaogefull
     local function _AddLootItem(itemID, FB, numb, link, Texture, level, Hope, count, typeID, lootplayer, fromLast)
         level = BG.ResolveItemLevel and BG.ResolveItemLevel(link, level) or level
         local icon
@@ -493,11 +493,11 @@ BG.Init(function()
                     "|cffDC143C" .. L["自动记录失败：%s%s%s。因为%s< %s >%s的格子满了"], RR,
                     (AddTexture(Texture) .. link), levelText, "|cff" .. BG.Boss[FB]["boss" .. numb]["color"],
                     BG.Boss[FB]["boss" .. numb]["name2"], RR) .. inSertItem .. icon)
-                if not biaogefull then
-                    biaogefull = true
-                    BG.After(1, function()
-                        biaogefull = false
-                    end)
+                local alertThrottle = BG.BGNext and BG.BGNext.AlertThrottle
+                if alertThrottle then
+                    fullTableSoundThrottle = fullTableSoundThrottle or alertThrottle.new(30)
+                end
+                if not alertThrottle or fullTableSoundThrottle.allow(GetTime()) then
                     BG.PlaySound("biaogefull")
                 end
                 return
