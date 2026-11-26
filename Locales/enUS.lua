@@ -204,9 +204,14 @@ do -- BGNext 0.8.10 release text
     L["没有权限时的提示改为“只有团长或物品分配者可以发起拍卖”；非团长在背包 Alt+点击物品时，不在团队中不提示，在团队中每次登录最多提示一次。"] = "The no-permission message now reads \"Only the raid leader or master looter can start an auction\"; a non-leader Alt+clicking a bag item gets no message outside a raid and at most one per login inside a raid."
     L["无限服新用户普通拍卖窗口默认起拍价改为 10G，已保存的起拍价不变。"] = "Forever: the plain auction window now defaults to a 10G starting price for new users; saved starting prices are unchanged."
     L["修复无限服 1.60.1 服务器 ID 为 0 时个人心理价无法保存的问题；其他服不受影响。"] = "Fixed personal price expectations failing to save on Forever 1.60.1 when the realm ID is 0; other clients are unaffected."
+    L["无限服黑石塔只有团队状态才记账：五人小队打黑石塔下层不再误记、不再弹清空账单提示；其他团本和其他服不受影响。"] = "Forever: Upper Blackrock Spire now records loot only while in a raid group; 5-player Lower Blackrock Spire runs are no longer recorded and no longer prompt to clear the bill. Other raids and clients are unaffected."
+    L["“表格满了”语音提示 30 秒内只响一次（所有服生效），文字提示照常每次显示。"] = "The \"table full\" voice alert now plays at most once every 30 seconds (all clients); the text message is still shown every time."
+    L["修复批量邮寄工资页切回发件箱时附件格错位、标题重叠，旧客户端离开批量页会恢复原标题；适配 EllesmereUI 邮箱皮肤。感谢露露（@Rurutia-wow）。"] = "Fixed the batch salary mail tab misplacing attachment slots and overlapping titles when switching back to Send Mail; older clients restore the original title when leaving the batch tab. Added EllesmereUI mailbox skin support. Thanks to Lulu (@Rurutia-wow)."
     ns.updateText_now = {
-        "BGNext 0.8.24",
-        L["修复无限服 1.60.1 服务器 ID 为 0 时个人心理价无法保存的问题；其他服不受影响。"],
+        "BGNext 0.8.25",
+        L["无限服黑石塔只有团队状态才记账：五人小队打黑石塔下层不再误记、不再弹清空账单提示；其他团本和其他服不受影响。"],
+        L["“表格满了”语音提示 30 秒内只响一次（所有服生效），文字提示照常每次显示。"],
+        L["修复批量邮寄工资页切回发件箱时附件格错位、标题重叠，旧客户端离开批量页会恢复原标题；适配 EllesmereUI 邮箱皮肤。感谢露露（@Rurutia-wow）。"],
     }
 end
 

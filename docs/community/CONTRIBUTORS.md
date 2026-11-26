@@ -16,6 +16,7 @@ BGNext 感谢每一项可核验的实际贡献。名单按贡献类型分类，�
 ## 代码与架构
 
 - **Wesley ([@wesleysui](https://github.com/wesleysui))** — 修复副本切换后顶部副本标签选中高亮未及时刷新的问题（[#42](https://github.com/pitcn/bgnext/pull/42)）。
+- **露露 ([@Rurutia-wow](https://github.com/Rurutia-wow))** — 修复批量邮寄工资页附件格错位与标题重叠，适配 Elles 邮箱皮肤（[#165](https://github.com/pitcn/bgnext/pull/165)）。
 
 ## 测试与问题复现
 
