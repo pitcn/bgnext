@@ -81,8 +81,13 @@ local function RoadSendMail()
                         end)
                     else
                         tab:HookScript("OnClick", function(self)
+                            local wasBatchShown = mainFrame:IsShown()
                             mainFrame:Hide()
                             MailFrameInset:Show()
+                            -- The native tab click lays out attachments before the batch window restores its width.
+                            if wasBatchShown and SendMailFrame:IsShown() and type(SendMailFrame_Update) == "function" then
+                                SendMailFrame_Update()
+                            end
                         end)
                     end
                 end
@@ -111,6 +116,44 @@ local function RoadSendMail()
         elseif IsAddOnLoaded("NDui") and not (IsAddOnLoaded("NDui_Plus") and IsAddOnLoaded("InboxMailBag")) then
             local B = unpack(NDui)
             B.ReskinTab(BG.SendMailButton)
+        elseif _G.EllesmereUI and type(_G.EllesmereUI.RegisterSkin) == "function" then
+            local eui = _G.EllesmereUI
+            local tab = BG.SendMailButton
+            local function LayoutEllesTab()
+                local ref = _G.MailFrameTab1
+                if ref and ref.GetHeight and tab.SetHeight then
+                    local h = ref:GetHeight()
+                    if h and h > 0 then tab:SetHeight(h) end
+                end
+                local prev
+                for i = num - 1, 1, -1 do
+                    local t = _G["MailFrameTab" .. i]
+                    if t and (not t.IsShown or t:IsShown()) then
+                        prev = t
+                        break
+                    end
+                end
+                if prev then
+                    local pp = eui.PP
+                    local es = tab.GetEffectiveScale and tab:GetEffectiveScale()
+                    local gap = (pp and pp.mult) or 1
+                    if pp and pp.perfect and es and es > 0.1 and es < 10 then
+                        gap = pp.perfect / es
+                    end
+                    tab:ClearAllPoints()
+                    tab:SetPoint("LEFT", prev, "RIGHT", gap, 0)
+                end
+            end
+            eui.RegisterSkin("BGNextSendMail", function(S)
+                if not (S and S.IsEnabled and S.IsEnabled() and S.Tab and eui.GetBlizzWindowStyle) then return end
+                local style = eui.GetBlizzWindowStyle("mail")
+                if style ~= "eui" and style ~= "modern" then return end
+                S.Tab(tab)
+                LayoutEllesTab()
+                MailFrame:HookScript("OnShow", function()
+                    After(0, LayoutEllesTab)
+                end)
+            end)
         end
     end
 
@@ -118,6 +161,7 @@ local function RoadSendMail()
     do
         local width = 600
         local w, h = MailFrame:GetSize()
+        local previousTitle
         mainFrame = CreateFrame("Frame", nil, MailFrame, "BackdropTemplate")
         mainFrame:SetPoint("TOPLEFT", 0, -58)
         mainFrame:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -126,11 +170,28 @@ local function RoadSendMail()
         BG.SendMailButton.frame = mainFrame
         mainFrame:SetScript("OnShow", function(self)
             MailFrame:SetSize(width, h)
+            if type(MailFrame.SetTitle) == "function" then
+                MailFrame:SetTitle(L["批量邮寄工资"])
+            elseif MailFrameTitleText and type(MailFrameTitleText.SetText) == "function" then
+                if type(MailFrameTitleText.GetText) == "function" then
+                    local currentTitle = MailFrameTitleText:GetText()
+                    if currentTitle ~= L["批量邮寄工资"] then
+                        previousTitle = currentTitle
+                    end
+                end
+                MailFrameTitleText:SetText(L["批量邮寄工资"])
+            end
             self:RegisterEvent("PLAYER_MONEY")
             mainFrame:UpdateGZFrame()
         end)
         mainFrame:SetScript("OnHide", function(self)
             MailFrame:SetSize(w, h)
+            if previousTitle ~= nil and MailFrameTitleText and type(MailFrameTitleText.SetText) == "function" then
+                if type(MailFrameTitleText.GetText) ~= "function" or MailFrameTitleText:GetText() == L["批量邮寄工资"] then
+                    MailFrameTitleText:SetText(previousTitle)
+                end
+            end
+            previousTitle = nil
             StaticPopup_Hide("BiaoGe_SendMail")
             self:UnregisterEvent("PLAYER_MONEY")
         end)
@@ -139,11 +200,6 @@ local function RoadSendMail()
                 UpdateMailFrame()
             end
         end)
-
-        local t = mainFrame:CreateFontString()
-        t:SetFont(BIAOGE_TEXT_FONT, 15, "OUTLINE")
-        t:SetPoint("CENTER", MailFrame, "TOP", 0, -11)
-        t:SetText(L["批量邮寄工资"])
 
         -- 禁用此功能
         do
