@@ -1096,6 +1096,10 @@ BG.Init(function()
                     if BG.IsTBCFB(FB) and not ns.canShowTBC then
                         break
                     end
+                    if BG.IsForever and BG.ForeverRaidActive and not BG.ForeverRaidActive(FB, IsInRaid()) then
+                        lastZoneID = nil
+                        return
+                    end
                     BG.FB2 = FB
                     break
                 end

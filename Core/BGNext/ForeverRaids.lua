@@ -3,7 +3,7 @@ if not BG.IsForever then return end
 local _, ns = ...
 local L = ns.L
 BG.ForeverRaids = {
-    { id = "UBRSforever", mapID = 229, phase = "P0", players = 10,
+    { id = "UBRSforever", mapID = 229, phase = "P0", players = 10, requiresRaid = true,
       name = L["黑石塔上层"], rows = { 4, 3, 3, 3, 3, 4, 3, 4, 3 }, bosses = {
         L["烈焰卫士艾博希尔"],
         L["索拉卡·火冠"],
@@ -47,6 +47,16 @@ BG.ForeverRaids = {
         L["奥妮克希亚"],
     } },
 }
+
+local raids = BG.ForeverRaids
+function BG.ForeverRaidActive(fb, inRaid)
+    for _, raid in ipairs(raids) do
+        if raid.id == fb and raid.requiresRaid then
+            return inRaid == true
+        end
+    end
+    return true
+end
 
 -- SavedVariables becomes available before ADDON_LOADED. Keep any occupied
 -- bill row visible rather than truncating a ledger when adopting compact rows.
